@@ -1006,10 +1006,7 @@ fn clean_description(desc: &str) -> String {
     }
 
     // Trim trailing blank lines.
-    while output
-        .last()
-        .is_some_and(|l: &String| l.trim().is_empty())
-    {
+    while output.last().is_some_and(|l: &String| l.trim().is_empty()) {
         output.pop();
     }
 
