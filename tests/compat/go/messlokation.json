@@ -1,0 +1,13 @@
+{
+  "_typ": "MESSLOKATION",
+  "_version": "v202501.0.0",
+  "messlokationsId": "DE0000000000000000000000000000002",
+  "sparte": "GAS",
+  "messadresse": {
+    "_version": "v202501.0.0",
+    "postleitzahl": "50667",
+    "ort": "Köln",
+    "strasse": "Domkloster",
+    "hausnummer": "4"
+  }
+}

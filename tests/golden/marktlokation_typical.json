@@ -1,0 +1,17 @@
+{
+  "_typ": "MARKTLOKATION",
+  "_version": "v202501.0.0",
+  "marktlokationsId": "51238696780",
+  "sparte": "STROM",
+  "netzebene": "NSP",
+  "lokationsadresse": {
+    "strasse": "Musterstraße",
+    "hausnummer": "42",
+    "postleitzahl": "10115",
+    "ort": "Berlin",
+    "landescode": "DE"
+  },
+  "kundengruppen": [
+    "HAUSHALT"
+  ]
+}

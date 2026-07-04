@@ -1,0 +1,125 @@
+[workspace]
+members  = ["generator"]
+resolver = "2"
+
+[workspace.dependencies]
+# Shared across workspace members — pin versions here, inherit elsewhere.
+serde      = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["raw_value"] }
+indexmap   = { version = "2", features = ["serde"] }
+anyhow     = "1"
+
+# ─── Published crate ─────────────────────────────────────────────────────────
+
+[package]
+name        = "rubo4e"
+version     = "0.1.0"
+edition     = "2021"
+rust-version = "1.87"
+description = "Rust implementation of the BO4E energy-market data standard"
+license     = "MIT"
+repository  = "https://github.com/hupe1980/rubo4e"
+keywords    = ["bo4e", "energy", "electricity", "gas", "market"]
+categories  = ["encoding", "data-structures"]
+publish     = true
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
+[features]
+# ── Default ──────────────────────────────────────────────────────────────────
+default = ["serde"]
+
+# ── Core feature gates ───────────────────────────────────────────────────────
+# Wire-format / serialization
+serde      = ["dep:serde", "dep:indexmap"]
+json       = ["serde", "dep:serde_json"]
+
+# Date/time backend
+time       = ["dep:time"]
+
+# Scalar types
+decimal    = ["dep:rust_decimal"]
+
+# Ergonomics
+builder    = ["dep:typed-builder"]
+validate   = ["dep:garde"]
+
+# Ecosystem integrations
+schemars   = ["serde", "dep:schemars"]
+sqlx       = ["dep:sqlx", "json"]
+utoipa     = ["dep:utoipa"]
+strum      = ["dep:strum"]
+
+# High-performance JSON parsing via SIMD instructions (x86_64 / aarch64).
+# Usually accelerates `from_json_german` and `from_json_snake_case` deserialization
+# on supported hardware.  Serialization paths still use serde_json.  Benchmark with
+# `cargo bench --bench json_perf --features versioned,json` and compare against
+# `cargo bench --bench json_perf --features versioned,json,simd-json`.
+# Requires `json` because it supplements that path.
+simd-json  = ["json", "dep:simd-json"]
+
+# Multi-version schema modules.
+#
+# C-01 fix: `versioned` is now a **minimal** feature that enables only the
+# generated BO/COM type modules with `serde` wire-format support.  Date-time
+# and decimal fields fall back to `String` when `time` / `decimal` are absent,
+# preserving the ISO-8601 / decimal string value but losing native type-safety.
+#
+# Typical full-featured setup:
+#   features = ["versioned", "time", "decimal"]
+#
+# Minimal setup (no heavy date/money deps — fields become String):
+#   features = ["versioned"]
+versioned  = ["serde"]
+
+# Note: proptest is a dev-dependency. The former `testing` feature is removed;
+# proptest Arbitrary impls are compiled with `#[cfg(test)]` only.
+
+# Structured diagnostics: identifier validation failures, migration spans,
+# and extension-data capture events (warn on unexpected fields).
+tracing    = ["dep:tracing"]
+
+# Optional metrics export hooks for counters (compatible with metrics ecosystem).
+metrics    = ["dep:metrics"]
+
+[dependencies]
+# Always-on
+thiserror = "2"
+
+# Optional — toggled via features above
+serde         = { workspace = true, optional = true }
+serde_json    = { workspace = true, optional = true }
+rust_decimal  = { version = "1",    features = ["serde-with-str"],       optional = true }
+time          = { version = "0.3.53",  features = ["serde", "serde-well-known", "formatting", "parsing", "macros"], optional = true }
+indexmap      = { workspace = true, optional = true }
+typed-builder = { version = "0.23", optional = true }
+garde         = { version = "0.23", features = ["derive"],                optional = true }
+schemars      = { version = "1", optional = true, features = ["indexmap2", "rust_decimal1"] }
+sqlx          = { version = "0.8",  features = ["postgres"],             optional = true }
+utoipa        = { version = "5",    optional = true, features = ["time", "decimal", "indexmap"] }
+strum         = { version = "0.28", features = ["derive"],                optional = true }
+simd-json     = { version = "0.17", features = ["serde_impl"],            optional = true }
+tracing       = { version = "0.1",  default-features = false,             optional = true }
+metrics       = { version = "0.24", default-features = false,             optional = true }
+
+[dev-dependencies]
+insta      = "1"
+serde_json = { workspace = true }
+criterion  = { version = "0.8", features = ["html_reports"] }
+proptest   = "1"
+trybuild   = { version = "1", features = ["diff"] }
+
+[[example]]
+name = "serialize"
+required-features = ["versioned", "json", "decimal"]
+
+[[example]]
+name = "builder"
+required-features = ["versioned", "builder", "json", "decimal"]
+
+[[bench]]
+name = "json_perf"
+harness = false
+required-features = ["versioned", "json", "time", "decimal"]

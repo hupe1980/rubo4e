@@ -1,0 +1,25 @@
+[package]
+name        = "bo4e-generator"
+version     = "0.1.0"
+edition     = "2021"
+description = "Internal code generator for the bo4e crate — not published"
+publish     = false
+
+[[bin]]
+name = "bo4e-generator"
+path = "src/main.rs"
+
+[lib]
+name = "bo4e_generator"
+path = "src/lib.rs"
+
+[dependencies]
+anyhow     = { workspace = true }
+serde      = { workspace = true }
+serde_json = { workspace = true }
+indexmap   = { workspace = true }
+
+clap         = { version = "4", features = ["derive"] }
+heck         = "0.5"
+prettyplease = "0.2"
+syn          = { version = "2", features = ["parsing", "printing"] }

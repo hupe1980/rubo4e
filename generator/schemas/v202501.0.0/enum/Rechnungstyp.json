@@ -1,0 +1,20 @@
+{
+    "description": "Abbildung verschiedener Rechnungstypen zur Kennzeichnung von Rechnungen",
+    "enum": [
+        "ENDKUNDENRECHNUNG",
+        "NETZNUTZUNGSRECHNUNG",
+        "MEHRMINDERMENGENRECHNUNG",
+        "MESSSTELLENBETRIEBSRECHNUNG",
+        "BESCHAFFUNGSRECHNUNG",
+        "AUSGLEICHSENERGIERECHNUNG",
+        "ABSCHLUSSRECHNUNG",
+        "ABSCHLAGSRECHNUNG",
+        "TURNUSRECHNUNG",
+        "MONATSRECHNUNG",
+        "ZWISCHENRECHNUNG",
+        "INTEGRIERTE_13TE_RECHNUNG",
+        "ZUSAETZLICHE_13TE_RECHNUNG"
+    ],
+    "title": "Rechnungstyp",
+    "type": "string"
+}

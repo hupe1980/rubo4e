@@ -1,0 +1,13 @@
+{
+  "_typ": "MESSLOKATION",
+  "_version": "v202501.0.0",
+  "messlokationsId": "DE0000000000000000000000000000001",
+  "sparte": "STROM",
+  "messadresse": {
+    "strasse": "Beispielweg",
+    "hausnummer": "7",
+    "postleitzahl": "80331",
+    "ort": "München",
+    "landescode": "DE"
+  }
+}

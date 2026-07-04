@@ -1,0 +1,22 @@
+{
+  "_typ": "RECHNUNG",
+  "_version": "v202501.0.0",
+  "rechnungsnummer": "R-2025-0042",
+  "rechnungstitel": "Jahresrechnung 2025",
+  "sparte": "STROM",
+  "gesamtnetto": {
+    "_version": "v202501.0.0",
+    "wert": "840.34",
+    "waehrung": "EUR"
+  },
+  "gesamtsteuer": {
+    "_version": "v202501.0.0",
+    "wert": "159.66",
+    "waehrung": "EUR"
+  },
+  "gesamtbrutto": {
+    "_version": "v202501.0.0",
+    "wert": "1000.00",
+    "waehrung": "EUR"
+  }
+}

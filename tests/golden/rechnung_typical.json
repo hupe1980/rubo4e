@@ -1,0 +1,19 @@
+{
+  "_typ": "RECHNUNG",
+  "_version": "v202501.0.0",
+  "rechnungsnummer": "RE-2025-00042",
+  "rechnungstitel": "Abschlagsrechnung Januar 2025",
+  "sparte": "STROM",
+  "gesamtnetto": {
+    "wert": "100.00",
+    "waehrung": "EUR"
+  },
+  "gesamtsteuer": {
+    "wert": "19.00",
+    "waehrung": "EUR"
+  },
+  "gesamtbrutto": {
+    "wert": "119.00",
+    "waehrung": "EUR"
+  }
+}

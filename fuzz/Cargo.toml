@@ -1,0 +1,68 @@
+[package]
+name = "bo4e-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[workspace]
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+serde_json = "1"
+
+[dependencies.rubo4e]
+path = ".."
+package = "rubo4e"
+features = ["json", "versioned"]
+
+[[bin]]
+name = "fuzz_deserialize_vertrag"
+path = "fuzz_targets/fuzz_deserialize_vertrag.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "fuzz_deserialize_marktlokation"
+path = "fuzz_targets/fuzz_deserialize_marktlokation.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "fuzz_deserialize_rechnung"
+path = "fuzz_targets/fuzz_deserialize_rechnung.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "fuzz_deserialize_lastgang"
+path = "fuzz_targets/fuzz_deserialize_lastgang.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "fuzz_deserialize_bilanzierung"
+path = "fuzz_targets/fuzz_deserialize_bilanzierung.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "fuzz_deserialize_zeitreihenwert"
+path = "fuzz_targets/fuzz_deserialize_zeitreihenwert.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "fuzz_parse_identifiers"
+path = "fuzz_targets/fuzz_parse_identifiers.rs"
+test = false
+doc = false
+bench = false

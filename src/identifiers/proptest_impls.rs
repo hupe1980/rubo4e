@@ -1,0 +1,158 @@
+//! Proptest [`Arbitrary`] strategies for BO4E identifier newtypes.
+//!
+//! Gated behind the `testing` feature flag, which pulls in `proptest`.
+//! These strategies generate *valid* identifiers (ones that pass construction-time
+//! validation), ensuring property tests never see spurious errors from invalid inputs.
+
+use proptest::prelude::*;
+
+use crate::identifiers::{EicCode, MaloId, MarktpartnerId, MeloId, NeloId, ObisCode, SrId, TrId};
+
+// ─── 11-digit BDEW identifiers (MaloId, SrId, TrId) ─────────────────────────
+
+/// Strategy that generates a valid 11-digit BDEW identifier string.
+fn valid_11digit_strategy() -> impl Strategy<Value = String> {
+    prop::array::uniform10(0u8..=9u8)
+        .prop_map(|prefix| super::checksum::make_valid_11digit(&prefix))
+}
+
+impl Arbitrary for MaloId {
+    type Parameters = ();
+    type Strategy = BoxedStrategy<Self>;
+    fn arbitrary_with(_: Self::Parameters) -> Self::Strategy {
+        valid_11digit_strategy()
+            .prop_map(|s| MaloId::new(&s).expect("generated MaloId must be valid"))
+            .boxed()
+    }
+}
+
+impl Arbitrary for SrId {
+    type Parameters = ();
+    type Strategy = BoxedStrategy<Self>;
+    fn arbitrary_with(_: Self::Parameters) -> Self::Strategy {
+        valid_11digit_strategy()
+            .prop_map(|s| SrId::new(&s).expect("generated SrId must be valid"))
+            .boxed()
+    }
+}
+
+impl Arbitrary for TrId {
+    type Parameters = ();
+    type Strategy = BoxedStrategy<Self>;
+    fn arbitrary_with(_: Self::Parameters) -> Self::Strategy {
+        valid_11digit_strategy()
+            .prop_map(|s| TrId::new(&s).expect("generated TrId must be valid"))
+            .boxed()
+    }
+}
+
+// ─── MeloId (33-char: 2-char uppercase country code + 31 alphanumeric) ─────────
+
+impl Arbitrary for MeloId {
+    type Parameters = ();
+    type Strategy = BoxedStrategy<Self>;
+    fn arbitrary_with(_: Self::Parameters) -> Self::Strategy {
+        // Country code: 2 uppercase ASCII letters (ISO 3166-1 alpha-2)
+        const UPPER: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+        // Body: 31 alphanumeric chars (upper, lower, digits)
+        const BODY: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+        let country = prop::array::uniform2(prop::sample::select(UPPER));
+        let body = prop::collection::vec(prop::sample::select(BODY), 31);
+        (country, body)
+            .prop_map(|(cc, body_bytes)| {
+                let mut s = String::with_capacity(33);
+                s.push(cc[0] as char);
+                s.push(cc[1] as char);
+                for b in body_bytes {
+                    s.push(b as char);
+                }
+                MeloId::new(&s).expect("generated MeloId must be valid")
+            })
+            .boxed()
+    }
+}
+
+// ─── NeloId (11-char alphanumeric) ────────────────────────────────────────────
+
+impl Arbitrary for NeloId {
+    type Parameters = ();
+    type Strategy = BoxedStrategy<Self>;
+    fn arbitrary_with(_: Self::Parameters) -> Self::Strategy {
+        const CHARS: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+        prop::collection::vec(prop::sample::select(CHARS), 11)
+            .prop_map(|bytes| {
+                let s: String = bytes.iter().map(|&b| b as char).collect();
+                NeloId::new(&s).expect("generated NeloId must be valid")
+            })
+            .boxed()
+    }
+}
+
+// ─── MarktpartnerId (13 decimal digits, no checksum) ─────────────────────────
+
+impl Arbitrary for MarktpartnerId {
+    type Parameters = ();
+    type Strategy = BoxedStrategy<Self>;
+    fn arbitrary_with(_: Self::Parameters) -> Self::Strategy {
+        prop::array::uniform13(b'0'..=b'9')
+            .prop_map(|digits| {
+                let s: String = digits.iter().map(|&b| b as char).collect();
+                MarktpartnerId::new(&s).expect("generated MarktpartnerId must be valid")
+            })
+            .boxed()
+    }
+}
+
+// ─── EicCode (EIC format: 2-char type + 14 chars payload + check char) ────────
+
+impl Arbitrary for EicCode {
+    type Parameters = ();
+    type Strategy = BoxedStrategy<Self>;
+    fn arbitrary_with(_: Self::Parameters) -> Self::Strategy {
+        // Valid type characters for EIC codes
+        const TYPE_CHARS: &[char] = &['W', 'X', 'Y', 'Z', 'A', 'V'];
+        // EIC payload: positions 2–15 must be alphanumeric or hyphen, uppercase
+        const PAYLOAD_CHARS: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-";
+        let payload_len = 14usize;
+
+        (
+            prop::sample::select(TYPE_CHARS),
+            prop::collection::vec(prop::sample::select(PAYLOAD_CHARS), payload_len),
+        )
+            .prop_filter_map(
+                "EIC check char computation",
+                |(type_char, payload_bytes)| {
+                    let payload: String = payload_bytes.iter().map(|&b| b as char).collect();
+                    let prefix = format!("{}{}", type_char, payload);
+                    let check = EicCode::compute_check_char(&prefix)?;
+                    let full = format!("{prefix}{check}");
+                    EicCode::new(&full).ok()
+                },
+            )
+            .boxed()
+    }
+}
+
+// ─── ObisCode ─────────────────────────────────────────────────────────────────
+
+impl Arbitrary for ObisCode {
+    type Parameters = ();
+    type Strategy = BoxedStrategy<Self>;
+    fn arbitrary_with(_: Self::Parameters) -> Self::Strategy {
+        // OBIS code format: A-B:C.D.E*F  where all components are u8 (0..=255).
+        // Simplified: generate the canonical 6-field form.
+        (
+            any::<u8>(), // A medium
+            any::<u8>(), // B channel
+            1u8..=99u8,  // C value type (1–99 are well-defined)
+            any::<u8>(), // D measurement type
+            any::<u8>(), // E tariff
+            any::<u8>(), // F billing
+        )
+            .prop_map(|(a, b, c, d, e, f)| {
+                let s = format!("{a}-{b}:{c}.{d}.{e}*{f}");
+                ObisCode::new(&s).expect("generated ObisCode must be valid")
+            })
+            .boxed()
+    }
+}

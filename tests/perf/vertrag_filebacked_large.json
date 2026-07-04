@@ -1,0 +1,92 @@
+{
+  "_typ": "VERTRAG",
+  "_version": "v202501.0.0",
+  "vertragsnummer": "V-2025-001",
+  "beschreibung": "Strom-Liefervertrag Haushalt",
+  "sparte": "Strom",
+  "vertragsart": "Liefervertrag",
+  "vertragsstatus": "Aktiv",
+  "perf_rahmendaten": {
+    "abschlusskanal": "Onlineportal",
+    "vertriebsregion": "Berlin-Brandenburg",
+    "kundensegment": "Privatkunden",
+    "produktlinie": "DynamikPlus"
+  },
+  "perf_preisbestandteile": [
+    {
+      "name": "Grundpreis",
+      "einheit": "EUR/Monat",
+      "wert": 12.45,
+      "gueltig_ab": "2025-01-01"
+    },
+    {
+      "name": "Arbeitspreis",
+      "einheit": "ct/kWh",
+      "wert": 31.2,
+      "gueltig_ab": "2025-01-01"
+    },
+    {
+      "name": "Messstellenbetrieb",
+      "einheit": "EUR/Monat",
+      "wert": 4.35,
+      "gueltig_ab": "2025-01-01"
+    }
+  ],
+  "perf_historie": [
+    {
+      "zeitpunkt": "2024-12-15T09:15:00Z",
+      "ereignis": "angebot_erstellt",
+      "bearbeiter": "vertrieb-web"
+    },
+    {
+      "zeitpunkt": "2024-12-16T10:22:00Z",
+      "ereignis": "kunde_bestaetigt",
+      "bearbeiter": "kunde"
+    },
+    {
+      "zeitpunkt": "2024-12-16T10:30:00Z",
+      "ereignis": "vertrag_aktiviert",
+      "bearbeiter": "backend-batch"
+    }
+  ],
+  "perf_abrechnungszyklen": {
+    "standard": {
+      "intervall": "monatlich",
+      "faelligkeit_tage": 14,
+      "verfahren": "SEPA"
+    },
+    "jahresrechnung": {
+      "intervall": "jaehrlich",
+      "faelligkeit_tage": 21,
+      "verfahren": "SEPA"
+    }
+  },
+  "perf_serviceniveau": {
+    "reaktionszeit_stunden": 24,
+    "kontaktkanaele": [
+      "telefon",
+      "email",
+      "portal"
+    ],
+    "sla_klasse": "gold"
+  },
+  "perf_anhaenge": [
+    {
+      "id": "ANH-100",
+      "typ": "preisblatt",
+      "checksum": "sha256:4f2d1135c9ad3a8f5cc027f3025c22b0"
+    },
+    {
+      "id": "ANH-101",
+      "typ": "agb",
+      "checksum": "sha256:7fbc106da49fe6f8d2f9e311f6494512"
+    }
+  ],
+  "perf_notiz": "Large file-backed Vertragsobjekt zur robusteren SIMD-Regressionsevaluierung.",
+  "perf_flags": [
+    "preisgarantie",
+    "oekooption",
+    "digitalrechnung",
+    "langzeitvertrag"
+  ]
+}

@@ -1,0 +1,28 @@
+---
+source: tests/schemars_snapshots.rs
+expression: "schema_json::<Sparte>()"
+---
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Sparte",
+  "description": "Unterscheidungsmöglichkeiten für die Sparte.",
+  "oneOf": [
+    {
+      "type": "string",
+      "enum": [
+        "STROM",
+        "GAS",
+        "FERNWAERME",
+        "NAHWAERME",
+        "WASSER",
+        "ABWASSER",
+        "STROM_UND_GAS"
+      ]
+    },
+    {
+      "description": "Unknown or future variant — produced when deserializing a value\nthat is not yet known to this version of the library.",
+      "type": "string",
+      "const": "UNKNOWN"
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "_typ": "MESSLOKATION",
+  "_version": "v202501.0.0",
+  "messlokationsId": "DE0000000000000000000000000000001",
+  "sparte": "STROM",
+  "messadresse": {
+    "_version": "v202501.0.0",
+    "postleitzahl": "80331",
+    "ort": "München",
+    "strasse": "Marienplatz",
+    "hausnummer": "1"
+  }
+}

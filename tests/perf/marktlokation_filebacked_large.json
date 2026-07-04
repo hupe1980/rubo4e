@@ -1,0 +1,103 @@
+{
+  "_typ": "MARKTLOKATION",
+  "_version": "v202501.0.0",
+  "marktlokationsId": "51238696780",
+  "sparte": "Strom",
+  "netzebene": "NSP",
+  "lokationsadresse": {
+    "strasse": "Musterstraße",
+    "hausnummer": "42",
+    "postleitzahl": "10115",
+    "ort": "Berlin",
+    "landescode": "DE"
+  },
+  "kundengruppen": [
+    "Haushalt",
+    "Gewerbe"
+  ],
+  "perf_dokumentation": {
+    "quellen": [
+      "edis-portal",
+      "sap-export",
+      "netznutzungsvertrag"
+    ],
+    "labels": [
+      "lastprofil",
+      "regionalnetz",
+      "monitoring",
+      "prognose"
+    ],
+    "hinweis": "Dieses Feld simuliert ein reales erweitertes Payload-Objekt mit mehreren Metadatenfeldern."
+  },
+  "perf_zeitreihe": [
+    {
+      "zeitpunkt": "2025-01-01T00:00:00Z",
+      "leistung_kw": 2.3,
+      "status": "ok"
+    },
+    {
+      "zeitpunkt": "2025-01-01T00:15:00Z",
+      "leistung_kw": 2.5,
+      "status": "ok"
+    },
+    {
+      "zeitpunkt": "2025-01-01T00:30:00Z",
+      "leistung_kw": 2.1,
+      "status": "ok"
+    },
+    {
+      "zeitpunkt": "2025-01-01T00:45:00Z",
+      "leistung_kw": 2.0,
+      "status": "ok"
+    }
+  ],
+  "perf_anlagen": [
+    {
+      "id": "ANL-1001",
+      "typ": "PV",
+      "leistung_kw": 8.4,
+      "inbetriebnahme": "2021-04-12"
+    },
+    {
+      "id": "ANL-1002",
+      "typ": "BHKW",
+      "leistung_kw": 4.1,
+      "inbetriebnahme": "2020-09-30"
+    }
+  ],
+  "perf_verbrauchssegmente": {
+    "nacht": {
+      "anteil": 0.18,
+      "beschreibung": "Niedrige Last im Nachtfenster"
+    },
+    "tag": {
+      "anteil": 0.47,
+      "beschreibung": "Regulaere Last in Arbeitszeiten"
+    },
+    "spitze": {
+      "anteil": 0.35,
+      "beschreibung": "Abendliche Lastspitze"
+    }
+  },
+  "perf_kontakte": [
+    {
+      "rolle": "Betrieb",
+      "name": "Netzleitstelle Nord",
+      "telefon": "+49-30-123456-100"
+    },
+    {
+      "rolle": "Abrechnung",
+      "name": "Servicecenter Energie",
+      "telefon": "+49-30-123456-200"
+    }
+  ],
+  "perf_notizen": "Dieses Zusatzfeld dient als file-backed Large-Payload-Artefakt fuer die SIMD-Regressionstests.",
+  "perf_tags": [
+    "bo4e",
+    "marktlokation",
+    "perf",
+    "large",
+    "filebacked",
+    "compat"
+  ]
+}

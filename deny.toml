@@ -1,0 +1,70 @@
+# cargo-deny configuration for rubo4e
+# Docs: https://embarkstudios.github.io/cargo-deny/
+
+[graph]
+# Restrict to the root crate only (not the generator — it's never published).
+targets = []
+
+# ─── Licenses ────────────────────────────────────────────────────────────────
+
+[licenses]
+# cargo-deny 0.19+: `deny`, `copyleft`, `allow-osi-fsf-free`, `default` fields
+# are removed.  All licenses are denied unless explicitly listed in `allow`.
+# Copyleft licenses (GPL/AGPL/LGPL) are implicitly denied by omission.
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "ISC",
+    "Unicode-DFS-2016",
+    "Unicode-3.0",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "0BSD",
+    "CC0-1.0",
+    "Zlib",
+]
+# Silence warnings for allowed licenses that don't appear in the dep tree.
+unused-allowed-license = "allow"
+
+# ─── Advisories ──────────────────────────────────────────────────────────────
+
+[advisories]
+# cargo-deny 0.19+: `vulnerability`, `notice`, `severity-threshold` fields are
+# removed — all vulnerability and notice advisories now unconditionally fail.
+db-urls = ["https://github.com/rustsec/advisory-db"]
+# "workspace" = only fail for direct dependencies; transitive failures are
+# warnings.  Use "all" for maximum strictness.
+unmaintained = "workspace"
+unsound      = "workspace"
+# Yanked crate versions fail the check.
+yanked       = "deny"
+
+# ─── Bans ────────────────────────────────────────────────────────────────────
+
+[bans]
+# Deny duplicate crate versions to prevent supply-chain confusion and hidden
+# dependency churn.  Add a `skip` entry below only when the duplication is
+# genuinely unavoidable (two transitive deps pin different majors) and has been
+# manually reviewed as safe.
+multiple-versions = "deny"
+# Specifically deny duplicate versions of these high-impact crates.
+deny = []
+# Allow these crates even if they appear to violate rules above.
+allow = []
+# Known-safe version splits that cannot be resolved upstream yet.
+# Each entry must include a comment explaining why it is acceptable.
+skip = [
+    # memchr: multiple crates in the ecosystem still pull v2 alongside the
+    # current v2 branch; both are maintained by the same author and are ABI-safe.
+    { name = "memchr" },
+]
+
+# ─── Sources ─────────────────────────────────────────────────────────────────
+
+[sources]
+# Only allow crates from crates.io (no git deps, no unpublished local paths that
+# would be published to crates.io).
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]

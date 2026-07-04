@@ -1,0 +1,5 @@
+error[E0599]: no method named `typ` found for struct `rubo4e::v202501::vertrag::VertragBuilder<TypedBuilderFields>` in the current scope
+ --> tests/builder/ui/bo_typ_setter_unavailable.rs:4:32
+  |
+4 |     let _ = Vertrag::builder().typ(BoTyp::Vertrag).build();
+  |                                ^^^ method not found in `rubo4e::v202501::vertrag::VertragBuilder`

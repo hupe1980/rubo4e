@@ -1,0 +1,22 @@
+{
+  "_typ": "RECHNUNG",
+  "_version": "v202501.0.0",
+  "rechnungsnummer": "INV-2025-007",
+  "rechnungstitel": "Quartalabrechnung Q1/2025",
+  "sparte": "GAS",
+  "gesamtnetto": {
+    "_version": "v202501.0.0",
+    "wert": "500.00",
+    "waehrung": "EUR"
+  },
+  "gesamtsteuer": {
+    "_version": "v202501.0.0",
+    "wert": "95.00",
+    "waehrung": "EUR"
+  },
+  "gesamtbrutto": {
+    "_version": "v202501.0.0",
+    "wert": "595.00",
+    "waehrung": "EUR"
+  }
+}

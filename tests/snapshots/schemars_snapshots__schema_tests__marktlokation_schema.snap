@@ -1,0 +1,4224 @@
+---
+source: tests/schemars_snapshots.rs
+expression: "schema_json::<Marktlokation>()"
+---
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Marktlokation",
+  "description": "Object containing information about a Marktlokation\n\n> **Note:** [Marktlokation JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202501.0.0/src/bo4e_schemas/bo/Marktlokation.json)",
+  "type": "object",
+  "properties": {
+    "_id": {
+      "description": "Eine generische ID, die für eigene Zwecke genutzt werden kann.\nZ.B. könnten hier UUIDs aus einer Datenbank stehen oder URLs zu einem Backend-System.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "_typ": {
+      "description": "BO type identifier — always `BoTyp::Marktlokation` for this struct.",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/BoTyp"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "_version": {
+      "description": "Version der BO-Struktur aka \"fachliche Versionierung\"",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "bilanzierungsgebiet": {
+      "description": "Bilanzierungsgebiet, dem das Netzgebiet zugeordnet ist - im Falle eines Strom Netzes",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "bilanzierungsmethode": {
+      "description": "Die Bilanzierungsmethode, RLM oder SLP",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Bilanzierungsmethode"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "endkunde": {
+      "description": "Geschäftspartner, dem diese Marktlokation gehört",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Geschaeftspartner"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "energierichtung": {
+      "description": "Kennzeichnung, ob Energie eingespeist oder entnommen (ausgespeist) wird",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Energierichtung"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "gasqualitaet": {
+      "description": "Die Gasqualität in diesem Netzgebiet. H-Gas oder L-Gas. Im Falle eines Gas-Netzes",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Gasqualitaet"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "gebietstyp": {
+      "description": "Typ des Netzgebietes, z.B. Verteilnetz",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Gebiettyp"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "geoadresse": {
+      "description": "Alternativ zu einer postalischen Adresse kann hier ein Ort mittels Geokoordinaten angegeben werden\n(z.B. zur Identifikation von Sendemasten).",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Geokoordinaten"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "grundversorgercodenr": {
+      "description": "Codenummer des Grundversorgers, der für diese Marktlokation zuständig ist",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/MarktpartnerId"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "istUnterbrechbar": {
+      "description": "Gibt an, ob es sich um eine unterbrechbare Belieferung handelt",
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "katasterinformation": {
+      "description": "Alternativ zu einer postalischen Adresse und Geokoordinaten kann hier eine Ortsangabe mittels Gemarkung und\nFlurstück erfolgen.",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Katasteradresse"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "kundengruppen": {
+      "description": "Kundengruppen der Marktlokation",
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "$ref": "#/$defs/Kundentyp"
+      }
+    },
+    "lokationsadresse": {
+      "description": "Die Adresse, an der die Energie-Lieferung oder -Einspeisung erfolgt",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Adresse"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "lokationsbuendelObjektcode": {
+      "description": "Lokationsbuendel Code, der die Funktion dieses BOs an der Lokationsbuendelstruktur beschreibt.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "lokationszuordnungen": {
+      "description": "Lokationszuordnung, um bspw. die zugehörigen Messlokationen anzugeben",
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "$ref": "#/$defs/Lokationszuordnung"
+      }
+    },
+    "marktgebiet": {
+      "description": "für Gas. Code vom EIC, <https://www.entsog.eu/data/data-portal/codes-list>",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/EicCode"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "marktlokationsId": {
+      "description": "Identifikationsnummer einer Marktlokation, an der Energie entweder verbraucht, oder erzeugt wird.",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/MaloId"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "netzbetreibercodenr": {
+      "description": "Codenummer des Netzbetreibers, an dessen Netz diese Marktlokation angeschlossen ist.",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/MarktpartnerId"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "netzebene": {
+      "description": "Netzebene, in der der Bezug der Energie erfolgt.\nBei Strom Spannungsebene der Lieferung, bei Gas Druckstufe.\nBeispiel Strom: Niederspannung Beispiel Gas: Niederdruck.",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Netzebene"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "netzgebietsnr": {
+      "description": "Die ID des Gebietes in der ene't-Datenbank",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "regelzone": {
+      "description": "für Strom. Code vom EIC, <https://www.entsoe.eu/data/energy-identification-codes-eic/eic-approved-codes/>",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/EicCode"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "sparte": {
+      "description": "Sparte der Marktlokation, z.B. Gas oder Strom",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Sparte"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "verbrauchsart": {
+      "description": "Verbrauchsart der Marktlokation.",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Verbrauchsart"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "verbrauchsmengen": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "$ref": "#/$defs/Verbrauch"
+      }
+    },
+    "zaehlwerke": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "$ref": "#/$defs/Zaehlwerk"
+      }
+    },
+    "zaehlwerkeDerBeteiligtenMarktrolle": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "$ref": "#/$defs/Zaehlwerk"
+      }
+    },
+    "zusatzAttribute": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "$ref": "#/$defs/ZusatzAttribut"
+      }
+    }
+  },
+  "additionalProperties": true,
+  "$defs": {
+    "AbgabeArt": {
+      "description": "Art der Konzessionsabgabe",
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "KAS",
+            "SA",
+            "SAS",
+            "TA",
+            "TAS",
+            "TK",
+            "TKS",
+            "TS",
+            "TSS"
+          ]
+        },
+        {
+          "description": "Unknown or future variant — produced when deserializing a value\nthat is not yet known to this version of the library.",
+          "type": "string",
+          "const": "UNKNOWN"
+        }
+      ]
+    },
+    "Adresse": {
+      "description": "Contains an address that can be used for most purposes.\n\n> **Note:** [Adresse JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202501.0.0/src/bo4e_schemas/com/Adresse.json)",
+      "type": "object",
+      "properties": {
+        "_id": {
+          "description": "Eine generische ID, die für eigene Zwecke genutzt werden kann.\nZ.B. könnten hier UUIDs aus einer Datenbank stehen oder URLs zu einem Backend-System.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "_typ": {
+          "description": "COM type identifier for this struct.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ComTyp"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "_version": {
+          "description": "Version der COM-Struktur aka \"fachliche Versionierung\"",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "adresszusatz": {
+          "description": "Zusatzhinweis zum Auffinden der Adresse, z.B. \"3. Stock linke Wohnung\"",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "coErgaenzung": {
+          "description": "Im Falle einer c/o-Adresse steht in diesem Attribut die Anrede. Z.B. \"c/o Veronica Hauptmieterin\"",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "hausnummer": {
+          "description": "Hausnummer inkl. Zusatz; z.B. \"3\", \"4a\"",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "landescode": {
+          "description": "Offizieller ISO-Landescode",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Landescode"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "ort": {
+          "description": "Bezeichnung der Stadt; z.B. \"Hückelhoven\"",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "ortsteil": {
+          "description": "Bezeichnung des Ortsteils; z.B. \"Mitte\"",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "postfach": {
+          "description": "Im Falle einer Postfachadresse das Postfach; Damit werden Straße und Hausnummer nicht berücksichtigt",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "postleitzahl": {
+          "description": "Die Postleitzahl; z.B: \"41836\"",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "strasse": {
+          "description": "Bezeichnung der Straße; z.B. \"Weserstraße\"",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "zusatzAttribute": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/$defs/ZusatzAttribut"
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "Anrede": {
+      "description": "Übersicht möglicher Anreden, z.B. eines Geschäftspartners.",
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "HERR",
+            "FRAU",
+            "EHELEUTE",
+            "FIRMA",
+            "FAMILIE",
+            "ERBENGEMEINSCHAFT",
+            "GRUNDSTUECKSGEMEINSCHAFT"
+          ]
+        },
+        {
+          "description": "Unknown or future variant — produced when deserializing a value\nthat is not yet known to this version of the library.",
+          "type": "string",
+          "const": "UNKNOWN"
+        }
+      ]
+    },
+    "Befestigungsart": {
+      "description": "Befestigungsart von Zählern",
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "STECKTECHNIK",
+            "DREIPUNKT",
+            "HUTSCHIENE",
+            "EINSTUTZEN",
+            "ZWEISTUTZEN"
+          ]
+        },
+        {
+          "description": "Unknown or future variant — produced when deserializing a value\nthat is not yet known to this version of the library.",
+          "type": "string",
+          "const": "UNKNOWN"
+        }
+      ]
+    },
+    "Bilanzierungsmethode": {
+      "description": "Mit dieser Aufzählung kann zwischen den Bilanzierungsmethoden bzw. -grundlagen unterschieden werden.",
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "RLM",
+            "SLP",
+            "TLP_GEMEINSAM",
+            "TLP_GETRENNT",
+            "PAUSCHAL",
+            "IMS"
+          ]
+        },
+        {
+          "description": "Unknown or future variant — produced when deserializing a value\nthat is not yet known to this version of the library.",
+          "type": "string",
+          "const": "UNKNOWN"
+        }
+      ]
+    },
+    "BoTyp": {
+      "description": "Auflistung sämtlicher existierender Geschäftsobjekte.",
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "ANGEBOT",
+            "AUSSCHREIBUNG",
+            "BILANZIERUNG",
+            "BUENDELVERTRAG",
+            "ENERGIEMENGE",
+            "FREMDKOSTEN",
+            "GERAET",
+            "GESCHAEFTSOBJEKT",
+            "GESCHAEFTSPARTNER",
+            "KOSTEN",
+            "LASTGANG",
+            "MARKTLOKATION",
+            "MESSLOKATION",
+            "NETZLOKATION",
+            "MARKTTEILNEHMER",
+            "NETZNUTZUNGSRECHNUNG",
+            "TECHNISCHERESSOURCE",
+            "STEUERBARERESSOURCE",
+            "PERSON",
+            "PREISBLATT",
+            "PREISBLATTDIENSTLEISTUNG",
+            "PREISBLATTHARDWARE",
+            "PREISBLATTKONZESSIONSABGABE",
+            "PREISBLATTMESSUNG",
+            "PREISBLATTNETZNUTZUNG",
+            "PREISBLATTUMLAGEN",
+            "RECHNUNG",
+            "REGION",
+            "REGIONALTARIF",
+            "STANDORTEIGENSCHAFTEN",
+            "TARIF",
+            "TARIFINFO",
+            "TARIFKOSTEN",
+            "TARIFPREISBLATT",
+            "VERTRAG",
+            "ZAEHLER",
+            "ZEITREIHE",
+            "LOKATIONSZUORDNUNG"
+          ]
+        },
+        {
+          "description": "Unknown or future variant — produced when deserializing a value\nthat is not yet known to this version of the library.",
+          "type": "string",
+          "const": "UNKNOWN"
+        }
+      ]
+    },
+    "ComTyp": {
+      "description": "Auflistung sämtlicher existierender Komponenten.",
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "ADRESSE",
+            "ANGEBOTSPOSITION",
+            "ANGEBOTSTEIL",
+            "ANGEBOTSVARIANTE",
+            "AUFABSCHLAG",
+            "AUFABSCHLAGPROORT",
+            "AUFABSCHLAGREGIONAL",
+            "AUFABSCHLAGSTAFFELPROORT",
+            "AUSSCHREIBUNGSDETAIL",
+            "AUSSCHREIBUNGSLOS",
+            "BETRAG",
+            "DIENSTLEISTUNG",
+            "ENERGIEHERKUNFT",
+            "ENERGIEMIX",
+            "FREMDKOSTENBLOCK",
+            "FREMDKOSTENPOSITION",
+            "GEOKOORDINATEN",
+            "KATASTERADRESSE",
+            "KONFIGURATIONSPRODUKT",
+            "KONTAKTWEG",
+            "KONZESSIONSABGABE",
+            "KOSTENBLOCK",
+            "KOSTENPOSITION",
+            "KRITERIUMWERT",
+            "LASTPROFIL",
+            "MARKTGEBIETINFO",
+            "MENGE",
+            "POSITIONSAUFABSCHLAG",
+            "PREIS",
+            "PREISGARANTIE",
+            "PREISPOSITION",
+            "PREISSTAFFEL",
+            "RECHNUNGSPOSITION",
+            "REGIONALEGUELTIGKEIT",
+            "REGIONALEPREISGARANTIE",
+            "REGIONALEPREISSTAFFEL",
+            "REGIONALERAUFABSCHLAG",
+            "REGIONALETARIFPREISPOSITION",
+            "REGIONSKRITERIUM",
+            "SIGMOIDPARAMETER",
+            "STANDORTEIGENSCHAFTENGAS",
+            "STANDORTEIGENSCHAFTENSTROM",
+            "STEUERBETRAG",
+            "TAGESPARAMETER",
+            "TARIFBERECHNUNGSPARAMETER",
+            "TARIFEINSCHRAENKUNG",
+            "TARIFPREIS",
+            "TARIFPREISPOSITION",
+            "TARIFPREISPOSITIONPROORT",
+            "TARIFPREISSTAFFELPROORT",
+            "UNTERSCHRIFT",
+            "VERBRAUCH",
+            "VERTRAGSKONDITIONEN",
+            "VERTRAGSTEIL",
+            "VERWENDUNGSZWECKPROMARKTROLLE",
+            "ZAEHLWERK",
+            "ZAEHLZEITREGISTER",
+            "ZEITRAUM",
+            "ZEITREIHENWERT",
+            "ZUSTAENDIGKEIT"
+          ]
+        },
+        {
+          "description": "Unknown or future variant — produced when deserializing a value\nthat is not yet known to this version of the library.",
+          "type": "string",
+          "const": "UNKNOWN"
+        }
+      ]
+    },
+    "Dienstleistung": {
+      "description": "Abbildung einer abrechenbaren Dienstleistung.\n\n> **Note:** [Dienstleistung JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202501.0.0/src/bo4e_schemas/com/Dienstleistung.json)",
+      "type": "object",
+      "properties": {
+        "_id": {
+          "description": "Eine generische ID, die für eigene Zwecke genutzt werden kann.\nZ.B. könnten hier UUIDs aus einer Datenbank stehen oder URLs zu einem Backend-System.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "_typ": {
+          "description": "COM type identifier for this struct.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ComTyp"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "_version": {
+          "description": "Version der COM-Struktur aka \"fachliche Versionierung\"",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "bezeichnung": {
+          "description": "Bezeichnung der Dienstleistung",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "dienstleistungstyp": {
+          "description": "Kennzeichnung der Dienstleistung",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Dienstleistungstyp"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "zusatzAttribute": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/$defs/ZusatzAttribut"
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "Dienstleistungstyp": {
+      "description": "Auflistung möglicher abzurechnender Dienstleistungen.",
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "DATENBEREITSTELLUNG_TAEGLICH",
+            "DATENBEREITSTELLUNG_WOECHENTLICH",
+            "DATENBEREITSTELLUNG_MONATLICH",
+            "DATENBEREITSTELLUNG_JAEHRLICH",
+            "DATENBEREITSTELLUNG_HISTORISCHE_LG",
+            "DATENBEREITSTELLUNG_STUENDLICH",
+            "DATENBEREITSTELLUNG_VIERTELJAEHRLICH",
+            "DATENBEREITSTELLUNG_HALBJAEHRLICH",
+            "DATENBEREITSTELLUNG_MONATLICH_ZUSAETZLICH",
+            "DATENBEREITSTELLUNG_EINMALIG",
+            "AUSLESUNG_2X_TAEGLICH_FERNAUSLESUNG",
+            "AUSLESUNG_TAEGLICH_FERNAUSLESUNG",
+            "AUSLESUNG_MANUELL_MSB",
+            "AUSLESUNG_MONATLICH_FERNAUSLESUNG",
+            "AUSLESUNG_JAEHRLICH_FERNAUSLESUNG",
+            "AUSLESUNG_MDE",
+            "ABLESUNG_MONATLICH",
+            "ABLESUNG_VIERTELJAEHRLICH",
+            "ABLESUNG_HALBJAEHRLICH",
+            "ABLESUNG_JAEHRLICH",
+            "AUSLESUNG_FERNAUSLESUNG",
+            "ABLESUNG_ZUSAETZLICH_MSB",
+            "ABLESUNG_ZUSAETZLICH_KUNDE",
+            "AUSLESUNG_FERNAUSLESUNG_ZUSAETZLICH_MSB",
+            "AUSLESUNG_MOATLICH_FERNAUSLESUNG",
+            "AUSLESUNG_STUENDLICH_FERNAUSLESUNG",
+            "AUSLESUNG_TEMPERATURMENGENUMWERTER",
+            "AUSLESUNG_ZUSTANDSMENGENUMWERTER",
+            "AUSLESUNG_SYSTEMMENGENUMWERTER",
+            "AUSLESUNG_VORGANG",
+            "AUSLESUNG_KOMPAKTMENGENUMWERTER",
+            "SPERRUNG",
+            "ENTSPERRUNG",
+            "MAHNKOSTEN",
+            "INKASSOKOSTEN"
+          ]
+        },
+        {
+          "description": "Unknown or future variant — produced when deserializing a value\nthat is not yet known to this version of the library.",
+          "type": "string",
+          "const": "UNKNOWN"
+        }
+      ]
+    },
+    "EMobilitaetsart": {
+      "description": "Art der E-Mobilität",
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "WALLBOX",
+            "E_MOBILITAETSLADESAEULE",
+            "LADEPARK"
+          ]
+        },
+        {
+          "description": "Unknown or future variant — produced when deserializing a value\nthat is not yet known to this version of the library.",
+          "type": "string",
+          "const": "UNKNOWN"
+        }
+      ]
+    },
+    "EicCode": {
+      "description": "Energy Identification Code (EIC): 16-character code issued by ENTSO-E.\n\nStructure:\n- Positions 1–2:  Local Issuing Office (LIO) identifier (alphanumeric)\n- Position 3:     EIC type character (`A`, `T`, `V`, `W`, `X`, `Y`, or `Z`)\n- Positions 4–15: LIO-specific code body (alphanumeric or `-` as padding)\n- Position 16:    Check character computed by the ENTSO-E algorithm\n\n# Domain\n\nUse [`EicCode::domain`] to query whether this code is an Area or Party code.\nUse [`EicCode::type_char`] to get the raw type character (position 3).\n\n# Examples\n```\nuse rubo4e::identifiers::{EicCode, EicDomain};\n\n// 10YDE-EON------1 = E.ON Germany control area (type Y = Area).\nlet area = EicCode::new(\"10YDE-EON------1\").expect(\"valid area EIC\");\nassert_eq!(area.domain(), EicDomain::Area);\nassert_eq!(area.type_char(), 'Y');\n```",
+      "type": "string"
+    },
+    "Energierichtung": {
+      "description": "Spezifiziert die Energierichtung einer Markt- und/oder Messlokation",
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "AUSSP",
+            "EINSP"
+          ]
+        },
+        {
+          "description": "Unknown or future variant — produced when deserializing a value\nthat is not yet known to this version of the library.",
+          "type": "string",
+          "const": "UNKNOWN"
+        }
+      ]
+    },
+    "Erzeugungsart": {
+      "description": "Auflistung der Erzeugungsarten von Energie.",
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "FOSSIL",
+            "KWK",
+            "WIND",
+            "SOLAR",
+            "KERNKRAFT",
+            "WASSER",
+            "GEOTHERMIE",
+            "BIOMASSE",
+            "KOHLE",
+            "GAS",
+            "SONSTIGE",
+            "SONSTIGE_EEG",
+            "BIOGAS",
+            "KLIMANEUTRALES_GAS"
+          ]
+        },
+        {
+          "description": "Unknown or future variant — produced when deserializing a value\nthat is not yet known to this version of the library.",
+          "type": "string",
+          "const": "UNKNOWN"
+        }
+      ]
+    },
+    "Gasqualitaet": {
+      "description": "Unterscheidung für hoch- und niedrig-kalorisches Gas.",
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "H_GAS",
+            "L_GAS"
+          ]
+        },
+        {
+          "description": "Unknown or future variant — produced when deserializing a value\nthat is not yet known to this version of the library.",
+          "type": "string",
+          "const": "UNKNOWN"
+        }
+      ]
+    },
+    "Gebiettyp": {
+      "description": "List of possible Gebiettypen.",
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "REGELZONE",
+            "MARKTGEBIET",
+            "BILANZIERUNGSGEBIET",
+            "VERTEILNETZ",
+            "TRANSPORTNETZ",
+            "REGIONALNETZ",
+            "AREALNETZ",
+            "GRUNDVERSORGUNGSGEBIET",
+            "VERSORGUNGSGEBIET"
+          ]
+        },
+        {
+          "description": "Unknown or future variant — produced when deserializing a value\nthat is not yet known to this version of the library.",
+          "type": "string",
+          "const": "UNKNOWN"
+        }
+      ]
+    },
+    "Geokoordinaten": {
+      "description": "This component provides the geo-coordinates for a location.\n\n> **Note:** [Geokoordinaten JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202501.0.0/src/bo4e_schemas/com/Geokoordinaten.json)",
+      "type": "object",
+      "properties": {
+        "_id": {
+          "description": "Eine generische ID, die für eigene Zwecke genutzt werden kann.\nZ.B. könnten hier UUIDs aus einer Datenbank stehen oder URLs zu einem Backend-System.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "_typ": {
+          "description": "COM type identifier for this struct.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ComTyp"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "_version": {
+          "description": "Version der COM-Struktur aka \"fachliche Versionierung\"",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "breitengrad": {
+          "type": [
+            "string",
+            "number",
+            "null"
+          ],
+          "pattern": "^-?\\d+(\\.\\d+)?([eE]\\d+)?$"
+        },
+        "laengengrad": {
+          "type": [
+            "string",
+            "number",
+            "null"
+          ],
+          "pattern": "^-?\\d+(\\.\\d+)?([eE]\\d+)?$"
+        },
+        "zusatzAttribute": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/$defs/ZusatzAttribut"
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "Geraet": {
+      "description": "Mit diesem BO werden alle Geräte modelliert, die keine Zähler sind.\n\n> **Note:** [Geraet JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202501.0.0/src/bo4e_schemas/bo/Geraet.json)",
+      "type": "object",
+      "properties": {
+        "_id": {
+          "description": "Eine generische ID, die für eigene Zwecke genutzt werden kann.\nZ.B. könnten hier UUIDs aus einer Datenbank stehen oder URLs zu einem Backend-System.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "_typ": {
+          "description": "BO type identifier — always `BoTyp::Geraet` for this struct.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BoTyp"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "_version": {
+          "description": "Version der BO-Struktur aka \"fachliche Versionierung\"",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "bezeichnung": {
+          "description": "Bezeichnung des Geräts",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "geraeteklasse": {
+          "description": "Die übergreifende Klasse eines Geräts, beispielsweise Wandler",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Geraeteklasse"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "geraetenummer": {
+          "description": "Die auf dem Gerät aufgedruckte Nummer, die vom MSB vergeben wird.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "geraetetyp": {
+          "description": "Der speziellere Typ eines Gerätes, beispielsweise Stromwandler",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Geraetetyp"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "zusatzAttribute": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/$defs/ZusatzAttribut"
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "Geraeteklasse": {
+      "description": "Auflistung möglicher übergreifenden Geräteklassen.",
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "WANDLER",
+            "KOMMUNIKATIONSEINRICHTUNG",
+            "TECHNISCHE_STEUEREINRICHTUNG",
+            "MENGENUMWERTER",
+            "SMARTMETER_GATEWAY",
+            "STEUERBOX",
+            "ZAEHLEINRICHTUNG"
+          ]
+        },
+        {
+          "description": "Unknown or future variant — produced when deserializing a value\nthat is not yet known to this version of the library.",
+          "type": "string",
+          "const": "UNKNOWN"
+        }
+      ]
+    },
+    "Geraetetyp": {
+      "description": "Auflistung möglicher abzurechnender Gerätetypen.",
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "MULTIPLEXANLAGE",
+            "PAUSCHALANLAGE",
+            "VERSTAERKERANLAGE",
+            "SUMMATIONSGERAET",
+            "IMPULSGEBER",
+            "MENGENUMWERTER",
+            "STROMWANDLER",
+            "SPANNUNGSWANDLER",
+            "KOMBIMESSWANDLER",
+            "BLOCKSTROMWANDLER",
+            "DATENLOGGER",
+            "KOMMUNIKATIONSANSCHLUSS",
+            "MODEM",
+            "TELEKOMMUNIKATIONSEINRICHTUNG",
+            "MODERNE_MESSEINRICHTUNG",
+            "INTELLIGENTES_MESSYSTEM",
+            "STEUEREINRICHTUNG",
+            "TARIFSCHALTGERAET",
+            "RUNDSTEUEREMPFAENGER",
+            "OPTIONALE_ZUS_ZAEHLEINRICHTUNG",
+            "MESSWANDLERSATZ_IMS_MME",
+            "KOMBIMESSWANDLER_IMS_MME",
+            "TARIFSCHALTGERAET_IMS_MME",
+            "RUNDSTEUEREMPFAENGER_IMS_MME",
+            "TEMPERATUR_KOMPENSATION",
+            "HOECHSTBELASTUNGS_ANZEIGER",
+            "SONSTIGES_GERAET",
+            "EDL_21",
+            "EDL_40_ZAEHLERAUFSATZ",
+            "EDL_40",
+            "TELEFONANSCHLUSS",
+            "MODEM_GSM",
+            "MODEM_GPRS",
+            "MODEM_FUNK",
+            "MODEM_GSM_O_LG",
+            "MODEM_GSM_M_LG",
+            "MODEM_FESTNETZ",
+            "MODEM_GPRS_M_LG",
+            "PLC_KOM",
+            "ETHERNET_KOM",
+            "DSL_KOM",
+            "LTE_KOM",
+            "KOMPAKT_MU",
+            "SYSTEM_MU",
+            "TEMPERATUR_MU",
+            "ZUSTANDS_MU"
+          ]
+        },
+        {
+          "description": "Unknown or future variant — produced when deserializing a value\nthat is not yet known to this version of the library.",
+          "type": "string",
+          "const": "UNKNOWN"
+        }
+      ]
+    },
+    "Geschaeftspartner": {
+      "description": "Mit diesem Objekt können Geschäftspartner übertragen werden.\nSowohl Unternehmen, als auch Privatpersonen können Geschäftspartner sein.\nHinweis: \"Marktteilnehmer\" haben ein eigenes BO, welches sich von diesem BO ableitet.\nHier sollte daher keine Zuordnung zu Marktrollen erfolgen.\n\n> **Note:** [Geschaeftspartner JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202501.0.0/src/bo4e_schemas/bo/Geschaeftspartner.json)",
+      "type": "object",
+      "properties": {
+        "_id": {
+          "description": "Eine generische ID, die für eigene Zwecke genutzt werden kann.\nZ.B. könnten hier UUIDs aus einer Datenbank stehen oder URLs zu einem Backend-System.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "_typ": {
+          "description": "BO type identifier — always `BoTyp::Geschaeftspartner` for this struct.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BoTyp"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "_version": {
+          "description": "Version der BO-Struktur aka \"fachliche Versionierung\"",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "adresse": {
+          "description": "Adresse des Geschäftspartners",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Adresse"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "amtsgericht": {
+          "description": "Amtsgericht bzw Handelsregistergericht, das die Handelsregisternummer herausgegeben hat",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "anrede": {
+          "description": "Mögliche Anrede der Person",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Anrede"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "ansprechpartner": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/$defs/Person"
+          }
+        },
+        "geschaeftspartnerrollen": {
+          "description": "Rollen, die die Geschäftspartner inne haben (z.B. Interessent, Kunde)",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/$defs/Geschaeftspartnerrolle"
+          }
+        },
+        "glaeubigerId": {
+          "description": "Die Gläubiger-ID welche im Zahlungsverkehr verwendet wird; Z.B. \"DE 47116789\"",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "handelsregisternummer": {
+          "description": "Handelsregisternummer des Geschäftspartners",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "individuelleAnrede": {
+          "description": "Im Falle einer nicht standardisierten Anrede kann hier eine frei definierbare Anrede vorgegeben werden.\nBeispiel: \"Vereinsgemeinschaft\", \"Pfarrer\", \"Hochwürdigster Herr Abt\".",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "kontaktwege": {
+          "description": "Kontaktwege des Geschäftspartners",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/$defs/Kontaktweg"
+          }
+        },
+        "nachname": {
+          "description": "Nachname (Familienname) der Person",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "organisationsname": {
+          "description": "Name der Firma, wenn Gewerbe oder andere Organisation.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "organisationstyp": {
+          "description": "Kennzeichnung ob es sich um ein Gewerbe/Unternehmen, eine Privatperson oder eine andere Art von Organisation handelt.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Organisationstyp"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "titel": {
+          "description": "Möglicher Titel der Person",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Titel"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "umsatzsteuerId": {
+          "description": "Die Steuer-ID des Geschäftspartners; Beispiel: \"DE 813281825\"",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "vorname": {
+          "description": "Vorname der Person",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "website": {
+          "description": "Internetseite des Marktpartners",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "zusatzAttribute": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/$defs/ZusatzAttribut"
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "Geschaeftspartnerrolle": {
+      "description": "Diese Rollen kann ein Geschäftspartner einnehmen.",
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "LIEFERANT",
+            "DIENSTLEISTER",
+            "KUNDE",
+            "INTERESSENT",
+            "MARKTPARTNER"
+          ]
+        },
+        {
+          "description": "Unknown or future variant — produced when deserializing a value\nthat is not yet known to this version of the library.",
+          "type": "string",
+          "const": "UNKNOWN"
+        }
+      ]
+    },
+    "Katasteradresse": {
+      "description": "Dient der Adressierung über die Liegenschafts-Information.\n\n> **Note:** [Katasteradresse JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202501.0.0/src/bo4e_schemas/com/Katasteradresse.json)",
+      "type": "object",
+      "properties": {
+        "_id": {
+          "description": "Eine generische ID, die für eigene Zwecke genutzt werden kann.\nZ.B. könnten hier UUIDs aus einer Datenbank stehen oder URLs zu einem Backend-System.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "_typ": {
+          "description": "COM type identifier for this struct.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ComTyp"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "_version": {
+          "description": "Version der COM-Struktur aka \"fachliche Versionierung\"",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "flurstueck": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "gemarkungFlur": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "zusatzAttribute": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/$defs/ZusatzAttribut"
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "Konfigurationsprodukt": {
+      "description": "Object containing information about a Konfigurationsprodukt\n\n> **Note:** [Konfigurationsprodukt JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202501.0.0/src/bo4e_schemas/bo/Konfigurationsprodukt.json)",
+      "type": "object",
+      "properties": {
+        "_id": {
+          "description": "Eine generische ID, die für eigene Zwecke genutzt werden kann.\nZ.B. könnten hier UUIDs aus einer Datenbank stehen oder URLs zu einem Backend-System.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "_typ": {
+          "description": "COM type identifier for this struct.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ComTyp"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "_version": {
+          "description": "Version der COM-Struktur aka \"fachliche Versionierung\"",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "leistungskurvendefinition": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "marktpartner": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Marktteilnehmer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "produktcode": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "schaltzeitdefinition": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "zusatzAttribute": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/$defs/ZusatzAttribut"
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "Kontaktart": {
+      "description": "Gibt an, auf welchem Weg die Person oder der Geschäftspartner kontaktiert werden kann.",
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "POSTWEG",
+            "TELEFON",
+            "FAX",
+            "E_MAIL",
+            "SMS"
+          ]
+        },
+        {
+          "description": "Unknown or future variant — produced when deserializing a value\nthat is not yet known to this version of the library.",
+          "type": "string",
+          "const": "UNKNOWN"
+        }
+      ]
+    },
+    "Kontaktweg": {
+      "description": "Die Komponente wird dazu verwendet, die Kontaktwege innerhalb des BOs Person darzustellen\n\n> **Note:** [Kontakt JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202501.0.0/src/bo4e_schemas/com/Kontakt.json)",
+      "type": "object",
+      "properties": {
+        "_id": {
+          "description": "Eine generische ID, die für eigene Zwecke genutzt werden kann.\nZ.B. könnten hier UUIDs aus einer Datenbank stehen oder URLs zu einem Backend-System.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "_typ": {
+          "description": "COM type identifier for this struct.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ComTyp"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "_version": {
+          "description": "Version der COM-Struktur aka \"fachliche Versionierung\"",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "beschreibung": {
+          "description": "Spezifikation, beispielsweise \"Durchwahl\", \"Sammelnummer\" etc.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "istBevorzugterKontaktweg": {
+          "description": "Gibt an, ob es sich um den bevorzugten Kontaktweg handelt.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "kontaktart": {
+          "description": "Gibt die Kontaktart des Kontaktes an.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Kontaktart"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "kontaktwert": {
+          "description": "Die Nummer oder E-Mail-Adresse.",
+          "type": [
+            "string",
+            "number",
+            "null"
+          ],
+          "pattern": "^-?\\d+(\\.\\d+)?([eE]\\d+)?$"
+        },
+        "zusatzAttribute": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/$defs/ZusatzAttribut"
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "Konzessionsabgabe": {
+      "description": "Diese Komponente wird zur Übertagung der Details zu einer Konzessionsabgabe verwendet.\n\n> **Note:** [Konzessionsabgabe JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202501.0.0/src/bo4e_schemas/com/Konzessionsabgabe.json)",
+      "type": "object",
+      "properties": {
+        "_id": {
+          "description": "Eine generische ID, die für eigene Zwecke genutzt werden kann.\nZ.B. könnten hier UUIDs aus einer Datenbank stehen oder URLs zu einem Backend-System.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "_typ": {
+          "description": "COM type identifier for this struct.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ComTyp"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "_version": {
+          "description": "Version der COM-Struktur aka \"fachliche Versionierung\"",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "kategorie": {
+          "description": "Gebührenkategorie der Konzessionsabgabe",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "kosten": {
+          "description": "Konzessionsabgabe in E/kWh",
+          "type": [
+            "string",
+            "number",
+            "null"
+          ],
+          "pattern": "^-?\\d+(\\.\\d+)?([eE]\\d+)?$"
+        },
+        "satz": {
+          "description": "Art der Abgabe",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AbgabeArt"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "zusatzAttribute": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/$defs/ZusatzAttribut"
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "Kundentyp": {
+      "description": "Auflistung der Typen von Endkunden. Daraus kann das Verbrauchsprofil abgeleitet werden.",
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "GEWERBE",
+            "PRIVAT",
+            "LANDWIRT",
+            "SONSTIGE",
+            "HAUSHALT",
+            "DIREKTHEIZUNG",
+            "GEMEINSCHAFT_MFH",
+            "KIRCHE",
+            "KWK",
+            "LADESAEULE",
+            "BELEUCHTUNG_OEFFENTLICH",
+            "BELEUCHTUNG_STRASSE",
+            "SPEICHERHEIZUNG",
+            "UNTERBR_EINRICHTUNG",
+            "WAERMEPUMPE"
+          ]
+        },
+        {
+          "description": "Unknown or future variant — produced when deserializing a value\nthat is not yet known to this version of the library.",
+          "type": "string",
+          "const": "UNKNOWN"
+        }
+      ]
+    },
+    "Landescode": {
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "AF",
+            "AX",
+            "AL",
+            "DZ",
+            "AS",
+            "AD",
+            "AO",
+            "AI",
+            "AQ",
+            "AG",
+            "AR",
+            "AM",
+            "AW",
+            "AU",
+            "AT",
+            "AZ",
+            "BS",
+            "BH",
+            "BD",
+            "BB",
+            "BY",
+            "BE",
+            "BZ",
+            "BJ",
+            "BM",
+            "BT",
+            "BO",
+            "BQ",
+            "BA",
+            "BW",
+            "BV",
+            "BR",
+            "IO",
+            "BN",
+            "BG",
+            "BF",
+            "BI",
+            "KH",
+            "CM",
+            "CA",
+            "CV",
+            "KY",
+            "CF",
+            "TD",
+            "CL",
+            "CN",
+            "CX",
+            "CC",
+            "CO",
+            "KM",
+            "CG",
+            "CD",
+            "CK",
+            "CR",
+            "CI",
+            "HR",
+            "CU",
+            "CW",
+            "CY",
+            "CZ",
+            "DK",
+            "DJ",
+            "DM",
+            "DO",
+            "EC",
+            "EG",
+            "SV",
+            "GQ",
+            "ER",
+            "EE",
+            "ET",
+            "FK",
+            "FO",
+            "FJ",
+            "FI",
+            "FR",
+            "GF",
+            "PF",
+            "TF",
+            "GA",
+            "GM",
+            "GE",
+            "DE",
+            "GH",
+            "GI",
+            "GR",
+            "GL",
+            "GD",
+            "GP",
+            "GU",
+            "GT",
+            "GG",
+            "GN",
+            "GW",
+            "GY",
+            "HT",
+            "HM",
+            "VA",
+            "HN",
+            "HK",
+            "HU",
+            "IS",
+            "IN",
+            "ID",
+            "IR",
+            "IQ",
+            "IE",
+            "IM",
+            "IL",
+            "IT",
+            "JM",
+            "JP",
+            "JE",
+            "JO",
+            "KZ",
+            "KE",
+            "KI",
+            "KP",
+            "KR",
+            "XK",
+            "KW",
+            "KG",
+            "LA",
+            "LV",
+            "LB",
+            "LS",
+            "LR",
+            "LY",
+            "LI",
+            "LT",
+            "LU",
+            "MO",
+            "MK",
+            "MG",
+            "MW",
+            "MY",
+            "MV",
+            "ML",
+            "MT",
+            "MH",
+            "MQ",
+            "MR",
+            "MU",
+            "YT",
+            "MX",
+            "FM",
+            "MD",
+            "MC",
+            "MN",
+            "ME",
+            "MS",
+            "MA",
+            "MZ",
+            "MM",
+            "NA",
+            "NR",
+            "NP",
+            "NL",
+            "NC",
+            "NZ",
+            "NI",
+            "NE",
+            "NG",
+            "NU",
+            "NF",
+            "MP",
+            "NO",
+            "OM",
+            "PK",
+            "PW",
+            "PS",
+            "PA",
+            "PG",
+            "PY",
+            "PE",
+            "PH",
+            "PN",
+            "PL",
+            "PT",
+            "PR",
+            "QA",
+            "RE",
+            "RO",
+            "RU",
+            "RW",
+            "BL",
+            "SH",
+            "KN",
+            "LC",
+            "MF",
+            "PM",
+            "VC",
+            "WS",
+            "SM",
+            "ST",
+            "SA",
+            "SN",
+            "RS",
+            "SC",
+            "SL",
+            "SG",
+            "SX",
+            "SK",
+            "SI",
+            "SB",
+            "SO",
+            "ZA",
+            "GS",
+            "SS",
+            "ES",
+            "LK",
+            "SD",
+            "SR",
+            "SJ",
+            "SZ",
+            "SE",
+            "CH",
+            "SY",
+            "TW",
+            "TJ",
+            "TZ",
+            "TH",
+            "TL",
+            "TG",
+            "TK",
+            "TO",
+            "TT",
+            "TN",
+            "TR",
+            "TM",
+            "TC",
+            "TV",
+            "UG",
+            "UA",
+            "AE",
+            "GB",
+            "US",
+            "UM",
+            "UY",
+            "UZ",
+            "VU",
+            "VE",
+            "VN",
+            "VG",
+            "VI",
+            "WF",
+            "EH",
+            "YE",
+            "ZM",
+            "ZW"
+          ]
+        },
+        {
+          "description": "Unknown or future variant — produced when deserializing a value\nthat is not yet known to this version of the library.",
+          "type": "string",
+          "const": "UNKNOWN"
+        }
+      ]
+    },
+    "Lokationszuordnung": {
+      "description": "Modell für die Abbildung der Referenz auf die Lokationsbündelstruktur. Diese gibt an welche Marktlokationen,\nMesslokationen, Netzlokationen, technische/steuerbaren Ressourcen an einer Lokation vorhanden sind.\n\n> **Note:** [Lokationszuordnung JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202501.0.0/src/bo4e_schemas/bo/Lokationszuordnung.json)",
+      "type": "object",
+      "properties": {
+        "_id": {
+          "description": "Eine generische ID, die für eigene Zwecke genutzt werden kann.\nZ.B. könnten hier UUIDs aus einer Datenbank stehen oder URLs zu einem Backend-System.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "_typ": {
+          "description": "BO type identifier — always `BoTyp::Lokationszuordnung` for this struct.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BoTyp"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "_version": {
+          "description": "Version der BO-Struktur aka \"fachliche Versionierung\"",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "gueltigkeit": {
+          "description": "Zeitraum der Gültigkeit",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Zeitraum"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "lokationsbuendelcode": {
+          "description": "Code, der angibt wie die Lokationsbündelstruktur zusammengesetzt ist (zu finden unter \"Codeliste der Lokationsbündelstrukturen\" auf <https://www.edi-energy.de/index.php?id=38>)",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "marktlokationen": {
+          "description": "Liste mit referenzierten Marktlokationen",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#"
+          }
+        },
+        "messlokationen": {
+          "description": "Liste mit referenzierten Messlokationen",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/$defs/Messlokation"
+          }
+        },
+        "netzlokationen": {
+          "description": "Liste mit referenzierten Netzlokationen",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/$defs/Netzlokation"
+          }
+        },
+        "steuerbareRessourcen": {
+          "description": "Liste mit referenzierten steuerbaren Ressourcen",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/$defs/SteuerbareRessource"
+          }
+        },
+        "technischeRessourcen": {
+          "description": "Liste mit referenzierten technischen Ressourcen",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/$defs/TechnischeRessource"
+          }
+        },
+        "zuordnungstyp": {
+          "description": "Verknüpfungsrichtung z.B. Malo-Melo",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "zusatzAttribute": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/$defs/ZusatzAttribut"
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "MaloId": {
+      "description": "Marktlokations-ID (MaLo-ID): 11-digit string validated by BDEW checksum.\n\nThe 11th digit is a check digit computed from the first ten digits using the\nBDEW alternating-weight algorithm.\n\n# Examples\n```\nuse rubo4e::identifiers::MaloId;\n\nlet id = MaloId::new(\"51238696780\").unwrap();\nassert_eq!(id.as_ref(), \"51238696780\");\n```",
+      "type": "string"
+    },
+    "MarktpartnerId": {
+      "description": "Marktpartner-ID (Rollencodenummer): 13-digit numeric string.\n\nNo checksum is applied; all 13 characters must be decimal digits `[0-9]`.",
+      "type": "string"
+    },
+    "Marktrolle": {
+      "description": "Diese Rollen kann ein Marktteilnehmer einnehmen.",
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "BTR",
+            "BIKO",
+            "BKV",
+            "DP",
+            "EIV",
+            "ESA",
+            "KN",
+            "LF",
+            "MGV",
+            "MSB",
+            "NB",
+            "RB",
+            "UENB"
+          ]
+        },
+        {
+          "description": "Unknown or future variant — produced when deserializing a value\nthat is not yet known to this version of the library.",
+          "type": "string",
+          "const": "UNKNOWN"
+        }
+      ]
+    },
+    "Marktteilnehmer": {
+      "description": "Objekt zur Aufnahme der Information zu einem Marktteilnehmer\n\n> **Note:** [Marktteilnehmer JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202501.0.0/src/bo4e_schemas/bo/Marktteilnehmer.json)",
+      "type": "object",
+      "properties": {
+        "_id": {
+          "description": "Eine generische ID, die für eigene Zwecke genutzt werden kann.\nZ.B. könnten hier UUIDs aus einer Datenbank stehen oder URLs zu einem Backend-System.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "_typ": {
+          "description": "BO type identifier — always `BoTyp::Marktteilnehmer` for this struct.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BoTyp"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "_version": {
+          "description": "Version der BO-Struktur aka \"fachliche Versionierung\"",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "geschaeftspartner": {
+          "description": "Der zu diesem Marktteilnehmer gehörende Geschäftspartner",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Geschaeftspartner"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "makoadresse": {
+          "description": "Die 1:1-Kommunikationsadresse des Marktteilnehmers. Diese wird in der Marktkommunikation verwendet. Konkret kann dies eine eMail-Adresse oder ein AS4-Endpunkt sein.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "marktrolle": {
+          "description": "Gibt im Klartext die Bezeichnung der Marktrolle an",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Marktrolle"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "rollencodenummer": {
+          "description": "Gibt die Codenummer der Marktrolle an",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MarktpartnerId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "rollencodetyp": {
+          "description": "Gibt den Typ des Codes an",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Rollencodetyp"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "sparte": {
+          "description": "Sparte des Marktteilnehmers, z.B. Gas oder Strom",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Sparte"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "zusatzAttribute": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/$defs/ZusatzAttribut"
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "MeloId": {
+      "description": "Messlokations-ID (MeLo-ID): 33-character string.\n\nStructure (per BDEW specification):\n- **Positions 1–2**: ISO 3166-1 alpha-2 country code, uppercase (e.g. `\"DE\"`, `\"AT\"`)\n- **Positions 3–33**: alphanumeric body `[A-Za-z0-9]` (31 characters)\n\nNo checksum is applied.\n\n# Examples\n```\nuse rubo4e::identifiers::MeloId;\n\nlet id = MeloId::new(\"DE0000000000000000000000000000001\").unwrap();\nassert_eq!(id.as_ref(), \"DE0000000000000000000000000000001\");\n```",
+      "type": "string"
+    },
+    "Menge": {
+      "description": "Abbildung einer Menge mit Wert und Einheit.\n\n> **Note:** [Menge JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202501.0.0/src/bo4e_schemas/com/Menge.json)",
+      "type": "object",
+      "properties": {
+        "_id": {
+          "description": "Eine generische ID, die für eigene Zwecke genutzt werden kann.\nZ.B. könnten hier UUIDs aus einer Datenbank stehen oder URLs zu einem Backend-System.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "_typ": {
+          "description": "COM type identifier for this struct.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ComTyp"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "_version": {
+          "description": "Version der COM-Struktur aka \"fachliche Versionierung\"",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "einheit": {
+          "description": "Gibt die Einheit zum jeweiligen Wert an",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Mengeneinheit"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "wert": {
+          "description": "Gibt den absoluten Wert der Menge an",
+          "type": [
+            "string",
+            "number",
+            "null"
+          ],
+          "pattern": "^-?\\d+(\\.\\d+)?([eE]\\d+)?$"
+        },
+        "zusatzAttribute": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/$defs/ZusatzAttribut"
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "Mengeneinheit": {
+      "description": "Einheit: Messgrößen, die per Messung oder Vorgabe ermittelt werden können.",
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "W",
+            "WH",
+            "KW",
+            "KWH",
+            "KVARH",
+            "MW",
+            "MWH",
+            "STUECK",
+            "KUBIKMETER",
+            "SEKUNDE",
+            "MINUTE",
+            "STUNDE",
+            "VIERTEL_STUNDE",
+            "TAG",
+            "WOCHE",
+            "MONAT",
+            "QUARTAL",
+            "HALBJAHR",
+            "JAHR",
+            "PROZENT",
+            "KVAR",
+            "KWHK",
+            "VAR",
+            "VARH"
+          ]
+        },
+        {
+          "description": "Unknown or future variant — produced when deserializing a value\nthat is not yet known to this version of the library.",
+          "type": "string",
+          "const": "UNKNOWN"
+        }
+      ]
+    },
+    "Messlokation": {
+      "description": "Object containing information about a Messlokation\n\n> **Note:** [Messlokation JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202501.0.0/src/bo4e_schemas/bo/Messlokation.json)",
+      "type": "object",
+      "properties": {
+        "_id": {
+          "description": "Eine generische ID, die für eigene Zwecke genutzt werden kann.\nZ.B. könnten hier UUIDs aus einer Datenbank stehen oder URLs zu einem Backend-System.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "_typ": {
+          "description": "BO type identifier — always `BoTyp::Messlokation` for this struct.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BoTyp"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "_version": {
+          "description": "Version der BO-Struktur aka \"fachliche Versionierung\"",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "geoadresse": {
+          "description": "Alternativ zu einer postalischen Adresse kann hier ein Ort mittels Geokoordinaten angegeben werden\n(z.B. zur Identifikation von Sendemasten).",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Geokoordinaten"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "geraete": {
+          "description": "Liste der Geräte, die zu dieser Messstelle gehört",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/$defs/Geraet"
+          }
+        },
+        "grundzustaendigerMsbCodenr": {
+          "description": "Codenummer des grundzuständigen Messstellenbetreibers, der für diese Messlokation zuständig ist.\n(Dieser ist immer dann Messstellenbetreiber, wenn kein anderer MSB die Einrichtungen an der Messlokation betreibt.)",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MarktpartnerId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "grundzustaendigerMsbimCodenr": {
+          "description": "Codenummer des grundzuständigen Messstellenbetreibers für intelligente Messsysteme, der für diese Messlokation\nzuständig ist.\n(Dieser ist immer dann Messstellenbetreiber, wenn kein anderer MSB die Einrichtungen an der Messlokation betreibt.)",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MarktpartnerId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "katasterinformation": {
+          "description": "Alternativ zu einer postalischen Adresse und Geokoordinaten kann hier eine Ortsangabe mittels Gemarkung und\nFlurstück erfolgen.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Katasteradresse"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "lokationsbuendelObjektcode": {
+          "description": "Lokationsbuendel Code, der die Funktion dieses BOs an der Lokationsbuendelstruktur beschreibt.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "lokationszuordnungen": {
+          "description": "Lokationszuordnung, um bspw. die zugehörigen Marktlokationen anzugeben",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/$defs/Lokationszuordnung"
+          }
+        },
+        "messadresse": {
+          "description": "Die Adresse, an der die Messeinrichtungen zu finden sind.\n(Nur angeben, wenn diese von der Adresse der Marktlokation abweicht.)",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Adresse"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "messdienstleistung": {
+          "description": "Liste der Messdienstleistungen, die zu dieser Messstelle gehört",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/$defs/Dienstleistung"
+          }
+        },
+        "messgebietnr": {
+          "description": "Die Nummer des Messgebietes in der ene't-Datenbank",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "messlokationsId": {
+          "description": "Die Messlokations-Identifikation; Das ist die frühere Zählpunktbezeichnung",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MeloId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "messlokationszaehler": {
+          "description": "Zähler, die zu dieser Messlokation gehören",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/$defs/Zaehler"
+          }
+        },
+        "netzebeneMessung": {
+          "description": "Spannungsebene der Messung",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Netzebene"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "sparte": {
+          "description": "Sparte der Messlokation, z.B. Gas oder Strom",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Sparte"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "zusatzAttribute": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/$defs/ZusatzAttribut"
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "Messwerterfassung": {
+      "description": "Die Messwerterfassung des Zählers",
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "FERNAUSLESBAR",
+            "MANUELL_AUSGELESENE"
+          ]
+        },
+        {
+          "description": "Unknown or future variant — produced when deserializing a value\nthat is not yet known to this version of the library.",
+          "type": "string",
+          "const": "UNKNOWN"
+        }
+      ]
+    },
+    "Messwertstatus": {
+      "description": "Der Status eines Zählerstandes",
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "ABGELESEN",
+            "ERSATZWERT",
+            "ANGABE_FUER_LIEFERSCHEIN",
+            "VORSCHLAGSWERT",
+            "NICHT_VERWENDBAR",
+            "PROGNOSEWERT",
+            "VORLAEUFIGERWERT",
+            "ENERGIEMENGESUMMIERT",
+            "FEHLT"
+          ]
+        },
+        {
+          "description": "Unknown or future variant — produced when deserializing a value\nthat is not yet known to this version of the library.",
+          "type": "string",
+          "const": "UNKNOWN"
+        }
+      ]
+    },
+    "NeloId": {
+      "description": "Netzlokations-ID (NeLo-ID): 11-character alphanumeric string.\n\nCharacters must be in `[A-Za-z0-9]`. No checksum is applied.",
+      "type": "string"
+    },
+    "Netzebene": {
+      "description": "Auflistung möglicher Netzebenen innerhalb der Energiearten Strom und Gas.",
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "NSP",
+            "MSP",
+            "HSP",
+            "HSS",
+            "MSP_NSP_UMSP",
+            "HSP_MSP_UMSP",
+            "HSS_HSP_UMSP",
+            "HD",
+            "MD",
+            "ND"
+          ]
+        },
+        {
+          "description": "Unknown or future variant — produced when deserializing a value\nthat is not yet known to this version of the library.",
+          "type": "string",
+          "const": "UNKNOWN"
+        }
+      ]
+    },
+    "Netzlokation": {
+      "description": "Object containing information about a Netzlokation\n\n> **Note:** [Netzlokation JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202501.0.0/src/bo4e_schemas/bo/Netzlokation.json)",
+      "type": "object",
+      "properties": {
+        "_id": {
+          "description": "Eine generische ID, die für eigene Zwecke genutzt werden kann.\nZ.B. könnten hier UUIDs aus einer Datenbank stehen oder URLs zu einem Backend-System.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "_typ": {
+          "description": "BO type identifier — always `BoTyp::Netzlokation` for this struct.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BoTyp"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "_version": {
+          "description": "Version der BO-Struktur aka \"fachliche Versionierung\"",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "eigenschaftMsbLokation": {
+          "description": "Eigenschaft des Messstellenbetreibers an der Lokation",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Marktrolle"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "grundzustaendigerMsbCodenr": {
+          "description": "Codenummer des grundzuständigen Messstellenbetreibers, der für diese Netzlokation zuständig ist.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MarktpartnerId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "konfigurationsprodukte": {
+          "description": "Produkt-Daten der Netzlokation",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/$defs/Konfigurationsprodukt"
+          }
+        },
+        "lokationsbuendelObjektcode": {
+          "description": "Lokationsbuendel Code, der die Funktion dieses BOs an der Lokationsbuendelstruktur beschreibt.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "lokationszuordnungen": {
+          "description": "Lokationszuordnung, um bspw. die zugehörigen Messlokationen anzugeben",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/$defs/Lokationszuordnung"
+          }
+        },
+        "netzanschlussleistung": {
+          "description": "Netzanschlussleistungsmenge der Netzlokation",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Menge"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "netzlokationsId": {
+          "description": "Identifikationsnummer einer Netzlokation, an der Energie entweder verbraucht, oder erzeugt wird",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/NeloId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "obiskennzahl": {
+          "description": "Die OBIS-Kennzahl für die Netzlokation",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "sparte": {
+          "description": "Sparte der Netzlokation, z.B. Gas oder Strom.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Sparte"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "steuerkanal": {
+          "description": "Ob ein Steuerkanal der Netzlokation zugeordnet ist und somit die Netzlokation gesteuert werden kann.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "verwendungszweck": {
+          "description": "Verwendungungszweck der Werte Netzlokation",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/VerwendungszweckProMarktrolle"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "zusatzAttribute": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/$defs/ZusatzAttribut"
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "ObisCode": {
+      "description": "OBIS identifier (IEC 62056-61 / BDEW): compact reference for metering values.\n\nGrammar: `[A-B:]C.D[.E][*F]`\n\nAll components are non-negative integers.  Components `A`, `B`, `E`, and `F`\nare optional; `C` and `D` are mandatory.\n\nThe stored string is **normalised** at construction time: the alternative `&`\nseparator for the F component is converted to `*`.  Two codes that differ\nonly in separator are therefore equal.\n\nUse [`ObisCode::components`] to access the parsed values.\n\n# Examples\n```\nuse rubo4e::identifiers::ObisCode;\n\nObisCode::new(\"1-0:1.8.1\").unwrap();   // A-B:C.D.E\nObisCode::new(\"1-0:1.8.0*255\").unwrap(); // with F component\nObisCode::new(\"1:1.8\").unwrap();           // A-only prefix (B absent)\nObisCode::new(\"1.8.1\").unwrap();          // C.D.E only\nObisCode::new(\"1.8\").unwrap();            // C.D only\n// & separator is accepted and normalised to *\nassert_eq!(ObisCode::new(\"1.8.1&255\").unwrap(), ObisCode::new(\"1.8.1*255\").unwrap());\n// A-only: components() returns b = None\nlet c = ObisCode::new(\"1:1.8\").unwrap().components();\nassert_eq!(c.a, Some(1));\nassert_eq!(c.b, None);\nassert_eq!(c.c, 1);\nassert_eq!(c.d, 8);\n```",
+      "type": "string"
+    },
+    "Organisationstyp": {
+      "description": "Hier wird festgelegt, ob der Geschäftspartner eine Person, eine Firma oder etwas anderes ist.",
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "PRIVATPERSON",
+            "UNTERNEHMEN",
+            "KOMMUNALE_EINRICHTUNG",
+            "STAATLICHE_BEHOERDE"
+          ]
+        },
+        {
+          "description": "Unknown or future variant — produced when deserializing a value\nthat is not yet known to this version of the library.",
+          "type": "string",
+          "const": "UNKNOWN"
+        }
+      ]
+    },
+    "Person": {
+      "description": "Object containing information about a Person\n\n> **Note:** [Person JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202501.0.0/src/bo4e_schemas/bo/Person.json)",
+      "type": "object",
+      "properties": {
+        "_id": {
+          "description": "Eine generische ID, die für eigene Zwecke genutzt werden kann.\nZ.B. könnten hier UUIDs aus einer Datenbank stehen oder URLs zu einem Backend-System.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "_typ": {
+          "description": "BO type identifier — always `BoTyp::Person` for this struct.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BoTyp"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "_version": {
+          "description": "Version der BO-Struktur aka \"fachliche Versionierung\"",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "adresse": {
+          "description": "Adresse der Person, falls diese von der Adresse des Geschäftspartners abweicht",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Adresse"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "anrede": {
+          "description": "Mögliche Anrede der Person",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Anrede"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "geburtsdatum": {
+          "description": "Geburtsdatum der Person",
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "individuelleAnrede": {
+          "description": "Im Falle einer nicht standardisierten Anrede kann hier eine frei definierbare Anrede vorgegeben werden.\nBeispiel: \"Vereinsgemeinschaft\", \"Pfarrer\", \"Hochwürdigster Herr Abt\".",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "kommentar": {
+          "description": "Weitere Informationen zur Person",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "kontaktwege": {
+          "description": "Kontaktwege der Person",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/$defs/Kontaktweg"
+          }
+        },
+        "nachname": {
+          "description": "Nachname (Familienname) der Person",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "titel": {
+          "description": "Möglicher Titel der Person",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Titel"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "vorname": {
+          "description": "Vorname der Person",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "zusatzAttribute": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/$defs/ZusatzAttribut"
+          }
+        },
+        "zustaendigkeiten": {
+          "description": "Liste der Abteilungen und Zuständigkeiten der Person",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/$defs/Zustaendigkeit"
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "Registeranzahl": {
+      "description": "Die Registeranzahl wird verwendet zur Charakterisierung von Zählern und daraus resultierenden Tarifen.",
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "EINTARIF",
+            "ZWEITARIF",
+            "MEHRTARIF"
+          ]
+        },
+        {
+          "description": "Unknown or future variant — produced when deserializing a value\nthat is not yet known to this version of the library.",
+          "type": "string",
+          "const": "UNKNOWN"
+        }
+      ]
+    },
+    "Rollencodetyp": {
+      "description": "Gibt den Codetyp einer Rolle, beispielsweise einer Marktrolle, an.",
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "BDEW",
+            "DVGW",
+            "GLN"
+          ]
+        },
+        {
+          "description": "Unknown or future variant — produced when deserializing a value\nthat is not yet known to this version of the library.",
+          "type": "string",
+          "const": "UNKNOWN"
+        }
+      ]
+    },
+    "Sparte": {
+      "description": "Unterscheidungsmöglichkeiten für die Sparte.",
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "STROM",
+            "GAS",
+            "FERNWAERME",
+            "NAHWAERME",
+            "WASSER",
+            "ABWASSER",
+            "STROM_UND_GAS"
+          ]
+        },
+        {
+          "description": "Unknown or future variant — produced when deserializing a value\nthat is not yet known to this version of the library.",
+          "type": "string",
+          "const": "UNKNOWN"
+        }
+      ]
+    },
+    "Speicherart": {
+      "description": "Art der Speicherung",
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "WASSERSTOFFSPEICHER",
+            "PUMPSPEICHER",
+            "BATTERIESPEICHER",
+            "SONSTIGE_SPEICHERART"
+          ]
+        },
+        {
+          "description": "Unknown or future variant — produced when deserializing a value\nthat is not yet known to this version of the library.",
+          "type": "string",
+          "const": "UNKNOWN"
+        }
+      ]
+    },
+    "SrId": {
+      "description": "Steuerbare-Ressource-ID (SR-ID): 11-digit string validated by BDEW checksum.\n\nUses the same alternating-weight checksum algorithm as [`MaloId`](super::MaloId).\n\n# Examples\n```\nuse rubo4e::identifiers::SrId;\n\nlet id_str = \"51238696780\"; // valid check digit = 0\n// SrId::new(id_str) succeeds for any correctly-checksummed 11-digit string.\n```",
+      "type": "string"
+    },
+    "SteuerbareRessource": {
+      "description": "Object containing information about a steuerbare Ressource\n\n> **Note:** [SteuerbareRessource JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202501.0.0/src/bo4e_schemas/bo/SteuerbareRessource.json)",
+      "type": "object",
+      "properties": {
+        "_id": {
+          "description": "Eine generische ID, die für eigene Zwecke genutzt werden kann.\nZ.B. könnten hier UUIDs aus einer Datenbank stehen oder URLs zu einem Backend-System.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "_typ": {
+          "description": "BO type identifier — always `BoTyp::SteuerbareRessource` for this struct.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BoTyp"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "_version": {
+          "description": "Version der BO-Struktur aka \"fachliche Versionierung\"",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "eigenschaftMsbLokation": {
+          "description": "Eigenschaft des Messstellenbetreibers an der Lokation",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Marktrolle"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "konfigurationsprodukte": {
+          "description": "Produkt-Daten der Steuerbaren Ressource",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/$defs/Konfigurationsprodukt"
+          }
+        },
+        "lokationsbuendelObjektcode": {
+          "description": "Lokationsbuendel Code, der die Funktion dieses BOs an der Lokationsbuendelstruktur beschreibt.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "lokationszuordnungen": {
+          "description": "Lokationszuordnung, um bspw. die zugehörigen Messlokationen anzugeben",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/$defs/Lokationszuordnung"
+          }
+        },
+        "steuerbareRessourceId": {
+          "description": "Id der steuerbaren Ressource",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SrId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "steuerkanalLeistungsbeschreibung": {
+          "description": "Leistungsbeschreibung des Steuerkanals",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SteuerkanalLeistungsbeschreibung"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "zugeordneteMsbCodenummer": {
+          "description": "Angabe des Messstellenbetreibers, der der Steuerbaren Ressource zugeordnet ist.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MarktpartnerId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "zusatzAttribute": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/$defs/ZusatzAttribut"
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "SteuerkanalLeistungsbeschreibung": {
+      "description": "Beschreibung des Steuerkanals",
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "AN_AUS",
+            "GESTUFT"
+          ]
+        },
+        {
+          "description": "Unknown or future variant — produced when deserializing a value\nthat is not yet known to this version of the library.",
+          "type": "string",
+          "const": "UNKNOWN"
+        }
+      ]
+    },
+    "TechnischeRessource": {
+      "description": "Object containing information about a technische Ressource\n\n> **Note:** [TechnischeRessource JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202501.0.0/src/bo4e_schemas/bo/TechnischeRessource.json)",
+      "type": "object",
+      "properties": {
+        "_id": {
+          "description": "Eine generische ID, die für eigene Zwecke genutzt werden kann.\nZ.B. könnten hier UUIDs aus einer Datenbank stehen oder URLs zu einem Backend-System.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "_typ": {
+          "description": "BO type identifier — always `BoTyp::TechnischeRessource` for this struct.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BoTyp"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "_version": {
+          "description": "Version der BO-Struktur aka \"fachliche Versionierung\"",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "emobilitaetsart": {
+          "description": "Art der E-Mobilität",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/EMobilitaetsart"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "erzeugungsart": {
+          "description": "Art der Erzeugung der Energie",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Erzeugungsart"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "lokationsbuendelObjektcode": {
+          "description": "Lokationsbuendel Code, der die Funktion dieses BOs an der Lokationsbuendelstruktur beschreibt.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "lokationszuordnungen": {
+          "description": "Lokationszuordnung, um bspw. die zugehörigen Messlokationen anzugeben",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/$defs/Lokationszuordnung"
+          }
+        },
+        "nennleistungabgabe": {
+          "description": "Nennleistung (Abgabe)",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Menge"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "nennleistungaufnahme": {
+          "description": "Nennleistung (Aufnahme)",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Menge"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "speicherart": {
+          "description": "Art des Speichers",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Speicherart"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "speicherkapazitaet": {
+          "description": "Speicherkapazität",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Menge"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "technischeRessourceId": {
+          "description": "Identifikationsnummer einer technischen Ressource",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TrId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "technischeRessourceNutzung": {
+          "description": "Art und Nutzung der technischen Ressource",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TechnischeRessourceNutzung"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "technischeRessourceVerbrauchsart": {
+          "description": "Verbrauchsart der technischen Ressource",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TechnischeRessourceVerbrauchsart"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "vorgelagerteMesslokationId": {
+          "description": "Vorgelagerte Messlokation ID",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "waermenutzung": {
+          "description": "Wärmenutzung",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Waermenutzung"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "zugeordneteMarktlokationId": {
+          "description": "Referenz auf die der technischen Ressource zugeordneten Marktlokation",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "zugeordneteSteuerbareRessourceId": {
+          "description": "Referenz auf die der technischen Ressource zugeordneten Steuerbaren Ressource",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "zusatzAttribute": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/$defs/ZusatzAttribut"
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "TechnischeRessourceNutzung": {
+      "description": "Nutzung der technischen Ressource",
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "STROMVERBRAUCHSART",
+            "STROMERZEUGUNGSART",
+            "SPEICHER"
+          ]
+        },
+        {
+          "description": "Unknown or future variant — produced when deserializing a value\nthat is not yet known to this version of the library.",
+          "type": "string",
+          "const": "UNKNOWN"
+        }
+      ]
+    },
+    "TechnischeRessourceVerbrauchsart": {
+      "description": "Verbrauchsart der technischen Ressource",
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "KRAFT_LICHT",
+            "WAERME",
+            "E_MOBILITAET",
+            "STRASSENBELEUCHTUNG"
+          ]
+        },
+        {
+          "description": "Unknown or future variant — produced when deserializing a value\nthat is not yet known to this version of the library.",
+          "type": "string",
+          "const": "UNKNOWN"
+        }
+      ]
+    },
+    "Themengebiet": {
+      "description": "Über dieses ENUM kann eine thematische Zuordnung, beispielsweise eines Ansprechpartners, vorgenommen werden.",
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "ALLGEMEINER_INFORMATIONSAUSTAUSCH",
+            "AN_UND_ABMELDUNG",
+            "ANSPRECHPARTNER_ALLGEMEIN",
+            "ANSPRECHPARTNER_BDEW_DVGW",
+            "ANSPRECHPARTNER_IT_TECHNIK",
+            "BILANZIERUNG",
+            "BILANZKREISKOORDINATOR",
+            "BILANZKREISVERANTWORTLICHER",
+            "DATENFORMATE_ZERTIFIKATE_VERSCHLUESSELUNGEN",
+            "DEBITORENMANAGEMENT",
+            "DEMAND_SIDE_MANAGEMENT",
+            "EDI_VEREINBARUNG",
+            "EDIFACT",
+            "ENERGIEDATENMANAGEMENT",
+            "FAHRPLANMANAGEMENT",
+            "ALOCAT",
+            "APERAK",
+            "CONTRL",
+            "INVOIC",
+            "MSCONS",
+            "ORDERS",
+            "ORDERSP",
+            "REMADV",
+            "UTILMD",
+            "GABI",
+            "GELI",
+            "GERAETERUECKGABE",
+            "GERAETEWECHSEL",
+            "GPKE",
+            "INBETRIEBNAHME",
+            "KAPAZITAETSMANAGEMENT",
+            "KLAERFAELLE",
+            "LASTGAENGE_RLM",
+            "LIEFERANTENRAHMENVERTRAG",
+            "LIEFERANTENWECHSEL",
+            "MABIS",
+            "MAHNWESEN",
+            "MARKTGEBIETSVERANTWORTLICHER",
+            "MARKTKOMMUNIKATION",
+            "MEHR_MINDERMENGEN",
+            "MSB_MDL",
+            "NETZABRECHNUNG",
+            "NETZENTGELTE",
+            "NETZMANAGEMENT",
+            "RECHT",
+            "REGULIERUNGSMANAGEMENT",
+            "REKLAMATIONEN",
+            "SPERREN_ENTSPERREN_INKASSO",
+            "STAMMDATEN",
+            "STOERUNGSFAELLE",
+            "TECHNISCHE_FRAGEN",
+            "UMSTELLUNG_INVOIC",
+            "VERSCHLUESSELUNG_SIGNATUR",
+            "VERTRAGSMANAGEMENT",
+            "VERTRIEB",
+            "WIM",
+            "ZAEHLERSTAENDE_SLP",
+            "ZAHLUNGSVERKEHR",
+            "ZUORDNUNGSVEREINBARUNG",
+            "EINSPEISUNG",
+            "BEWEGUNGSDATEN"
+          ]
+        },
+        {
+          "description": "Unknown or future variant — produced when deserializing a value\nthat is not yet known to this version of the library.",
+          "type": "string",
+          "const": "UNKNOWN"
+        }
+      ]
+    },
+    "Titel": {
+      "description": "Übersicht möglicher Titel, z.B. eines Geschäftspartners.",
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "DR",
+            "PROF",
+            "PROF_DR"
+          ]
+        },
+        {
+          "description": "Unknown or future variant — produced when deserializing a value\nthat is not yet known to this version of the library.",
+          "type": "string",
+          "const": "UNKNOWN"
+        }
+      ]
+    },
+    "TrId": {
+      "description": "Technische-Ressource-ID (TR-ID): 11-digit string validated by BDEW checksum.\n\nUses the same alternating-weight checksum algorithm as [`MaloId`](super::MaloId).",
+      "type": "string"
+    },
+    "Verbrauch": {
+      "description": "Abbildung eines zeitlich abgegrenzten Verbrauchs\n\n> **Note:** [Verbrauch JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202501.0.0/src/bo4e_schemas/com/Verbrauch.json)",
+      "type": "object",
+      "properties": {
+        "_id": {
+          "description": "Eine generische ID, die für eigene Zwecke genutzt werden kann.\nZ.B. könnten hier UUIDs aus einer Datenbank stehen oder URLs zu einem Backend-System.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "_typ": {
+          "description": "COM type identifier for this struct.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ComTyp"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "_version": {
+          "description": "Version der COM-Struktur aka \"fachliche Versionierung\"",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "einheit": {
+          "description": "Gibt die Einheit zum jeweiligen Wert an",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Mengeneinheit"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "enddatum": {
+          "description": "Exklusives Ende des Zeitraumes, für den der Verbrauch angegeben wird",
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "messwertstatus": {
+          "description": "Messwertstatus includes the plausibility of the value",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Messwertstatus"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "obisKennzahl": {
+          "description": "Die OBIS-Kennzahl für den Wert, die festlegt, welche Größe mit dem Stand gemeldet wird, z.B. '1-0:",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ObisCode"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "startdatum": {
+          "description": "Inklusiver Beginn des Zeitraumes, für den der Verbrauch angegeben wird",
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "wert": {
+          "description": "Gibt den absoluten Wert der Menge an",
+          "type": [
+            "string",
+            "number",
+            "null"
+          ],
+          "pattern": "^-?\\d+(\\.\\d+)?([eE]\\d+)?$"
+        },
+        "zusatzAttribute": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/$defs/ZusatzAttribut"
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "Verbrauchsart": {
+      "description": "Verbrauchsart einer Marktlokation.",
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "KL",
+            "KLW",
+            "KLWS",
+            "W",
+            "WS"
+          ]
+        },
+        {
+          "description": "Unknown or future variant — produced when deserializing a value\nthat is not yet known to this version of the library.",
+          "type": "string",
+          "const": "UNKNOWN"
+        }
+      ]
+    },
+    "Verwendungszweck": {
+      "description": "Verwendungszweck der Werte Marktlokation",
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "NETZNUTZUNGSABRECHNUNG",
+            "BILANZKREISABRECHNUNG",
+            "MEHRMINDERMENGENABRECHNUNG",
+            "ENDKUNDENABRECHNUNG",
+            "UEBERMITTLUNG_AN_DAS_HKNR",
+            "ERMITTLUNG_AUSGEGLICHENHEIT_BILANZKREIS"
+          ]
+        },
+        {
+          "description": "Unknown or future variant — produced when deserializing a value\nthat is not yet known to this version of the library.",
+          "type": "string",
+          "const": "UNKNOWN"
+        }
+      ]
+    },
+    "VerwendungszweckProMarktrolle": {
+      "description": "Dient zur Identifizierung des Verwendungszwecks der Marktrolle an der Marktlokation, der die Werte zu übermitteln sind.\n\n> **Note:** [Verwendungszweck JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202501.0.0/src/bo4e_schemas/com/Verwendungszweck.json)",
+      "type": "object",
+      "properties": {
+        "_id": {
+          "description": "Eine generische ID, die für eigene Zwecke genutzt werden kann.\nZ.B. könnten hier UUIDs aus einer Datenbank stehen oder URLs zu einem Backend-System.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "_typ": {
+          "description": "COM type identifier for this struct.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ComTyp"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "_version": {
+          "description": "Version der COM-Struktur aka \"fachliche Versionierung\"",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "marktrolle": {
+          "description": "Marktrolle, für die die Daten relevant sind",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Marktrolle"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "zusatzAttribute": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/$defs/ZusatzAttribut"
+          }
+        },
+        "zwecke": {
+          "description": "Verwendungszwecke",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/$defs/Verwendungszweck"
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "Waermenutzung": {
+      "description": "Wärmenutzung Marktlokation",
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "SPEICHERHEIZUNG",
+            "WAERMEPUMPE",
+            "DIREKTHEIZUNG"
+          ]
+        },
+        {
+          "description": "Unknown or future variant — produced when deserializing a value\nthat is not yet known to this version of the library.",
+          "type": "string",
+          "const": "UNKNOWN"
+        }
+      ]
+    },
+    "Zaehler": {
+      "description": "Object containing information about a meter/\"Zaehler\".\n\n> **Note:** [Zaehler JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202501.0.0/src/bo4e_schemas/bo/Zaehler.json)",
+      "type": "object",
+      "properties": {
+        "_id": {
+          "description": "Eine generische ID, die für eigene Zwecke genutzt werden kann.\nZ.B. könnten hier UUIDs aus einer Datenbank stehen oder URLs zu einem Backend-System.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "_typ": {
+          "description": "BO type identifier — always `BoTyp::Zaehler` for this struct.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BoTyp"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "_version": {
+          "description": "Version der BO-Struktur aka \"fachliche Versionierung\"",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "befestigungsart": {
+          "description": "Befestigungsart",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Befestigungsart"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "eichungBis": {
+          "description": "Bis zu diesem Datum (exklusiv) ist der Zähler geeicht.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "geraete": {
+          "description": "Liste der Geräte, die zu diesem Zähler gehören, bspw. Smartmeter-Gateway",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/$defs/Geraet"
+          }
+        },
+        "istFernschaltbar": {
+          "description": "Fernschaltung",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "letzteEichung": {
+          "description": "Zu diesem Datum fand die letzte Eichprüfung des Zählers statt.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "messwerterfassung": {
+          "description": "Messwerterfassung des Zählers",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Messwerterfassung"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "registeranzahl": {
+          "description": "Spezifikation bezüglich unterstützter Tarif",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Registeranzahl"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "sparte": {
+          "description": "Strom oder Gas",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Sparte"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "zaehlerauspraegung": {
+          "description": "Spezifikation die Richtung des Zählers betreffend",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Zaehlerauspraegung"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "zaehlergroesse": {
+          "description": "Größe des Zählers",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Zaehlergroesse"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "zaehlerhersteller": {
+          "description": "Der Hersteller des Zählers",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Geschaeftspartner"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "zaehlerkonstante": {
+          "description": "Zählerkonstante auf dem Zähler",
+          "type": [
+            "string",
+            "number",
+            "null"
+          ],
+          "pattern": "^-?\\d+(\\.\\d+)?([eE]\\d+)?$"
+        },
+        "zaehlernummer": {
+          "description": "Nummerierung des Zählers,vergeben durch den Messstellenbetreiber",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "zaehlertyp": {
+          "description": "Typisierung des Zählers",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Zaehlertyp"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "zaehlertypSpezifikation": {
+          "description": "Besondere Spezifikation des Zählers",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ZaehlertypSpezifikation"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "zaehlwerke": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/$defs/Zaehlwerk"
+          }
+        },
+        "zusatzAttribute": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/$defs/ZusatzAttribut"
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "Zaehlerauspraegung": {
+      "description": "Gibt an, ob es sich um einen Einrichtungs- oder Zweirichtungszähler handelt.",
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "EINRICHTUNGSZAEHLER",
+            "ZWEIRICHTUNGSZAEHLER"
+          ]
+        },
+        {
+          "description": "Unknown or future variant — produced when deserializing a value\nthat is not yet known to this version of the library.",
+          "type": "string",
+          "const": "UNKNOWN"
+        }
+      ]
+    },
+    "Zaehlergroesse": {
+      "description": "Auflistung möglicher Größen von Zählern",
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "G2KOMMA5",
+            "G4",
+            "G6",
+            "G10",
+            "G16",
+            "G25",
+            "G40",
+            "G65",
+            "G100",
+            "G160",
+            "G250",
+            "G400",
+            "G650",
+            "G1000",
+            "G1600",
+            "G2500",
+            "G4000",
+            "G6500",
+            "G10000",
+            "G12500",
+            "G16000"
+          ]
+        },
+        {
+          "description": "Unknown or future variant — produced when deserializing a value\nthat is not yet known to this version of the library.",
+          "type": "string",
+          "const": "UNKNOWN"
+        }
+      ]
+    },
+    "Zaehlertyp": {
+      "description": "Bei diesem Enum handelt es sich um die Abbildung von Zählertypen der Sparten Strom und Gas.",
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "DREHSTROMZAEHLER",
+            "BALGENGASZAEHLER",
+            "DREHKOLBENZAEHLER",
+            "LEISTUNGSZAEHLER",
+            "MAXIMUMZAEHLER",
+            "TURBINENRADGASZAEHLER",
+            "ULTRASCHALLGASZAEHLER",
+            "WECHSELSTROMZAEHLER",
+            "MODERNE_MESSEINRICHTUNG",
+            "INTELLIGENTES_MESSSYSTEM",
+            "ELEKTRONISCHER_ZAEHLER",
+            "WIRBELGASZAEHLER",
+            "WASSERZAEHLER"
+          ]
+        },
+        {
+          "description": "Unknown or future variant — produced when deserializing a value\nthat is not yet known to this version of the library.",
+          "type": "string",
+          "const": "UNKNOWN"
+        }
+      ]
+    },
+    "ZaehlertypSpezifikation": {
+      "description": "Bei diesem Enum handelt es sich um die Abbildung von besonderen Zählertyp-Spezifikationen der Sparten Strom und Gas.",
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "EDL40",
+            "EDL21",
+            "SONSTIGER_EHZ",
+            "MME_STANDARD",
+            "MME_MEDA"
+          ]
+        },
+        {
+          "description": "Unknown or future variant — produced when deserializing a value\nthat is not yet known to this version of the library.",
+          "type": "string",
+          "const": "UNKNOWN"
+        }
+      ]
+    },
+    "Zaehlwerk": {
+      "description": "Mit dieser Komponente werden Zählwerke modelliert.\n\n> **Note:** [Zaehlwerk JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202501.0.0/src/bo4e_schemas/com/Zaehlwerk.json)",
+      "type": "object",
+      "properties": {
+        "_id": {
+          "description": "Eine generische ID, die für eigene Zwecke genutzt werden kann.\nZ.B. könnten hier UUIDs aus einer Datenbank stehen oder URLs zu einem Backend-System.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "_typ": {
+          "description": "COM type identifier for this struct.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ComTyp"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "_version": {
+          "description": "Version der COM-Struktur aka \"fachliche Versionierung\"",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "anzahlAblesungen": {
+          "description": "Anzahl Ablesungen pro Jahr",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int64"
+        },
+        "bezeichnung": {
+          "description": "Zusätzliche Bezeichnung, z.B. Zählwerk_Wirkarbeit.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "einheit": {
+          "description": "Die Einheit der gemessenen Größe, z.B. kWh",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Mengeneinheit"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "istAbrechnungsrelevant": {
+          "description": "Abrechnungsrelevant",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "istSchwachlastfaehig": {
+          "description": "Schwachlastfaehigkeit",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "istSteuerbefreit": {
+          "description": "Steuerbefreiung",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "istUnterbrechbar": {
+          "description": "Unterbrechbarkeit Marktlokation",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "konzessionsabgabe": {
+          "description": "Konzessionsabgabe",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Konzessionsabgabe"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "nachkommastelle": {
+          "description": "Anzahl der Nachkommastellen",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int64"
+        },
+        "obisKennzahl": {
+          "description": "Die OBIS-Kennzahl für das Zählwerk, die festlegt, welche auf die gemessene Größe mit dem Stand gemeldet wird.\nNur Zählwerkstände mit dieser OBIS-Kennzahl werden an diesem Zählwerk registriert.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ObisCode"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "richtung": {
+          "description": "Die Energierichtung, Einspeisung oder Ausspeisung.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Energierichtung"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "verbrauchsart": {
+          "description": "Stromverbrauchsart/Verbrauchsart Marktlokation",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Verbrauchsart"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "verwendungszwecke": {
+          "description": "Verwendungungszweck der Werte Marktlokation",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/$defs/VerwendungszweckProMarktrolle"
+          }
+        },
+        "vorkommastelle": {
+          "description": "Anzahl der Vorkommastellen",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int64"
+        },
+        "waermenutzung": {
+          "description": "Wärmenutzung Marktlokation",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Waermenutzung"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "wandlerfaktor": {
+          "description": "Mit diesem Faktor wird eine Zählerstandsdifferenz multipliziert, um zum eigentlichen Verbrauch im Zeitraum\nzu kommen.",
+          "type": [
+            "string",
+            "number",
+            "null"
+          ],
+          "pattern": "^-?\\d+(\\.\\d+)?([eE]\\d+)?$"
+        },
+        "zaehlwerkId": {
+          "description": "Identifikation des Zählwerks (Registers) innerhalb des Zählers.\nOftmals eine laufende Nummer hinter der Zählernummer. Z.B. 47110815_1",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "zaehlzeitregister": {
+          "description": "Erweiterte Definition der Zählzeit in Bezug auf ein Register",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Zaehlzeitregister"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "zusatzAttribute": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/$defs/ZusatzAttribut"
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "Zaehlzeitregister": {
+      "description": "Mit dieser Komponente werden Zählzeitregister modelliert. Ein Zählzeitregister beschreibt eine erweiterte Definition der Zählzeit\nin Bezug auf ein Register. Dabei werden alle Codes dazu vom Netzbetreiber vergeben.\n\n> **Note:** [Zaehlzeitregister JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202501.0.0/src/bo4e_schemas/com/Zaehlzeitregister.json)",
+      "type": "object",
+      "properties": {
+        "_id": {
+          "description": "Eine generische ID, die für eigene Zwecke genutzt werden kann.\nZ.B. könnten hier UUIDs aus einer Datenbank stehen oder URLs zu einem Backend-System.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "_typ": {
+          "description": "COM type identifier for this struct.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ComTyp"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "_version": {
+          "description": "Version der COM-Struktur aka \"fachliche Versionierung\"",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "istSchwachlastfaehig": {
+          "description": "Schwachlastfaehigkeit",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "zaehlzeitDefinition": {
+          "description": "Zählzeitdefinition",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "zaehlzeitRegister": {
+          "description": "Zählzeitregister",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "zusatzAttribute": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/$defs/ZusatzAttribut"
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "Zeitraum": {
+      "description": "Diese Komponente wird zur Abbildung von Zeiträumen in Form von Dauern oder der Angabe von Start und Ende verwendet.\nEs muss daher eine der drei Möglichkeiten angegeben sein:\n- Einheit und Dauer oder\n- Zeitraum: Startdatum bis Enddatum oder\n- Zeitraum: Startzeitpunkt (Datum und Uhrzeit) bis Endzeitpunkt (Datum und Uhrzeit)\n\n> **Note:** [Zeitraum JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202501.0.0/src/bo4e_schemas/com/Zeitraum.json)",
+      "type": "object",
+      "properties": {
+        "_id": {
+          "description": "Eine generische ID, die für eigene Zwecke genutzt werden kann.\nZ.B. könnten hier UUIDs aus einer Datenbank stehen oder URLs zu einem Backend-System.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "_typ": {
+          "description": "COM type identifier for this struct.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ComTyp"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "_version": {
+          "description": "Version der COM-Struktur aka \"fachliche Versionierung\"",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "dauer": {
+          "description": "Dauer in ISO 8601 Format.\n\nExample:\n'P1DT30H4S'\n\nSee [RFC 3339](https://datatracker.ietf.org/doc/html/rfc3339)",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "enddatum": {
+          "description": "Enddatum des betrachteten Zeitraums ist **inklusiv**.\n\nExample:\n'2025-01-01'",
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "enduhrzeit": {
+          "description": "Enduhrzeit mit Zeitzone. Die angegebene Uhrzeit ist im betrachteten Zeitraum **exklusiv**.\n\nExample:\n'19:00:00+01:00'",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "startdatum": {
+          "description": "Startdatum des betrachteten Zeitraums ist **inklusiv**.\n\nExample:\n'2025-01-01'",
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "startuhrzeit": {
+          "description": "Startuhrzeit mit Zeitzone. Die angegebene Uhrzeit ist im betrachteten Zeitraum **inklusiv**.\n\nExample:\n'18:00:00+01:00'",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "zusatzAttribute": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/$defs/ZusatzAttribut"
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "ZusatzAttribut": {
+      "description": "Viele Datenobjekte weisen in unterschiedlichen Systemen eine eindeutige ID (Kundennummer, GP-Nummer etc.) auf.\nBeim Austausch von Datenobjekten zwischen verschiedenen Systemen ist es daher hilfreich,\nsich die eindeutigen IDs der anzubindenden Systeme zu merken.\n\n> **Note:** [ZusatzAttribut JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202501.0.0/src/bo4e_schemas/ZusatzAttribut.json)",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "wert": true
+      },
+      "additionalProperties": true
+    },
+    "Zustaendigkeit": {
+      "description": "Enthält die zeitliche Zuordnung eines Ansprechpartners zu Abteilungen und Zuständigkeiten.\n\n> **Note:** [Zustaendigkeit JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202501.0.0/src/bo4e_schemas/com/Zustaendigkeit.json)",
+      "type": "object",
+      "properties": {
+        "_id": {
+          "description": "Eine generische ID, die für eigene Zwecke genutzt werden kann.\nZ.B. könnten hier UUIDs aus einer Datenbank stehen oder URLs zu einem Backend-System.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "_typ": {
+          "description": "COM type identifier for this struct.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ComTyp"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "_version": {
+          "description": "Version der COM-Struktur aka \"fachliche Versionierung\"",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "abteilung": {
+          "description": "Abteilung, in der der Ansprechpartner/ die Person tätig ist",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "position": {
+          "description": "Berufliche Rolle des Ansprechpartners/ der Person",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "themengebiet": {
+          "description": "Hier kann eine thematische Zuordnung des Ansprechpartners bzw. der Person angegeben werden",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Themengebiet"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "zusatzAttribute": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/$defs/ZusatzAttribut"
+          }
+        }
+      },
+      "additionalProperties": true
+    }
+  }
+}

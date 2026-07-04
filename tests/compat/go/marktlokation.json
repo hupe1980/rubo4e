@@ -1,0 +1,16 @@
+{
+  "_typ": "MARKTLOKATION",
+  "_version": "v202501.0.0",
+  "marktlokationsId": "51238696780",
+  "sparte": "STROM",
+  "energierichtung": "AUSSP",
+  "bilanzierungsmethode": "RLM",
+  "netzebene": "MSP",
+  "lokationsadresse": {
+    "_version": "v202501.0.0",
+    "postleitzahl": "20095",
+    "ort": "Hamburg",
+    "strasse": "Mönckebergstraße",
+    "hausnummer": "7"
+  }
+}
