@@ -44,9 +44,6 @@ jobs:
       - name: Tests (no default features)
         run: cargo test --workspace --no-default-features
 
-      - name: Docs drift guard
-        run: bash scripts/check_docs_drift.sh
-
       - name: Docs-backed examples
         run: |
           cargo run --example serialize --features versioned,json

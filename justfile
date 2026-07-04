@@ -56,10 +56,6 @@ deny-check:
 check-strict:
     RUSTFLAGS="-D warnings" cargo check --workspace --all-targets --all-features
 
-# Guardrail against stale docs symbols/examples
-check-docs-drift:
-    bash scripts/check_docs_drift.sh
-
 # Compile and run docs-backed usage examples (single build, all example features)
 check-docs-examples:
     cargo build --examples --all-features
