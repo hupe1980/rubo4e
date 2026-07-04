@@ -966,7 +966,7 @@ fn peek_typ_field(raw: &str) -> &str {
                         let rest = &raw[i..];
                         if rest.starts_with(NEEDLE) {
                             // Skip past the key and any whitespace/colon.
-                            let after_key = &rest[NEEDLE.len()..];
+                            let after_key = rest.strip_prefix(NEEDLE).unwrap_or_default();
                             let after_colon = after_key
                                 .trim_start_matches([' ', '\t', '\n', '\r'])
                                 .trim_start_matches(':')

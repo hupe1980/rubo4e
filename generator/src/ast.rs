@@ -1,7 +1,6 @@
-/// Abstract Syntax Tree produced by the JSON Schema parser.
-///
-/// Each variant represents one top-level schema definition in a BO4E release.
-
+//! Abstract Syntax Tree produced by the JSON Schema parser.
+//!
+//! Each variant represents one top-level schema definition in a BO4E release.
 // ─── Field types ─────────────────────────────────────────────────────────────
 
 /// Primitive Rust scalar that a field maps to.

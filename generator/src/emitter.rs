@@ -183,7 +183,7 @@ pub fn emit_node(node: &SchemaNode, schema_version: &str) -> Result<(String, Str
             emit_enum(&en2)
         }
     }?;
-    let filename = format!("{}.rs", heck::AsSnakeCase(&rust_name).to_string());
+    let filename = format!("{}.rs", heck::AsSnakeCase(&rust_name));
     Ok((filename, source))
 }
 
@@ -475,7 +475,7 @@ fn emit_struct_impls(
     // std::fmt::Display: forward to compact BO4E German JSON.
     // Gated on `json` because it requires serde_json (not just serde).
     // Allows ergonomic use in log messages and `format!("{val}")` contexts.
-    s.push_str(&format!("\n#[cfg(feature = \"json\")]\n"));
+    s.push_str("\n#[cfg(feature = \"json\")]\n");
     s.push_str(&format!("impl std::fmt::Display for {name} {{\n"));
     s.push_str("    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {\n");
     s.push_str("        match serde_json::to_string(self) {\n");
@@ -1008,7 +1008,7 @@ fn clean_description(desc: &str) -> String {
     // Trim trailing blank lines.
     while output
         .last()
-        .map_or(false, |l: &String| l.trim().is_empty())
+        .is_some_and(|l: &String| l.trim().is_empty())
     {
         output.pop();
     }

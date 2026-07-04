@@ -238,7 +238,7 @@ fn resolve_field_type(schema: &Value) -> FieldType {
         Some("array") => {
             let items = schema
                 .get("items")
-                .map(|i| resolve_field_type(i))
+                .map(resolve_field_type)
                 .unwrap_or(FieldType::JsonValue);
             FieldType::Array(Box::new(items))
         }

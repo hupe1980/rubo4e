@@ -8,7 +8,7 @@ the canonical data model for the German energy industry.
 > This crate aims for idiomatic Rust ergonomics, strong domain types, and ecosystem integration.
 
 [![Crates.io](https://img.shields.io/crates/v/rubo4e.svg)](https://crates.io/crates/rubo4e)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE-MIT) [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE-APACHE)
 [![Rust 1.87+](https://img.shields.io/badge/rust-1.87%2B-orange.svg)](https://www.rust-lang.org/)
 
 ---
@@ -148,7 +148,7 @@ All domain identifiers validate their format on construction:
 
 ## 📜 License
 
-Licensed under the [MIT License](LICENSE).
+Dual-licensed under [MIT](LICENSE-MIT) or [Apache 2.0](LICENSE-APACHE) — your choice.
 
 The BO4E standard itself is maintained by the
 [Interessengemeinschaft Geschäftsobjekte Energiewirtschaft e. V.](https://www.bo4e.de/).
