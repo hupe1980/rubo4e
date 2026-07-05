@@ -332,7 +332,7 @@ fn emit_struct(
     // Doc comment: strip RST directives (from BO4E Python docs) and convert to Markdown.
     if let Some(doc) = description {
         for line in clean_description(doc).lines() {
-            s.push_str(&format!("/// {}\n", line.trim()));
+            s.push_str(&format!("/// {}\n", line));
         }
     }
 
@@ -519,7 +519,7 @@ fn emit_struct_impls(
 fn emit_field(s: &mut String, field: &Field) {
     if let Some(doc) = &field.description {
         for line in clean_description(doc).lines() {
-            s.push_str(&format!("    /// {}\n", line.trim()));
+            s.push_str(&format!("    /// {}\n", line));
         }
     }
 
@@ -756,7 +756,7 @@ fn emit_enum(en: &EnumNode) -> Result<String> {
 
     if let Some(doc) = &en.description {
         for line in clean_description(doc).lines() {
-            s.push_str(&format!("/// {}\n", line.trim()));
+            s.push_str(&format!("/// {}\n", line));
         }
     }
     // Prevents downstream exhaustive match arms; complements the `Unknown` catch-all
@@ -769,7 +769,7 @@ fn emit_enum(en: &EnumNode) -> Result<String> {
     for (variant, doc) in &en.variants {
         if let Some(d) = doc {
             for line in clean_description(d).lines() {
-                s.push_str(&format!("    /// {}\n", line.trim()));
+                s.push_str(&format!("    /// {}\n", line));
             }
         }
         let raw_rust = variant.to_upper_camel_case();

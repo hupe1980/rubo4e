@@ -149,11 +149,11 @@ pub struct Bilanzierung {
     /// Verbrauchsaufteilung in % zwischen SLP und TLP-Profil.
     ///
     /// 1. [Gemessene Energiemenge der OBIS "nicht Schwachlast"] * [Verbrauchsaufteilung in % / 100%]
-    /// = [zu verlagernde Energiemenge]
+    ///    = [zu verlagernde Energiemenge]
     /// 2. [Gemessene Energiemenge der OBIS "Schwachlast"] - [zu verlagernde Energiemenge]
-    /// = [Ermittelte Energiemenge für Schwachlast]
+    ///    = [Ermittelte Energiemenge für Schwachlast]
     /// 3. [Gemessene Energiemenge der OBIS "nicht Schwachlast"] + [zu verlagernde Energiemenge]
-    /// = [Ermittelte Energiemenge für nicht Schwachlast]
+    ///    = [Ermittelte Energiemenge für nicht Schwachlast]
     #[cfg_attr(feature = "serde", serde(rename = "verbrauchsaufteilung"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]

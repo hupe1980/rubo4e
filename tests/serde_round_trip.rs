@@ -10,8 +10,8 @@ mod serde_tests {
     /// serialize to JSON that contains `"_typ":"VERTRAG"`.
     #[test]
     fn vertrag_typ_field_serializes() {
-        let mut v = Vertrag::default();
-        v.typ = Some(BoTyp::Vertrag);
+        // Vertrag::default() pre-fills typ via the custom Default impl.
+        let v = Vertrag::default();
         let json = serde_json::to_string(&v).expect("serialization failed");
         assert!(
             json.contains("\"_typ\":\"VERTRAG\""),
@@ -22,8 +22,7 @@ mod serde_tests {
     /// E04-S20: Round-trip: serialize then deserialize → identical value.
     #[test]
     fn vertrag_serde_round_trip() {
-        let mut original = Vertrag::default();
-        original.typ = Some(BoTyp::Vertrag);
+        let original = Vertrag::default();
         let json = serde_json::to_string(&original).expect("serialize failed");
         let restored: Vertrag = serde_json::from_str(&json).expect("deserialize failed");
         assert_eq!(original.typ, restored.typ);

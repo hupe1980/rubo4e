@@ -5,18 +5,18 @@
 
 use rubo4e::{
     json::Bo4eJsonExt,
-    v202501::{
-        Bilanzierungsmethode, BoTyp, Energierichtung, Marktlokation, Menge, Mengeneinheit, Sparte,
-    },
+    v202501::{Bilanzierungsmethode, Energierichtung, Marktlokation, Menge, Mengeneinheit, Sparte},
 };
 use rust_decimal::Decimal;
 use std::str::FromStr;
 
 fn main() {
     // ── Menge (COM) ──────────────────────────────────────────────────────────
-    let mut menge = Menge::default();
-    menge.wert = Some(Decimal::from_str("42.5").unwrap());
-    menge.einheit = Some(Mengeneinheit::Kwh);
+    let menge = Menge {
+        wert: Some(Decimal::from_str("42.5").unwrap()),
+        einheit: Some(Mengeneinheit::Kwh),
+        ..Default::default()
+    };
 
     println!("=== Menge — German camelCase (BO4E wire format) ===");
     println!("{}", menge.to_json_german().unwrap());
@@ -25,12 +25,14 @@ fn main() {
     println!("{}", menge.to_json_snake_case().unwrap());
 
     // ── Marktlokation (BO) ───────────────────────────────────────────────────
-    let mut malo = Marktlokation::default();
-    malo.typ = Some(BoTyp::Marktlokation);
-    malo.sparte = Some(Sparte::Strom);
-    malo.energierichtung = Some(Energierichtung::Aussp);
-    malo.bilanzierungsmethode = Some(Bilanzierungsmethode::Slp);
-    malo.bilanzierungsgebiet = Some("11YE-N-TEST--GAS-8".to_string());
+    let malo = Marktlokation {
+        sparte: Some(Sparte::Strom),
+        energierichtung: Some(Energierichtung::Aussp),
+        bilanzierungsmethode: Some(Bilanzierungsmethode::Slp),
+        bilanzierungsgebiet: Some("11YE-N-TEST--GAS-8".to_string()),
+        ..Default::default()
+    };
+    // Marktlokation::default() pre-fills typ via the custom Default impl.
 
     println!("\n=== Marktlokation — German camelCase ===");
     println!("{}", malo.to_json_german().unwrap());

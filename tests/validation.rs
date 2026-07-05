@@ -96,8 +96,10 @@ mod messlokation_tests {
 
     #[test]
     fn xor_messadresse_ok() {
-        let mut m = Messlokation::default();
-        m.messadresse = Some(Adresse::default());
+        let m = Messlokation {
+            messadresse: Some(Adresse::default()),
+            ..Default::default()
+        };
         assert!(m.validate().is_ok());
     }
 
@@ -109,9 +111,11 @@ mod messlokation_tests {
 
     #[test]
     fn xor_two_addresses_fails() {
-        let mut m = Messlokation::default();
-        m.messadresse = Some(Adresse::default());
-        m.geoadresse = Some(Geokoordinaten::default());
+        let m = Messlokation {
+            messadresse: Some(Adresse::default()),
+            geoadresse: Some(Geokoordinaten::default()),
+            ..Default::default()
+        };
         assert!(m.validate().is_err());
     }
 }
@@ -124,25 +128,31 @@ mod vertrag_tests {
 
     #[test]
     fn valid_date_range_ok() {
-        let mut v = Vertrag::default();
-        v.vertragsbeginn = Some(OffsetDateTime::from_unix_timestamp(0).unwrap());
-        v.vertragsende = Some(OffsetDateTime::from_unix_timestamp(3600).unwrap());
+        let v = Vertrag {
+            vertragsbeginn: Some(OffsetDateTime::from_unix_timestamp(0).unwrap()),
+            vertragsende: Some(OffsetDateTime::from_unix_timestamp(3600).unwrap()),
+            ..Default::default()
+        };
         assert!(v.validate().is_ok());
     }
 
     #[test]
     fn inverted_date_range_fails() {
-        let mut v = Vertrag::default();
-        v.vertragsbeginn = Some(OffsetDateTime::from_unix_timestamp(3600).unwrap());
-        v.vertragsende = Some(OffsetDateTime::from_unix_timestamp(0).unwrap());
+        let v = Vertrag {
+            vertragsbeginn: Some(OffsetDateTime::from_unix_timestamp(3600).unwrap()),
+            vertragsende: Some(OffsetDateTime::from_unix_timestamp(0).unwrap()),
+            ..Default::default()
+        };
         assert!(v.validate().is_err());
     }
 
     #[test]
     fn one_date_missing_ok() {
-        let mut v = Vertrag::default();
-        v.vertragsbeginn = Some(OffsetDateTime::from_unix_timestamp(0).unwrap());
-        // vertragsende = None → no constraint
+        let v = Vertrag {
+            vertragsbeginn: Some(OffsetDateTime::from_unix_timestamp(0).unwrap()),
+            // vertragsende = None → no constraint
+            ..Default::default()
+        };
         assert!(v.validate().is_ok());
     }
 }
@@ -159,49 +169,58 @@ mod rechnung_tests {
     }
 
     fn betrag(wert: Decimal) -> Option<Betrag> {
-        let mut b = Betrag::default();
-        b.wert = Some(wert);
-        Some(b)
+        Some(Betrag {
+            wert: Some(wert),
+            ..Default::default()
+        })
     }
 
     #[test]
     fn balanced_invoice_ok() {
-        let mut r = Rechnung::default();
-        r.gesamtnetto = betrag(dec("100.00"));
-        r.gesamtsteuer = betrag(dec("19.00"));
-        r.gesamtbrutto = betrag(dec("119.00"));
-        r.zu_zahlen = betrag(dec("119.00"));
+        let r = Rechnung {
+            gesamtnetto: betrag(dec("100.00")),
+            gesamtsteuer: betrag(dec("19.00")),
+            gesamtbrutto: betrag(dec("119.00")),
+            zu_zahlen: betrag(dec("119.00")),
+            ..Default::default()
+        };
         assert!(r.validate().is_ok());
     }
 
     #[test]
     fn netto_steuer_mismatch_fails() {
-        let mut r = Rechnung::default();
-        r.gesamtnetto = betrag(dec("100.00"));
-        r.gesamtsteuer = betrag(dec("19.00"));
-        r.gesamtbrutto = betrag(dec("120.00")); // off by 1
-        r.zu_zahlen = betrag(dec("120.00"));
+        let r = Rechnung {
+            gesamtnetto: betrag(dec("100.00")),
+            gesamtsteuer: betrag(dec("19.00")),
+            gesamtbrutto: betrag(dec("120.00")), // off by 1
+            zu_zahlen: betrag(dec("120.00")),
+            ..Default::default()
+        };
         assert!(r.validate().is_err());
     }
 
     #[test]
     fn zu_zahlen_mismatch_fails() {
-        let mut r = Rechnung::default();
-        r.gesamtnetto = betrag(dec("100.00"));
-        r.gesamtsteuer = betrag(dec("19.00"));
-        r.gesamtbrutto = betrag(dec("119.00"));
-        r.zu_zahlen = betrag(dec("118.00")); // off by 1
+        let r = Rechnung {
+            gesamtnetto: betrag(dec("100.00")),
+            gesamtsteuer: betrag(dec("19.00")),
+            gesamtbrutto: betrag(dec("119.00")),
+            zu_zahlen: betrag(dec("118.00")), // off by 1
+            ..Default::default()
+        };
         assert!(r.validate().is_err());
     }
 
     #[test]
     fn invoice_with_prepayment_ok() {
-        let mut r = Rechnung::default();
-        r.gesamtnetto = betrag(dec("100.00"));
-        r.gesamtsteuer = betrag(dec("19.00"));
-        r.gesamtbrutto = betrag(dec("119.00"));
-        r.vorausgezahlt = betrag(dec("20.00"));
-        r.zu_zahlen = betrag(dec("99.00"));
+        let r = Rechnung {
+            gesamtnetto: betrag(dec("100.00")),
+            gesamtsteuer: betrag(dec("19.00")),
+            gesamtbrutto: betrag(dec("119.00")),
+            vorausgezahlt: betrag(dec("20.00")),
+            zu_zahlen: betrag(dec("99.00")),
+            ..Default::default()
+        };
         assert!(r.validate().is_ok());
     }
 }
@@ -245,8 +264,10 @@ mod report_errors_tests {
     #[test]
     fn report_errors_empty_for_valid_type() {
         use rubo4e::v202501::Adresse;
-        let mut malo = Marktlokation::default();
-        malo.lokationsadresse = Some(Adresse::default());
+        let malo = Marktlokation {
+            lokationsadresse: Some(Adresse::default()),
+            ..Default::default()
+        };
         let failures = match malo.validate() {
             Ok(()) => vec![],
             Err(r) => report_errors(&r),
