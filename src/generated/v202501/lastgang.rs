@@ -1,6 +1,6 @@
 use super::{
-    Bo4eObject, BoTyp, Marktlokation, Menge, Mengeneinheit, Messlokation, Sparte, Zeitreihenwert,
-    ZusatzAttribut,
+    Bo4eObject, BoTyp, Marktlokation, Menge, Mengeneinheit, Messlokation, Sparte,
+    Zeitreihenwert, ZusatzAttribut,
 };
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(not(feature = "json"), derive(Hash))]
@@ -19,31 +19,31 @@ pub struct Lastgang {
     /// Z.B. könnten hier UUIDs aus einer Datenbank stehen oder URLs zu einem Backend-System.
     #[cfg_attr(feature = "serde", serde(rename = "_id"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub id: Option<String>,
     #[cfg_attr(feature = "serde", serde(rename = "marktlokation"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub marktlokation: Option<Box<Marktlokation>>,
     /// Definition der gemessenen Größe anhand ihrer Einheit
     #[cfg_attr(feature = "serde", serde(rename = "messgroesse"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub messgroesse: Option<Mengeneinheit>,
     #[cfg_attr(feature = "serde", serde(rename = "messlokation"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub messlokation: Option<Box<Messlokation>>,
     /// Die OBIS-Kennzahl für den Wert, die festlegt, welche Größe mit dem Stand gemeldet wird, z.B. '1-0:1.8.1'
     #[cfg_attr(feature = "serde", serde(rename = "obisKennzahl"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     #[cfg_attr(feature = "validate", garde(dive))]
     pub obis_kennzahl: Option<crate::identifiers::ObisCode>,
     /// Angabe, ob es sich um einen Gas- oder Stromlastgang handelt
     #[cfg_attr(feature = "serde", serde(rename = "sparte"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub sparte: Option<Sparte>,
     /// BO type identifier — always `BoTyp::Lastgang` for this struct.
     #[cfg_attr(feature = "serde", serde(rename = "_typ"))]
@@ -56,18 +56,18 @@ pub struct Lastgang {
     /// Versionsnummer des Lastgangs
     #[cfg_attr(feature = "serde", serde(rename = "version"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub version: Option<String>,
     /// Die im Lastgang enthaltenen Messwerte
     #[cfg_attr(feature = "serde", serde(rename = "werte"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub werte: Option<Vec<Zeitreihenwert>>,
     #[cfg_attr(feature = "serde", serde(rename = "zeitIntervallLaenge"))]
     pub zeit_intervall_laenge: Menge,
     #[cfg_attr(feature = "serde", serde(rename = "zusatzAttribute"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub zusatz_attribute: Option<Vec<ZusatzAttribut>>,
     /// Unknown JSON fields captured during deserialization for round-trip preservation.
     /// `None` when no unknown fields were present (zero heap allocation).
@@ -78,7 +78,8 @@ pub struct Lastgang {
     )]
     #[cfg_attr(not(feature = "json"), serde(skip))]
     #[cfg_attr(feature = "builder", builder(default, setter(skip)))]
-    pub(crate) _additional: crate::LimitedExtensionMap,
+    #[doc(hidden)]
+    pub _additional: crate::LimitedExtensionMap,
 }
 impl Default for Lastgang {
     fn default() -> Self {
@@ -114,9 +115,7 @@ impl crate::json::Bo4eJsonExt for Lastgang {}
 #[cfg(feature = "json")]
 impl crate::json::Bo4eExtensionData for Lastgang {
     fn extension_data(&self) -> &indexmap::IndexMap<String, serde_json::Value> {
-        self._additional
-            .as_map()
-            .unwrap_or(&crate::json::extension::EMPTY_EXTENSION_MAP)
+        self._additional.as_map().unwrap_or(&crate::json::extension::EMPTY_EXTENSION_MAP)
     }
     fn has_extension_data(&self) -> bool {
         !self._additional.is_empty()

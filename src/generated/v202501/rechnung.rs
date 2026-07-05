@@ -22,7 +22,7 @@ pub struct Rechnung {
     /// Zu diesem Datum ist die Zahlung fällig
     #[cfg_attr(feature = "serde", serde(rename = "faelligkeitsdatum"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     #[cfg_attr(feature = "serde", serde(default))]
     #[cfg_attr(
         feature = "schemars",
@@ -39,7 +39,7 @@ pub struct Rechnung {
     #[cfg_attr(feature = "serde", serde(rename = "faelligkeitsdatum"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "serde", serde(default))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     #[cfg_attr(
         feature = "schemars",
         schemars(schema_with = "crate::schema_helpers::opt_datetime_schema")
@@ -49,74 +49,74 @@ pub struct Rechnung {
     /// Die Summe aus Netto- und Steuerbetrag
     #[cfg_attr(feature = "serde", serde(rename = "gesamtbrutto"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub gesamtbrutto: Option<Betrag>,
     /// Die Summe der Nettobeträge der Rechnungsteile
     #[cfg_attr(feature = "serde", serde(rename = "gesamtnetto"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub gesamtnetto: Option<Betrag>,
     /// Die Summe der Steuerbeträge der Rechnungsteile
     #[cfg_attr(feature = "serde", serde(rename = "gesamtsteuer"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub gesamtsteuer: Option<Betrag>,
     /// Eine generische ID, die für eigene Zwecke genutzt werden kann.
     /// Z.B. könnten hier UUIDs aus einer Datenbank stehen oder URLs zu einem Backend-System.
     #[cfg_attr(feature = "serde", serde(rename = "_id"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub id: Option<String>,
     /// Kennzeichen, ob es sich um ein Original (true) oder eine Kopie handelt (false)
     #[cfg_attr(feature = "serde", serde(rename = "istOriginal"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub ist_original: Option<bool>,
     /// Kennzeichen, ob es sich um eine simulierte Rechnung, z.B. zur Rechnungsprüfung handelt
     #[cfg_attr(feature = "serde", serde(rename = "istSimuliert"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub ist_simuliert: Option<bool>,
     /// Kennzeichnung, ob es sich um eine Stornorechnung handelt;
     /// im Falle "true" findet sich im Attribut "originalrechnungsnummer" die Nummer der Originalrechnung.
     #[cfg_attr(feature = "serde", serde(rename = "istStorno"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub ist_storno: Option<bool>,
     /// Marktlokation, auf die sich die Rechnung bezieht
     #[cfg_attr(feature = "serde", serde(rename = "marktlokation"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub marktlokation: Option<Box<Marktlokation>>,
     /// Messlokation, auf die sich die Rechnung bezieht
     #[cfg_attr(feature = "serde", serde(rename = "messlokation"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub messlokation: Option<Box<Messlokation>>,
     /// Aus der INVOIC entnommen, befüllt wenn es sich um eine Netznutzungsrechnung handelt
     #[cfg_attr(feature = "serde", serde(rename = "netznutzungrechnungsart"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub netznutzungrechnungsart: Option<NetznutzungRechnungsart>,
     /// Aus der INVOIC entnommen, befüllt wenn es sich um eine Netznutzungsrechnung handelt
     #[cfg_attr(feature = "serde", serde(rename = "netznutzungrechnungstyp"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub netznutzungrechnungstyp: Option<NetznutzungRechnungstyp>,
     /// Im Falle einer Stornorechnung (storno = true) steht hier die Rechnungsnummer der stornierten Rechnung
     #[cfg_attr(feature = "serde", serde(rename = "originalRechnungsnummer"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub original_rechnungsnummer: Option<String>,
     /// Gesamtrabatt auf den Bruttobetrag
     #[cfg_attr(feature = "serde", serde(rename = "rabattBrutto"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub rabatt_brutto: Option<Betrag>,
     /// Ausstellungsdatum der Rechnung
     #[cfg_attr(feature = "serde", serde(rename = "rechnungsdatum"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     #[cfg_attr(feature = "serde", serde(default))]
     #[cfg_attr(
         feature = "schemars",
@@ -133,7 +133,7 @@ pub struct Rechnung {
     #[cfg_attr(feature = "serde", serde(rename = "rechnungsdatum"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "serde", serde(default))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     #[cfg_attr(
         feature = "schemars",
         schemars(schema_with = "crate::schema_helpers::opt_datetime_schema")
@@ -143,53 +143,53 @@ pub struct Rechnung {
     /// Der Aussteller der Rechnung, die Rollencodenummer kennt man über den im Geschäftspartner verlinkten Marktteilnehmer
     #[cfg_attr(feature = "serde", serde(rename = "rechnungsempfaenger"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub rechnungsempfaenger: Option<Box<Geschaeftspartner>>,
     /// Der Aussteller der Rechnung, die Rollencodenummer kennt man über den im Geschäftspartner verlinkten Marktteilnehmer
     #[cfg_attr(feature = "serde", serde(rename = "rechnungsersteller"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub rechnungsersteller: Option<Box<Geschaeftspartner>>,
     /// Eine im Verwendungskontext eindeutige Nummer für die Rechnung
     #[cfg_attr(feature = "serde", serde(rename = "rechnungsnummer"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub rechnungsnummer: Option<String>,
     /// Der Zeitraum der zugrunde liegenden Lieferung zur Rechnung
     #[cfg_attr(feature = "serde", serde(rename = "rechnungsperiode"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub rechnungsperiode: Option<Zeitraum>,
     /// Die Rechnungspositionen
     #[cfg_attr(feature = "serde", serde(rename = "rechnungspositionen"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub rechnungspositionen: Option<Vec<Rechnungsposition>>,
     /// Status der Rechnung zur Kennzeichnung des Bearbeitungsstandes
     #[cfg_attr(feature = "serde", serde(rename = "rechnungsstatus"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub rechnungsstatus: Option<Rechnungsstatus>,
     /// Bezeichnung für die vorliegende Rechnung
     #[cfg_attr(feature = "serde", serde(rename = "rechnungstitel"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub rechnungstitel: Option<String>,
     /// Ein kontextbezogender Rechnungstyp, z.B. Netznutzungsrechnung
     #[cfg_attr(feature = "serde", serde(rename = "rechnungstyp"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub rechnungstyp: Option<Rechnungstyp>,
     /// Sparte (Strom, Gas ...) für die die Rechnung ausgestellt ist
     #[cfg_attr(feature = "serde", serde(rename = "sparte"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub sparte: Option<Sparte>,
     /// Eine Liste mit Steuerbeträgen pro Steuerkennzeichen/Steuersatz;
     /// die Summe dieser Beträge ergibt den Wert für gesamtsteuer.
     #[cfg_attr(feature = "serde", serde(rename = "steuerbetraege"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub steuerbetraege: Option<Vec<Steuerbetrag>>,
     /// BO type identifier — always `BoTyp::Rechnung` for this struct.
     #[cfg_attr(feature = "serde", serde(rename = "_typ"))]
@@ -202,21 +202,21 @@ pub struct Rechnung {
     /// Version der BO-Struktur aka "fachliche Versionierung"
     #[cfg_attr(feature = "serde", serde(rename = "_version"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub version: Option<String>,
     /// Die Summe evtl. vorausgezahlter Beträge, z.B. Abschläge. Angabe als Bruttowert
     #[cfg_attr(feature = "serde", serde(rename = "vorausgezahlt"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub vorausgezahlt: Option<Betrag>,
     /// Der zu zahlende Betrag, der sich aus (gesamtbrutto - vorausbezahlt - rabattBrutto) ergibt
     #[cfg_attr(feature = "serde", serde(rename = "zuZahlen"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub zu_zahlen: Option<Betrag>,
     #[cfg_attr(feature = "serde", serde(rename = "zusatzAttribute"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub zusatz_attribute: Option<Vec<ZusatzAttribut>>,
     /// Unknown JSON fields captured during deserialization for round-trip preservation.
     /// `None` when no unknown fields were present (zero heap allocation).
@@ -227,7 +227,8 @@ pub struct Rechnung {
     )]
     #[cfg_attr(not(feature = "json"), serde(skip))]
     #[cfg_attr(feature = "builder", builder(default, setter(skip)))]
-    pub(crate) _additional: crate::LimitedExtensionMap,
+    #[doc(hidden)]
+    pub _additional: crate::LimitedExtensionMap,
 }
 impl Default for Rechnung {
     fn default() -> Self {
@@ -282,9 +283,7 @@ impl crate::json::Bo4eJsonExt for Rechnung {}
 #[cfg(feature = "json")]
 impl crate::json::Bo4eExtensionData for Rechnung {
     fn extension_data(&self) -> &indexmap::IndexMap<String, serde_json::Value> {
-        self._additional
-            .as_map()
-            .unwrap_or(&crate::json::extension::EMPTY_EXTENSION_MAP)
+        self._additional.as_map().unwrap_or(&crate::json::extension::EMPTY_EXTENSION_MAP)
     }
     fn has_extension_data(&self) -> bool {
         !self._additional.is_empty()

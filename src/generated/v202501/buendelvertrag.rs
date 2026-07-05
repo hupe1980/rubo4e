@@ -18,23 +18,23 @@ pub struct Buendelvertrag {
     /// Beschreibung zum Vertrag
     #[cfg_attr(feature = "serde", serde(rename = "beschreibung"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub beschreibung: Option<String>,
     /// Die Liste mit den Einzelverträgen zu den Abnahmestellen
     #[cfg_attr(feature = "serde", serde(rename = "einzelvertraege"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub einzelvertraege: Option<Vec<Box<Vertrag>>>,
     /// Eine generische ID, die für eigene Zwecke genutzt werden kann.
     /// Z.B. könnten hier UUIDs aus einer Datenbank stehen oder URLs zu einem Backend-System.
     #[cfg_attr(feature = "serde", serde(rename = "_id"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub id: Option<String>,
     /// Unterscheidungsmöglichkeiten für die Sparte
     #[cfg_attr(feature = "serde", serde(rename = "sparte"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub sparte: Option<Sparte>,
     /// BO type identifier — always `BoTyp::Buendelvertrag` for this struct.
     #[cfg_attr(feature = "serde", serde(rename = "_typ"))]
@@ -47,27 +47,27 @@ pub struct Buendelvertrag {
     /// Unterzeichner des Vertragspartners1
     #[cfg_attr(feature = "serde", serde(rename = "unterzeichnervp1"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub unterzeichnervp1: Option<Vec<Unterschrift>>,
     /// Unterzeichner des Vertragspartners2
     #[cfg_attr(feature = "serde", serde(rename = "unterzeichnervp2"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub unterzeichnervp2: Option<Vec<Unterschrift>>,
     /// Version der BO-Struktur aka "fachliche Versionierung"
     #[cfg_attr(feature = "serde", serde(rename = "_version"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub version: Option<String>,
     /// Hier ist festgelegt, um welche Art von Vertrag es sich handelt. Z.B. Netznutzungvertrag
     #[cfg_attr(feature = "serde", serde(rename = "vertragsart"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub vertragsart: Option<Vertragsart>,
     /// Gibt an, wann der Vertrag beginnt (inklusiv)
     #[cfg_attr(feature = "serde", serde(rename = "vertragsbeginn"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     #[cfg_attr(feature = "serde", serde(default))]
     #[cfg_attr(
         feature = "schemars",
@@ -84,7 +84,7 @@ pub struct Buendelvertrag {
     #[cfg_attr(feature = "serde", serde(rename = "vertragsbeginn"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "serde", serde(default))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     #[cfg_attr(
         feature = "schemars",
         schemars(schema_with = "crate::schema_helpers::opt_datetime_schema")
@@ -94,7 +94,7 @@ pub struct Buendelvertrag {
     /// Gibt an, wann der Vertrag (voraussichtlich) endet oder beendet wurde (exklusiv)
     #[cfg_attr(feature = "serde", serde(rename = "vertragsende"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     #[cfg_attr(feature = "serde", serde(default))]
     #[cfg_attr(
         feature = "schemars",
@@ -111,7 +111,7 @@ pub struct Buendelvertrag {
     #[cfg_attr(feature = "serde", serde(rename = "vertragsende"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "serde", serde(default))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     #[cfg_attr(
         feature = "schemars",
         schemars(schema_with = "crate::schema_helpers::opt_datetime_schema")
@@ -121,33 +121,33 @@ pub struct Buendelvertrag {
     /// Festlegungen zu Laufzeiten und Kündigungsfristen
     #[cfg_attr(feature = "serde", serde(rename = "vertragskonditionen"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub vertragskonditionen: Option<Vec<Vertragskonditionen>>,
     /// Eine im Verwendungskontext eindeutige Nummer für den Vertrag
     #[cfg_attr(feature = "serde", serde(rename = "vertragsnummer"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub vertragsnummer: Option<String>,
     /// Der "erstgenannte" Vertragspartner. In der Regel der Aussteller des Vertrags.
     /// Beispiel: "Vertrag zwischen Vertagspartner 1 ..."
     #[cfg_attr(feature = "serde", serde(rename = "vertragspartner1"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub vertragspartner1: Option<Box<Geschaeftspartner>>,
     /// Der "zweitgenannte" Vertragspartner. In der Regel der Empfänger des Vertrags.
     /// Beispiel "Vertrag zwischen Vertagspartner 1 und Vertragspartner 2"
     #[cfg_attr(feature = "serde", serde(rename = "vertragspartner2"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub vertragspartner2: Option<Box<Geschaeftspartner>>,
     /// Gibt den Status des Vertrages an
     #[cfg_attr(feature = "serde", serde(rename = "vertragsstatus"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub vertragsstatus: Option<Vertragsstatus>,
     #[cfg_attr(feature = "serde", serde(rename = "zusatzAttribute"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub zusatz_attribute: Option<Vec<ZusatzAttribut>>,
     /// Unknown JSON fields captured during deserialization for round-trip preservation.
     /// `None` when no unknown fields were present (zero heap allocation).
@@ -158,7 +158,8 @@ pub struct Buendelvertrag {
     )]
     #[cfg_attr(not(feature = "json"), serde(skip))]
     #[cfg_attr(feature = "builder", builder(default, setter(skip)))]
-    pub(crate) _additional: crate::LimitedExtensionMap,
+    #[doc(hidden)]
+    pub _additional: crate::LimitedExtensionMap,
 }
 impl Default for Buendelvertrag {
     fn default() -> Self {
@@ -200,9 +201,7 @@ impl crate::json::Bo4eJsonExt for Buendelvertrag {}
 #[cfg(feature = "json")]
 impl crate::json::Bo4eExtensionData for Buendelvertrag {
     fn extension_data(&self) -> &indexmap::IndexMap<String, serde_json::Value> {
-        self._additional
-            .as_map()
-            .unwrap_or(&crate::json::extension::EMPTY_EXTENSION_MAP)
+        self._additional.as_map().unwrap_or(&crate::json::extension::EMPTY_EXTENSION_MAP)
     }
     fn has_extension_data(&self) -> bool {
         !self._additional.is_empty()

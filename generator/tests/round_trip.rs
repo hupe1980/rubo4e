@@ -343,6 +343,48 @@ fn v202501_inference_audit() {
         ),
         // ── JsonValue (free-form struct override) ──────────────────────────
         ("ZusatzAttribut", "wert", FieldType::JsonValue),
+        // ── Schema $ref wins over suffix inference ──────────────────────────
+        // These fields end with a suffix in the inference table (e.g. "preis" →
+        // Decimal, "menge" → Decimal) but their schemas carry an explicit `$ref`
+        // to a structured COM type.  The parser must trust the `$ref` and produce
+        // the correct `Com(…)` variant rather than a bare `Primitive(Decimal)`.
+        (
+            "Rechnungsposition",
+            "einzelpreis",
+            FieldType::Com("Preis".into()),
+        ),
+        (
+            "Angebotsposition",
+            "positionsmenge",
+            FieldType::Com("Menge".into()),
+        ),
+        (
+            "Angebotsposition",
+            "positionspreis",
+            FieldType::Com("Preis".into()),
+        ),
+        (
+            "Kostenposition",
+            "einzelpreis",
+            FieldType::Com("Preis".into()),
+        ),
+        ("Kostenposition", "menge", FieldType::Com("Menge".into())),
+        (
+            "Fremdkostenposition",
+            "einzelpreis",
+            FieldType::Com("Preis".into()),
+        ),
+        (
+            "Fremdkostenposition",
+            "menge",
+            FieldType::Com("Menge".into()),
+        ),
+        (
+            "Tarifberechnungsparameter",
+            "mindestpreis",
+            FieldType::Com("Preis".into()),
+        ),
+        ("Bilanzierung", "kundenwert", FieldType::Com("Menge".into())),
     ];
 
     let mut failures: Vec<String> = Vec::new();

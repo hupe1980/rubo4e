@@ -14,23 +14,23 @@ pub struct Region {
     /// Bezeichnung der Region
     #[cfg_attr(feature = "serde", serde(rename = "bezeichnung"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub bezeichnung: Option<String>,
     /// Eine generische ID, die für eigene Zwecke genutzt werden kann.
     /// Z.B. könnten hier UUIDs aus einer Datenbank stehen oder URLs zu einem Backend-System.
     #[cfg_attr(feature = "serde", serde(rename = "_id"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub id: Option<String>,
     /// Negativliste der Kriterien zur Definition der Region
     #[cfg_attr(feature = "serde", serde(rename = "negativListe"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub negativ_liste: Option<Vec<Regionskriterium>>,
     /// Positivliste der Kriterien zur Definition der Region
     #[cfg_attr(feature = "serde", serde(rename = "positivListe"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub positiv_liste: Option<Vec<Regionskriterium>>,
     /// BO type identifier — always `BoTyp::Region` for this struct.
     #[cfg_attr(feature = "serde", serde(rename = "_typ"))]
@@ -43,11 +43,11 @@ pub struct Region {
     /// Version der BO-Struktur aka "fachliche Versionierung"
     #[cfg_attr(feature = "serde", serde(rename = "_version"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub version: Option<String>,
     #[cfg_attr(feature = "serde", serde(rename = "zusatzAttribute"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub zusatz_attribute: Option<Vec<ZusatzAttribut>>,
     /// Unknown JSON fields captured during deserialization for round-trip preservation.
     /// `None` when no unknown fields were present (zero heap allocation).
@@ -58,7 +58,8 @@ pub struct Region {
     )]
     #[cfg_attr(not(feature = "json"), serde(skip))]
     #[cfg_attr(feature = "builder", builder(default, setter(skip)))]
-    pub(crate) _additional: crate::LimitedExtensionMap,
+    #[doc(hidden)]
+    pub _additional: crate::LimitedExtensionMap,
 }
 impl Default for Region {
     fn default() -> Self {
@@ -90,9 +91,7 @@ impl crate::json::Bo4eJsonExt for Region {}
 #[cfg(feature = "json")]
 impl crate::json::Bo4eExtensionData for Region {
     fn extension_data(&self) -> &indexmap::IndexMap<String, serde_json::Value> {
-        self._additional
-            .as_map()
-            .unwrap_or(&crate::json::extension::EMPTY_EXTENSION_MAP)
+        self._additional.as_map().unwrap_or(&crate::json::extension::EMPTY_EXTENSION_MAP)
     }
     fn has_extension_data(&self) -> bool {
         !self._additional.is_empty()

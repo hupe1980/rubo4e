@@ -110,33 +110,36 @@ fn emit_any_bo(bo_names: &[String]) -> String {
     s.push_str("    }\n");
     s.push_str("}\n\n");
 
-    // ── Deserialize — requires json feature for _typ peek via serde_json::Value
+    // ── Deserialize — single-pass via Box<RawValue> + peek_typ_field
+    // Avoids the two-pass Value-based strategy that allocated the full JSON tree
+    // just to read the `_typ` discriminant.  peek_typ_field scans only that key.
     s.push_str("#[cfg(all(feature = \"serde\", feature = \"json\"))]\n");
     s.push_str("impl<'de> serde::Deserialize<'de> for AnyBo {\n");
     s.push_str(
         "    fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {\n",
     );
-    s.push_str("        // Two-pass strategy: capture the full JSON object into a Value so we\n");
-    s.push_str("        // can peek at `_typ` before dispatching to the concrete deserializer.\n");
-    s.push_str(
-        "        // The overhead is one extra allocation; acceptable for type-dispatch paths.\n",
-    );
-    s.push_str("        let raw = serde_json::Value::deserialize(d)?;\n");
-    s.push_str(
-        "        let typ_str = raw.get(\"_typ\").and_then(|v| v.as_str()).unwrap_or(\"\");\n",
-    );
+    s.push_str("        // Capture the raw JSON without materialising a full serde_json::Value\n");
+    s.push_str("        // tree.  peek_typ_field borrows from the raw string — zero heap\n");
+    s.push_str("        // allocation beyond the Box<RawValue> wrapper itself.\n");
+    s.push_str("        let raw: Box<serde_json::value::RawValue> =\n");
+    s.push_str("            serde::Deserialize::deserialize(d)?;\n");
+    s.push_str("        let typ_str = crate::json::peek_typ_field(raw.get()).unwrap_or(\"\");\n");
     s.push_str("        match typ_str {\n");
     for name in bo_names {
         let typ_key = name.to_ascii_uppercase();
         s.push_str(&format!(
-            "            \"{typ_key}\" => serde_json::from_value::<{name}>(raw)\n"
+            "            \"{typ_key}\" => serde_json::from_str::<{name}>(raw.get())\n"
         ));
         s.push_str(&format!(
             "                .map(|v| AnyBo::{name}(Box::new(v)))\n"
         ));
         s.push_str("                .map_err(serde::de::Error::custom),\n");
     }
-    s.push_str("            _ => Ok(AnyBo::Unknown { typ: typ_str.to_owned(), data: raw }),\n");
+    s.push_str("            _ => {\n");
+    s.push_str("                let data: serde_json::Value = serde_json::from_str(raw.get())\n");
+    s.push_str("                    .map_err(serde::de::Error::custom)?;\n");
+    s.push_str("                Ok(AnyBo::Unknown { typ: typ_str.to_owned(), data })\n");
+    s.push_str("            }\n");
     s.push_str("        }\n");
     s.push_str("    }\n");
     s.push_str("}\n\n");
@@ -220,6 +223,29 @@ pub fn emit_mod_rs(nodes: &[SchemaNode], _schema_version: &str) -> Result<String
         .map(|n| n.name().to_upper_camel_case())
         .collect();
     s.push_str(&emit_any_bo(&bo_names));
+
+    // ── Bo4eObject sealed-trait impls ─────────────────────────────────────────
+    // Implement the sealing supertrait for every BO type so they satisfy the
+    // `Bo4eObject: bo4e_object_sealed::Sealed` bound.  The whole `generated`
+    // module is already gated on `#[cfg(feature = "versioned")]` in lib.rs, so
+    // a single cfg gate here covers the entire block cleanly.
+    if !bo_names.is_empty() {
+        s.push_str(
+            "// ── Bo4eObject sealed-trait impls ──────────────────────────────────────────\n",
+        );
+        s.push_str("// These implement the sealing supertrait for all BO types that carry\n");
+        s.push_str(
+            "// `impl Bo4eObject for Type`.  External crates cannot implement this trait.\n",
+        );
+        s.push_str("#[cfg(feature = \"versioned\")]\n");
+        s.push_str("const _: () = {\n");
+        for bo_name in &bo_names {
+            s.push_str(&format!(
+                "    impl crate::bo4e_object_sealed::Sealed for {bo_name} {{}}\n"
+            ));
+        }
+        s.push_str("};\n");
+    }
 
     format_source(s)
 }
@@ -333,9 +359,7 @@ fn emit_struct(
             s.push_str(
                 "    #[cfg_attr(feature = \"serde\", serde(skip_serializing_if = \"Option::is_none\"))]\n",
             );
-            s.push_str(
-                "    #[cfg_attr(feature = \"builder\", builder(default, setter(strip_option)))]\n",
-            );
+            s.push_str("    #[cfg_attr(feature = \"builder\", builder(default, setter(into)))]\n");
             s.push_str("    pub typ: Option<ComTyp>,\n");
         } else {
             emit_field(&mut s, field);
@@ -400,7 +424,11 @@ fn emit_extension_field(s: &mut String) {
     s.push_str("    #[cfg_attr(feature = \"json\", serde(skip_serializing_if = \"crate::json::ext_map_is_empty\"))]\n");
     s.push_str("    #[cfg_attr(not(feature = \"json\"), serde(skip))]\n");
     s.push_str("    #[cfg_attr(feature = \"builder\", builder(default, setter(skip)))]\n");
-    s.push_str("    pub(crate) _additional: crate::LimitedExtensionMap,\n");
+    // #[doc(hidden)] keeps the field out of rustdoc while making it `pub` so that
+    // external crates can use functional-update syntax (`..Default::default()`).
+    // The leading underscore signals that direct mutation is discouraged.
+    s.push_str("    #[doc(hidden)]\n");
+    s.push_str("    pub _additional: crate::LimitedExtensionMap,\n");
 }
 
 /// Emits a custom `Default` impl for a BO struct that pre-fills `typ` with the correct variant.
@@ -506,10 +534,11 @@ fn emit_field(s: &mut String, field: &Field) {
     // For Option<T> fields, omit the key entirely when the value is None.
     if field.is_optional {
         s.push_str("    #[cfg_attr(feature = \"serde\", serde(skip_serializing_if = \"Option::is_none\"))]\n");
-        // Builder: optional fields default to None and accept T directly (no Some() wrapping).
-        s.push_str(
-            "    #[cfg_attr(feature = \"builder\", builder(default, setter(strip_option)))]\n",
-        );
+        // Builder: `setter(into)` accepts both `T` and `Option<T>` — `T: Into<Option<T>>`
+        // via `From<T> for Option<T>`, and `Option<T>: Into<Option<T>>` via identity.
+        // This replaces `strip_option` and allows mapping from `Option`-valued sources
+        // (e.g. EDIFACT parsing) without verbose `if let Some(v) = opt { b = b.f(v); }`.
+        s.push_str("    #[cfg_attr(feature = \"builder\", builder(default, setter(into)))]\n");
     }
 
     // garde: dive into identifier newtypes so their custom validators run.
@@ -665,10 +694,8 @@ fn emit_fallback_attrs(s: &mut String, field: &Field, datetime_schemars: bool) {
         if datetime_schemars {
             s.push_str("    #[cfg_attr(feature = \"serde\", serde(default))]\n");
         }
-        // Builder: optional fields default to None, setter unwraps Some().
-        s.push_str(
-            "    #[cfg_attr(feature = \"builder\", builder(default, setter(strip_option)))]\n",
-        );
+        // Builder: same `setter(into)` semantics as primary fields — accepts `T` or `Option<T>`.
+        s.push_str("    #[cfg_attr(feature = \"builder\", builder(default, setter(into)))]\n");
     }
     // Datetime fallback: retain the ISO-8601 `"format": "date-time"` annotation
     // in the JSON Schema even when the `time` crate is not enabled.

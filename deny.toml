@@ -54,11 +54,7 @@ deny = []
 allow = []
 # Known-safe version splits that cannot be resolved upstream yet.
 # Each entry must include a comment explaining why it is acceptable.
-skip = [
-    # memchr: multiple crates in the ecosystem still pull v2 alongside the
-    # current v2 branch; both are maintained by the same author and are ABI-safe.
-    { name = "memchr" },
-]
+skip = []
 
 # ─── Sources ─────────────────────────────────────────────────────────────────
 

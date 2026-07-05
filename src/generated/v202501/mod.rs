@@ -190,7 +190,6 @@ pub mod zeitreihentyp;
 pub mod zeitreihenwert;
 pub mod zusatz_attribut;
 pub mod zustaendigkeit;
-pub use crate::Bo4eObject;
 pub use abgabe_art::AbgabeArt;
 pub use abwicklungsmodell::Abwicklungsmodell;
 pub use adresse::Adresse;
@@ -383,6 +382,7 @@ pub use zeitreihentyp::Zeitreihentyp;
 pub use zeitreihenwert::Zeitreihenwert;
 pub use zusatz_attribut::ZusatzAttribut;
 pub use zustaendigkeit::Zustaendigkeit;
+pub use crate::Bo4eObject;
 /// Sum type over **all** BO4E Geschäftsobjekte for dynamic type dispatch.
 ///
 /// Use this when you receive a JSON message where the concrete BO type is
@@ -927,205 +927,189 @@ impl serde::Serialize for AnyBo {
         }
     }
 }
-
-/// Extracts the `_typ` field value from a raw JSON object string without
-/// building a full [`serde_json::Value`] tree.
-///
-/// Uses a simple linear scan that honours JSON string escaping.  Designed for
-/// BO4E payloads where `_typ` appears early in the object (typically first or
-/// second field).
-///
-/// Returns `""` if `_typ` is absent, null, or not a string.
-///
-/// Scans at depth-1 only: stops tracking once a `{` or `[` is seen inside a
-/// value (and resumes only when the matching closer is found).  This prevents
-/// a `"_typ"` key embedded inside a nested object from being returned instead
-/// of the top-level one.
-#[cfg(all(feature = "serde", feature = "json"))]
-fn peek_typ_field(raw: &str) -> &str {
-    const NEEDLE: &str = "\"_typ\"";
-    let bytes = raw.as_bytes();
-    let mut i = 0;
-    let mut depth: usize = 0;
-    let mut in_string = false;
-
-    while i < bytes.len() {
-        let b = bytes[i];
-        if in_string {
-            if b == b'\\' {
-                i += 2;
-                continue;
-            } else if b == b'"' {
-                in_string = false;
-            }
-        } else {
-            match b {
-                b'"' => {
-                    // Only scan for `"_typ"` key at depth 1 (top-level object).
-                    if depth == 1 {
-                        let rest = &raw[i..];
-                        if rest.starts_with(NEEDLE) {
-                            // Skip past the key and any whitespace/colon.
-                            let after_key = rest.strip_prefix(NEEDLE).unwrap_or_default();
-                            let after_colon = after_key
-                                .trim_start_matches([' ', '\t', '\n', '\r'])
-                                .trim_start_matches(':')
-                                .trim_start_matches([' ', '\t', '\n', '\r']);
-                            if !after_colon.starts_with('"') {
-                                return "";
-                            }
-                            let value_start = &after_colon[1..];
-                            let vbytes = value_start.as_bytes();
-                            let mut j = 0;
-                            while j < vbytes.len() {
-                                match vbytes[j] {
-                                    b'\\' => j += 2,
-                                    b'"' => return &value_start[..j],
-                                    _ => j += 1,
-                                }
-                            }
-                            return "";
-                        }
-                    }
-                    in_string = true;
-                }
-                b'{' | b'[' => depth += 1,
-                b'}' | b']' => depth = depth.saturating_sub(1),
-                _ => {}
-            }
-        }
-        i += 1;
-    }
-    ""
-}
-
 #[cfg(all(feature = "serde", feature = "json"))]
 impl<'de> serde::Deserialize<'de> for AnyBo {
     fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
-        // C-02 fix: single-pass deserialization via RawValue.
-        //
-        // The old two-pass approach materialized the full serde_json::Value tree,
-        // extracted `_typ`, then called from_value() — double-allocating every payload.
-        // This approach instead:
-        //   1. Captures the raw JSON bytes as a RawValue (zero-parse, just a string copy).
-        //   2. Peeks at `_typ` via a fast linear scan of the raw string.
-        //   3. Parses directly from raw.get() into the concrete type in one pass.
-        // For the Unknown variant the full Value tree is still needed for data preservation.
-        let raw = Box::<serde_json::value::RawValue>::deserialize(d)?;
-        let typ_str = peek_typ_field(raw.get());
+        let raw: Box<serde_json::value::RawValue> = serde::Deserialize::deserialize(d)?;
+        let typ_str = crate::json::peek_typ_field(raw.get()).unwrap_or("");
         match typ_str {
-            "ANGEBOT" => serde_json::from_str::<Angebot>(raw.get())
-                .map(|v| AnyBo::Angebot(Box::new(v)))
-                .map_err(serde::de::Error::custom),
-            "AUSSCHREIBUNG" => serde_json::from_str::<Ausschreibung>(raw.get())
-                .map(|v| AnyBo::Ausschreibung(Box::new(v)))
-                .map_err(serde::de::Error::custom),
-            "BILANZIERUNG" => serde_json::from_str::<Bilanzierung>(raw.get())
-                .map(|v| AnyBo::Bilanzierung(Box::new(v)))
-                .map_err(serde::de::Error::custom),
-            "BUENDELVERTRAG" => serde_json::from_str::<Buendelvertrag>(raw.get())
-                .map(|v| AnyBo::Buendelvertrag(Box::new(v)))
-                .map_err(serde::de::Error::custom),
-            "ENERGIEMENGE" => serde_json::from_str::<Energiemenge>(raw.get())
-                .map(|v| AnyBo::Energiemenge(Box::new(v)))
-                .map_err(serde::de::Error::custom),
-            "FREMDKOSTEN" => serde_json::from_str::<Fremdkosten>(raw.get())
-                .map(|v| AnyBo::Fremdkosten(Box::new(v)))
-                .map_err(serde::de::Error::custom),
-            "GERAET" => serde_json::from_str::<Geraet>(raw.get())
-                .map(|v| AnyBo::Geraet(Box::new(v)))
-                .map_err(serde::de::Error::custom),
-            "GESCHAEFTSPARTNER" => serde_json::from_str::<Geschaeftspartner>(raw.get())
-                .map(|v| AnyBo::Geschaeftspartner(Box::new(v)))
-                .map_err(serde::de::Error::custom),
-            "KOSTEN" => serde_json::from_str::<Kosten>(raw.get())
-                .map(|v| AnyBo::Kosten(Box::new(v)))
-                .map_err(serde::de::Error::custom),
-            "LASTGANG" => serde_json::from_str::<Lastgang>(raw.get())
-                .map(|v| AnyBo::Lastgang(Box::new(v)))
-                .map_err(serde::de::Error::custom),
-            "LOKATIONSZUORDNUNG" => serde_json::from_str::<Lokationszuordnung>(raw.get())
-                .map(|v| AnyBo::Lokationszuordnung(Box::new(v)))
-                .map_err(serde::de::Error::custom),
-            "MARKTLOKATION" => serde_json::from_str::<Marktlokation>(raw.get())
-                .map(|v| AnyBo::Marktlokation(Box::new(v)))
-                .map_err(serde::de::Error::custom),
-            "MARKTTEILNEHMER" => serde_json::from_str::<Marktteilnehmer>(raw.get())
-                .map(|v| AnyBo::Marktteilnehmer(Box::new(v)))
-                .map_err(serde::de::Error::custom),
-            "MESSLOKATION" => serde_json::from_str::<Messlokation>(raw.get())
-                .map(|v| AnyBo::Messlokation(Box::new(v)))
-                .map_err(serde::de::Error::custom),
-            "NETZLOKATION" => serde_json::from_str::<Netzlokation>(raw.get())
-                .map(|v| AnyBo::Netzlokation(Box::new(v)))
-                .map_err(serde::de::Error::custom),
-            "PERSON" => serde_json::from_str::<Person>(raw.get())
-                .map(|v| AnyBo::Person(Box::new(v)))
-                .map_err(serde::de::Error::custom),
-            "PREISBLATT" => serde_json::from_str::<Preisblatt>(raw.get())
-                .map(|v| AnyBo::Preisblatt(Box::new(v)))
-                .map_err(serde::de::Error::custom),
+            "ANGEBOT" => {
+                serde_json::from_str::<Angebot>(raw.get())
+                    .map(|v| AnyBo::Angebot(Box::new(v)))
+                    .map_err(serde::de::Error::custom)
+            }
+            "AUSSCHREIBUNG" => {
+                serde_json::from_str::<Ausschreibung>(raw.get())
+                    .map(|v| AnyBo::Ausschreibung(Box::new(v)))
+                    .map_err(serde::de::Error::custom)
+            }
+            "BILANZIERUNG" => {
+                serde_json::from_str::<Bilanzierung>(raw.get())
+                    .map(|v| AnyBo::Bilanzierung(Box::new(v)))
+                    .map_err(serde::de::Error::custom)
+            }
+            "BUENDELVERTRAG" => {
+                serde_json::from_str::<Buendelvertrag>(raw.get())
+                    .map(|v| AnyBo::Buendelvertrag(Box::new(v)))
+                    .map_err(serde::de::Error::custom)
+            }
+            "ENERGIEMENGE" => {
+                serde_json::from_str::<Energiemenge>(raw.get())
+                    .map(|v| AnyBo::Energiemenge(Box::new(v)))
+                    .map_err(serde::de::Error::custom)
+            }
+            "FREMDKOSTEN" => {
+                serde_json::from_str::<Fremdkosten>(raw.get())
+                    .map(|v| AnyBo::Fremdkosten(Box::new(v)))
+                    .map_err(serde::de::Error::custom)
+            }
+            "GERAET" => {
+                serde_json::from_str::<Geraet>(raw.get())
+                    .map(|v| AnyBo::Geraet(Box::new(v)))
+                    .map_err(serde::de::Error::custom)
+            }
+            "GESCHAEFTSPARTNER" => {
+                serde_json::from_str::<Geschaeftspartner>(raw.get())
+                    .map(|v| AnyBo::Geschaeftspartner(Box::new(v)))
+                    .map_err(serde::de::Error::custom)
+            }
+            "KOSTEN" => {
+                serde_json::from_str::<Kosten>(raw.get())
+                    .map(|v| AnyBo::Kosten(Box::new(v)))
+                    .map_err(serde::de::Error::custom)
+            }
+            "LASTGANG" => {
+                serde_json::from_str::<Lastgang>(raw.get())
+                    .map(|v| AnyBo::Lastgang(Box::new(v)))
+                    .map_err(serde::de::Error::custom)
+            }
+            "LOKATIONSZUORDNUNG" => {
+                serde_json::from_str::<Lokationszuordnung>(raw.get())
+                    .map(|v| AnyBo::Lokationszuordnung(Box::new(v)))
+                    .map_err(serde::de::Error::custom)
+            }
+            "MARKTLOKATION" => {
+                serde_json::from_str::<Marktlokation>(raw.get())
+                    .map(|v| AnyBo::Marktlokation(Box::new(v)))
+                    .map_err(serde::de::Error::custom)
+            }
+            "MARKTTEILNEHMER" => {
+                serde_json::from_str::<Marktteilnehmer>(raw.get())
+                    .map(|v| AnyBo::Marktteilnehmer(Box::new(v)))
+                    .map_err(serde::de::Error::custom)
+            }
+            "MESSLOKATION" => {
+                serde_json::from_str::<Messlokation>(raw.get())
+                    .map(|v| AnyBo::Messlokation(Box::new(v)))
+                    .map_err(serde::de::Error::custom)
+            }
+            "NETZLOKATION" => {
+                serde_json::from_str::<Netzlokation>(raw.get())
+                    .map(|v| AnyBo::Netzlokation(Box::new(v)))
+                    .map_err(serde::de::Error::custom)
+            }
+            "PERSON" => {
+                serde_json::from_str::<Person>(raw.get())
+                    .map(|v| AnyBo::Person(Box::new(v)))
+                    .map_err(serde::de::Error::custom)
+            }
+            "PREISBLATT" => {
+                serde_json::from_str::<Preisblatt>(raw.get())
+                    .map(|v| AnyBo::Preisblatt(Box::new(v)))
+                    .map_err(serde::de::Error::custom)
+            }
             "PREISBLATTDIENSTLEISTUNG" => {
                 serde_json::from_str::<PreisblattDienstleistung>(raw.get())
                     .map(|v| AnyBo::PreisblattDienstleistung(Box::new(v)))
                     .map_err(serde::de::Error::custom)
             }
-            "PREISBLATTHARDWARE" => serde_json::from_str::<PreisblattHardware>(raw.get())
-                .map(|v| AnyBo::PreisblattHardware(Box::new(v)))
-                .map_err(serde::de::Error::custom),
+            "PREISBLATTHARDWARE" => {
+                serde_json::from_str::<PreisblattHardware>(raw.get())
+                    .map(|v| AnyBo::PreisblattHardware(Box::new(v)))
+                    .map_err(serde::de::Error::custom)
+            }
             "PREISBLATTKONZESSIONSABGABE" => {
                 serde_json::from_str::<PreisblattKonzessionsabgabe>(raw.get())
                     .map(|v| AnyBo::PreisblattKonzessionsabgabe(Box::new(v)))
                     .map_err(serde::de::Error::custom)
             }
-            "PREISBLATTMESSUNG" => serde_json::from_str::<PreisblattMessung>(raw.get())
-                .map(|v| AnyBo::PreisblattMessung(Box::new(v)))
-                .map_err(serde::de::Error::custom),
-            "PREISBLATTNETZNUTZUNG" => serde_json::from_str::<PreisblattNetznutzung>(raw.get())
-                .map(|v| AnyBo::PreisblattNetznutzung(Box::new(v)))
-                .map_err(serde::de::Error::custom),
-            "RECHNUNG" => serde_json::from_str::<Rechnung>(raw.get())
-                .map(|v| AnyBo::Rechnung(Box::new(v)))
-                .map_err(serde::de::Error::custom),
-            "REGION" => serde_json::from_str::<Region>(raw.get())
-                .map(|v| AnyBo::Region(Box::new(v)))
-                .map_err(serde::de::Error::custom),
-            "REGIONALTARIF" => serde_json::from_str::<Regionaltarif>(raw.get())
-                .map(|v| AnyBo::Regionaltarif(Box::new(v)))
-                .map_err(serde::de::Error::custom),
-            "STANDORTEIGENSCHAFTEN" => serde_json::from_str::<Standorteigenschaften>(raw.get())
-                .map(|v| AnyBo::Standorteigenschaften(Box::new(v)))
-                .map_err(serde::de::Error::custom),
-            "STEUERBARERESSOURCE" => serde_json::from_str::<SteuerbareRessource>(raw.get())
-                .map(|v| AnyBo::SteuerbareRessource(Box::new(v)))
-                .map_err(serde::de::Error::custom),
-            "TARIF" => serde_json::from_str::<Tarif>(raw.get())
-                .map(|v| AnyBo::Tarif(Box::new(v)))
-                .map_err(serde::de::Error::custom),
-            "TARIFINFO" => serde_json::from_str::<Tarifinfo>(raw.get())
-                .map(|v| AnyBo::Tarifinfo(Box::new(v)))
-                .map_err(serde::de::Error::custom),
-            "TARIFKOSTEN" => serde_json::from_str::<Tarifkosten>(raw.get())
-                .map(|v| AnyBo::Tarifkosten(Box::new(v)))
-                .map_err(serde::de::Error::custom),
-            "TARIFPREISBLATT" => serde_json::from_str::<Tarifpreisblatt>(raw.get())
-                .map(|v| AnyBo::Tarifpreisblatt(Box::new(v)))
-                .map_err(serde::de::Error::custom),
-            "TECHNISCHERESSOURCE" => serde_json::from_str::<TechnischeRessource>(raw.get())
-                .map(|v| AnyBo::TechnischeRessource(Box::new(v)))
-                .map_err(serde::de::Error::custom),
-            "VERTRAG" => serde_json::from_str::<Vertrag>(raw.get())
-                .map(|v| AnyBo::Vertrag(Box::new(v)))
-                .map_err(serde::de::Error::custom),
-            "ZAEHLER" => serde_json::from_str::<Zaehler>(raw.get())
-                .map(|v| AnyBo::Zaehler(Box::new(v)))
-                .map_err(serde::de::Error::custom),
-            "ZEITREIHE" => serde_json::from_str::<Zeitreihe>(raw.get())
-                .map(|v| AnyBo::Zeitreihe(Box::new(v)))
-                .map_err(serde::de::Error::custom),
+            "PREISBLATTMESSUNG" => {
+                serde_json::from_str::<PreisblattMessung>(raw.get())
+                    .map(|v| AnyBo::PreisblattMessung(Box::new(v)))
+                    .map_err(serde::de::Error::custom)
+            }
+            "PREISBLATTNETZNUTZUNG" => {
+                serde_json::from_str::<PreisblattNetznutzung>(raw.get())
+                    .map(|v| AnyBo::PreisblattNetznutzung(Box::new(v)))
+                    .map_err(serde::de::Error::custom)
+            }
+            "RECHNUNG" => {
+                serde_json::from_str::<Rechnung>(raw.get())
+                    .map(|v| AnyBo::Rechnung(Box::new(v)))
+                    .map_err(serde::de::Error::custom)
+            }
+            "REGION" => {
+                serde_json::from_str::<Region>(raw.get())
+                    .map(|v| AnyBo::Region(Box::new(v)))
+                    .map_err(serde::de::Error::custom)
+            }
+            "REGIONALTARIF" => {
+                serde_json::from_str::<Regionaltarif>(raw.get())
+                    .map(|v| AnyBo::Regionaltarif(Box::new(v)))
+                    .map_err(serde::de::Error::custom)
+            }
+            "STANDORTEIGENSCHAFTEN" => {
+                serde_json::from_str::<Standorteigenschaften>(raw.get())
+                    .map(|v| AnyBo::Standorteigenschaften(Box::new(v)))
+                    .map_err(serde::de::Error::custom)
+            }
+            "STEUERBARERESSOURCE" => {
+                serde_json::from_str::<SteuerbareRessource>(raw.get())
+                    .map(|v| AnyBo::SteuerbareRessource(Box::new(v)))
+                    .map_err(serde::de::Error::custom)
+            }
+            "TARIF" => {
+                serde_json::from_str::<Tarif>(raw.get())
+                    .map(|v| AnyBo::Tarif(Box::new(v)))
+                    .map_err(serde::de::Error::custom)
+            }
+            "TARIFINFO" => {
+                serde_json::from_str::<Tarifinfo>(raw.get())
+                    .map(|v| AnyBo::Tarifinfo(Box::new(v)))
+                    .map_err(serde::de::Error::custom)
+            }
+            "TARIFKOSTEN" => {
+                serde_json::from_str::<Tarifkosten>(raw.get())
+                    .map(|v| AnyBo::Tarifkosten(Box::new(v)))
+                    .map_err(serde::de::Error::custom)
+            }
+            "TARIFPREISBLATT" => {
+                serde_json::from_str::<Tarifpreisblatt>(raw.get())
+                    .map(|v| AnyBo::Tarifpreisblatt(Box::new(v)))
+                    .map_err(serde::de::Error::custom)
+            }
+            "TECHNISCHERESSOURCE" => {
+                serde_json::from_str::<TechnischeRessource>(raw.get())
+                    .map(|v| AnyBo::TechnischeRessource(Box::new(v)))
+                    .map_err(serde::de::Error::custom)
+            }
+            "VERTRAG" => {
+                serde_json::from_str::<Vertrag>(raw.get())
+                    .map(|v| AnyBo::Vertrag(Box::new(v)))
+                    .map_err(serde::de::Error::custom)
+            }
+            "ZAEHLER" => {
+                serde_json::from_str::<Zaehler>(raw.get())
+                    .map(|v| AnyBo::Zaehler(Box::new(v)))
+                    .map_err(serde::de::Error::custom)
+            }
+            "ZEITREIHE" => {
+                serde_json::from_str::<Zeitreihe>(raw.get())
+                    .map(|v| AnyBo::Zeitreihe(Box::new(v)))
+                    .map_err(serde::de::Error::custom)
+            }
             _ => {
-                // Unknown _typ: preserve raw data as a full Value for forward-compat.
-                let data = serde_json::from_str::<serde_json::Value>(raw.get())
+                let data: serde_json::Value = serde_json::from_str(raw.get())
                     .map_err(serde::de::Error::custom)?;
                 Ok(AnyBo::Unknown {
                     typ: typ_str.to_owned(),
@@ -1139,43 +1123,41 @@ impl<'de> serde::Deserialize<'de> for AnyBo {
 impl crate::json::sealed::Sealed for AnyBo {}
 #[cfg(feature = "json")]
 impl crate::json::Bo4eJsonExt for AnyBo {}
-
-// ── Bo4eObject sealed-trait impls ────────────────────────────────────────────
-// These implement the sealing supertrait for all BO types that carry
-// `impl Bo4eObject for Type`.  External crates cannot implement this trait.
 #[cfg(feature = "versioned")]
-impl crate::bo4e_object_sealed::Sealed for Angebot {}
-impl crate::bo4e_object_sealed::Sealed for Ausschreibung {}
-impl crate::bo4e_object_sealed::Sealed for Bilanzierung {}
-impl crate::bo4e_object_sealed::Sealed for Buendelvertrag {}
-impl crate::bo4e_object_sealed::Sealed for Energiemenge {}
-impl crate::bo4e_object_sealed::Sealed for Fremdkosten {}
-impl crate::bo4e_object_sealed::Sealed for Geraet {}
-impl crate::bo4e_object_sealed::Sealed for Geschaeftspartner {}
-impl crate::bo4e_object_sealed::Sealed for Kosten {}
-impl crate::bo4e_object_sealed::Sealed for Lastgang {}
-impl crate::bo4e_object_sealed::Sealed for Lokationszuordnung {}
-impl crate::bo4e_object_sealed::Sealed for Marktlokation {}
-impl crate::bo4e_object_sealed::Sealed for Marktteilnehmer {}
-impl crate::bo4e_object_sealed::Sealed for Messlokation {}
-impl crate::bo4e_object_sealed::Sealed for Netzlokation {}
-impl crate::bo4e_object_sealed::Sealed for Person {}
-impl crate::bo4e_object_sealed::Sealed for Preisblatt {}
-impl crate::bo4e_object_sealed::Sealed for PreisblattDienstleistung {}
-impl crate::bo4e_object_sealed::Sealed for PreisblattHardware {}
-impl crate::bo4e_object_sealed::Sealed for PreisblattKonzessionsabgabe {}
-impl crate::bo4e_object_sealed::Sealed for PreisblattMessung {}
-impl crate::bo4e_object_sealed::Sealed for PreisblattNetznutzung {}
-impl crate::bo4e_object_sealed::Sealed for Rechnung {}
-impl crate::bo4e_object_sealed::Sealed for Region {}
-impl crate::bo4e_object_sealed::Sealed for Regionaltarif {}
-impl crate::bo4e_object_sealed::Sealed for Standorteigenschaften {}
-impl crate::bo4e_object_sealed::Sealed for SteuerbareRessource {}
-impl crate::bo4e_object_sealed::Sealed for Tarif {}
-impl crate::bo4e_object_sealed::Sealed for Tarifinfo {}
-impl crate::bo4e_object_sealed::Sealed for Tarifkosten {}
-impl crate::bo4e_object_sealed::Sealed for Tarifpreisblatt {}
-impl crate::bo4e_object_sealed::Sealed for TechnischeRessource {}
-impl crate::bo4e_object_sealed::Sealed for Vertrag {}
-impl crate::bo4e_object_sealed::Sealed for Zaehler {}
-impl crate::bo4e_object_sealed::Sealed for Zeitreihe {}
+const _: () = {
+    impl crate::bo4e_object_sealed::Sealed for Angebot {}
+    impl crate::bo4e_object_sealed::Sealed for Ausschreibung {}
+    impl crate::bo4e_object_sealed::Sealed for Bilanzierung {}
+    impl crate::bo4e_object_sealed::Sealed for Buendelvertrag {}
+    impl crate::bo4e_object_sealed::Sealed for Energiemenge {}
+    impl crate::bo4e_object_sealed::Sealed for Fremdkosten {}
+    impl crate::bo4e_object_sealed::Sealed for Geraet {}
+    impl crate::bo4e_object_sealed::Sealed for Geschaeftspartner {}
+    impl crate::bo4e_object_sealed::Sealed for Kosten {}
+    impl crate::bo4e_object_sealed::Sealed for Lastgang {}
+    impl crate::bo4e_object_sealed::Sealed for Lokationszuordnung {}
+    impl crate::bo4e_object_sealed::Sealed for Marktlokation {}
+    impl crate::bo4e_object_sealed::Sealed for Marktteilnehmer {}
+    impl crate::bo4e_object_sealed::Sealed for Messlokation {}
+    impl crate::bo4e_object_sealed::Sealed for Netzlokation {}
+    impl crate::bo4e_object_sealed::Sealed for Person {}
+    impl crate::bo4e_object_sealed::Sealed for Preisblatt {}
+    impl crate::bo4e_object_sealed::Sealed for PreisblattDienstleistung {}
+    impl crate::bo4e_object_sealed::Sealed for PreisblattHardware {}
+    impl crate::bo4e_object_sealed::Sealed for PreisblattKonzessionsabgabe {}
+    impl crate::bo4e_object_sealed::Sealed for PreisblattMessung {}
+    impl crate::bo4e_object_sealed::Sealed for PreisblattNetznutzung {}
+    impl crate::bo4e_object_sealed::Sealed for Rechnung {}
+    impl crate::bo4e_object_sealed::Sealed for Region {}
+    impl crate::bo4e_object_sealed::Sealed for Regionaltarif {}
+    impl crate::bo4e_object_sealed::Sealed for Standorteigenschaften {}
+    impl crate::bo4e_object_sealed::Sealed for SteuerbareRessource {}
+    impl crate::bo4e_object_sealed::Sealed for Tarif {}
+    impl crate::bo4e_object_sealed::Sealed for Tarifinfo {}
+    impl crate::bo4e_object_sealed::Sealed for Tarifkosten {}
+    impl crate::bo4e_object_sealed::Sealed for Tarifpreisblatt {}
+    impl crate::bo4e_object_sealed::Sealed for TechnischeRessource {}
+    impl crate::bo4e_object_sealed::Sealed for Vertrag {}
+    impl crate::bo4e_object_sealed::Sealed for Zaehler {}
+    impl crate::bo4e_object_sealed::Sealed for Zeitreihe {}
+};

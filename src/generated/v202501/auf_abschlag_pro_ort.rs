@@ -16,41 +16,41 @@ pub struct AufAbschlagProOrt {
     /// Z.B. könnten hier UUIDs aus einer Datenbank stehen oder URLs zu einem Backend-System.
     #[cfg_attr(feature = "serde", serde(rename = "_id"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub id: Option<String>,
     /// Die ene't-Netznummer des Netzes in dem der Aufschlag gilt.
     #[cfg_attr(feature = "serde", serde(rename = "netznr"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub netznr: Option<String>,
     /// Der Ort für den der Aufschlag gilt.
     #[cfg_attr(feature = "serde", serde(rename = "ort"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub ort: Option<String>,
     /// Die Postleitzahl des Ortes für den der Aufschlag gilt.
     #[cfg_attr(feature = "serde", serde(rename = "postleitzahl"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub postleitzahl: Option<String>,
     /// Werte für die gestaffelten Auf/Abschläge mit regionaler Eingrenzung.
     #[cfg_attr(feature = "serde", serde(rename = "staffeln"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub staffeln: Option<Vec<AufAbschlagstaffelProOrt>>,
     /// COM type identifier for this struct.
     #[cfg_attr(feature = "serde", serde(rename = "_typ"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub typ: Option<ComTyp>,
     /// Version der COM-Struktur aka "fachliche Versionierung"
     #[cfg_attr(feature = "serde", serde(rename = "_version"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub version: Option<String>,
     #[cfg_attr(feature = "serde", serde(rename = "zusatzAttribute"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub zusatz_attribute: Option<Vec<ZusatzAttribut>>,
     /// Unknown JSON fields captured during deserialization for round-trip preservation.
     /// `None` when no unknown fields were present (zero heap allocation).
@@ -61,7 +61,8 @@ pub struct AufAbschlagProOrt {
     )]
     #[cfg_attr(not(feature = "json"), serde(skip))]
     #[cfg_attr(feature = "builder", builder(default, setter(skip)))]
-    pub(crate) _additional: crate::LimitedExtensionMap,
+    #[doc(hidden)]
+    pub _additional: crate::LimitedExtensionMap,
 }
 #[cfg(feature = "json")]
 impl crate::json::sealed::Sealed for AufAbschlagProOrt {}
@@ -70,9 +71,7 @@ impl crate::json::Bo4eJsonExt for AufAbschlagProOrt {}
 #[cfg(feature = "json")]
 impl crate::json::Bo4eExtensionData for AufAbschlagProOrt {
     fn extension_data(&self) -> &indexmap::IndexMap<String, serde_json::Value> {
-        self._additional
-            .as_map()
-            .unwrap_or(&crate::json::extension::EMPTY_EXTENSION_MAP)
+        self._additional.as_map().unwrap_or(&crate::json::extension::EMPTY_EXTENSION_MAP)
     }
     fn has_extension_data(&self) -> bool {
         !self._additional.is_empty()

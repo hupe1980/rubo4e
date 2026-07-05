@@ -1,6 +1,6 @@
 use super::{
-    Ausschreibungslos, Ausschreibungsportal, Ausschreibungsstatus, Ausschreibungstyp, Bo4eObject,
-    BoTyp, Geschaeftspartner, Zeitraum, ZusatzAttribut,
+    Ausschreibungslos, Ausschreibungsportal, Ausschreibungsstatus, Ausschreibungstyp,
+    Bo4eObject, BoTyp, Geschaeftspartner, Zeitraum, ZusatzAttribut,
 };
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(not(feature = "json"), derive(Hash))]
@@ -18,55 +18,55 @@ pub struct Ausschreibung {
     /// Es muss daher entweder eine Dauer oder ein Zeitraum in Form von Start und Ende angegeben sein
     #[cfg_attr(feature = "serde", serde(rename = "abgabefrist"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub abgabefrist: Option<Zeitraum>,
     /// Mit diesem Objekt können Geschäftspartner übertragen werden.
     /// Sowohl Unternehmen, als auch Privatpersonen können Geschäftspartner sein
     #[cfg_attr(feature = "serde", serde(rename = "ausschreibender"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub ausschreibender: Option<Box<Geschaeftspartner>>,
     /// Aufzählung der unterstützten Ausschreibungsportale
     #[cfg_attr(feature = "serde", serde(rename = "ausschreibungportal"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub ausschreibungportal: Option<Ausschreibungsportal>,
     /// Vom Herausgeber der Ausschreibung vergebene eindeutige Nummer
     #[cfg_attr(feature = "serde", serde(rename = "ausschreibungsnummer"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub ausschreibungsnummer: Option<String>,
     /// Bezeichnungen für die Ausschreibungsphasen
     #[cfg_attr(feature = "serde", serde(rename = "ausschreibungsstatus"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub ausschreibungsstatus: Option<Ausschreibungsstatus>,
     /// Aufzählung für die Typisierung von Ausschreibungen
     #[cfg_attr(feature = "serde", serde(rename = "ausschreibungstyp"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub ausschreibungstyp: Option<Ausschreibungstyp>,
     /// Diese Komponente wird zur Abbildung von Zeiträumen in Form von Dauern oder der Angabe von Start und Ende verwendet.
     /// Es muss daher entweder eine Dauer oder ein Zeitraum in Form von Start und Ende angegeben sein
     #[cfg_attr(feature = "serde", serde(rename = "bindefrist"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub bindefrist: Option<Zeitraum>,
     /// Eine generische ID, die für eigene Zwecke genutzt werden kann.
     /// Z.B. könnten hier UUIDs aus einer Datenbank stehen oder URLs zu einem Backend-System.
     #[cfg_attr(feature = "serde", serde(rename = "_id"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub id: Option<String>,
     /// Kennzeichen, ob die Ausschreibung kostenpflichtig ist
     #[cfg_attr(feature = "serde", serde(rename = "istKostenpflichtig"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub ist_kostenpflichtig: Option<bool>,
     /// Die einzelnen Lose, aus denen sich die Ausschreibung zusammensetzt
     #[cfg_attr(feature = "serde", serde(rename = "lose"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub lose: Option<Vec<Ausschreibungslos>>,
     /// BO type identifier — always `BoTyp::Ausschreibung` for this struct.
     #[cfg_attr(feature = "serde", serde(rename = "_typ"))]
@@ -79,7 +79,7 @@ pub struct Ausschreibung {
     /// Gibt den Veröffentlichungszeitpunkt der Ausschreibung an
     #[cfg_attr(feature = "serde", serde(rename = "veroeffentlichungszeitpunkt"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     #[cfg_attr(feature = "serde", serde(default))]
     #[cfg_attr(
         feature = "schemars",
@@ -96,7 +96,7 @@ pub struct Ausschreibung {
     #[cfg_attr(feature = "serde", serde(rename = "veroeffentlichungszeitpunkt"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "serde", serde(default))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     #[cfg_attr(
         feature = "schemars",
         schemars(schema_with = "crate::schema_helpers::opt_datetime_schema")
@@ -106,16 +106,16 @@ pub struct Ausschreibung {
     /// Version der BO-Struktur aka "fachliche Versionierung"
     #[cfg_attr(feature = "serde", serde(rename = "_version"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub version: Option<String>,
     /// Internetseite, auf der die Ausschreibung veröffentlicht wurde (falls vorhanden)
     #[cfg_attr(feature = "serde", serde(rename = "webseite"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub webseite: Option<String>,
     #[cfg_attr(feature = "serde", serde(rename = "zusatzAttribute"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub zusatz_attribute: Option<Vec<ZusatzAttribut>>,
     /// Unknown JSON fields captured during deserialization for round-trip preservation.
     /// `None` when no unknown fields were present (zero heap allocation).
@@ -126,7 +126,8 @@ pub struct Ausschreibung {
     )]
     #[cfg_attr(not(feature = "json"), serde(skip))]
     #[cfg_attr(feature = "builder", builder(default, setter(skip)))]
-    pub(crate) _additional: crate::LimitedExtensionMap,
+    #[doc(hidden)]
+    pub _additional: crate::LimitedExtensionMap,
 }
 impl Default for Ausschreibung {
     fn default() -> Self {
@@ -166,9 +167,7 @@ impl crate::json::Bo4eJsonExt for Ausschreibung {}
 #[cfg(feature = "json")]
 impl crate::json::Bo4eExtensionData for Ausschreibung {
     fn extension_data(&self) -> &indexmap::IndexMap<String, serde_json::Value> {
-        self._additional
-            .as_map()
-            .unwrap_or(&crate::json::extension::EMPTY_EXTENSION_MAP)
+        self._additional.as_map().unwrap_or(&crate::json::extension::EMPTY_EXTENSION_MAP)
     }
     fn has_extension_data(&self) -> bool {
         !self._additional.is_empty()

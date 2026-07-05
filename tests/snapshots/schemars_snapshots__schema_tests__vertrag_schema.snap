@@ -1596,21 +1596,25 @@ expression: "schema_json::<Vertrag>()"
         },
         "maximaleAbnahmemenge": {
           "description": "Für die Lokation festgelegte maximale Abnahmemenge (exklusiv)",
-          "type": [
-            "string",
-            "number",
-            "null"
-          ],
-          "pattern": "^-?\\d+(\\.\\d+)?([eE]\\d+)?$"
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Menge"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "minimaleAbnahmemenge": {
           "description": "Für die Lokation festgelegte Mindestabnahmemenge (inklusiv)",
-          "type": [
-            "string",
-            "number",
-            "null"
-          ],
-          "pattern": "^-?\\d+(\\.\\d+)?([eE]\\d+)?$"
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Menge"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "vertraglichFixierteMenge": {
           "description": "Für die Lokation festgeschriebene Abnahmemenge",

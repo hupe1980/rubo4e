@@ -1,7 +1,8 @@
 use super::{
-    Adresse, Bilanzierungsmethode, Bo4eObject, BoTyp, Energierichtung, Gasqualitaet, Gebiettyp,
-    Geokoordinaten, Geschaeftspartner, Katasteradresse, Kundentyp, Lokationszuordnung, Netzebene,
-    Sparte, Verbrauch, Verbrauchsart, Zaehlwerk, ZusatzAttribut,
+    Adresse, Bilanzierungsmethode, Bo4eObject, BoTyp, Energierichtung, Gasqualitaet,
+    Gebiettyp, Geokoordinaten, Geschaeftspartner, Katasteradresse, Kundentyp,
+    Lokationszuordnung, Netzebene, Sparte, Verbrauch, Verbrauchsart, Zaehlwerk,
+    ZusatzAttribut,
 };
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(not(feature = "json"), derive(Hash))]
@@ -22,98 +23,98 @@ pub struct Marktlokation {
     /// Bilanzierungsgebiet, dem das Netzgebiet zugeordnet ist - im Falle eines Strom Netzes
     #[cfg_attr(feature = "serde", serde(rename = "bilanzierungsgebiet"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub bilanzierungsgebiet: Option<String>,
     /// Die Bilanzierungsmethode, RLM oder SLP
     #[cfg_attr(feature = "serde", serde(rename = "bilanzierungsmethode"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub bilanzierungsmethode: Option<Bilanzierungsmethode>,
     /// Geschäftspartner, dem diese Marktlokation gehört
     #[cfg_attr(feature = "serde", serde(rename = "endkunde"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub endkunde: Option<Box<Geschaeftspartner>>,
     /// Kennzeichnung, ob Energie eingespeist oder entnommen (ausgespeist) wird
     #[cfg_attr(feature = "serde", serde(rename = "energierichtung"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub energierichtung: Option<Energierichtung>,
     /// Die Gasqualität in diesem Netzgebiet. H-Gas oder L-Gas. Im Falle eines Gas-Netzes
     #[cfg_attr(feature = "serde", serde(rename = "gasqualitaet"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub gasqualitaet: Option<Gasqualitaet>,
     /// Typ des Netzgebietes, z.B. Verteilnetz
     #[cfg_attr(feature = "serde", serde(rename = "gebietstyp"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub gebietstyp: Option<Gebiettyp>,
     /// Alternativ zu einer postalischen Adresse kann hier ein Ort mittels Geokoordinaten angegeben werden
     /// (z.B. zur Identifikation von Sendemasten).
     #[cfg_attr(feature = "serde", serde(rename = "geoadresse"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub geoadresse: Option<Geokoordinaten>,
     /// Codenummer des Grundversorgers, der für diese Marktlokation zuständig ist
     #[cfg_attr(feature = "serde", serde(rename = "grundversorgercodenr"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     #[cfg_attr(feature = "validate", garde(dive))]
     pub grundversorgercodenr: Option<crate::identifiers::MarktpartnerId>,
     /// Eine generische ID, die für eigene Zwecke genutzt werden kann.
     /// Z.B. könnten hier UUIDs aus einer Datenbank stehen oder URLs zu einem Backend-System.
     #[cfg_attr(feature = "serde", serde(rename = "_id"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub id: Option<String>,
     /// Gibt an, ob es sich um eine unterbrechbare Belieferung handelt
     #[cfg_attr(feature = "serde", serde(rename = "istUnterbrechbar"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub ist_unterbrechbar: Option<bool>,
     /// Alternativ zu einer postalischen Adresse und Geokoordinaten kann hier eine Ortsangabe mittels Gemarkung und
     /// Flurstück erfolgen.
     #[cfg_attr(feature = "serde", serde(rename = "katasterinformation"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub katasterinformation: Option<Katasteradresse>,
     /// Kundengruppen der Marktlokation
     #[cfg_attr(feature = "serde", serde(rename = "kundengruppen"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub kundengruppen: Option<Vec<Kundentyp>>,
     /// Die Adresse, an der die Energie-Lieferung oder -Einspeisung erfolgt
     #[cfg_attr(feature = "serde", serde(rename = "lokationsadresse"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub lokationsadresse: Option<Adresse>,
     /// Lokationsbuendel Code, der die Funktion dieses BOs an der Lokationsbuendelstruktur beschreibt.
     #[cfg_attr(feature = "serde", serde(rename = "lokationsbuendelObjektcode"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub lokationsbuendel_objektcode: Option<String>,
     /// Lokationszuordnung, um bspw. die zugehörigen Messlokationen anzugeben
     #[cfg_attr(feature = "serde", serde(rename = "lokationszuordnungen"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub lokationszuordnungen: Option<Vec<Box<Lokationszuordnung>>>,
     /// für Gas. Code vom EIC, <https://www.entsog.eu/data/data-portal/codes-list>
     #[cfg_attr(feature = "serde", serde(rename = "marktgebiet"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     #[cfg_attr(feature = "validate", garde(dive))]
     pub marktgebiet: Option<crate::identifiers::EicCode>,
     /// Identifikationsnummer einer Marktlokation, an der Energie entweder verbraucht, oder erzeugt wird.
     #[cfg_attr(feature = "serde", serde(rename = "marktlokationsId"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     #[cfg_attr(feature = "validate", garde(dive))]
     pub marktlokations_id: Option<crate::identifiers::MaloId>,
     /// Codenummer des Netzbetreibers, an dessen Netz diese Marktlokation angeschlossen ist.
     #[cfg_attr(feature = "serde", serde(rename = "netzbetreibercodenr"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     #[cfg_attr(feature = "validate", garde(dive))]
     pub netzbetreibercodenr: Option<crate::identifiers::MarktpartnerId>,
     /// Netzebene, in der der Bezug der Energie erfolgt.
@@ -121,23 +122,23 @@ pub struct Marktlokation {
     /// Beispiel Strom: Niederspannung Beispiel Gas: Niederdruck.
     #[cfg_attr(feature = "serde", serde(rename = "netzebene"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub netzebene: Option<Netzebene>,
     /// Die ID des Gebietes in der ene't-Datenbank
     #[cfg_attr(feature = "serde", serde(rename = "netzgebietsnr"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub netzgebietsnr: Option<String>,
     /// für Strom. Code vom EIC, <https://www.entsoe.eu/data/energy-identification-codes-eic/eic-approved-codes/>
     #[cfg_attr(feature = "serde", serde(rename = "regelzone"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     #[cfg_attr(feature = "validate", garde(dive))]
     pub regelzone: Option<crate::identifiers::EicCode>,
     /// Sparte der Marktlokation, z.B. Gas oder Strom
     #[cfg_attr(feature = "serde", serde(rename = "sparte"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub sparte: Option<Sparte>,
     /// BO type identifier — always `BoTyp::Marktlokation` for this struct.
     #[cfg_attr(feature = "serde", serde(rename = "_typ"))]
@@ -150,31 +151,28 @@ pub struct Marktlokation {
     /// Verbrauchsart der Marktlokation.
     #[cfg_attr(feature = "serde", serde(rename = "verbrauchsart"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub verbrauchsart: Option<Verbrauchsart>,
     #[cfg_attr(feature = "serde", serde(rename = "verbrauchsmengen"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub verbrauchsmengen: Option<Vec<Verbrauch>>,
     /// Version der BO-Struktur aka "fachliche Versionierung"
     #[cfg_attr(feature = "serde", serde(rename = "_version"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub version: Option<String>,
     #[cfg_attr(feature = "serde", serde(rename = "zaehlwerke"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub zaehlwerke: Option<Vec<Zaehlwerk>>,
-    #[cfg_attr(
-        feature = "serde",
-        serde(rename = "zaehlwerkeDerBeteiligtenMarktrolle")
-    )]
+    #[cfg_attr(feature = "serde", serde(rename = "zaehlwerkeDerBeteiligtenMarktrolle"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub zaehlwerke_der_beteiligten_marktrolle: Option<Vec<Zaehlwerk>>,
     #[cfg_attr(feature = "serde", serde(rename = "zusatzAttribute"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub zusatz_attribute: Option<Vec<ZusatzAttribut>>,
     /// Unknown JSON fields captured during deserialization for round-trip preservation.
     /// `None` when no unknown fields were present (zero heap allocation).
@@ -185,7 +183,8 @@ pub struct Marktlokation {
     )]
     #[cfg_attr(not(feature = "json"), serde(skip))]
     #[cfg_attr(feature = "builder", builder(default, setter(skip)))]
-    pub(crate) _additional: crate::LimitedExtensionMap,
+    #[doc(hidden)]
+    pub _additional: crate::LimitedExtensionMap,
 }
 impl Default for Marktlokation {
     fn default() -> Self {
@@ -239,9 +238,7 @@ impl crate::json::Bo4eJsonExt for Marktlokation {}
 #[cfg(feature = "json")]
 impl crate::json::Bo4eExtensionData for Marktlokation {
     fn extension_data(&self) -> &indexmap::IndexMap<String, serde_json::Value> {
-        self._additional
-            .as_map()
-            .unwrap_or(&crate::json::extension::EMPTY_EXTENSION_MAP)
+        self._additional.as_map().unwrap_or(&crate::json::extension::EMPTY_EXTENSION_MAP)
     }
     fn has_extension_data(&self) -> bool {
         !self._additional.is_empty()

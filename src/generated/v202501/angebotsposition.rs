@@ -1,4 +1,4 @@
-use super::{Betrag, ComTyp, ZusatzAttribut};
+use super::{Betrag, ComTyp, Menge, Preis, ZusatzAttribut};
 #[derive(Debug, Clone, PartialEq, Default)]
 #[cfg_attr(not(feature = "json"), derive(Hash))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -19,57 +19,41 @@ pub struct Angebotsposition {
     /// Z.B. könnten hier UUIDs aus einer Datenbank stehen oder URLs zu einem Backend-System.
     #[cfg_attr(feature = "serde", serde(rename = "_id"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub id: Option<String>,
     /// Bezeichnung der jeweiligen Position des Angebotsteils
     #[cfg_attr(feature = "serde", serde(rename = "positionsbezeichnung"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub positionsbezeichnung: Option<String>,
     /// Kosten (positionspreis * positionsmenge) für diese Angebotsposition
     #[cfg_attr(feature = "serde", serde(rename = "positionskosten"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub positionskosten: Option<Betrag>,
     /// Menge des angebotenen Artikels (z.B. Wirkarbeit in kWh), in dieser Angebotsposition
     #[cfg_attr(feature = "serde", serde(rename = "positionsmenge"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
-    #[cfg(feature = "decimal")]
-    pub positionsmenge: Option<rust_decimal::Decimal>,
-    /// Requires the `decimal` feature for the `rust_decimal::Decimal` representation.
-    /// Without `decimal`, stores the decimal string value unchanged.
-    #[cfg_attr(feature = "serde", serde(rename = "positionsmenge"))]
-    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
-    #[cfg(not(feature = "decimal"))]
-    pub positionsmenge: Option<String>,
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    pub positionsmenge: Option<Menge>,
     /// Preis pro Einheit/Stückpreis des angebotenen Artikels.
     #[cfg_attr(feature = "serde", serde(rename = "positionspreis"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
-    #[cfg(feature = "decimal")]
-    pub positionspreis: Option<rust_decimal::Decimal>,
-    /// Requires the `decimal` feature for the `rust_decimal::Decimal` representation.
-    /// Without `decimal`, stores the decimal string value unchanged.
-    #[cfg_attr(feature = "serde", serde(rename = "positionspreis"))]
-    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
-    #[cfg(not(feature = "decimal"))]
-    pub positionspreis: Option<String>,
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    pub positionspreis: Option<Preis>,
     /// COM type identifier for this struct.
     #[cfg_attr(feature = "serde", serde(rename = "_typ"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub typ: Option<ComTyp>,
     /// Version der COM-Struktur aka "fachliche Versionierung"
     #[cfg_attr(feature = "serde", serde(rename = "_version"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub version: Option<String>,
     #[cfg_attr(feature = "serde", serde(rename = "zusatzAttribute"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub zusatz_attribute: Option<Vec<ZusatzAttribut>>,
     /// Unknown JSON fields captured during deserialization for round-trip preservation.
     /// `None` when no unknown fields were present (zero heap allocation).
@@ -80,7 +64,8 @@ pub struct Angebotsposition {
     )]
     #[cfg_attr(not(feature = "json"), serde(skip))]
     #[cfg_attr(feature = "builder", builder(default, setter(skip)))]
-    pub(crate) _additional: crate::LimitedExtensionMap,
+    #[doc(hidden)]
+    pub _additional: crate::LimitedExtensionMap,
 }
 #[cfg(feature = "json")]
 impl crate::json::sealed::Sealed for Angebotsposition {}
@@ -89,9 +74,7 @@ impl crate::json::Bo4eJsonExt for Angebotsposition {}
 #[cfg(feature = "json")]
 impl crate::json::Bo4eExtensionData for Angebotsposition {
     fn extension_data(&self) -> &indexmap::IndexMap<String, serde_json::Value> {
-        self._additional
-            .as_map()
-            .unwrap_or(&crate::json::extension::EMPTY_EXTENSION_MAP)
+        self._additional.as_map().unwrap_or(&crate::json::extension::EMPTY_EXTENSION_MAP)
     }
     fn has_extension_data(&self) -> bool {
         !self._additional.is_empty()

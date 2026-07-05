@@ -16,59 +16,43 @@ pub struct Vertragsteil {
     /// Z.B. könnten hier UUIDs aus einer Datenbank stehen oder URLs zu einem Backend-System.
     #[cfg_attr(feature = "serde", serde(rename = "_id"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub id: Option<String>,
     /// Der Identifier für diejenigen Markt- oder Messlokation, die zu diesem Vertragsteil gehören.
     /// Verträge für mehrere Lokationen werden mit mehreren Vertragsteilen abgebildet
     #[cfg_attr(feature = "serde", serde(rename = "lokation"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub lokation: Option<String>,
     /// Für die Lokation festgelegte maximale Abnahmemenge (exklusiv)
     #[cfg_attr(feature = "serde", serde(rename = "maximaleAbnahmemenge"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
-    #[cfg(feature = "decimal")]
-    pub maximale_abnahmemenge: Option<rust_decimal::Decimal>,
-    /// Requires the `decimal` feature for the `rust_decimal::Decimal` representation.
-    /// Without `decimal`, stores the decimal string value unchanged.
-    #[cfg_attr(feature = "serde", serde(rename = "maximaleAbnahmemenge"))]
-    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
-    #[cfg(not(feature = "decimal"))]
-    pub maximale_abnahmemenge: Option<String>,
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    pub maximale_abnahmemenge: Option<Menge>,
     /// Für die Lokation festgelegte Mindestabnahmemenge (inklusiv)
     #[cfg_attr(feature = "serde", serde(rename = "minimaleAbnahmemenge"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
-    #[cfg(feature = "decimal")]
-    pub minimale_abnahmemenge: Option<rust_decimal::Decimal>,
-    /// Requires the `decimal` feature for the `rust_decimal::Decimal` representation.
-    /// Without `decimal`, stores the decimal string value unchanged.
-    #[cfg_attr(feature = "serde", serde(rename = "minimaleAbnahmemenge"))]
-    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
-    #[cfg(not(feature = "decimal"))]
-    pub minimale_abnahmemenge: Option<String>,
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    pub minimale_abnahmemenge: Option<Menge>,
     /// COM type identifier for this struct.
     #[cfg_attr(feature = "serde", serde(rename = "_typ"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub typ: Option<ComTyp>,
     /// Version der COM-Struktur aka "fachliche Versionierung"
     #[cfg_attr(feature = "serde", serde(rename = "_version"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub version: Option<String>,
     /// Für die Lokation festgeschriebene Abnahmemenge
     #[cfg_attr(feature = "serde", serde(rename = "vertraglichFixierteMenge"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub vertraglich_fixierte_menge: Option<Menge>,
     /// Start der Gültigkeit des Vertragsteils (inklusiv)
     #[cfg_attr(feature = "serde", serde(rename = "vertragsteilbeginn"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     #[cfg_attr(feature = "serde", serde(default))]
     #[cfg_attr(
         feature = "schemars",
@@ -85,7 +69,7 @@ pub struct Vertragsteil {
     #[cfg_attr(feature = "serde", serde(rename = "vertragsteilbeginn"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "serde", serde(default))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     #[cfg_attr(
         feature = "schemars",
         schemars(schema_with = "crate::schema_helpers::opt_datetime_schema")
@@ -95,7 +79,7 @@ pub struct Vertragsteil {
     /// Ende der Gültigkeit des Vertragsteils (exklusiv)
     #[cfg_attr(feature = "serde", serde(rename = "vertragsteilende"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     #[cfg_attr(feature = "serde", serde(default))]
     #[cfg_attr(
         feature = "schemars",
@@ -112,7 +96,7 @@ pub struct Vertragsteil {
     #[cfg_attr(feature = "serde", serde(rename = "vertragsteilende"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "serde", serde(default))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     #[cfg_attr(
         feature = "schemars",
         schemars(schema_with = "crate::schema_helpers::opt_datetime_schema")
@@ -121,7 +105,7 @@ pub struct Vertragsteil {
     pub vertragsteilende: Option<String>,
     #[cfg_attr(feature = "serde", serde(rename = "zusatzAttribute"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub zusatz_attribute: Option<Vec<ZusatzAttribut>>,
     /// Unknown JSON fields captured during deserialization for round-trip preservation.
     /// `None` when no unknown fields were present (zero heap allocation).
@@ -132,7 +116,8 @@ pub struct Vertragsteil {
     )]
     #[cfg_attr(not(feature = "json"), serde(skip))]
     #[cfg_attr(feature = "builder", builder(default, setter(skip)))]
-    pub(crate) _additional: crate::LimitedExtensionMap,
+    #[doc(hidden)]
+    pub _additional: crate::LimitedExtensionMap,
 }
 #[cfg(feature = "json")]
 impl crate::json::sealed::Sealed for Vertragsteil {}
@@ -141,9 +126,7 @@ impl crate::json::Bo4eJsonExt for Vertragsteil {}
 #[cfg(feature = "json")]
 impl crate::json::Bo4eExtensionData for Vertragsteil {
     fn extension_data(&self) -> &indexmap::IndexMap<String, serde_json::Value> {
-        self._additional
-            .as_map()
-            .unwrap_or(&crate::json::extension::EMPTY_EXTENSION_MAP)
+        self._additional.as_map().unwrap_or(&crate::json::extension::EMPTY_EXTENSION_MAP)
     }
     fn has_extension_data(&self) -> bool {
         !self._additional.is_empty()

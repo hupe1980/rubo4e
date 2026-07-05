@@ -55,6 +55,35 @@ use std::time::Instant;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
+// ─── _typ peek helper ─────────────────────────────────────────────────────────
+
+/// Peeks at the `_typ` discriminant field from a raw JSON object string without
+/// materializing a full [`serde_json::Value`] tree.
+///
+/// Returns a `&str` borrowed from `json` that holds the string value of `"_typ"`,
+/// or `None` if the key is absent, `null`, or the input is invalid JSON.
+///
+/// This is used by the generated [`AnyBo`] deserializer to dispatch to the correct
+/// concrete type after a single `Box<RawValue>` capture, avoiding the two-pass
+/// `Value`-based strategy that allocated an entire JSON object tree just to read
+/// one short string.
+///
+/// BO4E `_typ` values are ASCII SCREAMING_CASE (e.g. `"MARKTLOKATION"`) and
+/// contain no escape sequences, so the returned `&str` is a zero-copy slice into
+/// the input buffer.
+///
+/// [`AnyBo`]: crate::v202501::AnyBo
+pub(crate) fn peek_typ_field(json: &str) -> Option<&str> {
+    #[derive(serde::Deserialize)]
+    struct TypOnly<'a> {
+        #[serde(rename = "_typ", borrow)]
+        typ: Option<&'a str>,
+    }
+    serde_json::from_str::<TypOnly<'_>>(json)
+        .ok()
+        .and_then(|t| t.typ)
+}
+
 // ─── Sealed trait machinery ───────────────────────────────────────────────────
 
 /// Prevents external crates from implementing [`Bo4eJsonExt`] on arbitrary types.

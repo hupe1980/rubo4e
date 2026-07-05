@@ -14,17 +14,17 @@
 pub struct ZusatzAttribut {
     #[cfg_attr(feature = "serde", serde(rename = "name"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub name: Option<String>,
     #[cfg_attr(feature = "serde", serde(rename = "wert"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     #[cfg(feature = "json")]
     pub wert: Option<serde_json::Value>,
     /// Requires the `json` feature for the full `serde_json::Value` representation.
     #[cfg_attr(feature = "serde", serde(rename = "wert"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     #[cfg(not(feature = "json"))]
     pub wert: Option<String>,
     /// Unknown JSON fields captured during deserialization for round-trip preservation.
@@ -36,7 +36,8 @@ pub struct ZusatzAttribut {
     )]
     #[cfg_attr(not(feature = "json"), serde(skip))]
     #[cfg_attr(feature = "builder", builder(default, setter(skip)))]
-    pub(crate) _additional: crate::LimitedExtensionMap,
+    #[doc(hidden)]
+    pub _additional: crate::LimitedExtensionMap,
 }
 #[cfg(feature = "json")]
 impl crate::json::sealed::Sealed for ZusatzAttribut {}
@@ -45,9 +46,7 @@ impl crate::json::Bo4eJsonExt for ZusatzAttribut {}
 #[cfg(feature = "json")]
 impl crate::json::Bo4eExtensionData for ZusatzAttribut {
     fn extension_data(&self) -> &indexmap::IndexMap<String, serde_json::Value> {
-        self._additional
-            .as_map()
-            .unwrap_or(&crate::json::extension::EMPTY_EXTENSION_MAP)
+        self._additional.as_map().unwrap_or(&crate::json::extension::EMPTY_EXTENSION_MAP)
     }
     fn has_extension_data(&self) -> bool {
         !self._additional.is_empty()

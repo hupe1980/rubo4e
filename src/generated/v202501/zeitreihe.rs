@@ -1,6 +1,6 @@
 use super::{
-    Bo4eObject, BoTyp, Medium, Mengeneinheit, Messart, Messgroesse, Messwertstatus, Zeitreihenwert,
-    ZusatzAttribut,
+    Bo4eObject, BoTyp, Medium, Mengeneinheit, Messart, Messgroesse, Messwertstatus,
+    Zeitreihenwert, ZusatzAttribut,
 };
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(not(feature = "json"), derive(Hash))]
@@ -18,38 +18,38 @@ pub struct Zeitreihe {
     /// Beschreibt die Verwendung der Zeitreihe
     #[cfg_attr(feature = "serde", serde(rename = "beschreibung"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub beschreibung: Option<String>,
     /// Bezeichnung für die Zeitreihe
     #[cfg_attr(feature = "serde", serde(rename = "bezeichnung"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub bezeichnung: Option<String>,
     /// Alle Werte in der Tabelle haben die Einheit, die hier angegeben ist
     #[cfg_attr(feature = "serde", serde(rename = "einheit"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub einheit: Option<Mengeneinheit>,
     /// Eine generische ID, die für eigene Zwecke genutzt werden kann.
     /// Z.B. könnten hier UUIDs aus einer Datenbank stehen oder URLs zu einem Backend-System.
     #[cfg_attr(feature = "serde", serde(rename = "_id"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub id: Option<String>,
     /// Medium, das gemessen wurde (z.B. Wasser, Dampf, Strom, Gas)
     #[cfg_attr(feature = "serde", serde(rename = "medium"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub medium: Option<Medium>,
     /// Beschreibt die Art der Messung (z.B. aktueller Wert, mittlerer Wert, maximaler Wert)
     #[cfg_attr(feature = "serde", serde(rename = "messart"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub messart: Option<Messart>,
     /// Beschreibt, was gemessen wurde (z.B. Strom, Spannung, Wirkleistung, Scheinleistung)
     #[cfg_attr(feature = "serde", serde(rename = "messgroesse"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub messgroesse: Option<Messgroesse>,
     /// BO type identifier — always `BoTyp::Zeitreihe` for this struct.
     #[cfg_attr(feature = "serde", serde(rename = "_typ"))]
@@ -62,21 +62,21 @@ pub struct Zeitreihe {
     /// Version der Zeitreihe
     #[cfg_attr(feature = "serde", serde(rename = "version"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub version: Option<String>,
     /// Hier liegen jeweils die Werte
     #[cfg_attr(feature = "serde", serde(rename = "werte"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub werte: Option<Vec<Zeitreihenwert>>,
     /// Kennzeichnung, wie die Werte entstanden sind, z.B. ABGELESEN oder PROGNOSEWERT
     #[cfg_attr(feature = "serde", serde(rename = "wertherkunft"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub wertherkunft: Option<Messwertstatus>,
     #[cfg_attr(feature = "serde", serde(rename = "zusatzAttribute"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub zusatz_attribute: Option<Vec<ZusatzAttribut>>,
     /// Unknown JSON fields captured during deserialization for round-trip preservation.
     /// `None` when no unknown fields were present (zero heap allocation).
@@ -87,7 +87,8 @@ pub struct Zeitreihe {
     )]
     #[cfg_attr(not(feature = "json"), serde(skip))]
     #[cfg_attr(feature = "builder", builder(default, setter(skip)))]
-    pub(crate) _additional: crate::LimitedExtensionMap,
+    #[doc(hidden)]
+    pub _additional: crate::LimitedExtensionMap,
 }
 impl Default for Zeitreihe {
     fn default() -> Self {
@@ -124,9 +125,7 @@ impl crate::json::Bo4eJsonExt for Zeitreihe {}
 #[cfg(feature = "json")]
 impl crate::json::Bo4eExtensionData for Zeitreihe {
     fn extension_data(&self) -> &indexmap::IndexMap<String, serde_json::Value> {
-        self._additional
-            .as_map()
-            .unwrap_or(&crate::json::extension::EMPTY_EXTENSION_MAP)
+        self._additional.as_map().unwrap_or(&crate::json::extension::EMPTY_EXTENSION_MAP)
     }
     fn has_extension_data(&self) -> bool {
         !self._additional.is_empty()

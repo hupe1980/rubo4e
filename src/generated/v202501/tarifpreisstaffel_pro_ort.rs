@@ -14,87 +14,87 @@ pub struct TarifpreisstaffelProOrt {
     /// Der Arbeitspreis in ct/kWh
     #[cfg_attr(feature = "serde", serde(rename = "arbeitspreis"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     #[cfg(feature = "decimal")]
     pub arbeitspreis: Option<rust_decimal::Decimal>,
     /// Requires the `decimal` feature for the `rust_decimal::Decimal` representation.
     /// Without `decimal`, stores the decimal string value unchanged.
     #[cfg_attr(feature = "serde", serde(rename = "arbeitspreis"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     #[cfg(not(feature = "decimal"))]
     pub arbeitspreis: Option<String>,
     /// Der Arbeitspreis für Verbräuche in der Niedertarifzeit in ct/kWh
     #[cfg_attr(feature = "serde", serde(rename = "arbeitspreisNT"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     #[cfg(feature = "decimal")]
     pub arbeitspreis_nt: Option<rust_decimal::Decimal>,
     /// Requires the `decimal` feature for the `rust_decimal::Decimal` representation.
     /// Without `decimal`, stores the decimal string value unchanged.
     #[cfg_attr(feature = "serde", serde(rename = "arbeitspreisNT"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     #[cfg(not(feature = "decimal"))]
     pub arbeitspreis_nt: Option<String>,
     /// Der Grundpreis in Euro/Jahr
     #[cfg_attr(feature = "serde", serde(rename = "grundpreis"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     #[cfg(feature = "decimal")]
     pub grundpreis: Option<rust_decimal::Decimal>,
     /// Requires the `decimal` feature for the `rust_decimal::Decimal` representation.
     /// Without `decimal`, stores the decimal string value unchanged.
     #[cfg_attr(feature = "serde", serde(rename = "grundpreis"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     #[cfg(not(feature = "decimal"))]
     pub grundpreis: Option<String>,
     /// Eine generische ID, die für eigene Zwecke genutzt werden kann.
     /// Z.B. könnten hier UUIDs aus einer Datenbank stehen oder URLs zu einem Backend-System.
     #[cfg_attr(feature = "serde", serde(rename = "_id"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub id: Option<String>,
     /// Oberer Wert, bis zu dem die Staffel gilt (exklusive)
     #[cfg_attr(feature = "serde", serde(rename = "staffelgrenzeBis"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     #[cfg(feature = "decimal")]
     pub staffelgrenze_bis: Option<rust_decimal::Decimal>,
     /// Requires the `decimal` feature for the `rust_decimal::Decimal` representation.
     /// Without `decimal`, stores the decimal string value unchanged.
     #[cfg_attr(feature = "serde", serde(rename = "staffelgrenzeBis"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     #[cfg(not(feature = "decimal"))]
     pub staffelgrenze_bis: Option<String>,
     /// Unterer Wert, ab dem die Staffel gilt (inklusive)
     #[cfg_attr(feature = "serde", serde(rename = "staffelgrenzeVon"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     #[cfg(feature = "decimal")]
     pub staffelgrenze_von: Option<rust_decimal::Decimal>,
     /// Requires the `decimal` feature for the `rust_decimal::Decimal` representation.
     /// Without `decimal`, stores the decimal string value unchanged.
     #[cfg_attr(feature = "serde", serde(rename = "staffelgrenzeVon"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     #[cfg(not(feature = "decimal"))]
     pub staffelgrenze_von: Option<String>,
     /// COM type identifier for this struct.
     #[cfg_attr(feature = "serde", serde(rename = "_typ"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub typ: Option<ComTyp>,
     /// Version der COM-Struktur aka "fachliche Versionierung"
     #[cfg_attr(feature = "serde", serde(rename = "_version"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub version: Option<String>,
     #[cfg_attr(feature = "serde", serde(rename = "zusatzAttribute"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub zusatz_attribute: Option<Vec<ZusatzAttribut>>,
     /// Unknown JSON fields captured during deserialization for round-trip preservation.
     /// `None` when no unknown fields were present (zero heap allocation).
@@ -105,7 +105,8 @@ pub struct TarifpreisstaffelProOrt {
     )]
     #[cfg_attr(not(feature = "json"), serde(skip))]
     #[cfg_attr(feature = "builder", builder(default, setter(skip)))]
-    pub(crate) _additional: crate::LimitedExtensionMap,
+    #[doc(hidden)]
+    pub _additional: crate::LimitedExtensionMap,
 }
 #[cfg(feature = "json")]
 impl crate::json::sealed::Sealed for TarifpreisstaffelProOrt {}
@@ -114,9 +115,7 @@ impl crate::json::Bo4eJsonExt for TarifpreisstaffelProOrt {}
 #[cfg(feature = "json")]
 impl crate::json::Bo4eExtensionData for TarifpreisstaffelProOrt {
     fn extension_data(&self) -> &indexmap::IndexMap<String, serde_json::Value> {
-        self._additional
-            .as_map()
-            .unwrap_or(&crate::json::extension::EMPTY_EXTENSION_MAP)
+        self._additional.as_map().unwrap_or(&crate::json::extension::EMPTY_EXTENSION_MAP)
     }
     fn has_extension_data(&self) -> bool {
         !self._additional.is_empty()

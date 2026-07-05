@@ -324,16 +324,19 @@ macro_rules! impl_validators {
             ) -> Result<(), garde::Error> {
                 #[cfg(feature = "decimal")]
                 {
+                    // einzelpreis and menge are now typed structs (Preis / Menge) whose
+                    // `.wert` holds the numeric amount as a Decimal.  Extract it with
+                    // `and_then` so we skip the arithmetic check when the sub-field is absent.
                     let betrag = v.betrag_kostenposition.as_ref().and_then(|b| b.wert);
-                    let einzelpreis = v.einzelpreis;
-                    let menge = v.menge;
+                    let einzelpreis = v.einzelpreis.as_ref().and_then(|p| p.wert);
+                    let menge = v.menge.as_ref().and_then(|m| m.wert);
 
                     if let (Some(ep), Some(m), Some(b)) = (einzelpreis, menge, betrag) {
                         let expected = (ep * m).round_dp(10);
                         let actual = b.round_dp(10);
                         if expected != actual {
                             return Err(garde::Error::new(format!(
-                                "einzelpreis ({ep}) * menge ({m}) = {expected}, \
+                                "einzelpreis.wert ({ep}) * menge.wert ({m}) = {expected}, \
                                  but betrag_kostenposition.wert is {actual}"
                             )));
                         }

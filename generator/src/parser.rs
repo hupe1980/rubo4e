@@ -189,10 +189,20 @@ fn parse_field(
         .and_then(|v| v.as_str())
         .map(|s| s.to_owned());
 
-    // Semantic inference takes priority over raw JSON Schema type info.
-    // Pass the parent struct name so per-struct overrides can take effect.
-    let field_type = inference::infer_with_parent(parent_name, json_name)
-        .unwrap_or_else(|| resolve_field_type(schema));
+    // Resolve the schema's structural type first.
+    let schema_type = resolve_field_type(schema);
+
+    // Semantic inference enriches raw primitive types (string → identifier newtype,
+    // number → Decimal, string → OffsetDateTime).  However, when the schema
+    // explicitly references a structured BO or COM type via `$ref`, that reference
+    // is the authoritative type declaration — inference must not override it with a
+    // primitive alias.  For example, `einzelpreis` ends with the "preis" suffix but
+    // its schema says `$ref: Preis.json`; the field must be `Option<Preis>`, not
+    // `Option<Decimal>`.
+    let field_type = match &schema_type {
+        FieldType::Bo(_) | FieldType::Com(_) => schema_type,
+        _ => inference::infer_with_parent(parent_name, json_name).unwrap_or(schema_type),
+    };
 
     // Fields not in `required` are optional.
     let is_optional = !is_required;

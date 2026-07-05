@@ -17,39 +17,39 @@ pub struct SteuerbareRessource {
     /// Eigenschaft des Messstellenbetreibers an der Lokation
     #[cfg_attr(feature = "serde", serde(rename = "eigenschaftMsbLokation"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub eigenschaft_msb_lokation: Option<Marktrolle>,
     /// Eine generische ID, die für eigene Zwecke genutzt werden kann.
     /// Z.B. könnten hier UUIDs aus einer Datenbank stehen oder URLs zu einem Backend-System.
     #[cfg_attr(feature = "serde", serde(rename = "_id"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub id: Option<String>,
     /// Produkt-Daten der Steuerbaren Ressource
     #[cfg_attr(feature = "serde", serde(rename = "konfigurationsprodukte"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub konfigurationsprodukte: Option<Vec<Konfigurationsprodukt>>,
     /// Lokationsbuendel Code, der die Funktion dieses BOs an der Lokationsbuendelstruktur beschreibt.
     #[cfg_attr(feature = "serde", serde(rename = "lokationsbuendelObjektcode"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub lokationsbuendel_objektcode: Option<String>,
     /// Lokationszuordnung, um bspw. die zugehörigen Messlokationen anzugeben
     #[cfg_attr(feature = "serde", serde(rename = "lokationszuordnungen"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub lokationszuordnungen: Option<Vec<Box<Lokationszuordnung>>>,
     /// Id der steuerbaren Ressource
     #[cfg_attr(feature = "serde", serde(rename = "steuerbareRessourceId"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     #[cfg_attr(feature = "validate", garde(dive))]
     pub steuerbare_ressource_id: Option<crate::identifiers::SrId>,
     /// Leistungsbeschreibung des Steuerkanals
     #[cfg_attr(feature = "serde", serde(rename = "steuerkanalLeistungsbeschreibung"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub steuerkanal_leistungsbeschreibung: Option<SteuerkanalLeistungsbeschreibung>,
     /// BO type identifier — always `BoTyp::SteuerbareRessource` for this struct.
     #[cfg_attr(feature = "serde", serde(rename = "_typ"))]
@@ -62,17 +62,17 @@ pub struct SteuerbareRessource {
     /// Version der BO-Struktur aka "fachliche Versionierung"
     #[cfg_attr(feature = "serde", serde(rename = "_version"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub version: Option<String>,
     /// Angabe des Messstellenbetreibers, der der Steuerbaren Ressource zugeordnet ist.
     #[cfg_attr(feature = "serde", serde(rename = "zugeordneteMsbCodenummer"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     #[cfg_attr(feature = "validate", garde(dive))]
     pub zugeordnete_msb_codenummer: Option<crate::identifiers::MarktpartnerId>,
     #[cfg_attr(feature = "serde", serde(rename = "zusatzAttribute"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub zusatz_attribute: Option<Vec<ZusatzAttribut>>,
     /// Unknown JSON fields captured during deserialization for round-trip preservation.
     /// `None` when no unknown fields were present (zero heap allocation).
@@ -83,7 +83,8 @@ pub struct SteuerbareRessource {
     )]
     #[cfg_attr(not(feature = "json"), serde(skip))]
     #[cfg_attr(feature = "builder", builder(default, setter(skip)))]
-    pub(crate) _additional: crate::LimitedExtensionMap,
+    #[doc(hidden)]
+    pub _additional: crate::LimitedExtensionMap,
 }
 impl Default for SteuerbareRessource {
     fn default() -> Self {
@@ -119,9 +120,7 @@ impl crate::json::Bo4eJsonExt for SteuerbareRessource {}
 #[cfg(feature = "json")]
 impl crate::json::Bo4eExtensionData for SteuerbareRessource {
     fn extension_data(&self) -> &indexmap::IndexMap<String, serde_json::Value> {
-        self._additional
-            .as_map()
-            .unwrap_or(&crate::json::extension::EMPTY_EXTENSION_MAP)
+        self._additional.as_map().unwrap_or(&crate::json::extension::EMPTY_EXTENSION_MAP)
     }
     fn has_extension_data(&self) -> bool {
         !self._additional.is_empty()

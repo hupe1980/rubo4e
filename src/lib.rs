@@ -15,7 +15,7 @@
 //! | `simd-json`  |         | SIMD parser backend for `from_json_*` (workload-dependent)    |
 //! | `time`       |         | `time` crate for timestamps                                    |
 //! | `decimal`    |         | `rust_decimal::Decimal` for amounts/prices                     |
-//! | `builder`    |         | `typed-builder` derives with `strip_option` setters            |
+//! | `builder`    |         | `typed-builder` derives with `setter(into)` — accepts both `T` and `Option<T>`  |
 //! | `validate`   |         | `garde` validation                                             |
 //! | `schemars`   |         | JSON Schema generation                                         |
 //! | `sqlx`       |         | `sqlx` type integrations                                       |

@@ -1,7 +1,7 @@
 use super::{
-    Abwicklungsmodell, Aggregationsverantwortung, Bo4eObject, BoTyp, Fallgruppenzuordnung,
-    Lastprofil, Menge, Profiltyp, Prognosegrundlage, WahlrechtPrognosegrundlage, Zeitreihentyp,
-    ZusatzAttribut,
+    Abwicklungsmodell, Aggregationsverantwortung, Bo4eObject, BoTyp,
+    Fallgruppenzuordnung, Lastprofil, Menge, Profiltyp, Prognosegrundlage,
+    WahlrechtPrognosegrundlage, Zeitreihentyp, ZusatzAttribut,
 };
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(not(feature = "json"), derive(Hash))]
@@ -21,15 +21,15 @@ use super::{
 pub struct Bilanzierung {
     #[cfg_attr(feature = "serde", serde(rename = "abwicklungsmodell"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub abwicklungsmodell: Option<Abwicklungsmodell>,
     #[cfg_attr(feature = "serde", serde(rename = "aggregationsverantwortung"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub aggregationsverantwortung: Option<Aggregationsverantwortung>,
     #[cfg_attr(feature = "serde", serde(rename = "bilanzierungsbeginn"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     #[cfg_attr(feature = "serde", serde(default))]
     #[cfg_attr(
         feature = "schemars",
@@ -46,7 +46,7 @@ pub struct Bilanzierung {
     #[cfg_attr(feature = "serde", serde(rename = "bilanzierungsbeginn"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "serde", serde(default))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     #[cfg_attr(
         feature = "schemars",
         schemars(schema_with = "crate::schema_helpers::opt_datetime_schema")
@@ -55,7 +55,7 @@ pub struct Bilanzierung {
     pub bilanzierungsbeginn: Option<String>,
     #[cfg_attr(feature = "serde", serde(rename = "bilanzierungsende"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     #[cfg_attr(feature = "serde", serde(default))]
     #[cfg_attr(
         feature = "schemars",
@@ -72,7 +72,7 @@ pub struct Bilanzierung {
     #[cfg_attr(feature = "serde", serde(rename = "bilanzierungsende"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "serde", serde(default))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     #[cfg_attr(
         feature = "schemars",
         schemars(schema_with = "crate::schema_helpers::opt_datetime_schema")
@@ -81,7 +81,7 @@ pub struct Bilanzierung {
     pub bilanzierungsende: Option<String>,
     #[cfg_attr(feature = "serde", serde(rename = "bilanzkreis"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     #[cfg_attr(feature = "validate", garde(dive))]
     pub bilanzkreis: Option<crate::identifiers::EicCode>,
     /// Prognosegrundlage.
@@ -90,61 +90,53 @@ pub struct Bilanzierung {
     /// so ist dies über die 2 -malige Wiederholung des CAV Segments mit der Angabe der Codes E02 und E14 möglich.
     #[cfg_attr(feature = "serde", serde(rename = "detailsPrognosegrundlage"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub details_prognosegrundlage: Option<Vec<Profiltyp>>,
     #[cfg_attr(feature = "serde", serde(rename = "fallgruppenzuordnung"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub fallgruppenzuordnung: Option<Fallgruppenzuordnung>,
     /// Grund Wahlrecht der Prognosegrundlage.
     ///
     /// true=Wahlrecht beim Lieferanten vorhanden
     #[cfg_attr(feature = "serde", serde(rename = "grundWahlrechtPrognosegrundlage"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub grund_wahlrecht_prognosegrundlage: Option<WahlrechtPrognosegrundlage>,
     /// Eine generische ID, die für eigene Zwecke genutzt werden kann.
     /// Z.B. könnten hier UUIDs aus einer Datenbank stehen oder URLs zu einem Backend-System.
     #[cfg_attr(feature = "serde", serde(rename = "_id"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub id: Option<String>,
     #[cfg_attr(feature = "serde", serde(rename = "jahresverbrauchsprognose"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub jahresverbrauchsprognose: Option<Menge>,
     #[cfg_attr(feature = "serde", serde(rename = "kundenwert"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
-    #[cfg(feature = "decimal")]
-    pub kundenwert: Option<rust_decimal::Decimal>,
-    /// Requires the `decimal` feature for the `rust_decimal::Decimal` representation.
-    /// Without `decimal`, stores the decimal string value unchanged.
-    #[cfg_attr(feature = "serde", serde(rename = "kundenwert"))]
-    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
-    #[cfg(not(feature = "decimal"))]
-    pub kundenwert: Option<String>,
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    pub kundenwert: Option<Menge>,
     #[cfg_attr(feature = "serde", serde(rename = "lastprofil"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub lastprofil: Option<Vec<Lastprofil>>,
     #[cfg_attr(feature = "serde", serde(rename = "marktlokationsId"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     #[cfg_attr(feature = "validate", garde(dive))]
     pub marktlokations_id: Option<crate::identifiers::MaloId>,
     #[cfg_attr(feature = "serde", serde(rename = "prioritaet"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub prioritaet: Option<i64>,
     #[cfg_attr(feature = "serde", serde(rename = "prognosegrundlage"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub prognosegrundlage: Option<Prognosegrundlage>,
     #[cfg_attr(feature = "serde", serde(rename = "temperaturArbeit"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub temperatur_arbeit: Option<Menge>,
     /// BO type identifier — always `BoTyp::Bilanzierung` for this struct.
     #[cfg_attr(feature = "serde", serde(rename = "_typ"))]
@@ -157,40 +149,40 @@ pub struct Bilanzierung {
     /// Verbrauchsaufteilung in % zwischen SLP und TLP-Profil.
     ///
     /// 1. [Gemessene Energiemenge der OBIS "nicht Schwachlast"] * [Verbrauchsaufteilung in % / 100%]
-    ///    = [zu verlagernde Energiemenge]
+    /// = [zu verlagernde Energiemenge]
     /// 2. [Gemessene Energiemenge der OBIS "Schwachlast"] - [zu verlagernde Energiemenge]
-    ///    = [Ermittelte Energiemenge für Schwachlast]
+    /// = [Ermittelte Energiemenge für Schwachlast]
     /// 3. [Gemessene Energiemenge der OBIS "nicht Schwachlast"] + [zu verlagernde Energiemenge]
-    ///    = [Ermittelte Energiemenge für nicht Schwachlast]
+    /// = [Ermittelte Energiemenge für nicht Schwachlast]
     #[cfg_attr(feature = "serde", serde(rename = "verbrauchsaufteilung"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     #[cfg(feature = "decimal")]
     pub verbrauchsaufteilung: Option<rust_decimal::Decimal>,
     /// Requires the `decimal` feature for the `rust_decimal::Decimal` representation.
     /// Without `decimal`, stores the decimal string value unchanged.
     #[cfg_attr(feature = "serde", serde(rename = "verbrauchsaufteilung"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     #[cfg(not(feature = "decimal"))]
     pub verbrauchsaufteilung: Option<String>,
     /// Version der BO-Struktur aka "fachliche Versionierung"
     #[cfg_attr(feature = "serde", serde(rename = "_version"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub version: Option<String>,
     /// Wahlrecht der Prognosegrundlage.
     #[cfg_attr(feature = "serde", serde(rename = "wahlrechtPrognosegrundlage"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub wahlrecht_prognosegrundlage: Option<WahlrechtPrognosegrundlage>,
     #[cfg_attr(feature = "serde", serde(rename = "zeitreihentyp"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub zeitreihentyp: Option<Zeitreihentyp>,
     #[cfg_attr(feature = "serde", serde(rename = "zusatzAttribute"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub zusatz_attribute: Option<Vec<ZusatzAttribut>>,
     /// Unknown JSON fields captured during deserialization for round-trip preservation.
     /// `None` when no unknown fields were present (zero heap allocation).
@@ -201,7 +193,8 @@ pub struct Bilanzierung {
     )]
     #[cfg_attr(not(feature = "json"), serde(skip))]
     #[cfg_attr(feature = "builder", builder(default, setter(skip)))]
-    pub(crate) _additional: crate::LimitedExtensionMap,
+    #[doc(hidden)]
+    pub _additional: crate::LimitedExtensionMap,
 }
 impl Default for Bilanzierung {
     fn default() -> Self {
@@ -248,9 +241,7 @@ impl crate::json::Bo4eJsonExt for Bilanzierung {}
 #[cfg(feature = "json")]
 impl crate::json::Bo4eExtensionData for Bilanzierung {
     fn extension_data(&self) -> &indexmap::IndexMap<String, serde_json::Value> {
-        self._additional
-            .as_map()
-            .unwrap_or(&crate::json::extension::EMPTY_EXTENSION_MAP)
+        self._additional.as_map().unwrap_or(&crate::json::extension::EMPTY_EXTENSION_MAP)
     }
     fn has_extension_data(&self) -> bool {
         !self._additional.is_empty()

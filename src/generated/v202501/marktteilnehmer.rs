@@ -1,5 +1,6 @@
 use super::{
-    Bo4eObject, BoTyp, Geschaeftspartner, Marktrolle, Rollencodetyp, Sparte, ZusatzAttribut,
+    Bo4eObject, BoTyp, Geschaeftspartner, Marktrolle, Rollencodetyp, Sparte,
+    ZusatzAttribut,
 };
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(not(feature = "json"), derive(Hash))]
@@ -16,39 +17,39 @@ pub struct Marktteilnehmer {
     /// Der zu diesem Marktteilnehmer gehörende Geschäftspartner
     #[cfg_attr(feature = "serde", serde(rename = "geschaeftspartner"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub geschaeftspartner: Option<Box<Geschaeftspartner>>,
     /// Eine generische ID, die für eigene Zwecke genutzt werden kann.
     /// Z.B. könnten hier UUIDs aus einer Datenbank stehen oder URLs zu einem Backend-System.
     #[cfg_attr(feature = "serde", serde(rename = "_id"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub id: Option<String>,
     /// Die 1:1-Kommunikationsadresse des Marktteilnehmers. Diese wird in der Marktkommunikation verwendet. Konkret kann dies eine eMail-Adresse oder ein AS4-Endpunkt sein.
     #[cfg_attr(feature = "serde", serde(rename = "makoadresse"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub makoadresse: Option<Vec<String>>,
     /// Gibt im Klartext die Bezeichnung der Marktrolle an
     #[cfg_attr(feature = "serde", serde(rename = "marktrolle"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub marktrolle: Option<Marktrolle>,
     /// Gibt die Codenummer der Marktrolle an
     #[cfg_attr(feature = "serde", serde(rename = "rollencodenummer"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     #[cfg_attr(feature = "validate", garde(dive))]
     pub rollencodenummer: Option<crate::identifiers::MarktpartnerId>,
     /// Gibt den Typ des Codes an
     #[cfg_attr(feature = "serde", serde(rename = "rollencodetyp"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub rollencodetyp: Option<Rollencodetyp>,
     /// Sparte des Marktteilnehmers, z.B. Gas oder Strom
     #[cfg_attr(feature = "serde", serde(rename = "sparte"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub sparte: Option<Sparte>,
     /// BO type identifier — always `BoTyp::Marktteilnehmer` for this struct.
     #[cfg_attr(feature = "serde", serde(rename = "_typ"))]
@@ -61,11 +62,11 @@ pub struct Marktteilnehmer {
     /// Version der BO-Struktur aka "fachliche Versionierung"
     #[cfg_attr(feature = "serde", serde(rename = "_version"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub version: Option<String>,
     #[cfg_attr(feature = "serde", serde(rename = "zusatzAttribute"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub zusatz_attribute: Option<Vec<ZusatzAttribut>>,
     /// Unknown JSON fields captured during deserialization for round-trip preservation.
     /// `None` when no unknown fields were present (zero heap allocation).
@@ -76,7 +77,8 @@ pub struct Marktteilnehmer {
     )]
     #[cfg_attr(not(feature = "json"), serde(skip))]
     #[cfg_attr(feature = "builder", builder(default, setter(skip)))]
-    pub(crate) _additional: crate::LimitedExtensionMap,
+    #[doc(hidden)]
+    pub _additional: crate::LimitedExtensionMap,
 }
 impl Default for Marktteilnehmer {
     fn default() -> Self {
@@ -111,9 +113,7 @@ impl crate::json::Bo4eJsonExt for Marktteilnehmer {}
 #[cfg(feature = "json")]
 impl crate::json::Bo4eExtensionData for Marktteilnehmer {
     fn extension_data(&self) -> &indexmap::IndexMap<String, serde_json::Value> {
-        self._additional
-            .as_map()
-            .unwrap_or(&crate::json::extension::EMPTY_EXTENSION_MAP)
+        self._additional.as_map().unwrap_or(&crate::json::extension::EMPTY_EXTENSION_MAP)
     }
     fn has_extension_data(&self) -> bool {
         !self._additional.is_empty()

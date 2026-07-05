@@ -18,48 +18,48 @@ pub struct Zaehler {
     /// Befestigungsart
     #[cfg_attr(feature = "serde", serde(rename = "befestigungsart"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub befestigungsart: Option<Befestigungsart>,
     /// Bis zu diesem Datum (exklusiv) ist der Zähler geeicht.
     #[cfg_attr(feature = "serde", serde(rename = "eichungBis"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub eichung_bis: Option<String>,
     /// Liste der Geräte, die zu diesem Zähler gehören, bspw. Smartmeter-Gateway
     #[cfg_attr(feature = "serde", serde(rename = "geraete"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub geraete: Option<Vec<Box<Geraet>>>,
     /// Eine generische ID, die für eigene Zwecke genutzt werden kann.
     /// Z.B. könnten hier UUIDs aus einer Datenbank stehen oder URLs zu einem Backend-System.
     #[cfg_attr(feature = "serde", serde(rename = "_id"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub id: Option<String>,
     /// Fernschaltung
     #[cfg_attr(feature = "serde", serde(rename = "istFernschaltbar"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub ist_fernschaltbar: Option<bool>,
     /// Zu diesem Datum fand die letzte Eichprüfung des Zählers statt.
     #[cfg_attr(feature = "serde", serde(rename = "letzteEichung"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub letzte_eichung: Option<String>,
     /// Messwerterfassung des Zählers
     #[cfg_attr(feature = "serde", serde(rename = "messwerterfassung"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub messwerterfassung: Option<Messwerterfassung>,
     /// Spezifikation bezüglich unterstützter Tarif
     #[cfg_attr(feature = "serde", serde(rename = "registeranzahl"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub registeranzahl: Option<Registeranzahl>,
     /// Strom oder Gas
     #[cfg_attr(feature = "serde", serde(rename = "sparte"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub sparte: Option<Sparte>,
     /// BO type identifier — always `BoTyp::Zaehler` for this struct.
     #[cfg_attr(feature = "serde", serde(rename = "_typ"))]
@@ -72,58 +72,58 @@ pub struct Zaehler {
     /// Version der BO-Struktur aka "fachliche Versionierung"
     #[cfg_attr(feature = "serde", serde(rename = "_version"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub version: Option<String>,
     /// Spezifikation die Richtung des Zählers betreffend
     #[cfg_attr(feature = "serde", serde(rename = "zaehlerauspraegung"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub zaehlerauspraegung: Option<Zaehlerauspraegung>,
     /// Größe des Zählers
     #[cfg_attr(feature = "serde", serde(rename = "zaehlergroesse"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub zaehlergroesse: Option<Zaehlergroesse>,
     /// Der Hersteller des Zählers
     #[cfg_attr(feature = "serde", serde(rename = "zaehlerhersteller"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub zaehlerhersteller: Option<Box<Geschaeftspartner>>,
     /// Zählerkonstante auf dem Zähler
     #[cfg_attr(feature = "serde", serde(rename = "zaehlerkonstante"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     #[cfg(feature = "decimal")]
     pub zaehlerkonstante: Option<rust_decimal::Decimal>,
     /// Requires the `decimal` feature for the `rust_decimal::Decimal` representation.
     /// Without `decimal`, stores the decimal string value unchanged.
     #[cfg_attr(feature = "serde", serde(rename = "zaehlerkonstante"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     #[cfg(not(feature = "decimal"))]
     pub zaehlerkonstante: Option<String>,
     /// Nummerierung des Zählers,vergeben durch den Messstellenbetreiber
     #[cfg_attr(feature = "serde", serde(rename = "zaehlernummer"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub zaehlernummer: Option<String>,
     /// Typisierung des Zählers
     #[cfg_attr(feature = "serde", serde(rename = "zaehlertyp"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub zaehlertyp: Option<Zaehlertyp>,
     /// Besondere Spezifikation des Zählers
     #[cfg_attr(feature = "serde", serde(rename = "zaehlertypSpezifikation"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub zaehlertyp_spezifikation: Option<ZaehlertypSpezifikation>,
     #[cfg_attr(feature = "serde", serde(rename = "zaehlwerke"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub zaehlwerke: Option<Vec<Zaehlwerk>>,
     #[cfg_attr(feature = "serde", serde(rename = "zusatzAttribute"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub zusatz_attribute: Option<Vec<ZusatzAttribut>>,
     /// Unknown JSON fields captured during deserialization for round-trip preservation.
     /// `None` when no unknown fields were present (zero heap allocation).
@@ -134,7 +134,8 @@ pub struct Zaehler {
     )]
     #[cfg_attr(not(feature = "json"), serde(skip))]
     #[cfg_attr(feature = "builder", builder(default, setter(skip)))]
-    pub(crate) _additional: crate::LimitedExtensionMap,
+    #[doc(hidden)]
+    pub _additional: crate::LimitedExtensionMap,
 }
 impl Default for Zaehler {
     fn default() -> Self {
@@ -179,9 +180,7 @@ impl crate::json::Bo4eJsonExt for Zaehler {}
 #[cfg(feature = "json")]
 impl crate::json::Bo4eExtensionData for Zaehler {
     fn extension_data(&self) -> &indexmap::IndexMap<String, serde_json::Value> {
-        self._additional
-            .as_map()
-            .unwrap_or(&crate::json::extension::EMPTY_EXTENSION_MAP)
+        self._additional.as_map().unwrap_or(&crate::json::extension::EMPTY_EXTENSION_MAP)
     }
     fn has_extension_data(&self) -> bool {
         !self._additional.is_empty()

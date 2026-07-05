@@ -17,58 +17,58 @@ pub struct PreisblattMessung {
     /// Eine Bezeichnung für das Preisblatt
     #[cfg_attr(feature = "serde", serde(rename = "bezeichnung"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub bezeichnung: Option<String>,
     /// Die Preise gelten für Marktlokationen der angebebenen Bilanzierungsmethode
     #[cfg_attr(feature = "serde", serde(rename = "bilanzierungsmethode"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub bilanzierungsmethode: Option<Bilanzierungsmethode>,
     /// Der Zeitraum für den der Preis festgelegt ist
     #[cfg_attr(feature = "serde", serde(rename = "gueltigkeit"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub gueltigkeit: Option<Zeitraum>,
     /// Der Netzbetreiber, der die Preise veröffentlicht hat
     #[cfg_attr(feature = "serde", serde(rename = "herausgeber"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub herausgeber: Option<Box<Marktteilnehmer>>,
     /// Eine generische ID, die für eigene Zwecke genutzt werden kann.
     /// Z.B. könnten hier UUIDs aus einer Datenbank stehen oder URLs zu einem Backend-System.
     #[cfg_attr(feature = "serde", serde(rename = "_id"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub id: Option<String>,
     /// Im Preis sind die hier angegebenen Dienstleistungen enthalten, z.B. Jährliche Ablesung
     #[cfg_attr(feature = "serde", serde(rename = "inklusiveDienstleistungen"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub inklusive_dienstleistungen: Option<Vec<Dienstleistungstyp>>,
     /// Im Preis sind die hier angegebenen Geräte mit enthalten, z.B. ein Wandler
     #[cfg_attr(feature = "serde", serde(rename = "inklusiveGeraete"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub inklusive_geraete: Option<Vec<Box<Geraet>>>,
     /// Die Preise gelten für Messlokationen in der angebebenen Netzebene
     #[cfg_attr(feature = "serde", serde(rename = "messebene"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub messebene: Option<Netzebene>,
     /// Die einzelnen Positionen, die mit dem Preisblatt abgerechnet werden können. Z.B. Arbeitspreis, Grundpreis etc
     #[cfg_attr(feature = "serde", serde(rename = "preispositionen"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub preispositionen: Option<Vec<Preisposition>>,
     /// Merkmal, das anzeigt, ob es sich um vorläufige oder endgültige Preise handelt
     #[cfg_attr(feature = "serde", serde(rename = "preisstatus"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub preisstatus: Option<Preisstatus>,
     /// Preisblatt gilt für angegebene Sparte
     #[cfg_attr(feature = "serde", serde(rename = "sparte"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub sparte: Option<Sparte>,
     /// BO type identifier — always `BoTyp::PreisblattMessung` for this struct.
     #[cfg_attr(feature = "serde", serde(rename = "_typ"))]
@@ -81,16 +81,16 @@ pub struct PreisblattMessung {
     /// Version der BO-Struktur aka "fachliche Versionierung"
     #[cfg_attr(feature = "serde", serde(rename = "_version"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub version: Option<String>,
     /// Der Preis betrifft den hier angegebenen Zähler, z.B. einen Drehstromzähler
     #[cfg_attr(feature = "serde", serde(rename = "zaehler"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub zaehler: Option<Box<Zaehler>>,
     #[cfg_attr(feature = "serde", serde(rename = "zusatzAttribute"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(strip_option)))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub zusatz_attribute: Option<Vec<ZusatzAttribut>>,
     /// Unknown JSON fields captured during deserialization for round-trip preservation.
     /// `None` when no unknown fields were present (zero heap allocation).
@@ -101,7 +101,8 @@ pub struct PreisblattMessung {
     )]
     #[cfg_attr(not(feature = "json"), serde(skip))]
     #[cfg_attr(feature = "builder", builder(default, setter(skip)))]
-    pub(crate) _additional: crate::LimitedExtensionMap,
+    #[doc(hidden)]
+    pub _additional: crate::LimitedExtensionMap,
 }
 impl Default for PreisblattMessung {
     fn default() -> Self {
@@ -141,9 +142,7 @@ impl crate::json::Bo4eJsonExt for PreisblattMessung {}
 #[cfg(feature = "json")]
 impl crate::json::Bo4eExtensionData for PreisblattMessung {
     fn extension_data(&self) -> &indexmap::IndexMap<String, serde_json::Value> {
-        self._additional
-            .as_map()
-            .unwrap_or(&crate::json::extension::EMPTY_EXTENSION_MAP)
+        self._additional.as_map().unwrap_or(&crate::json::extension::EMPTY_EXTENSION_MAP)
     }
     fn has_extension_data(&self) -> bool {
         !self._additional.is_empty()

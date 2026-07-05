@@ -1,6 +1,8 @@
 //! Demonstrates the typed builder API for constructing BO4E structs.
 //!
-//! Optional fields use `strip_option` — pass the value directly without wrapping in `Some`.
+//! Optional fields use `setter(into)` — you can pass the value `T` directly
+//! (wraps automatically in `Some(T)`) or pass an `Option<T>` from an
+//! existing optional source.
 //!
 //! Run with:
 //!   cargo run --example builder --features versioned,builder,json

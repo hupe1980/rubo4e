@@ -18,10 +18,10 @@ the canonical data model for the German energy industry.
 - 🏗️ **Generated types** from the official BO4E JSON Schema (v202501)
 - 🔒 **Strong domain identifiers** — `MaloId`, `MeloId`, `EicCode`, `ObisCode`, … with embedded validation
 - ✅ **Three-layer validation** — constructor checks, `garde` struct rules, cross-field business logic
-- 🔧 **Typed builders** — compile-time required-field enforcement via `typed-builder`
+- 🔧 **Typed builders** — compile-time required-field enforcement via `typed-builder`; optional-field setters accept both `T` and `Option<T>`
 - 🌍 **German / English / Canonical JSON** — BO4E wire format out of the box
 - 📐 **JSON Schema** via `schemars`, OpenAPI via `utoipa`, DB via `sqlx`
-- 🧪 **Proptest strategies**, golden corpus, and fuzz harnesses included
+- 🧪 **Golden corpus** and **fuzz harnesses** included; proptest round-trip tests run as dev tests
 
 ---
 
@@ -31,13 +31,13 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-rubo4e = "0.1"
+rubo4e = "0.2"
 ```
 
 Enable optional features as needed:
 
 ```toml
-rubo4e = { version = "0.1", features = ["json", "versioned", "validate", "builder"] }
+rubo4e = { version = "0.2", features = ["json", "versioned", "validate", "builder"] }
 ```
 
 ---
