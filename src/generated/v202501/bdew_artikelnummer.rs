@@ -46,7 +46,10 @@ pub enum BdewArtikelnummer {
     #[cfg_attr(feature = "strum", strum(serialize = "ZUSAETZLICHE_ABLESUNG"))]
     ZusaetzlicheAblesung,
     #[cfg_attr(feature = "serde", serde(rename = "PRUEFGEBUEHREN_AUSSERPLANMAESSIG"))]
-    #[cfg_attr(feature = "strum", strum(serialize = "PRUEFGEBUEHREN_AUSSERPLANMAESSIG"))]
+    #[cfg_attr(
+        feature = "strum",
+        strum(serialize = "PRUEFGEBUEHREN_AUSSERPLANMAESSIG")
+    )]
     PruefgebuehrenAusserplanmaessig,
     #[cfg_attr(feature = "serde", serde(rename = "WIRKARBEIT"))]
     #[cfg_attr(feature = "strum", strum(serialize = "WIRKARBEIT"))]
@@ -136,7 +139,10 @@ pub enum BdewArtikelnummer {
     #[cfg_attr(feature = "strum", strum(serialize = "FIXE_ARBEITSENTGELTKOMPONENTE"))]
     FixeArbeitsentgeltkomponente,
     #[cfg_attr(feature = "serde", serde(rename = "FIXE_LEISTUNGSENTGELTKOMPONENTE"))]
-    #[cfg_attr(feature = "strum", strum(serialize = "FIXE_LEISTUNGSENTGELTKOMPONENTE"))]
+    #[cfg_attr(
+        feature = "strum",
+        strum(serialize = "FIXE_LEISTUNGSENTGELTKOMPONENTE")
+    )]
     FixeLeistungsentgeltkomponente,
     #[cfg_attr(feature = "serde", serde(rename = "UMLAGE_ABSCHALTBARE_LASTEN"))]
     #[cfg_attr(feature = "strum", strum(serialize = "UMLAGE_ABSCHALTBARE_LASTEN"))]

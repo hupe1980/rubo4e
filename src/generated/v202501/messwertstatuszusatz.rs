@@ -18,14 +18,20 @@ pub enum Messwertstatuszusatz {
     #[cfg_attr(feature = "serde", serde(rename = "Z84_LEERSTAND"))]
     #[cfg_attr(feature = "strum", strum(serialize = "Z84_LEERSTAND"))]
     Z84Leerstand,
-    #[cfg_attr(feature = "serde", serde(rename = "Z85_REALERZAEHLERUEBERLAUFGEPRUEFT"))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(rename = "Z85_REALERZAEHLERUEBERLAUFGEPRUEFT")
+    )]
     #[cfg_attr(
         feature = "strum",
         strum(serialize = "Z85_REALERZAEHLERUEBERLAUFGEPRUEFT")
     )]
     Z85Realerzaehlerueberlaufgeprueft,
     #[cfg_attr(feature = "serde", serde(rename = "Z86_PLAUSIBELWGKONTROLLABLESUNG"))]
-    #[cfg_attr(feature = "strum", strum(serialize = "Z86_PLAUSIBELWGKONTROLLABLESUNG"))]
+    #[cfg_attr(
+        feature = "strum",
+        strum(serialize = "Z86_PLAUSIBELWGKONTROLLABLESUNG")
+    )]
     Z86Plausibelwgkontrollablesung,
     #[cfg_attr(feature = "serde", serde(rename = "Z87_PLAUSIBELWGKUNDENHINWEIS"))]
     #[cfg_attr(feature = "strum", strum(serialize = "Z87_PLAUSIBELWGKUNDENHINWEIS"))]
@@ -36,7 +42,10 @@ pub enum Messwertstatuszusatz {
     #[cfg_attr(feature = "serde", serde(rename = "Z88_VERGLEICHSMESSUNG(GEEICHT)"))]
     #[cfg_attr(feature = "strum", strum(serialize = "Z88_VERGLEICHSMESSUNG(GEEICHT)"))]
     Z88VergleichsmessungGeeicht,
-    #[cfg_attr(feature = "serde", serde(rename = "Z89_VERGLEICHSMESSUNG(NICHTGEEICHT)"))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(rename = "Z89_VERGLEICHSMESSUNG(NICHTGEEICHT)")
+    )]
     #[cfg_attr(
         feature = "strum",
         strum(serialize = "Z89_VERGLEICHSMESSUNG(NICHTGEEICHT)")
@@ -102,7 +111,10 @@ pub enum Messwertstatuszusatz {
         strum(serialize = "Z80_GERAETARBEITETAUSSERHALBDERBETRIEBSBEDINGUNGEN")
     )]
     Z80Geraetarbeitetausserhalbderbetriebsbedingungen,
-    #[cfg_attr(feature = "serde", serde(rename = "Z81_MESSEINRICHTUNGGESTOERT_DEFEKT"))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(rename = "Z81_MESSEINRICHTUNGGESTOERT_DEFEKT")
+    )]
     #[cfg_attr(
         feature = "strum",
         strum(serialize = "Z81_MESSEINRICHTUNGGESTOERT_DEFEKT")
@@ -126,7 +138,10 @@ pub enum Messwertstatuszusatz {
         strum(serialize = "Z99_MENGENUMWERTUNGUNVOLLSTAENDIG")
     )]
     Z99Mengenumwertungunvollstaendig,
-    #[cfg_attr(feature = "serde", serde(rename = "ZA0_UHRZEITGESTELLT_SYNCHRONISATION"))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(rename = "ZA0_UHRZEITGESTELLT_SYNCHRONISATION")
+    )]
     #[cfg_attr(
         feature = "strum",
         strum(serialize = "ZA0_UHRZEITGESTELLT_SYNCHRONISATION")
@@ -168,7 +183,10 @@ pub enum Messwertstatuszusatz {
     #[cfg_attr(feature = "serde", serde(rename = "ZA9_Z-ZAHL-KORREKTUR"))]
     #[cfg_attr(feature = "strum", strum(serialize = "ZA9_Z-ZAHL-KORREKTUR"))]
     Za9ZZahlKorrektur,
-    #[cfg_attr(feature = "serde", serde(rename = "ZB0_STOERUNG_DEFEKTMESSEINRICHTUNG"))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(rename = "ZB0_STOERUNG_DEFEKTMESSEINRICHTUNG")
+    )]
     #[cfg_attr(
         feature = "strum",
         strum(serialize = "ZB0_STOERUNG_DEFEKTMESSEINRICHTUNG")
