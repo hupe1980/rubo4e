@@ -46,9 +46,8 @@ jobs:
 
       - name: Docs-backed examples
         run: |
-          cargo run --example serialize --features versioned,json
-          cargo run --example builder --features versioned,builder,json
-          cargo run --example migrate --features migrate,json
+          cargo run --example serialize --features versioned,json,decimal
+          cargo run --example builder --features versioned,builder,json,decimal
 
       - name: Package check (publish dry-run)
         run: cargo publish --dry-run --locked

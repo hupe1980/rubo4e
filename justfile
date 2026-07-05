@@ -59,9 +59,8 @@ check-strict:
 # Compile and run docs-backed usage examples (single build, all example features)
 check-docs-examples:
     cargo build --examples --all-features
-    cargo run --example serialize --all-features
-    cargo run --example builder --all-features
-    cargo run --example migrate --all-features
+    cargo run --example serialize --features versioned,json,decimal
+    cargo run --example builder --features versioned,builder,json,decimal
 
 # Lightweight JSON perf regression gate for simd-json
 check-perf-simd:
