@@ -406,10 +406,7 @@ mod convenience_tests {
     #[test]
     fn closed_range_both_present() {
         let r = closed_zeitraum().as_closed_range();
-        assert_eq!(
-            r,
-            Some((date!(2025 - 01 - 01), date!(2025 - 12 - 31)))
-        );
+        assert_eq!(r, Some((date!(2025 - 01 - 01), date!(2025 - 12 - 31))));
     }
 
     #[test]

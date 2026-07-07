@@ -108,4 +108,3 @@ pub(super) fn compute_11digit_from_base(
     result.push(char::from_digit(u32::from(check), 10).expect("check digit is 0..=9"));
     Ok(result)
 }
-

@@ -326,7 +326,9 @@ mod date_roundtrips {
             date: Date,
         }
         use time::macros::date;
-        let w = Wrapper { date: date!(2025 - 06 - 15) };
+        let w = Wrapper {
+            date: date!(2025 - 06 - 15),
+        };
         let json = serde_json::to_string(&w).expect("serialize");
         assert_eq!(json, r#"{"date":"2025-06-15"}"#);
     }

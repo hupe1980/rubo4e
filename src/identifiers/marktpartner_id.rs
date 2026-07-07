@@ -230,17 +230,12 @@ pub mod serde_as_i64 {
     use crate::error::IdentifierError;
 
     /// Serialize a `MarktpartnerId` as a JSON integer.
-    pub fn serialize<S: serde::Serializer>(
-        id: &MarktpartnerId,
-        s: S,
-    ) -> Result<S::Ok, S::Error> {
+    pub fn serialize<S: serde::Serializer>(id: &MarktpartnerId, s: S) -> Result<S::Ok, S::Error> {
         s.serialize_i64(id.to_i64())
     }
 
     /// Deserialize a `MarktpartnerId` from either a JSON integer or a JSON string.
-    pub fn deserialize<'de, D: serde::Deserializer<'de>>(
-        d: D,
-    ) -> Result<MarktpartnerId, D::Error> {
+    pub fn deserialize<'de, D: serde::Deserializer<'de>>(d: D) -> Result<MarktpartnerId, D::Error> {
         struct Visitor;
         impl<'de> serde::de::Visitor<'de> for Visitor {
             type Value = MarktpartnerId;

@@ -1,8 +1,7 @@
 use super::{
-    AufAbschlag, Bo4eObject, BoTyp, Energiemix, Kundentyp, Marktteilnehmer,
-    Preisgarantie, Registeranzahl, Sparte, Tarifberechnungsparameter,
-    Tarifeinschraenkung, Tarifmerkmal, Tarifpreisposition, Tariftyp, Vertragskonditionen,
-    Zeitraum, ZusatzAttribut,
+    AufAbschlag, Bo4eObject, BoTyp, Energiemix, Kundentyp, Marktteilnehmer, Preisgarantie,
+    Registeranzahl, Sparte, Tarifberechnungsparameter, Tarifeinschraenkung, Tarifmerkmal,
+    Tarifpreisposition, Tariftyp, Vertragskonditionen, Zeitraum, ZusatzAttribut,
 };
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(not(feature = "json"), derive(Hash))]
@@ -243,7 +242,9 @@ impl crate::json::Bo4eJsonExt for Tarifpreisblatt {}
 #[cfg(feature = "json")]
 impl crate::json::Bo4eExtensionData for Tarifpreisblatt {
     fn extension_data(&self) -> &indexmap::IndexMap<String, serde_json::Value> {
-        self._additional.as_map().unwrap_or(&crate::json::extension::EMPTY_EXTENSION_MAP)
+        self._additional
+            .as_map()
+            .unwrap_or(&crate::json::extension::EMPTY_EXTENSION_MAP)
     }
     fn has_extension_data(&self) -> bool {
         !self._additional.is_empty()

@@ -74,9 +74,7 @@ pub enum Kalkulationsmethode {
     Funktionen,
     #[cfg_attr(
         feature = "serde",
-        serde(
-            rename = "VERBRAUCH_UEBER_SLP_GRENZE_FUNKTIONSBEZOGEN_WEITERE_BERECHNUNG_ALS_LGK"
-        )
+        serde(rename = "VERBRAUCH_UEBER_SLP_GRENZE_FUNKTIONSBEZOGEN_WEITERE_BERECHNUNG_ALS_LGK")
     )]
     #[cfg_attr(
         feature = "strum",

@@ -557,10 +557,8 @@ fn emit_field(s: &mut String, field: &Field) {
         &field.field_type,
         FieldType::Primitive(PrimitiveType::OffsetDateTime)
     ) || matches!(&field.field_type, FieldType::Array(inner) if matches!(inner.as_ref(), FieldType::Primitive(PrimitiveType::OffsetDateTime)));
-    let has_date = matches!(
-        &field.field_type,
-        FieldType::Primitive(PrimitiveType::Date)
-    ) || matches!(&field.field_type, FieldType::Array(inner) if matches!(inner.as_ref(), FieldType::Primitive(PrimitiveType::Date)));
+    let has_date = matches!(&field.field_type, FieldType::Primitive(PrimitiveType::Date))
+        || matches!(&field.field_type, FieldType::Array(inner) if matches!(inner.as_ref(), FieldType::Primitive(PrimitiveType::Date)));
     if has_offset_datetime {
         let schema_fn = if field.is_optional {
             "crate::schema_helpers::opt_datetime_schema"

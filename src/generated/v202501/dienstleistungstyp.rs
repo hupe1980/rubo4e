@@ -19,7 +19,10 @@ pub enum Dienstleistungstyp {
     #[cfg_attr(feature = "strum", strum(serialize = "DATENBEREITSTELLUNG_TAEGLICH"))]
     DatenbereitstellungTaeglich,
     #[cfg_attr(feature = "serde", serde(rename = "DATENBEREITSTELLUNG_WOECHENTLICH"))]
-    #[cfg_attr(feature = "strum", strum(serialize = "DATENBEREITSTELLUNG_WOECHENTLICH"))]
+    #[cfg_attr(
+        feature = "strum",
+        strum(serialize = "DATENBEREITSTELLUNG_WOECHENTLICH")
+    )]
     DatenbereitstellungWoechentlich,
     #[cfg_attr(feature = "serde", serde(rename = "DATENBEREITSTELLUNG_MONATLICH"))]
     #[cfg_attr(feature = "strum", strum(serialize = "DATENBEREITSTELLUNG_MONATLICH"))]
@@ -27,7 +30,10 @@ pub enum Dienstleistungstyp {
     #[cfg_attr(feature = "serde", serde(rename = "DATENBEREITSTELLUNG_JAEHRLICH"))]
     #[cfg_attr(feature = "strum", strum(serialize = "DATENBEREITSTELLUNG_JAEHRLICH"))]
     DatenbereitstellungJaehrlich,
-    #[cfg_attr(feature = "serde", serde(rename = "DATENBEREITSTELLUNG_HISTORISCHE_LG"))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(rename = "DATENBEREITSTELLUNG_HISTORISCHE_LG")
+    )]
     #[cfg_attr(
         feature = "strum",
         strum(serialize = "DATENBEREITSTELLUNG_HISTORISCHE_LG")
@@ -63,14 +69,20 @@ pub enum Dienstleistungstyp {
     #[cfg_attr(feature = "serde", serde(rename = "DATENBEREITSTELLUNG_EINMALIG"))]
     #[cfg_attr(feature = "strum", strum(serialize = "DATENBEREITSTELLUNG_EINMALIG"))]
     DatenbereitstellungEinmalig,
-    #[cfg_attr(feature = "serde", serde(rename = "AUSLESUNG_2X_TAEGLICH_FERNAUSLESUNG"))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(rename = "AUSLESUNG_2X_TAEGLICH_FERNAUSLESUNG")
+    )]
     #[cfg_attr(
         feature = "strum",
         strum(serialize = "AUSLESUNG_2X_TAEGLICH_FERNAUSLESUNG")
     )]
     Auslesung2xTaeglichFernauslesung,
     #[cfg_attr(feature = "serde", serde(rename = "AUSLESUNG_TAEGLICH_FERNAUSLESUNG"))]
-    #[cfg_attr(feature = "strum", strum(serialize = "AUSLESUNG_TAEGLICH_FERNAUSLESUNG"))]
+    #[cfg_attr(
+        feature = "strum",
+        strum(serialize = "AUSLESUNG_TAEGLICH_FERNAUSLESUNG")
+    )]
     AuslesungTaeglichFernauslesung,
     #[cfg_attr(feature = "serde", serde(rename = "AUSLESUNG_MANUELL_MSB"))]
     #[cfg_attr(feature = "strum", strum(serialize = "AUSLESUNG_MANUELL_MSB"))]
@@ -121,22 +133,34 @@ pub enum Dienstleistungstyp {
     )]
     AuslesungFernauslesungZusaetzlichMsb,
     #[cfg_attr(feature = "serde", serde(rename = "AUSLESUNG_MOATLICH_FERNAUSLESUNG"))]
-    #[cfg_attr(feature = "strum", strum(serialize = "AUSLESUNG_MOATLICH_FERNAUSLESUNG"))]
+    #[cfg_attr(
+        feature = "strum",
+        strum(serialize = "AUSLESUNG_MOATLICH_FERNAUSLESUNG")
+    )]
     AuslesungMoatlichFernauslesung,
-    #[cfg_attr(feature = "serde", serde(rename = "AUSLESUNG_STUENDLICH_FERNAUSLESUNG"))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(rename = "AUSLESUNG_STUENDLICH_FERNAUSLESUNG")
+    )]
     #[cfg_attr(
         feature = "strum",
         strum(serialize = "AUSLESUNG_STUENDLICH_FERNAUSLESUNG")
     )]
     AuslesungStuendlichFernauslesung,
-    #[cfg_attr(feature = "serde", serde(rename = "AUSLESUNG_TEMPERATURMENGENUMWERTER"))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(rename = "AUSLESUNG_TEMPERATURMENGENUMWERTER")
+    )]
     #[cfg_attr(
         feature = "strum",
         strum(serialize = "AUSLESUNG_TEMPERATURMENGENUMWERTER")
     )]
     AuslesungTemperaturmengenumwerter,
     #[cfg_attr(feature = "serde", serde(rename = "AUSLESUNG_ZUSTANDSMENGENUMWERTER"))]
-    #[cfg_attr(feature = "strum", strum(serialize = "AUSLESUNG_ZUSTANDSMENGENUMWERTER"))]
+    #[cfg_attr(
+        feature = "strum",
+        strum(serialize = "AUSLESUNG_ZUSTANDSMENGENUMWERTER")
+    )]
     AuslesungZustandsmengenumwerter,
     #[cfg_attr(feature = "serde", serde(rename = "AUSLESUNG_SYSTEMMENGENUMWERTER"))]
     #[cfg_attr(feature = "strum", strum(serialize = "AUSLESUNG_SYSTEMMENGENUMWERTER"))]
@@ -145,7 +169,10 @@ pub enum Dienstleistungstyp {
     #[cfg_attr(feature = "strum", strum(serialize = "AUSLESUNG_VORGANG"))]
     AuslesungVorgang,
     #[cfg_attr(feature = "serde", serde(rename = "AUSLESUNG_KOMPAKTMENGENUMWERTER"))]
-    #[cfg_attr(feature = "strum", strum(serialize = "AUSLESUNG_KOMPAKTMENGENUMWERTER"))]
+    #[cfg_attr(
+        feature = "strum",
+        strum(serialize = "AUSLESUNG_KOMPAKTMENGENUMWERTER")
+    )]
     AuslesungKompaktmengenumwerter,
     #[cfg_attr(feature = "serde", serde(rename = "SPERRUNG"))]
     #[cfg_attr(feature = "strum", strum(serialize = "SPERRUNG"))]

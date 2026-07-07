@@ -64,9 +64,7 @@ pub mod opt_date_serde {
     ///
     /// Uses a zero-allocation visitor: `visit_str` borrows from the input
     /// without allocating an intermediate `String`.
-    pub fn deserialize<'de, D: serde::Deserializer<'de>>(
-        d: D,
-    ) -> Result<Option<Date>, D::Error> {
+    pub fn deserialize<'de, D: serde::Deserializer<'de>>(d: D) -> Result<Option<Date>, D::Error> {
         struct Visitor;
         impl<'de> serde::de::Visitor<'de> for Visitor {
             type Value = Option<Date>;
