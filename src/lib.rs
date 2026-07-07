@@ -14,14 +14,14 @@
 //! | `json`       |         | `serde_json` helpers (`to_json_*`, `from_json_*`)              |
 //! | `simd-json`  |         | SIMD parser backend for `from_json_*` (workload-dependent)    |
 //! | `time`       |         | `time` crate for timestamps                                    |
-//! | `decimal`    |         | `rust_decimal::Decimal` for amounts/prices                     |
+//! | `decimal`    |         | `rust_decimal::Decimal` for amounts/prices (see note below)   |
 //! | `builder`    |         | `typed-builder` derives with `setter(into)` — accepts both `T` and `Option<T>`  |
 //! | `validate`   |         | `garde` validation                                             |
 //! | `schemars`   |         | JSON Schema generation                                         |
 //! | `sqlx`       |         | `sqlx` type integrations                                       |
 //! | `utoipa`     |         | `utoipa` OpenAPI integrations                                  |
 //! | `strum`      |         | Enum iteration and string conversion                           |
-//! | `versioned`  |         | Expose versioned schema modules (`v202501`)                    |
+//! | `versioned`  |         | Expose versioned schema modules (`v202501`, `v202601`)         |
 //! | `tracing`    |         | Structured diagnostics via the `tracing` crate                 |
 //! | `metrics`    |         | Optional export hooks via the `metrics` crate                  |
 //!
@@ -32,6 +32,24 @@
 //! ```toml
 //! rubo4e = { version = "...", default-features = false, features = ["versioned"] }
 //! ```
+//!
+//! ## Feature-conditional field types (`decimal` and `time`)
+//!
+//! Enabling `decimal` or `time` **changes the Rust type** of certain struct fields:
+//!
+//! | Feature   | Without feature     | With feature                                        | Affected fields                        |
+//! |-----------|---------------------|-----------------------------------------------------|----------------------------------------|
+//! | `decimal` | `Option<String>`    | `Option<rust_decimal::Decimal>`                     | `wert`, `preis`, amounts, quantities   |
+//! | `time`    | `Option<String>`    | `Option<time::OffsetDateTime>` or `Option<time::Date>` | `beginn`/`ende` fields → `OffsetDateTime`; `*datum` fields → `Date` |
+//!
+//! This means code that compiles under one feature configuration may not compile
+//! under the other.  For code that must be feature-agnostic, either:
+//! - Always enable `decimal`/`time` and use the strong types, **or**
+//! - Access fields through JSON round-trip (`to_json_german` / `from_json_german`)
+//!   which is feature-independent.
+//!
+//! The string fallback preserves the ISO-8601 / decimal string value from JSON
+//! so data is never lost when these features are absent.
 //!
 //! ## Why generated structs do not implement `Eq`
 //!
@@ -83,17 +101,39 @@ pub mod validation;
 
 /// Schema helper functions used by generated schemars attributes.
 ///
-/// These provide `"format": "date-time"` annotations for `time::OffsetDateTime` fields,
-/// which schemars 1.x does not emit automatically.
+/// Provides `"format": "date-time"` and `"format": "date"` JSON Schema
+/// annotations for `time::OffsetDateTime` and `time::Date` fields, which
+/// schemars 1.x does not emit automatically.
 #[cfg(feature = "schemars")]
 #[cfg_attr(docsrs, doc(cfg(feature = "schemars")))]
 pub mod schema_helpers;
+
+/// Serde modules for `time::Date` fields in generated structs.
+///
+/// - [`time_serde::date_serde`] — required `time::Date` ↔ `"YYYY-MM-DD"`
+/// - [`time_serde::opt_date_serde`] — `Option<time::Date>` ↔ `"YYYY-MM-DD"` or `null`
+///
+/// These are referenced from generated code via
+/// `#[serde(with = "crate::time_serde::opt_date_serde")]`.
+#[cfg(feature = "time")]
+#[cfg_attr(docsrs, doc(cfg(feature = "time")))]
+pub mod time_serde;
 
 // Versioned schema modules — emitted by the generator; gated behind `versioned`.
 // Run `just generate` to populate or refresh these modules.
 #[cfg(feature = "versioned")]
 #[allow(missing_docs)]
 mod generated;
+
+/// Hand-written convenience methods on generated BO4E types.
+///
+/// Provides ergonomic accessors such as [`Zeitraum::as_closed_range`],
+/// [`Rechnung::billing_period`], and [`PreisblattNetznutzung::validity`].
+/// All methods are gated on the feature flags that make their return types
+/// available (`versioned`, `time`, `decimal`).
+#[cfg(feature = "versioned")]
+#[cfg_attr(docsrs, doc(cfg(feature = "versioned")))]
+pub mod convenience;
 
 /// BO4E schema v202501 types (latest stable release).
 #[cfg(feature = "versioned")]

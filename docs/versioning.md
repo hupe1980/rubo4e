@@ -10,7 +10,7 @@ conditionally behind the `versioned` feature flag.
 With the `versioned` feature enabled:
 
 ```rust
-rubo4e::v202501::Vertrag       // v202501 series (current stable)
+rubo4e::v202501::Vertrag       // v202501 series — pinned, stable across crate updates
 rubo4e::v202501::Adresse
 rubo4e::v202501::Sparte
 
@@ -48,6 +48,7 @@ represents the release cycle, not the calendar month.  Module names use the
 
 ```
 v202501.0.0  →  module: v202501
+v202601.0.0  →  module: v202601
 ```
 
 Within a series, minor/patch bumps (e.g. `v202501.0.0` → `v202501.1.0`) are
@@ -77,19 +78,30 @@ use rubo4e::v202501::Vertrag;   // stable even if rubo4e::current advances
 
 ## Adding a New Schema Version
 
-When a new BO4E schema release arrives (e.g. `v202601.0.0`):
+When a new BO4E schema release arrives (e.g. `v202601.0.0`) with new or changed types:
 
 1. Download the schema snapshot:
    ```
    just download-schemas v202601.0.0
    ```
-2. Run the generator:
+2. Run the generator targeting the new version:
    ```
    just generate v202601.0.0
    ```
-3. The generator writes `src/generated/v202601/` and updates `src/generated/mod.rs`.
-4. Add a `pub mod v202601` re-export in `src/lib.rs` and update the `current` alias.
-5. Update this document with the new series row.
+3. The generator writes `src/generated/v202601/` and appends `pub mod v202601;`
+   to `src/generated/mod.rs`.
+4. In `src/lib.rs`, add a versioned re-export module:
+   ```rust
+   #[cfg(feature = "versioned")]
+   pub mod v202601 {
+       pub use crate::generated::v202601::*;
+   }
+   ```
+5. Advance the `current` alias:
+   ```rust
+   pub use v202601 as current;  // was: v202501
+   ```
+6. Update the Known Schema Series table in this document.
 
 ---
 

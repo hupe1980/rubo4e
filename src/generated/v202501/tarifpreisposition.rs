@@ -1,4 +1,6 @@
-use super::{ComTyp, Mengeneinheit, Preisstaffel, Preistyp, Waehrungseinheit, ZusatzAttribut};
+use super::{
+    ComTyp, Mengeneinheit, Preisstaffel, Preistyp, Waehrungseinheit, ZusatzAttribut,
+};
 #[derive(Debug, Clone, PartialEq, Default)]
 #[cfg_attr(not(feature = "json"), derive(Hash))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -75,9 +77,7 @@ impl crate::json::Bo4eJsonExt for Tarifpreisposition {}
 #[cfg(feature = "json")]
 impl crate::json::Bo4eExtensionData for Tarifpreisposition {
     fn extension_data(&self) -> &indexmap::IndexMap<String, serde_json::Value> {
-        self._additional
-            .as_map()
-            .unwrap_or(&crate::json::extension::EMPTY_EXTENSION_MAP)
+        self._additional.as_map().unwrap_or(&crate::json::extension::EMPTY_EXTENSION_MAP)
     }
     fn has_extension_data(&self) -> bool {
         !self._additional.is_empty()

@@ -31,13 +31,13 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-rubo4e = "0.2"
+rubo4e = "0.3"
 ```
 
 Enable optional features as needed:
 
 ```toml
-rubo4e = { version = "0.2", features = ["json", "versioned", "validate", "builder"] }
+rubo4e = { version = "0.3", features = ["json", "versioned", "validate", "builder"] }
 ```
 
 ---
@@ -85,7 +85,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 | `sqlx`      |         | `sqlx` type integrations (PostgreSQL)            |
 | `utoipa`    |         | `utoipa` OpenAPI integration                     |
 | `strum`     |         | Enum iteration and string conversion             |
-| `versioned` |         | Versioned schema modules (`v202501`)             |
+| `versioned` |         | Versioned schema modules (`v202501`, `current`) |
 | `tracing`   |         | Structured diagnostics via the `tracing` crate   |
 | `metrics`   |         | Counter export hooks (metrics ecosystem)         |
 
@@ -93,14 +93,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 ## 🗂️ Schema Versions
 
-| Module        | Status             |
-|---------------|--------------------|
-| `v202501`     | ✅ Latest stable    |
+| Module    | Status              |
+|-----------|---------------------|
+| `v202501` | ✅ Current stable    |
 
 Use the versioned module to pin a stable schema:
 
 ```rust
-use rubo4e::v202501::Marktlokation;
+use rubo4e::v202501::Marktlokation;  // pin to v202501
+use rubo4e::current::Marktlokation;  // always the latest stable — advances with crate updates
 ```
 
 ---
@@ -109,16 +110,65 @@ use rubo4e::v202501::Marktlokation;
 
 All domain identifiers validate their format on construction:
 
-| Type             | Format / Rule                                      |
-|------------------|----------------------------------------------------|
-| `MaloId`         | 11 digits, BDEW alternating-weight checksum        |
-| `MeloId`         | 33-character DE-prefixed alphanumeric string       |
-| `NeloId`         | 11-character alphanumeric string                   |
-| `EicCode`        | 16-character EIC with checksum (A, T, V, W, X, Y, Z) |
-| `ObisCode`       | OBIS identifier (e.g. `1-1:1.8.0`)                |
-| `MarktpartnerId` | 13-digit numeric BDEW identifier                   |
-| `SrId`           | Non-empty string (Steuerobjekt-Referenz)           |
-| `TrId`           | Non-empty string (Tranche-Referenz)                |
+| Type             | Format / Rule                                         |
+|------------------|-------------------------------------------------------|
+| `MaloId`         | 11 digits, BDEW alternating-weight checksum           |
+| `SrId`           | 11 digits, BDEW alternating-weight checksum (same algorithm as `MaloId`) |
+| `TrId`           | 11 digits, BDEW alternating-weight checksum (same algorithm as `MaloId`) |
+| `MeloId`         | 33 characters: 2-char ISO country code + 31 alphanumeric |
+| `NeloId`         | 11 alphanumeric characters                            |
+| `EicCode`        | 16-character EIC with check character (types A, T, V, W, X, Y, Z) |
+| `ObisCode`       | OBIS identifier (e.g. `1-0:1.8.1`); C ≥ 1 enforced  |
+| `MarktpartnerId` | 13 decimal digits, no checksum                        |
+
+### Identifier Utilities
+
+Beyond construction, identifiers expose domain-specific helpers:
+
+```rust
+// Compute check digit / build from base (MaloId, SrId, TrId)
+let check = MaloId::check_digit("5123869678")?;        // → 0
+let id    = MaloId::from_base("5123869678")?;          // → "51238696780"
+
+// Country code extraction (MeloId)
+let melo = MeloId::new("DE0000123456789012345678901234561")?;
+assert_eq!(melo.country_code(), "DE");
+assert!(melo.is_german());
+
+// Integer round-trip for legacy systems (MarktpartnerId)
+let mp = MarktpartnerId::new("9900357000004")?;
+assert_eq!(mp.to_i64(), 9_900_357_000_004_i64);
+
+// Serde as integer instead of string (opt-in, field-level)
+#[serde(with = "rubo4e::identifiers::marktpartner_id_as_i64")]
+pub partner_id: MarktpartnerId,
+```
+
+### Convenience Methods on Generated Types
+
+The `convenience` module adds ergonomic helpers on generated BO types
+(requires `versioned` + `time` features):
+
+```rust
+use rubo4e::v202501::{Rechnung, PreisblattNetznutzung};
+
+// Rechnung — closed billing period
+if let Some((from, to)) = rechnung.billing_period() {
+    println!("Invoice period: {from} – {to}");
+}
+
+// PreisblattNetznutzung — open-ended or closed validity
+match preisblatt.validity() {
+    Some((start, Some(end))) => println!("valid {start} – {end}"),
+    Some((start, None))      => println!("valid from {start} (open-ended)"),
+    None                     => println!("validity unknown"),
+}
+
+// Zeitraum — low-level range helpers (also available on all types with gueltigkeit)
+let z: Zeitraum = todo!();
+let closed    = z.as_closed_range();     // Option<(Date, Date)>
+let half_open = z.as_half_open_range();  // Option<(Date, Option<Date>)>
+```
 
 ---
 

@@ -73,6 +73,43 @@ impl MeloId {
         validate(s)?;
         Ok(Self(Box::from(s)))
     }
+
+    /// Returns the ISO 3166-1 alpha-2 country code prefix (first two characters).
+    ///
+    /// Guaranteed to be two uppercase ASCII letters for any successfully
+    /// constructed `MeloId`.
+    ///
+    /// # Examples
+    /// ```
+    /// use rubo4e::identifiers::MeloId;
+    ///
+    /// let id = MeloId::new("DE0000000000000000000000000000001").unwrap();
+    /// assert_eq!(id.country_code(), "DE");
+    /// ```
+    #[must_use]
+    pub fn country_code(&self) -> &str {
+        // Safety: validated at construction — first 2 chars are always ASCII uppercase.
+        &self.0[..2]
+    }
+
+    /// Returns `true` if the country code is `"DE"` (Germany).
+    ///
+    /// Useful for EDIFACT NAD routing and MaStR query filtering.
+    ///
+    /// # Examples
+    /// ```
+    /// use rubo4e::identifiers::MeloId;
+    ///
+    /// let de = MeloId::new("DE0000000000000000000000000000001").unwrap();
+    /// assert!(de.is_german());
+    ///
+    /// let at = MeloId::new("AT0000000000000000000000000000001").unwrap();
+    /// assert!(!at.is_german());
+    /// ```
+    #[must_use]
+    pub fn is_german(&self) -> bool {
+        self.country_code() == "DE"
+    }
 }
 
 impl TryFrom<String> for MeloId {

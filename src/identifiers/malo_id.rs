@@ -1,6 +1,6 @@
 #[cfg(test)]
 use super::checksum::bdew_check_digit;
-use super::checksum::validate_11digit_bdew;
+use super::checksum::{compute_11digit_from_base, validate_11digit_bdew};
 use crate::error::IdentifierError;
 #[cfg(test)]
 use crate::error::LengthExpectation;
@@ -44,6 +44,49 @@ impl MaloId {
     pub fn new(s: &str) -> Result<Self, IdentifierError> {
         validate_11digit_bdew(s)?;
         Ok(Self(Box::from(s)))
+    }
+
+    /// Constructs a valid `MaloId` from a 10-digit numeric base string by computing
+    /// the BDEW alternating-weight check digit and appending it.
+    ///
+    /// This is the canonical way to generate a valid `MaloId` when only the 10-digit
+    /// base is known (e.g. during test data generation or synthetic MaLo assignment).
+    ///
+    /// # Errors
+    /// - [`IdentifierError::InvalidLength`] if `base` is not exactly 10 characters.
+    /// - [`IdentifierError::InvalidCharacter`] if any character is not a decimal digit.
+    ///
+    /// # Examples
+    /// ```
+    /// use rubo4e::identifiers::MaloId;
+    ///
+    /// let id = MaloId::from_base("5123869678").unwrap();
+    /// assert_eq!(id.as_ref(), "51238696780");
+    /// ```
+    pub fn from_base(base: &str) -> Result<Self, IdentifierError> {
+        let full = compute_11digit_from_base(base)?;
+        Ok(Self(Box::from(full.as_str())))
+    }
+
+    /// Computes the BDEW check digit for a 10-digit numeric base string without
+    /// constructing a full `MaloId`.
+    ///
+    /// Returns the single check digit (`0..=9`) on success.
+    ///
+    /// # Errors
+    /// - [`IdentifierError::InvalidLength`] if `base` is not exactly 10 characters.
+    /// - [`IdentifierError::InvalidCharacter`] if any character is not a decimal digit.
+    ///
+    /// # Examples
+    /// ```
+    /// use rubo4e::identifiers::MaloId;
+    ///
+    /// assert_eq!(MaloId::check_digit("5123869678").unwrap(), 0);
+    /// ```
+    pub fn check_digit(base: &str) -> Result<u8, IdentifierError> {
+        let full = compute_11digit_from_base(base)?;
+        let check = full.as_bytes().last().copied().expect("11 chars") - b'0';
+        Ok(check)
     }
 }
 

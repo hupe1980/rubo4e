@@ -86,9 +86,7 @@ impl crate::json::Bo4eJsonExt for Preis {}
 #[cfg(feature = "json")]
 impl crate::json::Bo4eExtensionData for Preis {
     fn extension_data(&self) -> &indexmap::IndexMap<String, serde_json::Value> {
-        self._additional
-            .as_map()
-            .unwrap_or(&crate::json::extension::EMPTY_EXTENSION_MAP)
+        self._additional.as_map().unwrap_or(&crate::json::extension::EMPTY_EXTENSION_MAP)
     }
     fn has_extension_data(&self) -> bool {
         !self._additional.is_empty()

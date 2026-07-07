@@ -1,4 +1,4 @@
-use super::checksum::validate_11digit_bdew;
+use super::checksum::{compute_11digit_from_base, validate_11digit_bdew};
 use crate::error::IdentifierError;
 #[cfg(test)]
 use crate::error::LengthExpectation;
@@ -31,6 +31,30 @@ impl TrId {
     pub fn new(s: &str) -> Result<Self, IdentifierError> {
         validate_11digit_bdew(s)?;
         Ok(Self(Box::from(s)))
+    }
+
+    /// Constructs a valid `TrId` from a 10-digit numeric base by computing the
+    /// BDEW alternating-weight check digit and appending it.
+    ///
+    /// # Errors
+    /// - [`IdentifierError::InvalidLength`] if `base` is not exactly 10 characters.
+    /// - [`IdentifierError::InvalidCharacter`] if any character is not a decimal digit.
+    pub fn from_base(base: &str) -> Result<Self, IdentifierError> {
+        let full = compute_11digit_from_base(base)?;
+        Ok(Self(Box::from(full.as_str())))
+    }
+
+    /// Computes the BDEW check digit for a 10-digit numeric base string.
+    ///
+    /// Returns the single check digit (`0..=9`) on success.
+    ///
+    /// # Errors
+    /// - [`IdentifierError::InvalidLength`] if `base` is not exactly 10 characters.
+    /// - [`IdentifierError::InvalidCharacter`] if any character is not a decimal digit.
+    pub fn check_digit(base: &str) -> Result<u8, IdentifierError> {
+        let full = compute_11digit_from_base(base)?;
+        let check = full.as_bytes().last().copied().expect("11 chars") - b'0';
+        Ok(check)
     }
 }
 

@@ -33,6 +33,15 @@ pub use obis_code::{ObisCode, ObisComponents};
 pub use sr_id::SrId;
 pub use tr_id::TrId;
 
+/// Serde adapter module for encoding [`MarktpartnerId`] as a JSON integer (`i64`).
+///
+/// Use `#[serde(with = "rubo4e::identifiers::marktpartner_id_as_i64")]` on struct
+/// fields that must round-trip through APIs which mandate integer encoding for GLN /
+/// Rollencodenummern (e.g. BDEW API-Webdienste Strom).
+#[cfg(feature = "serde")]
+#[cfg_attr(docsrs, doc(cfg(feature = "serde")))]
+pub use marktpartner_id::serde_as_i64 as marktpartner_id_as_i64;
+
 #[cfg(feature = "serde")]
 static IDENTIFIER_DESER_FAILURES: AtomicU64 = AtomicU64::new(0);
 

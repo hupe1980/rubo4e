@@ -24,6 +24,28 @@ pub struct Zaehler {
     #[cfg_attr(feature = "serde", serde(rename = "eichungBis"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "serde", serde(default))]
+    #[cfg_attr(
+        feature = "schemars",
+        schemars(schema_with = "crate::schema_helpers::opt_datetime_schema")
+    )]
+    #[cfg_attr(
+        all(feature = "serde", feature = "time"),
+        serde(with = "time::serde::rfc3339::option")
+    )]
+    #[cfg(feature = "time")]
+    pub eichung_bis: Option<time::OffsetDateTime>,
+    /// Requires the `time` feature for the `time::OffsetDateTime` representation.
+    /// Without `time`, stores the ISO-8601 string value unchanged.
+    #[cfg_attr(feature = "serde", serde(rename = "eichungBis"))]
+    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
+    #[cfg_attr(feature = "serde", serde(default))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(
+        feature = "schemars",
+        schemars(schema_with = "crate::schema_helpers::opt_datetime_schema")
+    )]
+    #[cfg(not(feature = "time"))]
     pub eichung_bis: Option<String>,
     /// Liste der Geräte, die zu diesem Zähler gehören, bspw. Smartmeter-Gateway
     #[cfg_attr(feature = "serde", serde(rename = "geraete"))]
@@ -45,6 +67,28 @@ pub struct Zaehler {
     #[cfg_attr(feature = "serde", serde(rename = "letzteEichung"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "serde", serde(default))]
+    #[cfg_attr(
+        feature = "schemars",
+        schemars(schema_with = "crate::schema_helpers::opt_datetime_schema")
+    )]
+    #[cfg_attr(
+        all(feature = "serde", feature = "time"),
+        serde(with = "time::serde::rfc3339::option")
+    )]
+    #[cfg(feature = "time")]
+    pub letzte_eichung: Option<time::OffsetDateTime>,
+    /// Requires the `time` feature for the `time::OffsetDateTime` representation.
+    /// Without `time`, stores the ISO-8601 string value unchanged.
+    #[cfg_attr(feature = "serde", serde(rename = "letzteEichung"))]
+    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
+    #[cfg_attr(feature = "serde", serde(default))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(
+        feature = "schemars",
+        schemars(schema_with = "crate::schema_helpers::opt_datetime_schema")
+    )]
+    #[cfg(not(feature = "time"))]
     pub letzte_eichung: Option<String>,
     /// Messwerterfassung des Zählers
     #[cfg_attr(feature = "serde", serde(rename = "messwerterfassung"))]
@@ -180,9 +224,7 @@ impl crate::json::Bo4eJsonExt for Zaehler {}
 #[cfg(feature = "json")]
 impl crate::json::Bo4eExtensionData for Zaehler {
     fn extension_data(&self) -> &indexmap::IndexMap<String, serde_json::Value> {
-        self._additional
-            .as_map()
-            .unwrap_or(&crate::json::extension::EMPTY_EXTENSION_MAP)
+        self._additional.as_map().unwrap_or(&crate::json::extension::EMPTY_EXTENSION_MAP)
     }
     fn has_extension_data(&self) -> bool {
         !self._additional.is_empty()

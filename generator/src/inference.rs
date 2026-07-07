@@ -93,18 +93,31 @@ static EXACT_MAP: LazyLock<HashMap<&'static str, FieldType>> = LazyLock::new(|| 
 /// All entries use the exact lowercase suffix as it appears in BO4E JSON
 /// property names (e.g. `"vertragsbeginn"` ends with `"beginn"`).
 /// Entries are sorted longest-suffix first so that more specific patterns win.
+///
+/// **Note:** since the parser now reads `"format"` from JSON Schema directly,
+/// these suffix rules only fire for string-typed fields with **no** format
+/// annotation.  Date/datetime fields with proper `"format": "date"` or
+/// `"format": "date-time"` annotations get their types from the schema and
+/// are never overridden here.
+///
+/// The `"datum"` suffix rule has been intentionally removed: German "datum"
+/// means "date" (date-only), not "datetime", and fields ending in "datum"
+/// in BO4E schemas carry `"format": "date"` annotations which are now handled
+/// directly by the parser.  Keeping the rule would produce incorrect
+/// `OffsetDateTime` types for any un-annotated future "datum" fields.
 static SUFFIX_MAP: LazyLock<Vec<(&'static str, FieldType)>> = LazyLock::new(|| {
     vec![
         // Identifiers
         ("marktlokationsid", FieldType::Identifier("MaloId".into())),
         ("messlokationsid", FieldType::Identifier("MeloId".into())),
         ("netzlokationsid", FieldType::Identifier("NeloId".into())),
-        // Timestamps → time::OffsetDateTime (feature-gated)
+        // Timestamps → time::OffsetDateTime (feature-gated).
+        // These fire only when the schema field has "type": "string" with no
+        // "format" annotation — a schema omission rather than a design choice.
         (
             "zeitpunkt",
             FieldType::Primitive(PrimitiveType::OffsetDateTime),
         ),
-        ("datum", FieldType::Primitive(PrimitiveType::OffsetDateTime)),
         (
             "beginn",
             FieldType::Primitive(PrimitiveType::OffsetDateTime),
@@ -223,7 +236,10 @@ mod tests {
         assert_eq!(infer("prozentsatz"), Some(DEC));
     }
 
-    // ── Suffix: datetime (ends with "beginn", "ende", "datum", "zeitpunkt") ─
+    // ── Suffix: datetime (ends with "beginn", "ende", "zeitpunkt") ──────────
+    // NOTE: the "datum" suffix rule was removed — see SUFFIX_MAP comment.
+    // All "datum" fields in BO4E schemas carry "format": "date" annotations
+    // and are now typed as time::Date via the parser's schema-format detection.
 
     #[test]
     fn suffix_datetime_matches() {
@@ -236,15 +252,25 @@ mod tests {
         assert_eq!(infer("vertragsende"), Some(DT));
         assert_eq!(infer("bilanzierungsende"), Some(DT));
         assert_eq!(infer("vertragsteilende"), Some(DT));
-        // "datum" suffix
-        assert_eq!(infer("angebotsdatum"), Some(DT));
-        assert_eq!(infer("rechnungsdatum"), Some(DT));
-        assert_eq!(infer("faelligkeitsdatum"), Some(DT));
-        assert_eq!(infer("geburtsdatum"), Some(DT));
-        assert_eq!(infer("startdatum"), Some(DT));
-        assert_eq!(infer("enddatum"), Some(DT));
         // "zeitpunkt" suffix
         assert_eq!(infer("veroeffentlichungszeitpunkt"), Some(DT));
+    }
+
+    // "datum" suffix no longer infers to OffsetDateTime (removed rule).
+    // "datum" in German means "date" (date-only) — these fields carry
+    // "format": "date" in the BO4E JSON Schema and are correctly typed
+    // as time::Date via parser schema-format detection.
+    #[test]
+    fn datum_suffix_no_longer_infers_to_offsetdatetime() {
+        // These used to return Some(DT) with the old "datum" inference rule.
+        // Now they return None (no inference override), so the parser's
+        // schema-format detection produces the correct time::Date type.
+        assert_eq!(infer("angebotsdatum"), None);
+        assert_eq!(infer("rechnungsdatum"), None);
+        assert_eq!(infer("faelligkeitsdatum"), None);
+        assert_eq!(infer("geburtsdatum"), None);
+        assert_eq!(infer("startdatum"), None);
+        assert_eq!(infer("enddatum"), None);
     }
 
     // ── Suffix: decimal (ends with "wert", "preis", "betrag", "menge") ───

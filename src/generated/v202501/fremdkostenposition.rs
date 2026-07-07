@@ -31,6 +31,28 @@ pub struct Fremdkostenposition {
     #[cfg_attr(feature = "serde", serde(rename = "bis"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "serde", serde(default))]
+    #[cfg_attr(
+        feature = "schemars",
+        schemars(schema_with = "crate::schema_helpers::opt_datetime_schema")
+    )]
+    #[cfg_attr(
+        all(feature = "serde", feature = "time"),
+        serde(with = "time::serde::rfc3339::option")
+    )]
+    #[cfg(feature = "time")]
+    pub bis: Option<time::OffsetDateTime>,
+    /// Requires the `time` feature for the `time::OffsetDateTime` representation.
+    /// Without `time`, stores the ISO-8601 string value unchanged.
+    #[cfg_attr(feature = "serde", serde(rename = "bis"))]
+    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
+    #[cfg_attr(feature = "serde", serde(default))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(
+        feature = "schemars",
+        schemars(schema_with = "crate::schema_helpers::opt_datetime_schema")
+    )]
+    #[cfg(not(feature = "time"))]
     pub bis: Option<String>,
     /// Der Preis für eine Einheit. Beispiele: 5,8200 ct/kWh oder 55 €/Jahr.
     #[cfg_attr(feature = "serde", serde(rename = "einzelpreis"))]
@@ -87,6 +109,28 @@ pub struct Fremdkostenposition {
     #[cfg_attr(feature = "serde", serde(rename = "von"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "serde", serde(default))]
+    #[cfg_attr(
+        feature = "schemars",
+        schemars(schema_with = "crate::schema_helpers::opt_datetime_schema")
+    )]
+    #[cfg_attr(
+        all(feature = "serde", feature = "time"),
+        serde(with = "time::serde::rfc3339::option")
+    )]
+    #[cfg(feature = "time")]
+    pub von: Option<time::OffsetDateTime>,
+    /// Requires the `time` feature for the `time::OffsetDateTime` representation.
+    /// Without `time`, stores the ISO-8601 string value unchanged.
+    #[cfg_attr(feature = "serde", serde(rename = "von"))]
+    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
+    #[cfg_attr(feature = "serde", serde(default))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(
+        feature = "schemars",
+        schemars(schema_with = "crate::schema_helpers::opt_datetime_schema")
+    )]
+    #[cfg(not(feature = "time"))]
     pub von: Option<String>,
     /// Wenn es einen zeitbasierten Preis gibt (z.B. €/Jahr), dann ist hier die Menge angegeben mit der die Kosten berechnet
     /// wurden. Z.B. 138 Tage.
@@ -117,9 +161,7 @@ impl crate::json::Bo4eJsonExt for Fremdkostenposition {}
 #[cfg(feature = "json")]
 impl crate::json::Bo4eExtensionData for Fremdkostenposition {
     fn extension_data(&self) -> &indexmap::IndexMap<String, serde_json::Value> {
-        self._additional
-            .as_map()
-            .unwrap_or(&crate::json::extension::EMPTY_EXTENSION_MAP)
+        self._additional.as_map().unwrap_or(&crate::json::extension::EMPTY_EXTENSION_MAP)
     }
     fn has_extension_data(&self) -> bool {
         !self._additional.is_empty()

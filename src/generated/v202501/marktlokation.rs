@@ -1,7 +1,8 @@
 use super::{
-    Adresse, Bilanzierungsmethode, Bo4eObject, BoTyp, Energierichtung, Gasqualitaet, Gebiettyp,
-    Geokoordinaten, Geschaeftspartner, Katasteradresse, Kundentyp, Lokationszuordnung, Netzebene,
-    Sparte, Verbrauch, Verbrauchsart, Zaehlwerk, ZusatzAttribut,
+    Adresse, Bilanzierungsmethode, Bo4eObject, BoTyp, Energierichtung, Gasqualitaet,
+    Gebiettyp, Geokoordinaten, Geschaeftspartner, Katasteradresse, Kundentyp,
+    Lokationszuordnung, Netzebene, Sparte, Verbrauch, Verbrauchsart, Zaehlwerk,
+    ZusatzAttribut,
 };
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(not(feature = "json"), derive(Hash))]
@@ -165,10 +166,7 @@ pub struct Marktlokation {
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub zaehlwerke: Option<Vec<Zaehlwerk>>,
-    #[cfg_attr(
-        feature = "serde",
-        serde(rename = "zaehlwerkeDerBeteiligtenMarktrolle")
-    )]
+    #[cfg_attr(feature = "serde", serde(rename = "zaehlwerkeDerBeteiligtenMarktrolle"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub zaehlwerke_der_beteiligten_marktrolle: Option<Vec<Zaehlwerk>>,
@@ -240,9 +238,7 @@ impl crate::json::Bo4eJsonExt for Marktlokation {}
 #[cfg(feature = "json")]
 impl crate::json::Bo4eExtensionData for Marktlokation {
     fn extension_data(&self) -> &indexmap::IndexMap<String, serde_json::Value> {
-        self._additional
-            .as_map()
-            .unwrap_or(&crate::json::extension::EMPTY_EXTENSION_MAP)
+        self._additional.as_map().unwrap_or(&crate::json::extension::EMPTY_EXTENSION_MAP)
     }
     fn has_extension_data(&self) -> bool {
         !self._additional.is_empty()

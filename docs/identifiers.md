@@ -23,18 +23,30 @@ All construction failures return `IdentifierError`:
 #[derive(Debug, thiserror::Error)]
 pub enum IdentifierError {
     #[error("invalid length: expected {expected}, got {actual}")]
-    InvalidLength { expected: usize, actual: usize },
+    InvalidLength { expected: LengthExpectation, actual: usize },
 
-    #[error("invalid character '{character}' at position {position}")]
+    #[error("invalid character {character:?} at position {position}")]
     InvalidCharacter { position: usize, character: char },
 
     #[error("invalid checksum")]
     InvalidChecksum,
 
     #[error("invalid format: {description}")]
-    InvalidFormat { description: &'static str },
+    InvalidFormat { description: Cow<'static, str> },
 }
 ```
+
+`LengthExpectation` encodes the accepted length contract:
+
+```rust
+pub enum LengthExpectation {
+    Exact(usize),
+    RangeInclusive { min: usize, max: usize },
+}
+```
+
+`Cow<'static, str>` in `InvalidFormat` allows both zero-allocation static messages
+and runtime-constructed strings that include the actual invalid data.
 
 ---
 
@@ -64,6 +76,16 @@ Given digits $d_1 d_2 \ldots d_{11}$:
 4. Check digit: $c = (10 - (S \bmod 10)) \bmod 10$.
 5. Valid if $c = d_{11}$.
 
+### Utilities
+
+```rust
+// Build from a 10-digit base — check digit is computed and appended.
+let malo = MaloId::from_base("5123869678")?;  // → MaloId("51238696780")
+
+// Compute just the check digit without building the full identifier.
+let c = MaloId::check_digit("5123869678")?;   // → 0u8
+```
+
 ### Display / FromStr
 
 ```rust
@@ -86,6 +108,17 @@ assert_eq!("51238696780".parse::<MaloId>()?, malo);
 let melo = MeloId::new("DE0000123456789012345678901234561")?;
 ```
 
+### Utilities
+
+```rust
+let melo = MeloId::new("DE0000123456789012345678901234561")?;
+assert_eq!(melo.country_code(), "DE");  // always 2-char slice; zero-copy
+assert!(melo.is_german());              // country_code() == "DE"
+
+let at = MeloId::new("AT0000123456789012345678901234561")?;
+assert!(!at.is_german());
+```
+
 ---
 
 ## NeloId — Netzlokations-ID
@@ -102,10 +135,12 @@ let nelo = NeloId::new("NELO1234567")?;
 ## SrId — Steuerbare-Ressource-ID
 
 **Format:** 11 decimal digits  
-**Checksum:** same algorithm as `MaloId`
+**Checksum:** same alternating-weight algorithm as `MaloId`
 
 ```rust
 let sr = SrId::new("51238696780")?;
+let sr = SrId::from_base("5123869678")?;  // compute check digit from base
+let c  = SrId::check_digit("5123869678")?; // → 0u8
 ```
 
 ---
@@ -113,10 +148,12 @@ let sr = SrId::new("51238696780")?;
 ## TrId — Technische-Ressource-ID
 
 **Format:** 11 decimal digits  
-**Checksum:** same algorithm as `MaloId`
+**Checksum:** same alternating-weight algorithm as `MaloId`
 
 ```rust
 let tr = TrId::new("51238696780")?;
+let tr = TrId::from_base("5123869678")?;  // compute check digit from base
+let c  = TrId::check_digit("5123869678")?; // → 0u8
 ```
 
 ---
@@ -176,6 +213,27 @@ let bad  = ObisCode::new("not-an-obis");   // Err(InvalidFormat { … })
 ```rust
 let mp = MarktpartnerId::new("9900743000009")?;
 ```
+
+### Integer Conversion
+
+Legacy systems sometimes store Marktpartner-IDs as integers. Two helpers bridge the gap:
+
+```rust
+let mp = MarktpartnerId::new("9900357000004")?;
+assert_eq!(mp.to_i64(), 9_900_357_000_004_i64);  // infallible; 13-digit decimal always fits i64
+```
+
+For fields in generated structs that a partner serializes as JSON numbers:
+
+```rust
+// In your own Serde-annotated struct:
+#[serde(with = "rubo4e::identifiers::marktpartner_id_as_i64")]
+pub partner_id: MarktpartnerId,
+// Serializes as: 9900357000004  (integer, not "9900357000004")
+// Deserializes from: integer or string — both accepted
+```
+
+`marktpartner_id_as_i64` is also re-exported from `rubo4e::identifiers` directly.
 
 ---
 

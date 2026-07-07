@@ -60,9 +60,7 @@ impl crate::json::Bo4eJsonExt for VerwendungszweckProMarktrolle {}
 #[cfg(feature = "json")]
 impl crate::json::Bo4eExtensionData for VerwendungszweckProMarktrolle {
     fn extension_data(&self) -> &indexmap::IndexMap<String, serde_json::Value> {
-        self._additional
-            .as_map()
-            .unwrap_or(&crate::json::extension::EMPTY_EXTENSION_MAP)
+        self._additional.as_map().unwrap_or(&crate::json::extension::EMPTY_EXTENSION_MAP)
     }
     fn has_extension_data(&self) -> bool {
         !self._additional.is_empty()
@@ -74,10 +72,7 @@ impl std::fmt::Display for VerwendungszweckProMarktrolle {
         match serde_json::to_string(self) {
             Ok(json) => f.write_str(&json),
             Err(e) => {
-                write!(
-                    f,
-                    "<VerwendungszweckProMarktrolle: serialization error: {e}>"
-                )
+                write!(f, "<VerwendungszweckProMarktrolle: serialization error: {e}>")
             }
         }
     }

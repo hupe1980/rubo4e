@@ -236,3 +236,98 @@ mod enum_roundtrips {
         }
     }
 }
+
+// ── Date serde round-trips (opt_date_serde / date_serde) ─────────────────────
+
+/// Inline strategy: generates a valid `time::Date` in the range used by BO4E
+/// (1900-01-01 to 2099-12-28; clamped to avoid leap-year edge cases without
+/// needing month-length tables).
+#[cfg(all(feature = "time", feature = "versioned"))]
+mod date_roundtrips {
+    use proptest::prelude::*;
+    use time::Date;
+
+    /// Any calendar date in 1900–2099 with day capped at 28 to avoid needing
+    /// a leap-year table while still covering all 12 months.
+    fn any_date() -> impl Strategy<Value = Date> {
+        (1900i32..=2099i32, 1u8..=12u8, 1u8..=28u8).prop_map(|(y, m, d)| {
+            Date::from_calendar_date(y, time::Month::try_from(m).unwrap(), d)
+                .expect("day ≤28 is always valid for any month")
+        })
+    }
+
+    proptest! {
+        /// `date_serde` (required `time::Date` field): serialize → deserialize identity.
+        #[test]
+        fn required_date_serde_roundtrip(date in any_date()) {
+            #[derive(serde::Serialize, serde::Deserialize)]
+            struct Wrapper {
+                #[serde(with = "rubo4e::time_serde::date_serde")]
+                date: Date,
+            }
+            let w = Wrapper { date };
+            let json = serde_json::to_string(&w).expect("serialize");
+            let back: Wrapper = serde_json::from_str(&json).expect("deserialize");
+            prop_assert_eq!(date, back.date, "date serde round-trip failed: json={}", json);
+        }
+
+        /// `opt_date_serde` (optional `time::Date` field): `Some(date)` round-trip.
+        #[test]
+        fn optional_date_serde_roundtrip_some(date in any_date()) {
+            #[derive(serde::Serialize, serde::Deserialize)]
+            struct Wrapper {
+                #[serde(with = "rubo4e::time_serde::opt_date_serde")]
+                date: Option<Date>,
+            }
+            let w = Wrapper { date: Some(date) };
+            let json = serde_json::to_string(&w).expect("serialize");
+            let back: Wrapper = serde_json::from_str(&json).expect("deserialize");
+            prop_assert_eq!(
+                Some(date),
+                back.date,
+                "opt_date_serde round-trip failed: json={}",
+                json
+            );
+        }
+    }
+
+    /// `opt_date_serde`: `None` round-trip (unit test, no proptest needed).
+    #[test]
+    fn optional_date_serde_roundtrip_none() {
+        #[derive(serde::Serialize, serde::Deserialize, PartialEq, Debug)]
+        struct Wrapper {
+            #[serde(with = "rubo4e::time_serde::opt_date_serde")]
+            date: Option<Date>,
+        }
+        let w = Wrapper { date: None };
+        let json = serde_json::to_string(&w).expect("serialize");
+        let back: Wrapper = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(w, back);
+    }
+
+    /// `opt_date_serde`: explicit JSON `null` deserializes to `None`.
+    #[test]
+    fn optional_date_serde_null_is_none() {
+        #[derive(serde::Deserialize, PartialEq, Debug)]
+        struct Wrapper {
+            #[serde(with = "rubo4e::time_serde::opt_date_serde")]
+            date: Option<Date>,
+        }
+        let back: Wrapper = serde_json::from_str(r#"{"date":null}"#).expect("deserialize");
+        assert_eq!(back.date, None);
+    }
+
+    /// `date_serde` and `opt_date_serde` use the ISO 8601 `YYYY-MM-DD` wire format.
+    #[test]
+    fn date_wire_format_is_iso8601() {
+        #[derive(serde::Serialize)]
+        struct Wrapper {
+            #[serde(with = "rubo4e::time_serde::date_serde")]
+            date: Date,
+        }
+        use time::macros::date;
+        let w = Wrapper { date: date!(2025 - 06 - 15) };
+        let json = serde_json::to_string(&w).expect("serialize");
+        assert_eq!(json, r#"{"date":"2025-06-15"}"#);
+    }
+}

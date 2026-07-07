@@ -45,10 +45,7 @@ pub enum Leistungstyp {
     #[cfg_attr(feature = "strum", strum(serialize = "MESSDIENSTLEISTUNG"))]
     Messdienstleistung,
     #[cfg_attr(feature = "serde", serde(rename = "MESSDIENSTLEISTUNG_INKL_MESSUNG"))]
-    #[cfg_attr(
-        feature = "strum",
-        strum(serialize = "MESSDIENSTLEISTUNG_INKL_MESSUNG")
-    )]
+    #[cfg_attr(feature = "strum", strum(serialize = "MESSDIENSTLEISTUNG_INKL_MESSUNG"))]
     MessdienstleistungInklMessung,
     #[cfg_attr(feature = "serde", serde(rename = "ABRECHNUNG"))]
     #[cfg_attr(feature = "strum", strum(serialize = "ABRECHNUNG"))]

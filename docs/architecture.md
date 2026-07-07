@@ -14,10 +14,12 @@ rubo4e/
 ├── justfile                 — build / generate / test recipes
 ├── docs/                    — technical documentation (this directory)
 ├── src/                     — bo4e crate source
-│   ├── lib.rs               — crate root; feature-gated re-exports
-│   ├── error.rs             — IdentifierError and crate error types
+│   ├── lib.rs               — crate root; feature-gated re-exports, prelude, Bo4eObject trait
+│   ├── error.rs             — IdentifierError and LengthExpectation types
 │   ├── json/                — Bo4eJsonExt, Bo4eExtensionData, LimitedExtensionMap
-│   ├── schema_helpers.rs    — schemars / utoipa integration helpers
+│   ├── schema_helpers.rs    — schemars schema_with= helpers for OffsetDateTime and Date
+│   ├── time_serde.rs        — date_serde / opt_date_serde modules (time feature)
+│   ├── convenience.rs       — hand-written ergonomic methods on generated types
 │   ├── identifiers/         — MaloId, MeloId, EicCode, ObisCode, …
 │   ├── validation/          — garde-based cross-field validators
 │   └── generated/           — written by generator; never pub outside crate
@@ -33,7 +35,7 @@ rubo4e/
 │   ├── src/
 │   │   ├── main.rs
 │   │   ├── parser.rs        — JSON Schema → AST
-│   │   ├── inference.rs     — semantic type inference
+│   │   ├── inference.rs     — semantic type inference (suffix-based heuristics)
 │   │   └── emitter.rs       — AST → Rust source
 │   ├── schemas/
 │   │   └── v202501.0.0/     — pinned schema snapshot
@@ -50,7 +52,7 @@ rubo4e/
 │   └── serialize.rs
 │
 └── tests/
-    ├── golden/              — official JSON payloads for round-trip tests
+    ├── golden/              — official JSON payloads for round-trip tests (flat, no version subdir)
     ├── compat/              — cross-implementation compatibility vectors
     │   ├── python/
     │   └── go/
@@ -79,6 +81,7 @@ graph TD
         validate_feat["validate (garde)"]
         builder_feat["builder (typed-builder)"]
         versioned_feat["versioned"]
+        time_feat["time"]
         sqlx_feat["sqlx"]
         utoipa_feat["utoipa"]
         schemars_feat["schemars"]
@@ -89,6 +92,8 @@ graph TD
 
     simd_feat -->|"requires"| json_feat
     json_feat -->|"requires"| serde_feat
+    time_feat -->|"enables"| time_serde["rubo4e::time_serde\n(date_serde / opt_date_serde)"]
+    versioned_feat -->|"enables"| convenience["rubo4e::convenience\n(billing_period / validity / …)"]
 ```
 
 ---
@@ -100,12 +105,12 @@ graph TD
 | `serde` | ✓ | `serde` | none | Derive `Serialize`/`Deserialize` on all types |
 | `json` | — | `serde_json` | none | `to_json_*()` methods; `serde` implied |
 | `simd-json` | — | `simd-json` | none | SIMD-accelerated JSON (x86_64 AVX2 / ARM NEON) |
-| `time` | — | `time` | none | `OffsetDateTime` for timestamp fields |
+| `time` | — | `time` | none | `OffsetDateTime` for datetime fields; `Date` for date-only fields; enables `rubo4e::time_serde` |
 | `decimal` | — | `rust_decimal` | none | `Decimal` for all monetary/quantity fields |
 | `builder` | — | `typed-builder` | none | Typed builder derives on all BO/COM structs |
 | `validate` | — | `garde` | **1.87** | `.validate()` method on all structs |
-| `schemars` | — | `schemars` | none | `JsonSchema` derive on all types |
-| `versioned` | — | none | none | Conditional compilation of `v202501` module |
+| `schemars` | — | `schemars` | none | `JsonSchema` derive on all types; enables `rubo4e::schema_helpers` |
+| `versioned` | — | none | none | Conditional compilation of `v202501` and `current` modules; enables `rubo4e::convenience` |
 | `sqlx` | — | `sqlx` | none | `sqlx::Type`/`Encode`/`Decode` for identifiers and enums |
 | `utoipa` | — | `utoipa` | none | `ToSchema` derive on all types |
 | `strum` | — | `strum` | none | `Display`/`FromStr` on all enums |

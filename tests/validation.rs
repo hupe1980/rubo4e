@@ -279,3 +279,233 @@ mod report_errors_tests {
         );
     }
 }
+
+// ── Zeitraum validation (date ordering) ─────────────────────────────────────
+
+#[cfg(all(feature = "validate", feature = "versioned", feature = "time"))]
+mod zeitraum_tests {
+    use garde::Validate as _;
+    use rubo4e::v202501::Zeitraum;
+    use time::macros::date;
+
+    fn zeitraum(start: Option<time::Date>, end: Option<time::Date>) -> Zeitraum {
+        Zeitraum {
+            startdatum: start,
+            enddatum: end,
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn valid_closed_range_ok() {
+        let z = zeitraum(Some(date!(2025 - 01 - 01)), Some(date!(2025 - 12 - 31)));
+        assert!(z.validate().is_ok(), "closed range start < end must pass");
+    }
+
+    #[test]
+    fn same_day_fails() {
+        // validate_zeitraum requires start < end (strict)
+        let z = zeitraum(Some(date!(2025 - 06 - 15)), Some(date!(2025 - 06 - 15)));
+        assert!(
+            z.validate().is_err(),
+            "start == end should be rejected (not a valid interval)"
+        );
+    }
+
+    #[test]
+    fn inverted_range_fails() {
+        let z = zeitraum(Some(date!(2025 - 12 - 31)), Some(date!(2025 - 01 - 01)));
+        assert!(z.validate().is_err(), "end before start must be rejected");
+    }
+
+    #[test]
+    fn only_start_ok() {
+        // open-ended period (no enddatum) — validator only fires when both are present
+        let z = zeitraum(Some(date!(2025 - 01 - 01)), None);
+        assert!(z.validate().is_ok(), "open-ended period (no end) must pass");
+    }
+
+    #[test]
+    fn only_end_ok() {
+        let z = zeitraum(None, Some(date!(2025 - 12 - 31)));
+        assert!(z.validate().is_ok(), "period with only end must pass");
+    }
+
+    #[test]
+    fn all_absent_fails() {
+        // A Zeitraum with NO temporal information is invalid by design.
+        // The validator requires at least one of: dauer, startdatum/enddatum,
+        // or startuhrzeit/enduhrzeit.
+        let z = zeitraum(None, None);
+        assert!(
+            z.validate().is_err(),
+            "empty Zeitraum (no temporal attributes at all) must fail validation"
+        );
+    }
+
+    #[test]
+    fn no_dates_but_dauer_ok() {
+        // Zeitraum with only dauer (no start/end dates) passes the date-ordering
+        // check, which only fires when BOTH startdatum and enddatum are present.
+        let z = rubo4e::v202501::Zeitraum {
+            dauer: Some("15".to_owned()),
+            ..Default::default()
+        };
+        assert!(
+            z.validate().is_ok(),
+            "Zeitraum with only dauer must pass date-ordering check"
+        );
+    }
+
+    #[test]
+    fn error_message_contains_dates() {
+        let z = zeitraum(Some(date!(2025 - 12 - 31)), Some(date!(2025 - 01 - 01)));
+        let err = z.validate().expect_err("inverted range must fail");
+        let msg = err.to_string();
+        // The error message should include both boundary dates for diagnostics.
+        assert!(
+            msg.contains("2025"),
+            "error message should include the year; got: {msg}"
+        );
+    }
+}
+
+// ── Convenience method tests ─────────────────────────────────────────────────
+
+#[cfg(all(feature = "versioned", feature = "time"))]
+mod convenience_tests {
+    use rubo4e::v202501::{PreisblattNetznutzung, Rechnung, Zeitraum};
+    use time::macros::date;
+
+    fn closed_zeitraum() -> Zeitraum {
+        Zeitraum {
+            startdatum: Some(date!(2025 - 01 - 01)),
+            enddatum: Some(date!(2025 - 12 - 31)),
+            ..Default::default()
+        }
+    }
+
+    fn open_zeitraum() -> Zeitraum {
+        Zeitraum {
+            startdatum: Some(date!(2025 - 01 - 01)),
+            enddatum: None,
+            ..Default::default()
+        }
+    }
+
+    fn no_start_zeitraum() -> Zeitraum {
+        Zeitraum {
+            startdatum: None,
+            enddatum: Some(date!(2025 - 12 - 31)),
+            ..Default::default()
+        }
+    }
+
+    // ── Zeitraum::as_closed_range ────────────────────────────────────────────
+
+    #[test]
+    fn closed_range_both_present() {
+        let r = closed_zeitraum().as_closed_range();
+        assert_eq!(
+            r,
+            Some((date!(2025 - 01 - 01), date!(2025 - 12 - 31)))
+        );
+    }
+
+    #[test]
+    fn closed_range_open_end_returns_none() {
+        assert_eq!(open_zeitraum().as_closed_range(), None);
+    }
+
+    #[test]
+    fn closed_range_no_start_returns_none() {
+        assert_eq!(no_start_zeitraum().as_closed_range(), None);
+    }
+
+    // ── Zeitraum::as_half_open_range ─────────────────────────────────────────
+
+    #[test]
+    fn half_open_range_both_present() {
+        let r = closed_zeitraum().as_half_open_range();
+        assert_eq!(
+            r,
+            Some((date!(2025 - 01 - 01), Some(date!(2025 - 12 - 31))))
+        );
+    }
+
+    #[test]
+    fn half_open_range_open_end() {
+        let r = open_zeitraum().as_half_open_range();
+        assert_eq!(r, Some((date!(2025 - 01 - 01), None)));
+    }
+
+    #[test]
+    fn half_open_range_no_start_returns_none() {
+        assert_eq!(no_start_zeitraum().as_half_open_range(), None);
+    }
+
+    // ── Rechnung::billing_period ─────────────────────────────────────────────
+
+    #[test]
+    fn billing_period_with_full_period() {
+        let r = Rechnung {
+            rechnungsperiode: Some(closed_zeitraum()),
+            ..Default::default()
+        };
+        assert_eq!(
+            r.billing_period(),
+            Some((date!(2025 - 01 - 01), date!(2025 - 12 - 31)))
+        );
+    }
+
+    #[test]
+    fn billing_period_no_periode_returns_none() {
+        let r = Rechnung {
+            rechnungsperiode: None,
+            ..Default::default()
+        };
+        assert_eq!(r.billing_period(), None);
+    }
+
+    #[test]
+    fn billing_period_open_ended_returns_none() {
+        // open-ended rechnungsperiode → billing_period() returns None (no closed range)
+        let r = Rechnung {
+            rechnungsperiode: Some(open_zeitraum()),
+            ..Default::default()
+        };
+        assert_eq!(r.billing_period(), None);
+    }
+
+    // ── PreisblattNetznutzung::validity ──────────────────────────────────────
+
+    #[test]
+    fn validity_closed_range() {
+        let p = PreisblattNetznutzung {
+            gueltigkeit: Some(closed_zeitraum()),
+            ..Default::default()
+        };
+        assert_eq!(
+            p.validity(),
+            Some((date!(2025 - 01 - 01), Some(date!(2025 - 12 - 31))))
+        );
+    }
+
+    #[test]
+    fn validity_open_ended() {
+        let p = PreisblattNetznutzung {
+            gueltigkeit: Some(open_zeitraum()),
+            ..Default::default()
+        };
+        assert_eq!(p.validity(), Some((date!(2025 - 01 - 01), None)));
+    }
+
+    #[test]
+    fn validity_no_gueltigkeit_returns_none() {
+        let p = PreisblattNetznutzung {
+            gueltigkeit: None,
+            ..Default::default()
+        };
+        assert_eq!(p.validity(), None);
+    }
+}

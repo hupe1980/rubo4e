@@ -102,18 +102,28 @@ Exactly **one** of the following address fields must be `Some`:
 
 ### Date Range Constraints
 
-**Vertrag:**
+**Vertrag** (fields: `Option<time::OffsetDateTime>`):
 ```
-vertragsbeginn < vertragsende   (when both are Some)
-```
-
-**Bilanzierung:**
-```
-bilanzierungsbeginn ≤ bilanzierungsende   (when both are Some)
+vertragsbeginn < vertragsende   (when both are Some; strict — equal is invalid)
 ```
 
-If only one of the two date fields is `Some`, the constraint is not checked.
-Equal dates are valid for `Bilanzierung` but invalid for `Vertrag`.
+**Bilanzierung** (fields: `Option<time::OffsetDateTime>`):
+```
+bilanzierungsbeginn ≤ bilanzierungsende   (when both are Some; equal is valid)
+```
+
+**Zeitraum** (fields: `Option<time::Date>`):
+```
+startdatum < enddatum   (when both are Some; strict — same day is invalid)
+```
+
+Additionally, a `Zeitraum` must have at least one temporal attribute set (`dauer`,
+`startdatum`, `enddatum`, `startuhrzeit`, or `enduhrzeit`). A completely empty
+`Zeitraum` fails validation.
+
+If only one boundary is `Some`, no ordering constraint is checked.
+Date-ordering constraints require the `time` feature — without it the comparison
+is not emitted.
 
 ### Rechnung Arithmetic Constraints
 

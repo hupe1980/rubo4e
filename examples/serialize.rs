@@ -1,7 +1,7 @@
 //! Demonstrates BO4E JSON serialization in three different key formats.
 //!
 //! Run with:
-//!   cargo run --example serialize --features versioned,json
+//!   cargo run --example serialize --features versioned,json,decimal
 
 use rubo4e::{
     json::Bo4eJsonExt,

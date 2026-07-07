@@ -1,6 +1,6 @@
 use super::{
-    Ausschreibungsdetail, ComTyp, Menge, Preismodell, Rechnungslegung, Sparte, Vertragsform,
-    Zeitraum, ZusatzAttribut,
+    Ausschreibungsdetail, ComTyp, Menge, Preismodell, Rechnungslegung, Sparte,
+    Vertragsform, Zeitraum, ZusatzAttribut,
 };
 #[derive(Debug, Clone, PartialEq, Default)]
 #[cfg_attr(not(feature = "json"), derive(Hash))]
@@ -139,9 +139,7 @@ impl crate::json::Bo4eJsonExt for Ausschreibungslos {}
 #[cfg(feature = "json")]
 impl crate::json::Bo4eExtensionData for Ausschreibungslos {
     fn extension_data(&self) -> &indexmap::IndexMap<String, serde_json::Value> {
-        self._additional
-            .as_map()
-            .unwrap_or(&crate::json::extension::EMPTY_EXTENSION_MAP)
+        self._additional.as_map().unwrap_or(&crate::json::extension::EMPTY_EXTENSION_MAP)
     }
     fn has_extension_data(&self) -> bool {
         !self._additional.is_empty()

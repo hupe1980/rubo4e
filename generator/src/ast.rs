@@ -11,8 +11,10 @@ pub enum PrimitiveType {
     I64,
     /// `rust_decimal::Decimal` (feature = "decimal")
     Decimal,
-    /// `time::OffsetDateTime` (feature = "time")
+    /// `time::OffsetDateTime` (feature = "time") — ISO 8601 date-time
     OffsetDateTime,
+    /// `time::Date` (feature = "time") — ISO 8601 date-only `YYYY-MM-DD`
+    Date,
 }
 
 /// The Rust type a BO4E field maps to.

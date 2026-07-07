@@ -147,7 +147,9 @@ match "INVALID_SPARTE".parse::<Sparte>() {
 
 ## proptest — Property Testing
 
-`proptest` is a **dev-dependency** of `rubo4e`. No feature flag is needed.
+`proptest` is a **dev-dependency** of `rubo4e`. No feature flag is required —
+there is no `testing` feature. `Arbitrary` impls for identifier types are compiled
+`#[cfg(test)]` only and are not exposed to external crates.
 
 To write property tests against BO4E-integrated code in your own crate, add both as
 dev-dependencies:
@@ -166,7 +168,16 @@ use proptest::prelude::*;
 
 // Build a valid 11-digit BDEW ID string with the correct checksum.
 fn valid_malo_id() -> impl Strategy<Value = String> {
-    // ... construct a valid strategy
+    prop::array::uniform10(0u8..=9u8).prop_map(|prefix| {
+        // Alternating-weight checksum: weights [2,1,2,1,…], reduce products ≥ 10 by −9
+        let sum: u32 = prefix.iter().enumerate()
+            .map(|(i, &d)| { let p = u32::from(d) * if i % 2 == 0 { 2 } else { 1 }; if p >= 10 { p - 9 } else { p } })
+            .sum();
+        let check = ((10 - (sum % 10)) % 10) as u8;
+        prefix.iter().chain(std::iter::once(&check))
+            .map(|&d| char::from_digit(u32::from(d), 10).unwrap())
+            .collect::<String>()
+    })
 }
 
 proptest! {
@@ -179,5 +190,72 @@ proptest! {
 }
 ```
 
-See `tests/proptest_roundtrips.rs` in the `rubo4e` source for reference strategy
-implementations.
+See `tests/proptest_roundtrips.rs` in the `rubo4e` source for complete reference
+strategy implementations for all identifier types, enum variants, and date fields.
+
+---
+
+## time_serde — Date Serde Helpers
+
+**Feature flag:** `time`  
+**Module:** `rubo4e::time_serde`
+
+When the `time` feature is enabled, generated structs use `rubo4e::time_serde` for
+`time::Date` fields instead of raw strings.  The module is also available to
+consumers who need the same `"YYYY-MM-DD"` serde behaviour on their own types:
+
+```toml
+rubo4e = { version = "...", features = ["time"] }
+```
+
+```rust
+use time::Date;
+
+#[derive(serde::Serialize, serde::Deserialize)]
+struct MyRecord {
+    // Required date — "YYYY-MM-DD" wire format, zero-allocation deserializer
+    #[serde(with = "rubo4e::time_serde::date_serde")]
+    billing_date: Date,
+
+    // Optional date — null or "YYYY-MM-DD"
+    #[serde(with = "rubo4e::time_serde::opt_date_serde")]
+    expiry_date: Option<Date>,
+}
+```
+
+Both submodules use a proper `Visitor` pattern: `visit_str` borrows from the input
+without heap allocation.  `opt_date_serde::deserialize` uses `deserialize_option`
+so that JSON `null` maps to `None` without constructing an intermediate `String`.
+
+---
+
+## convenience — Ergonomic Helpers on Generated Types
+
+**Feature flag:** `versioned` + `time`  
+**Module:** `rubo4e::convenience`
+
+Hand-written extension methods on generated BO4E types — useful accessor shortcuts
+that keep application code concise:
+
+```rust
+use rubo4e::v202501::{Rechnung, PreisblattNetznutzung, Zeitraum};
+
+// Rechnung — closed billing period (both dates must be present)
+let r: Rechnung = todo!();
+if let Some((from, to)) = r.billing_period() {
+    println!("Invoice period: {from} – {to}");
+}
+
+// PreisblattNetznutzung — open-ended or closed validity
+let p: PreisblattNetznutzung = todo!();
+match p.validity() {
+    Some((start, Some(end))) => println!("valid {start} – {end}"),
+    Some((start, None))      => println!("valid from {start} (open-ended)"),
+    None                     => println!("validity unknown"),
+}
+
+// Zeitraum — raw range accessors (also works for all 18+ types with gueltigkeit)
+let z: Zeitraum = todo!();
+let closed     = z.as_closed_range();     // Option<(Date, Date)>   — both bounds present
+let half_open  = z.as_half_open_range();  // Option<(Date, Option<Date>)> — start required
+```

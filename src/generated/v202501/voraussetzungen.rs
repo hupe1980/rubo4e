@@ -43,10 +43,7 @@ pub enum Voraussetzungen {
     #[cfg_attr(feature = "strum", strum(serialize = "NEUKUNDE"))]
     Neukunde,
     #[cfg_attr(feature = "serde", serde(rename = "BESTIMMTE_VERTRAGSFORMALITAETEN"))]
-    #[cfg_attr(
-        feature = "strum",
-        strum(serialize = "BESTIMMTE_VERTRAGSFORMALITAETEN")
-    )]
+    #[cfg_attr(feature = "strum", strum(serialize = "BESTIMMTE_VERTRAGSFORMALITAETEN"))]
     BestimmteVertragsformalitaeten,
     #[cfg_attr(feature = "serde", serde(rename = "SELBSTABLESUNG"))]
     #[cfg_attr(feature = "strum", strum(serialize = "SELBSTABLESUNG"))]

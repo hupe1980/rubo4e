@@ -50,6 +50,27 @@ impl MarktpartnerId {
         validate(s)?;
         Ok(Self(Box::from(s)))
     }
+
+    /// Converts this `MarktpartnerId` to its numeric `i64` representation.
+    ///
+    /// A validated 13-digit numeric string always fits in `i64`
+    /// (`9_999_999_999_999 < i64::MAX`), so the conversion is infallible for
+    /// any value that passed construction validation.
+    ///
+    /// # Examples
+    /// ```
+    /// use rubo4e::identifiers::MarktpartnerId;
+    ///
+    /// let id = MarktpartnerId::new("9900357000004").unwrap();
+    /// assert_eq!(id.to_i64(), 9_900_357_000_004_i64);
+    /// ```
+    #[must_use]
+    pub fn to_i64(&self) -> i64 {
+        // All 13-digit decimal strings fit in i64; parse cannot fail on validated input.
+        self.0
+            .parse::<i64>()
+            .expect("MarktpartnerId is validated as 13 ASCII digits; parse to i64 cannot fail")
+    }
 }
 
 impl TryFrom<String> for MarktpartnerId {
@@ -173,5 +194,76 @@ mod tests {
     fn round_trip() {
         let id = MarktpartnerId::new("1234567890123").unwrap();
         assert_eq!(id.to_string().parse::<MarktpartnerId>().unwrap(), id);
+    }
+
+    #[test]
+    fn to_i64_conversion() {
+        let id = MarktpartnerId::new("9900357000004").unwrap();
+        assert_eq!(id.to_i64(), 9_900_357_000_004_i64);
+
+        let zeros = MarktpartnerId::new("0000000000000").unwrap();
+        assert_eq!(zeros.to_i64(), 0_i64);
+
+        let max13 = MarktpartnerId::new("9999999999999").unwrap();
+        assert_eq!(max13.to_i64(), 9_999_999_999_999_i64);
+    }
+}
+
+/// Serde module that serializes/deserializes a [`MarktpartnerId`] as a JSON
+/// integer (`i64`) rather than a string.
+///
+/// Some BDEW REST APIs (e.g. API-Webdienste Strom) represent GLN / Rollencodenummern
+/// as 64-bit integers in their JSON payloads.  Use this adapter when the target
+/// endpoint mandates integer encoding:
+///
+/// ```rust,ignore
+/// #[serde(with = "rubo4e::identifiers::serde_as_i64")]
+/// pub market_partner_id: MarktpartnerId,
+/// ```
+///
+/// The deserializer accepts **both** integer and string representations so that
+/// data from string-typed upstream sources can be seamlessly decoded.
+#[cfg(feature = "serde")]
+#[cfg_attr(docsrs, doc(cfg(feature = "serde")))]
+pub mod serde_as_i64 {
+    use super::MarktpartnerId;
+    use crate::error::IdentifierError;
+
+    /// Serialize a `MarktpartnerId` as a JSON integer.
+    pub fn serialize<S: serde::Serializer>(
+        id: &MarktpartnerId,
+        s: S,
+    ) -> Result<S::Ok, S::Error> {
+        s.serialize_i64(id.to_i64())
+    }
+
+    /// Deserialize a `MarktpartnerId` from either a JSON integer or a JSON string.
+    pub fn deserialize<'de, D: serde::Deserializer<'de>>(
+        d: D,
+    ) -> Result<MarktpartnerId, D::Error> {
+        struct Visitor;
+        impl<'de> serde::de::Visitor<'de> for Visitor {
+            type Value = MarktpartnerId;
+            fn expecting(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                f.write_str("a 13-digit Marktpartner-ID as an integer or string")
+            }
+            fn visit_i64<E: serde::de::Error>(self, v: i64) -> Result<MarktpartnerId, E> {
+                if v < 0 {
+                    return Err(E::custom(IdentifierError::InvalidFormat {
+                        description: "MarktpartnerId cannot be negative".into(),
+                    }));
+                }
+                let s = format!("{v:013}");
+                MarktpartnerId::new(&s).map_err(E::custom)
+            }
+            fn visit_u64<E: serde::de::Error>(self, v: u64) -> Result<MarktpartnerId, E> {
+                let s = format!("{v:013}");
+                MarktpartnerId::new(&s).map_err(E::custom)
+            }
+            fn visit_str<E: serde::de::Error>(self, v: &str) -> Result<MarktpartnerId, E> {
+                MarktpartnerId::new(v).map_err(E::custom)
+            }
+        }
+        d.deserialize_any(Visitor)
     }
 }

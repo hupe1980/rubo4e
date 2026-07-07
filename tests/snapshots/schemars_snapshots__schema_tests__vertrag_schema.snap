@@ -1161,7 +1161,7 @@ expression: "schema_json::<Vertrag>()"
             "string",
             "null"
           ],
-          "format": "date-time"
+          "format": "date"
         },
         "individuelleAnrede": {
           "description": "Im Falle einer nicht standardisierten Anrede kann hier eine frei definierbare Anrede vorgegeben werden.\nBeispiel: \"Vereinsgemeinschaft\", \"Pfarrer\", \"Hochwürdigster Herr Abt\".",
@@ -1697,7 +1697,7 @@ expression: "schema_json::<Vertrag>()"
             "string",
             "null"
           ],
-          "format": "date-time"
+          "format": "date"
         },
         "enduhrzeit": {
           "description": "Enduhrzeit mit Zeitzone. Die angegebene Uhrzeit ist im betrachteten Zeitraum **exklusiv**.\n\nExample:\n'19:00:00+01:00'",
@@ -1712,7 +1712,7 @@ expression: "schema_json::<Vertrag>()"
             "string",
             "null"
           ],
-          "format": "date-time"
+          "format": "date"
         },
         "startuhrzeit": {
           "description": "Startuhrzeit mit Zeitzone. Die angegebene Uhrzeit ist im betrachteten Zeitraum **inklusiv**.\n\nExample:\n'18:00:00+01:00'",

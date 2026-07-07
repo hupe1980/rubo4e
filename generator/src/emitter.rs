@@ -557,6 +557,10 @@ fn emit_field(s: &mut String, field: &Field) {
         &field.field_type,
         FieldType::Primitive(PrimitiveType::OffsetDateTime)
     ) || matches!(&field.field_type, FieldType::Array(inner) if matches!(inner.as_ref(), FieldType::Primitive(PrimitiveType::OffsetDateTime)));
+    let has_date = matches!(
+        &field.field_type,
+        FieldType::Primitive(PrimitiveType::Date)
+    ) || matches!(&field.field_type, FieldType::Array(inner) if matches!(inner.as_ref(), FieldType::Primitive(PrimitiveType::Date)));
     if has_offset_datetime {
         let schema_fn = if field.is_optional {
             "crate::schema_helpers::opt_datetime_schema"
@@ -589,6 +593,28 @@ fn emit_field(s: &mut String, field: &Field) {
         ));
     }
 
+    if has_date {
+        let schema_fn = if field.is_optional {
+            "crate::schema_helpers::opt_date_schema"
+        } else {
+            "crate::schema_helpers::date_schema"
+        };
+        if field.is_optional {
+            s.push_str("    #[cfg_attr(feature = \"serde\", serde(default))]\n");
+        }
+        s.push_str(&format!(
+            "    #[cfg_attr(feature = \"schemars\", schemars(schema_with = \"{schema_fn}\"))]\n"
+        ));
+        let date_serde_with = if field.is_optional {
+            "crate::time_serde::opt_date_serde"
+        } else {
+            "crate::time_serde::date_serde"
+        };
+        s.push_str(&format!(
+            "    #[cfg_attr(all(feature = \"serde\", feature = \"time\"), serde(with = \"{date_serde_with}\"))]\n"
+        ));
+    }
+
     let type_str = field_type_to_rust(&field.field_type, field.is_optional);
     // `serde_json::Value` is only available when the `json` feature is active.
     // Emit a cfg-gated pair: primary type with feature, String fallback without.
@@ -610,7 +636,7 @@ fn emit_field(s: &mut String, field: &Field) {
             "json",
             &type_str,
             "    /// Requires the `json` feature for the full `serde_json::Value` representation.\n",
-            false,
+            None,
         );
     } else if has_offset_datetime {
         emit_feature_gated_field(
@@ -619,7 +645,16 @@ fn emit_field(s: &mut String, field: &Field) {
             "time",
             &type_str,
             "    /// Requires the `time` feature for the `time::OffsetDateTime` representation.\n    /// Without `time`, stores the ISO-8601 string value unchanged.\n",
-            true,
+            Some(("crate::schema_helpers::opt_datetime_schema", "crate::schema_helpers::datetime_schema")),
+        );
+    } else if has_date {
+        emit_feature_gated_field(
+            s,
+            field,
+            "time",
+            &type_str,
+            "    /// Requires the `time` feature for the `time::Date` representation.\n    /// Without `time`, stores the ISO 8601 date string (`YYYY-MM-DD`) unchanged.\n",
+            Some(("crate::schema_helpers::opt_date_schema", "crate::schema_helpers::date_schema")),
         );
     } else if matches!(
         &field.field_type,
@@ -632,7 +667,7 @@ fn emit_field(s: &mut String, field: &Field) {
             "decimal",
             &type_str,
             "    /// Requires the `decimal` feature for the `rust_decimal::Decimal` representation.\n    /// Without `decimal`, stores the decimal string value unchanged.\n",
-            false,
+            None,
         );
     } else {
         s.push_str(&format!("    pub {}: {type_str},\n", field.rust_name));
@@ -646,14 +681,16 @@ fn emit_field(s: &mut String, field: &Field) {
 /// `primary_type` — the fully resolved type string for the feature-gated variant.
 /// `fallback_doc` — the doc comment lines (already `    ///`-prefixed) to emit before
 ///    the fallback declaration so downstream readers know why the type differs.
-/// `datetime_schemars` — passed through to `emit_fallback_attrs` for datetime fields.
+/// `fallback_schema_fns` — when `Some((opt_fn, req_fn))`, `emit_fallback_attrs` emits
+///    `schemars(schema_with)` on the fallback field using the correct function path.
+///    Pass `None` for types that need no special schemars treatment (Decimal, JsonValue).
 fn emit_feature_gated_field(
     s: &mut String,
     field: &Field,
     feature: &str,
     primary_type: &str,
     fallback_doc: &str,
-    datetime_schemars: bool,
+    fallback_schema_fns: Option<(&'static str, &'static str)>,
 ) {
     let fallback_type = if field.is_optional {
         "Option<String>".to_owned()
@@ -663,7 +700,7 @@ fn emit_feature_gated_field(
     s.push_str(&format!("    #[cfg(feature = \"{feature}\")]\n"));
     s.push_str(&format!("    pub {}: {primary_type},\n", field.rust_name));
     s.push_str(fallback_doc);
-    emit_fallback_attrs(s, field, datetime_schemars);
+    emit_fallback_attrs(s, field, fallback_schema_fns);
     s.push_str(&format!("    #[cfg(not(feature = \"{feature}\"))]\n"));
     s.push_str(&format!("    pub {}: {fallback_type},\n", field.rust_name));
 }
@@ -675,9 +712,15 @@ fn emit_feature_gated_field(
 /// `#[cfg]` guards (e.g. the primary `time::OffsetDateTime` field and its
 /// `String` fallback), the fallback must re-declare every attribute it needs.
 ///
-/// `datetime_schemars`: set to `true` for the datetime fallback so the JSON
-/// Schema retains the `"format": "date-time"` annotation.
-fn emit_fallback_attrs(s: &mut String, field: &Field, datetime_schemars: bool) {
+/// `fallback_schema_fns`: when `Some((opt_fn, req_fn))`, emits
+/// `schemars(schema_with)` on the fallback field so JSON Schema annotations
+/// (e.g. `"format": "date-time"` or `"format": "date"`) are preserved even
+/// when the native time type is absent.
+fn emit_fallback_attrs(
+    s: &mut String,
+    field: &Field,
+    fallback_schema_fns: Option<(&'static str, &'static str)>,
+) {
     // serde rename: always needed so the JSON key matches the BO4E spec (camelCase).
     s.push_str(&format!(
         "    #[cfg_attr(feature = \"serde\", serde(rename = \"{}\"))]\n",
@@ -691,20 +734,16 @@ fn emit_fallback_attrs(s: &mut String, field: &Field, datetime_schemars: bool) {
         // schemars: `schema_with` bypasses the normal is-Option? detection, so we
         // need both `skip_serializing_if` AND `serde(default)` for schemars to
         // correctly omit this field from the `required` array.
-        if datetime_schemars {
+        if fallback_schema_fns.is_some() {
             s.push_str("    #[cfg_attr(feature = \"serde\", serde(default))]\n");
         }
         // Builder: same `setter(into)` semantics as primary fields — accepts `T` or `Option<T>`.
         s.push_str("    #[cfg_attr(feature = \"builder\", builder(default, setter(into)))]\n");
     }
-    // Datetime fallback: retain the ISO-8601 `"format": "date-time"` annotation
-    // in the JSON Schema even when the `time` crate is not enabled.
-    if datetime_schemars {
-        let schema_fn = if field.is_optional {
-            "crate::schema_helpers::opt_datetime_schema"
-        } else {
-            "crate::schema_helpers::datetime_schema"
-        };
+    // Retain the JSON Schema format annotation on the fallback field so that schemars
+    // produces the correct `"format"` annotation even when the native type is absent.
+    if let Some((opt_fn, req_fn)) = fallback_schema_fns {
+        let schema_fn = if field.is_optional { opt_fn } else { req_fn };
         s.push_str(&format!(
             "    #[cfg_attr(feature = \"schemars\", schemars(schema_with = \"{schema_fn}\"))]\n"
         ));
@@ -740,6 +779,7 @@ fn primitive_to_rust(p: &PrimitiveType) -> &'static str {
         // cfg-conditional fallbacks to `String` when the features are absent.
         PrimitiveType::Decimal => "rust_decimal::Decimal",
         PrimitiveType::OffsetDateTime => "time::OffsetDateTime",
+        PrimitiveType::Date => "time::Date",
     }
 }
 

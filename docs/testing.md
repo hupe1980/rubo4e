@@ -30,20 +30,20 @@ cargo test --features json,versioned --test golden
 
 ```
 tests/golden/
-├── v202501/
-│   ├── Vertrag_minimal.json        # only _typ + _version
-│   ├── Vertrag_typical.json        # common fields populated
-│   ├── Vertrag_maximal.json        # all fields populated
-│   ├── Marktlokation_minimal.json
-│   ├── Marktlokation_typical.json
-│   ├── Marktlokation_maximal.json
-│   ├── Messlokation_*.json
-│   ├── Rechnung_*.json
-│   └── Netzlokation_*.json
+├── vertrag_minimal.json        # only _typ + _version
+├── vertrag_typical.json        # common fields populated
+├── marktlokation_minimal.json
+├── marktlokation_typical.json
+├── messlokation_minimal.json
+├── messlokation_typical.json
+├── netzlokation_minimal.json
+├── netzlokation_typical.json
+├── rechnung_minimal.json
+└── rechnung_typical.json
 ```
 
-Payloads are sourced from `bo4e/BO4E-Schemas` test data or from the Go implementation's
-integration test fixtures. They are **not** hand-invented.
+Files are **not** nested in a version subdirectory — all live directly under
+`tests/golden/`. The schema version is encoded in each file’s `"_version"` field.
 
 **What the test checks:**
 - Deserialization does not return an error
@@ -73,35 +73,46 @@ that requires explicit review and acceptance with `cargo insta accept`.
 
 ---
 
-## Layer 3 — Identifier Property Tests
+## Layer 3 — Property-Based Tests
 
-Verify identifier invariants hold for all generated valid values.
+Verify identifier round-trip invariants, serde correctness for date types, and
+enum `Display`/`FromStr` for all generated variants.
 
 **Run:**
 ```bash
-cargo test --features testing
+cargo test --all-features --test proptest_roundtrips
 ```
 
-**Key properties tested:**
+> **Note:** there is no `testing` feature flag. `proptest` is a plain dev-dependency.
+> `Arbitrary` impls for identifier types are compiled `#[cfg(test)]` only and
+> are not available to external crates.
+
+**Properties covered:**
 
 ```rust
-// FromStr ↔ Display round-trip
+// Identifier: Display ↔ FromStr round-trip
 proptest! {
-    fn malo_id_roundtrip(id: MaloId) {
+    fn malo_id_display_from_str_roundtrip(s in valid_11digit()) {
+        let id = MaloId::new(&s).unwrap();
         prop_assert_eq!(id.to_string().parse::<MaloId>().unwrap(), id);
     }
 }
 
-// Arbitrary generates only valid values
+// Serde round-trip for required time::Date
 proptest! {
-    fn malo_id_arbitrary_always_valid(id: MaloId) {
-        prop_assert!(MaloId::new(id.as_str()).is_ok());
+    fn required_date_serde_roundtrip(date in any_date()) {
+        // serializes as "YYYY-MM-DD", deserializes back to the same Date
     }
+}
+
+// Enum: Display ↔ FromStr round-trip over all known variants (strum)
+proptest! {
+    fn sparte_display_from_str_roundtrip(variant in any_sparte()) { … }
 }
 ```
 
-Minimum 10 000 cases per identifier type (proptest default). Shrinking finds the
-minimal failing example on any failure.
+Also covered: `opt_date_serde` `None`/`Some` round-trips, JSON null → `None` deserialization,
+ISO 8601 wire-format assertion (`"YYYY-MM-DD"`).
 
 ---
 
@@ -208,7 +219,7 @@ cargo test --workspace --all-features
 # Just golden corpus tests
 cargo test --features json,versioned --test golden
 
-# Just identifier property tests
+# Identifier + serde + enum property tests (no extra feature flag needed)
 cargo test --all-features --test proptest_roundtrips
 
 # Cross-impl compatibility
@@ -216,6 +227,9 @@ cargo test --features json,versioned --test compat
 
 # schemars snapshot tests
 cargo test --features schemars --test schemars_snapshots
+
+# Validation integration tests
+cargo test --all-features --test validation
 
 # Fuzz (nightly, 1M iterations)
 cargo +nightly fuzz run fuzz_deserialize_vertrag -- -runs=1000000

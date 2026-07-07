@@ -200,7 +200,12 @@ fn parse_field(
     // its schema says `$ref: Preis.json`; the field must be `Option<Preis>`, not
     // `Option<Decimal>`.
     let field_type = match &schema_type {
+        // $ref types are authoritative — never override with name-based inference.
         FieldType::Bo(_) | FieldType::Com(_) => schema_type,
+        // Schema-detected datetime/date types are authoritative — name-based inference
+        // must not downgrade or change a type already established from the schema format.
+        FieldType::Primitive(PrimitiveType::OffsetDateTime)
+        | FieldType::Primitive(PrimitiveType::Date) => schema_type,
         _ => inference::infer_with_parent(parent_name, json_name).unwrap_or(schema_type),
     };
 
@@ -241,7 +246,11 @@ fn resolve_field_type(schema: &Value) -> FieldType {
     }
 
     match schema.get("type").and_then(|v| v.as_str()) {
-        Some("string") => FieldType::Primitive(PrimitiveType::String),
+        Some("string") => match schema.get("format").and_then(|v| v.as_str()) {
+            Some("date-time") => FieldType::Primitive(PrimitiveType::OffsetDateTime),
+            Some("date") => FieldType::Primitive(PrimitiveType::Date),
+            _ => FieldType::Primitive(PrimitiveType::String),
+        },
         Some("boolean") => FieldType::Primitive(PrimitiveType::Bool),
         Some("integer") => FieldType::Primitive(PrimitiveType::I64),
         Some("number") => FieldType::Primitive(PrimitiveType::Decimal),

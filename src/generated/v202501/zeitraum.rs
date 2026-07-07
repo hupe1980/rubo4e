@@ -39,23 +39,23 @@ pub struct Zeitraum {
     #[cfg_attr(feature = "serde", serde(default))]
     #[cfg_attr(
         feature = "schemars",
-        schemars(schema_with = "crate::schema_helpers::opt_datetime_schema")
+        schemars(schema_with = "crate::schema_helpers::opt_date_schema")
     )]
     #[cfg_attr(
         all(feature = "serde", feature = "time"),
-        serde(with = "time::serde::rfc3339::option")
+        serde(with = "crate::time_serde::opt_date_serde")
     )]
     #[cfg(feature = "time")]
-    pub enddatum: Option<time::OffsetDateTime>,
-    /// Requires the `time` feature for the `time::OffsetDateTime` representation.
-    /// Without `time`, stores the ISO-8601 string value unchanged.
+    pub enddatum: Option<time::Date>,
+    /// Requires the `time` feature for the `time::Date` representation.
+    /// Without `time`, stores the ISO 8601 date string (`YYYY-MM-DD`) unchanged.
     #[cfg_attr(feature = "serde", serde(rename = "enddatum"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "serde", serde(default))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     #[cfg_attr(
         feature = "schemars",
-        schemars(schema_with = "crate::schema_helpers::opt_datetime_schema")
+        schemars(schema_with = "crate::schema_helpers::opt_date_schema")
     )]
     #[cfg(not(feature = "time"))]
     pub enddatum: Option<String>,
@@ -83,23 +83,23 @@ pub struct Zeitraum {
     #[cfg_attr(feature = "serde", serde(default))]
     #[cfg_attr(
         feature = "schemars",
-        schemars(schema_with = "crate::schema_helpers::opt_datetime_schema")
+        schemars(schema_with = "crate::schema_helpers::opt_date_schema")
     )]
     #[cfg_attr(
         all(feature = "serde", feature = "time"),
-        serde(with = "time::serde::rfc3339::option")
+        serde(with = "crate::time_serde::opt_date_serde")
     )]
     #[cfg(feature = "time")]
-    pub startdatum: Option<time::OffsetDateTime>,
-    /// Requires the `time` feature for the `time::OffsetDateTime` representation.
-    /// Without `time`, stores the ISO-8601 string value unchanged.
+    pub startdatum: Option<time::Date>,
+    /// Requires the `time` feature for the `time::Date` representation.
+    /// Without `time`, stores the ISO 8601 date string (`YYYY-MM-DD`) unchanged.
     #[cfg_attr(feature = "serde", serde(rename = "startdatum"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "serde", serde(default))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     #[cfg_attr(
         feature = "schemars",
-        schemars(schema_with = "crate::schema_helpers::opt_datetime_schema")
+        schemars(schema_with = "crate::schema_helpers::opt_date_schema")
     )]
     #[cfg(not(feature = "time"))]
     pub startdatum: Option<String>,
@@ -144,9 +144,7 @@ impl crate::json::Bo4eJsonExt for Zeitraum {}
 #[cfg(feature = "json")]
 impl crate::json::Bo4eExtensionData for Zeitraum {
     fn extension_data(&self) -> &indexmap::IndexMap<String, serde_json::Value> {
-        self._additional
-            .as_map()
-            .unwrap_or(&crate::json::extension::EMPTY_EXTENSION_MAP)
+        self._additional.as_map().unwrap_or(&crate::json::extension::EMPTY_EXTENSION_MAP)
     }
     fn has_extension_data(&self) -> bool {
         !self._additional.is_empty()

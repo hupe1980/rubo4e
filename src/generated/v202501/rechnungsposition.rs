@@ -1,5 +1,6 @@
 use super::{
-    BdewArtikelnummer, Betrag, ComTyp, Menge, Mengeneinheit, Preis, Steuerbetrag, ZusatzAttribut,
+    BdewArtikelnummer, Betrag, ComTyp, Menge, Mengeneinheit, Preis, Steuerbetrag,
+    ZusatzAttribut,
 };
 #[derive(Debug, Clone, PartialEq, Default)]
 #[cfg_attr(not(feature = "json"), derive(Hash))]
@@ -39,11 +40,55 @@ pub struct Rechnungsposition {
     #[cfg_attr(feature = "serde", serde(rename = "lieferungBis"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "serde", serde(default))]
+    #[cfg_attr(
+        feature = "schemars",
+        schemars(schema_with = "crate::schema_helpers::opt_datetime_schema")
+    )]
+    #[cfg_attr(
+        all(feature = "serde", feature = "time"),
+        serde(with = "time::serde::rfc3339::option")
+    )]
+    #[cfg(feature = "time")]
+    pub lieferung_bis: Option<time::OffsetDateTime>,
+    /// Requires the `time` feature for the `time::OffsetDateTime` representation.
+    /// Without `time`, stores the ISO-8601 string value unchanged.
+    #[cfg_attr(feature = "serde", serde(rename = "lieferungBis"))]
+    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
+    #[cfg_attr(feature = "serde", serde(default))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(
+        feature = "schemars",
+        schemars(schema_with = "crate::schema_helpers::opt_datetime_schema")
+    )]
+    #[cfg(not(feature = "time"))]
     pub lieferung_bis: Option<String>,
     /// Start der Lieferung für die abgerechnete Leistung (inklusiv)
     #[cfg_attr(feature = "serde", serde(rename = "lieferungVon"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "serde", serde(default))]
+    #[cfg_attr(
+        feature = "schemars",
+        schemars(schema_with = "crate::schema_helpers::opt_datetime_schema")
+    )]
+    #[cfg_attr(
+        all(feature = "serde", feature = "time"),
+        serde(with = "time::serde::rfc3339::option")
+    )]
+    #[cfg(feature = "time")]
+    pub lieferung_von: Option<time::OffsetDateTime>,
+    /// Requires the `time` feature for the `time::OffsetDateTime` representation.
+    /// Without `time`, stores the ISO-8601 string value unchanged.
+    #[cfg_attr(feature = "serde", serde(rename = "lieferungVon"))]
+    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
+    #[cfg_attr(feature = "serde", serde(default))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(
+        feature = "schemars",
+        schemars(schema_with = "crate::schema_helpers::opt_datetime_schema")
+    )]
+    #[cfg(not(feature = "time"))]
     pub lieferung_von: Option<String>,
     /// Marktlokation, die zu dieser Position gehört
     #[cfg_attr(feature = "serde", serde(rename = "lokationsId"))]
@@ -126,9 +171,7 @@ impl crate::json::Bo4eJsonExt for Rechnungsposition {}
 #[cfg(feature = "json")]
 impl crate::json::Bo4eExtensionData for Rechnungsposition {
     fn extension_data(&self) -> &indexmap::IndexMap<String, serde_json::Value> {
-        self._additional
-            .as_map()
-            .unwrap_or(&crate::json::extension::EMPTY_EXTENSION_MAP)
+        self._additional.as_map().unwrap_or(&crate::json::extension::EMPTY_EXTENSION_MAP)
     }
     fn has_extension_data(&self) -> bool {
         !self._additional.is_empty()

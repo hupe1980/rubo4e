@@ -20,6 +20,28 @@ pub struct Angebotsvariante {
     #[cfg_attr(feature = "serde", serde(rename = "bindefrist"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "serde", serde(default))]
+    #[cfg_attr(
+        feature = "schemars",
+        schemars(schema_with = "crate::schema_helpers::opt_datetime_schema")
+    )]
+    #[cfg_attr(
+        all(feature = "serde", feature = "time"),
+        serde(with = "time::serde::rfc3339::option")
+    )]
+    #[cfg(feature = "time")]
+    pub bindefrist: Option<time::OffsetDateTime>,
+    /// Requires the `time` feature for the `time::OffsetDateTime` representation.
+    /// Without `time`, stores the ISO-8601 string value unchanged.
+    #[cfg_attr(feature = "serde", serde(rename = "bindefrist"))]
+    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
+    #[cfg_attr(feature = "serde", serde(default))]
+    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(
+        feature = "schemars",
+        schemars(schema_with = "crate::schema_helpers::opt_datetime_schema")
+    )]
+    #[cfg(not(feature = "time"))]
     pub bindefrist: Option<String>,
     /// Datum der Erstellung der Angebotsvariante
     #[cfg_attr(feature = "serde", serde(rename = "erstellungsdatum"))]
@@ -104,9 +126,7 @@ impl crate::json::Bo4eJsonExt for Angebotsvariante {}
 #[cfg(feature = "json")]
 impl crate::json::Bo4eExtensionData for Angebotsvariante {
     fn extension_data(&self) -> &indexmap::IndexMap<String, serde_json::Value> {
-        self._additional
-            .as_map()
-            .unwrap_or(&crate::json::extension::EMPTY_EXTENSION_MAP)
+        self._additional.as_map().unwrap_or(&crate::json::extension::EMPTY_EXTENSION_MAP)
     }
     fn has_extension_data(&self) -> bool {
         !self._additional.is_empty()
