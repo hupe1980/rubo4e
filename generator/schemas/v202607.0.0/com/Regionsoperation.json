@@ -1,0 +1,157 @@
+{
+    "additionalProperties": true,
+    "description": "Komponente zur Abbildung einer Regionsoperation.\n\nIn Kombination mit anderen Regionsoperationen kann eine Region definiert werden. Eine Regionsoperation ermöglicht\ndie Definition einer Region in eingeschränkter Form. Durch den Operator können mehrere \"einfache\" Regionsoperationen\nmiteinander kombiniert werden, um eine komplexere Region zu definieren.\n\n.. raw:: html\n\n    <object data=\"../_static/images/bo4e/com/Regionsoperation.svg\" type=\"image/svg+xml\"></object>\n\n.. HINT::\n    `Regionsoperation JSON Schema <https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/com/Regionsoperation.json>`_",
+    "properties": {
+        "_id": {
+            "anyOf": [
+                {
+                    "type": "string"
+                },
+                {
+                    "type": "null"
+                }
+            ],
+            "default": null,
+            "description": "Eine generische ID, die für eigene Zwecke genutzt werden kann.\nZ.B. könnten hier UUIDs aus einer Datenbank stehen oder URLs zu einem Backend-System.",
+            "title": "Id"
+        },
+        "_typ": {
+            "const": "REGIONSOPERATION",
+            "default": "REGIONSOPERATION",
+            "title": "Typ",
+            "type": "string"
+        },
+        "_version": {
+            "anyOf": [
+                {
+                    "type": "string"
+                },
+                {
+                    "type": "null"
+                }
+            ],
+            "default": "202607.0.0",
+            "description": "Version der COM-Struktur aka \"fachliche Versionierung\"",
+            "title": "Version"
+        },
+        "bezeichnung": {
+            "anyOf": [
+                {
+                    "type": "string"
+                },
+                {
+                    "type": "null"
+                }
+            ],
+            "default": null,
+            "description": "(auch IDs und PLZ möglich)",
+            "title": "Bezeichnung"
+        },
+        "bezeichnung2": {
+            "anyOf": [
+                {
+                    "type": "string"
+                },
+                {
+                    "type": "null"
+                }
+            ],
+            "default": null,
+            "description": "(TODO: bessere Benamung! geht vor allem um Postort: PLZ & Ort als Schnittmenge)",
+            "title": "Bezeichnung2"
+        },
+        "prioritaet": {
+            "anyOf": [
+                {
+                    "type": "integer"
+                },
+                {
+                    "type": "null"
+                }
+            ],
+            "default": null,
+            "description": "Priorität dieser Regionsoperation. Theoretisch sind Listen in JSON sortiert, jedoch ist eine solche Sortierung\neventuell implementierungsbedingt fehleranfällig. Daher nutzen wir dieses Feld. angefangen bei 1 (höchste Priorität) und aufsteigend",
+            "title": "Prioritaet"
+        },
+        "radiusInKm": {
+            "anyOf": [
+                {
+                    "format": "decimal",
+                    "type": "number"
+                },
+                {
+                    "type": "null"
+                }
+            ],
+            "default": null,
+            "description": "(inklusiv)",
+            "title": "Radiusinkm"
+        },
+        "regionskriterium": {
+            "anyOf": [
+                {
+                    "$ref": "https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/enum/Regionskriterium.json"
+                },
+                {
+                    "type": "null"
+                }
+            ],
+            "default": null,
+            "description": "(ehemals Regionskriteriumtyp)]"
+        },
+        "regionsoperator": {
+            "anyOf": [
+                {
+                    "$ref": "https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/enum/Operator.json"
+                },
+                {
+                    "type": "null"
+                }
+            ],
+            "default": null
+        },
+        "wertBis": {
+            "anyOf": [
+                {
+                    "type": "string"
+                },
+                {
+                    "type": "null"
+                }
+            ],
+            "default": null,
+            "description": "(inklusiv)",
+            "title": "Wertbis"
+        },
+        "wertVon": {
+            "anyOf": [
+                {
+                    "type": "string"
+                },
+                {
+                    "type": "null"
+                }
+            ],
+            "default": null,
+            "description": "(inklusiv)",
+            "title": "Wertvon"
+        },
+        "zusatzAttribute": {
+            "anyOf": [
+                {
+                    "items": {
+                        "$ref": "https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/ZusatzAttribut.json"
+                    },
+                    "type": "array"
+                },
+                {
+                    "type": "null"
+                }
+            ],
+            "default": null,
+            "title": "Zusatzattribute"
+        }
+    },
+    "title": "Regionsoperation",
+    "type": "object"
+}

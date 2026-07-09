@@ -9,7 +9,7 @@
 
 use rubo4e::{
     json::Bo4eJsonExt,
-    v202501::{Adresse, Menge, Mengeneinheit, Sparte, Vertrag},
+    v202607::{Adresse, Menge, Mengeneinheit, Sparte, Vertrag},
 };
 use rust_decimal::Decimal;
 use std::str::FromStr;

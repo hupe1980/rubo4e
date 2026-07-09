@@ -4,7 +4,7 @@
 
 #[cfg(feature = "versioned")]
 mod serde_tests {
-    use rubo4e::v202501::{BoTyp, Vertrag};
+    use rubo4e::v202607::{BoTyp, Vertrag};
 
     /// E04-S21: A freshly constructed `Vertrag` with `_typ = BoTyp::Vertrag` must
     /// serialize to JSON that contains `"_typ":"VERTRAG"`.
@@ -51,7 +51,7 @@ mod serde_tests {
     /// the resulting JSON should not break recipients expecting a valid enum string.
     #[test]
     fn unknown_variant_serializes_as_screaming_case() {
-        use rubo4e::v202501::Sparte;
+        use rubo4e::v202607::Sparte;
 
         // Deserialize an unknown enum value → Unknown variant.
         let sparte: Sparte = serde_json::from_str(r#""FUTURE_VALUE""#)
@@ -70,7 +70,7 @@ mod serde_tests {
     /// the `Unknown` variant without panic, and re-serializes as `"UNKNOWN"`.
     #[test]
     fn unknown_enum_round_trip() {
-        use rubo4e::v202501::Sparte;
+        use rubo4e::v202607::Sparte;
 
         let sparte: Sparte =
             serde_json::from_str(r#""SOME_FUTURE_SPARTE""#).expect("deserialize failed");
@@ -92,7 +92,7 @@ mod serde_tests {
 /// intact via the extension-data catch-all (requires `json` feature).
 #[cfg(all(feature = "versioned", feature = "json"))]
 mod extension_data_tests {
-    use rubo4e::{json::Bo4eExtensionData, json::Bo4eJsonExt, v202501::Vertrag};
+    use rubo4e::{json::Bo4eExtensionData, json::Bo4eJsonExt, v202607::Vertrag};
 
     /// A single unknown field round-trips through deserialize → re-serialize.
     #[test]

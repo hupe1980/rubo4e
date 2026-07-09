@@ -15,7 +15,7 @@ mod utoipa_tests {
 
     #[test]
     fn bo_types_implement_to_schema() {
-        use rubo4e::v202501::*;
+        use rubo4e::v202607::*;
 
         // Business Objects
         assert_to_schema::<Vertrag>();
@@ -30,7 +30,7 @@ mod utoipa_tests {
 
     #[test]
     fn com_types_implement_to_schema() {
-        use rubo4e::v202501::*;
+        use rubo4e::v202607::*;
 
         // Components
         assert_to_schema::<Adresse>();
@@ -42,7 +42,7 @@ mod utoipa_tests {
 
     #[test]
     fn enum_types_implement_to_schema() {
-        use rubo4e::v202501::*;
+        use rubo4e::v202607::*;
 
         assert_to_schema::<Sparte>();
         assert_to_schema::<BoTyp>();

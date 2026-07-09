@@ -1,0 +1,82 @@
+{
+    "additionalProperties": true,
+    "description": "Modelliert eine Umschaltzeit, wann auf ein bestimmtes Register geschaltet werden soll.\n\n.. raw:: html\n\n    <object data=\"../_static/images/bo4e/com/Umschaltzeit.svg\" type=\"image/svg+xml\"></object>\n\n.. HINT::\n    `Umschaltzeit JSON Schema <https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/com/Umschaltzeit.json>`_",
+    "properties": {
+        "_id": {
+            "anyOf": [
+                {
+                    "type": "string"
+                },
+                {
+                    "type": "null"
+                }
+            ],
+            "default": null,
+            "description": "Eine generische ID, die für eigene Zwecke genutzt werden kann.\nZ.B. könnten hier UUIDs aus einer Datenbank stehen oder URLs zu einem Backend-System.",
+            "title": "Id"
+        },
+        "_typ": {
+            "const": "UMSCHALTZEIT",
+            "default": "UMSCHALTZEIT",
+            "title": "Typ",
+            "type": "string"
+        },
+        "_version": {
+            "anyOf": [
+                {
+                    "type": "string"
+                },
+                {
+                    "type": "null"
+                }
+            ],
+            "default": "202607.0.0",
+            "description": "Version der COM-Struktur aka \"fachliche Versionierung\"",
+            "title": "Version"
+        },
+        "registercode": {
+            "anyOf": [
+                {
+                    "type": "string"
+                },
+                {
+                    "type": "null"
+                }
+            ],
+            "default": null,
+            "description": "Ein Code, der ein Register spezifiziert. Typischerweise eine 3-stellige Zeichenkette.",
+            "title": "Registercode"
+        },
+        "umschaltzeit": {
+            "anyOf": [
+                {
+                    "format": "time",
+                    "type": "string"
+                },
+                {
+                    "type": "null"
+                }
+            ],
+            "default": null,
+            "description": "Definiert den Zeitpunkt ab dem auf das Register geschaltet wird, das im Feld `registercode` spezifiziert ist.",
+            "title": "Umschaltzeit"
+        },
+        "zusatzAttribute": {
+            "anyOf": [
+                {
+                    "items": {
+                        "$ref": "https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/ZusatzAttribut.json"
+                    },
+                    "type": "array"
+                },
+                {
+                    "type": "null"
+                }
+            ],
+            "default": null,
+            "title": "Zusatzattribute"
+        }
+    },
+    "title": "Umschaltzeit",
+    "type": "object"
+}

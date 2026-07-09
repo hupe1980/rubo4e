@@ -12,7 +12,7 @@ fn required_field_must_be_supplied() {
     // This exercises the generated builder on a real BO type.
     #[cfg(feature = "versioned")]
     {
-        use rubo4e::v202501::Vertrag;
+        use rubo4e::v202607::Vertrag;
         let _ = Vertrag::builder().build();
     }
 }
@@ -20,7 +20,7 @@ fn required_field_must_be_supplied() {
 #[cfg(all(feature = "builder", feature = "versioned"))]
 #[test]
 fn bo_builder_auto_sets_typ_discriminant() {
-    use rubo4e::v202501::{BoTyp, Vertrag};
+    use rubo4e::v202607::{BoTyp, Vertrag};
 
     let vertrag = Vertrag::builder().build();
     assert_eq!(vertrag.typ, Some(BoTyp::Vertrag));
@@ -35,11 +35,11 @@ fn bo_builder_auto_sets_typ_discriminant() {
 #[cfg(all(feature = "builder", feature = "versioned"))]
 #[test]
 fn builder_setter_into_accepts_option_and_value() {
-    use rubo4e::v202501::Betrag;
+    use rubo4e::v202607::Betrag;
 
     // Use `organisationsname` (always `Option<String>`) as the test field so the
     // assertion is independent of the `decimal` feature flag.
-    use rubo4e::v202501::Geschaeftspartner;
+    use rubo4e::v202607::Geschaeftspartner;
 
     // 1. Passing `T` directly — same ergonomics as the old strip_option.
     let g1 = Geschaeftspartner::builder()
@@ -90,7 +90,7 @@ fn builder_setter_into_accepts_option_and_value() {
 #[cfg(feature = "versioned")]
 #[test]
 fn functional_update_syntax_works() {
-    use rubo4e::v202501::Geschaeftspartner;
+    use rubo4e::v202607::Geschaeftspartner;
 
     // Previously: `error[E0451]: field `_additional` is private`
     // Now: compiles cleanly — the `_additional` field is `pub #[doc(hidden)]`.

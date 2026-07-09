@@ -1,7 +1,7 @@
 use criterion::{criterion_group, criterion_main, BatchSize, BenchmarkId, Criterion, Throughput};
 use rubo4e::{
     json::Bo4eJsonExt,
-    v202501::{Marktlokation, Vertrag},
+    v202607::{Marktlokation, Vertrag},
 };
 use serde_json::Value;
 use std::hint::black_box;

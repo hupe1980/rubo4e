@@ -1,0 +1,79 @@
+{
+    "additionalProperties": true,
+    "description": "Komponente zur Abbildung einer Region mit einer Zeitscheibe.\n\n.. raw:: html\n\n    <object data=\"../_static/images/bo4e/com/Regionszeitscheibe.svg\" type=\"image/svg+xml\"></object>\n\n.. HINT::\n    `Regionszeitscheibe JSON Schema <https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/com/Regionszeitscheibe.json>`_",
+    "properties": {
+        "_id": {
+            "anyOf": [
+                {
+                    "type": "string"
+                },
+                {
+                    "type": "null"
+                }
+            ],
+            "default": null,
+            "description": "Eine generische ID, die für eigene Zwecke genutzt werden kann.\nZ.B. könnten hier UUIDs aus einer Datenbank stehen oder URLs zu einem Backend-System.",
+            "title": "Id"
+        },
+        "_typ": {
+            "const": "REGIONSZEITSCHEIBE",
+            "default": "REGIONSZEITSCHEIBE",
+            "title": "Typ",
+            "type": "string"
+        },
+        "_version": {
+            "anyOf": [
+                {
+                    "type": "string"
+                },
+                {
+                    "type": "null"
+                }
+            ],
+            "default": "202607.0.0",
+            "description": "Version der COM-Struktur aka \"fachliche Versionierung\"",
+            "title": "Version"
+        },
+        "region": {
+            "anyOf": [
+                {
+                    "$ref": "https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/bo/Region.json"
+                },
+                {
+                    "type": "null"
+                }
+            ],
+            "default": null,
+            "description": "Die Region wird durch das Feld `zeitscheibengueltigkeit` mit einer Zeitscheibe versehen."
+        },
+        "zeitscheibengueltigkeit": {
+            "anyOf": [
+                {
+                    "$ref": "https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/com/Zeitraum.json"
+                },
+                {
+                    "type": "null"
+                }
+            ],
+            "default": null,
+            "description": "Versieht die Region mit einer Zeitscheibe. Der Start- und Endzeitpunkt sollte durch das Objekt ermittelbar sein."
+        },
+        "zusatzAttribute": {
+            "anyOf": [
+                {
+                    "items": {
+                        "$ref": "https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/ZusatzAttribut.json"
+                    },
+                    "type": "array"
+                },
+                {
+                    "type": "null"
+                }
+            ],
+            "default": null,
+            "title": "Zusatzattribute"
+        }
+    },
+    "title": "Regionszeitscheibe",
+    "type": "object"
+}

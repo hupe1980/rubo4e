@@ -18,7 +18,7 @@ mod strum_tests {
 
     #[test]
     fn display_produces_variant_name() {
-        use rubo4e::v202501::Sparte;
+        use rubo4e::v202607::Sparte;
         // H-08: strum::Display must produce the canonical BO4E JSON string,
         // identical to what serde serializes — not the Rust PascalCase variant name.
         assert_eq!(Sparte::Strom.to_string(), "STROM");
@@ -29,7 +29,7 @@ mod strum_tests {
 
     #[test]
     fn from_str_roundtrips_known_variants() {
-        use rubo4e::v202501::Sparte;
+        use rubo4e::v202607::Sparte;
         // H-08: FromStr must accept the canonical BO4E JSON strings.
         assert_eq!(Sparte::from_str("STROM").unwrap(), Sparte::Strom);
         assert_eq!(Sparte::from_str("GAS").unwrap(), Sparte::Gas);
@@ -39,14 +39,14 @@ mod strum_tests {
 
     #[test]
     fn unknown_string_returns_variant_not_found() {
-        use rubo4e::v202501::Sparte;
+        use rubo4e::v202607::Sparte;
         let result = Sparte::from_str("Invalid");
         assert_eq!(result, Err(strum::ParseError::VariantNotFound));
     }
 
     #[test]
     fn into_static_str_returns_variant_name() {
-        use rubo4e::v202501::Sparte;
+        use rubo4e::v202607::Sparte;
         // H-08: IntoStaticStr derive adds `From<Sparte> for &'static str`.
         // Use the canonical conversion — no trait import required since it goes
         // through the derived `From` impl, not a method on the `IntoStaticStr` trait.
@@ -56,14 +56,14 @@ mod strum_tests {
 
     #[test]
     fn as_ref_str_returns_variant_name() {
-        use rubo4e::v202501::Sparte;
+        use rubo4e::v202607::Sparte;
         // H-08: AsRef<str> returns the canonical BO4E JSON string.
         assert_eq!(Sparte::Gas.as_ref(), "GAS");
     }
 
     #[test]
     fn enum_iter_includes_all_variants() {
-        use rubo4e::v202501::Sparte;
+        use rubo4e::v202607::Sparte;
         let variants: Vec<Sparte> = Sparte::iter().collect();
         // Must include all known variants and the catch-all Unknown
         assert!(variants.contains(&Sparte::Strom));
@@ -78,7 +78,7 @@ mod strum_tests {
 
     #[test]
     fn enum_iter_works_on_bo_typ() {
-        use rubo4e::v202501::BoTyp;
+        use rubo4e::v202607::BoTyp;
         let variants: Vec<BoTyp> = BoTyp::iter().collect();
         assert!(!variants.is_empty(), "BoTyp should have variants");
         assert!(variants.contains(&BoTyp::Vertrag));
@@ -87,7 +87,7 @@ mod strum_tests {
 
     #[test]
     fn all_sparte_variants_round_trip_display_from_str() {
-        use rubo4e::v202501::Sparte;
+        use rubo4e::v202607::Sparte;
         for variant in Sparte::iter() {
             let displayed = variant.to_string();
             let parsed = Sparte::from_str(&displayed)
@@ -101,7 +101,7 @@ mod strum_tests {
 
     #[test]
     fn iter_known_excludes_unknown() {
-        use rubo4e::v202501::Sparte;
+        use rubo4e::v202607::Sparte;
         let known: Vec<Sparte> = Sparte::iter_known().collect();
         // iter_known() must not include the Unknown catch-all
         assert!(
@@ -128,7 +128,7 @@ mod strum_tests {
 
     #[test]
     fn iter_known_bo_typ_no_unknown() {
-        use rubo4e::v202501::BoTyp;
+        use rubo4e::v202607::BoTyp;
         let known: Vec<BoTyp> = BoTyp::iter_known().collect();
         assert!(
             !known.is_empty(),

@@ -9,11 +9,8 @@ never published to crates.io.
 ## Running the Generator
 
 ```bash
-# Generate from the latest stable schema (v202501.0.0)
-cargo run -p bo4e-generator -- --schema-version v202501.0.0
-
-# Generate from the previous schema series
-cargo run -p bo4e-generator -- --schema-version v202501.0.0
+# Generate from the current stable schema (v202607.0.0)
+cargo run -p bo4e-generator -- --schema-version v202607.0.0
 ```
 
 The generator reads schema files from `generator/schemas/<TAG>/` relative to the workspace
@@ -28,10 +25,8 @@ When BO4E releases a new schema:
 
 1. **Download the schema tag** into `generator/schemas/<NEW_TAG>/`:
    ```bash
-   # Example: v202501.1.0
-   git clone --depth 1 --branch v202501.1.0 \
-     https://github.com/bo4e/BO4E-Schemas \
-     generator/schemas/v202501.1.0
+   # Uses scripts/download_schemas.sh which pulls the release archive from GitHub
+   just download-schemas v202701.0.0
    ```
 2. **Run the generator:**
    ```bash
@@ -56,17 +51,18 @@ When BO4E releases a new schema:
 The generator expects schemas in the layout used by `bo4e/BO4E-Schemas`:
 
 ```
-generator/schemas/v202501.0.0/
-├── BO-Objekte/
+generator/schemas/v202607.0.0/
+├── bo/
 │   ├── Vertrag.json
 │   ├── Marktlokation.json
 │   └── ...
-├── COM/
+├── com/
 │   ├── Adresse.json
 │   └── ...
-└── enum/
-    ├── Sparte.json
-    └── ...
+├── enum/
+│   ├── Sparte.json
+│   └── ...
+└── ZusatzAttribut.json   ← root-level COM (no category subdirectory)
 ```
 
 ---
@@ -178,11 +174,9 @@ This is enforced by:
 CI verifies this with:
 
 ```bash
-cargo run -p bo4e-generator -- --schema-version v202501.0.0
+cargo run -p bo4e-generator -- --schema-version v202607.0.0
 git diff --exit-code src/generated/
 ```
-
-If this step fails, the committed generated code is stale.
 
 ---
 

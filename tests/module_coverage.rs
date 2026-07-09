@@ -35,7 +35,7 @@ mod coverage {
     }
 
     fn count_generated(schema_version_dir: &str, category: &str) -> Option<usize> {
-        // e.g. "v202501" -> src/generated/v202501/
+        // e.g. "v202607" -> src/generated/v202607/
         let dir = workspace_root()
             .join("src/generated")
             .join(schema_version_dir)
@@ -56,16 +56,16 @@ mod coverage {
         )
     }
 
-    /// E05-S22 / E05-S24: v202501 type counts meet minimum CONCEPT.md thresholds.
+    /// E05-S22 / E05-S24: v202607 type counts meet minimum CONCEPT.md thresholds.
     #[test]
-    fn v202501_schema_counts() {
-        let Some(bo_count) = count_schemas("v202501.0.0", "bo") else {
+    fn v202607_schema_counts() {
+        let Some(bo_count) = count_schemas("v202607.0.0", "bo") else {
             return;
         };
-        let Some(com_count) = count_schemas("v202501.0.0", "com") else {
+        let Some(com_count) = count_schemas("v202607.0.0", "com") else {
             return;
         };
-        let Some(enum_count) = count_schemas("v202501.0.0", "enum") else {
+        let Some(enum_count) = count_schemas("v202607.0.0", "enum") else {
             return;
         };
 
@@ -78,23 +78,23 @@ mod coverage {
         );
 
         // Verify generated Rust files match the schema counts.
-        if let Some(gen_bo) = count_generated("v202501", "bo") {
-            assert_eq!(gen_bo, bo_count, "v202501 generated BO count ({gen_bo}) != schema count ({bo_count}); run `just generate`");
+        if let Some(gen_bo) = count_generated("v202607", "bo") {
+            assert_eq!(gen_bo, bo_count, "v202607 generated BO count ({gen_bo}) != schema count ({bo_count}); run `just generate`");
         }
-        if let Some(gen_com) = count_generated("v202501", "com") {
-            assert_eq!(gen_com, com_count, "v202501 generated COM count ({gen_com}) != schema count ({com_count}); run `just generate`");
+        if let Some(gen_com) = count_generated("v202607", "com") {
+            assert_eq!(gen_com, com_count, "v202607 generated COM count ({gen_com}) != schema count ({com_count}); run `just generate`");
         }
-        if let Some(gen_enum) = count_generated("v202501", "enum") {
-            assert_eq!(gen_enum, enum_count, "v202501 generated enum count ({gen_enum}) != schema count ({enum_count}); run `just generate`");
+        if let Some(gen_enum) = count_generated("v202607", "enum") {
+            assert_eq!(gen_enum, enum_count, "v202607 generated enum count ({gen_enum}) != schema count ({enum_count}); run `just generate`");
         }
     }
 
-    /// E05-S22: `rubo4e::v202501` is accessible as the current version module.
+    /// E05-S22: `rubo4e::v202607` is accessible as the current version module.
     /// Compile-time test — if this doesn't compile, the feature gate is broken.
     #[test]
-    fn v202501_is_current_version() {
-        // `rubo4e::v202501` is the current latest stable version
-        let _: rubo4e::v202501::Vertrag = rubo4e::v202501::Vertrag::default();
+    fn v202607_is_current_version() {
+        // `rubo4e::v202607` is the current latest stable version
+        let _: rubo4e::v202607::Vertrag = rubo4e::v202607::Vertrag::default();
     }
 
     /// E05-S25: No `v202402` schema directory exists.

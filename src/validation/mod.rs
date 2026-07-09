@@ -11,7 +11,7 @@
 //!
 //! ```rust,ignore
 //! use rubo4e::validation::Validated;
-//! use rubo4e::v202501::Marktlokation;
+//! use rubo4e::v202607::Marktlokation;
 //!
 //! let melo: Marktlokation = /* ... */;
 //! let validated = Validated::new(melo)?;  // Err(garde::Report) if invariants violated
@@ -53,7 +53,7 @@
 ///
 /// ```rust,ignore
 /// # use rubo4e::validation::Validated;
-/// # use rubo4e::v202501::Marktlokation;
+/// # use rubo4e::v202607::Marktlokation;
 /// let malo = Marktlokation::default();
 /// match Validated::new(malo) {
 ///     Ok(v)  => println!("valid: {:?}", v.lokations_id),
@@ -111,7 +111,7 @@ impl<T: serde::Serialize> serde::Serialize for Validated<T> {
     }
 }
 
-/// Stamps out a validation sub-module for a given schema version (e.g. `v202501`).
+/// Stamps out a validation sub-module for a given schema version (e.g. `v202607`).
 ///
 /// Each version gets its own `pub mod $ver { … }` so that future schema changes
 /// (renamed fields, new rules) can diverge independently per version without
@@ -198,7 +198,8 @@ macro_rules! impl_validators {
             ///    `Some`, all three must be present (partial amounts are not checkable).
             /// 2. When all three totals are present:
             ///    `gesamtnetto + gesamtsteuer == gesamtbrutto`
-            /// 3. `gesamtbrutto - vorausgezahlt - rabatt_brutto == zu_zahlen`
+            /// 3. When `gesamtbrutto` and `zu_zahlen` are both present:
+            ///    `gesamtbrutto - rabatt_netto - sum(vorauszahlungen) == zu_zahlen`
             ///
             /// The arithmetic checks are gated on the `decimal` feature; without it
             /// `Betrag.wert` is `Option<String>` and numeric comparison is unsafe.
@@ -210,14 +211,13 @@ macro_rules! impl_validators {
                     let wert =
                         |b: &Option<Betrag>| -> Option<Decimal> { b.as_ref().and_then(|b| b.wert) };
 
-                    // I-8 (M-09): Currency-mismatch guard.
+                    // Currency-mismatch guard — all monetary fields must use the same Waehrungscode.
                     let waehrung = |b: &Option<Betrag>| b.as_ref().and_then(|b| b.waehrung);
                     let currencies = [
                         ("gesamtnetto", waehrung(&v.gesamtnetto)),
                         ("gesamtsteuer", waehrung(&v.gesamtsteuer)),
                         ("gesamtbrutto", waehrung(&v.gesamtbrutto)),
-                        ("vorausgezahlt", waehrung(&v.vorausgezahlt)),
-                        ("rabatt_brutto", waehrung(&v.rabatt_brutto)),
+                        ("rabatt_netto", waehrung(&v.rabatt_netto)),
                         ("zu_zahlen", waehrung(&v.zu_zahlen)),
                     ];
                     let mut first_currency = None;
@@ -264,14 +264,22 @@ macro_rules! impl_validators {
                         }
                     }
 
+                    // zu_zahlen = gesamtbrutto - rabatt_netto - sum(vorauszahlungen)
                     if let (Some(b), Some(z)) = (wert(&v.gesamtbrutto), wert(&v.zu_zahlen)) {
-                        let expected = b
-                            - wert(&v.vorausgezahlt).unwrap_or(Decimal::ZERO)
-                            - wert(&v.rabatt_brutto).unwrap_or(Decimal::ZERO);
+                        let rabatt = wert(&v.rabatt_netto).unwrap_or(Decimal::ZERO);
+                        let vorauszahlungen: Decimal = v
+                            .vorauszahlungen
+                            .as_deref()
+                            .unwrap_or_default()
+                            .iter()
+                            .filter_map(|p| p.betrag.as_ref().and_then(|b| b.wert))
+                            .fold(Decimal::ZERO, |acc, v| acc + v);
+                        let expected = b - rabatt - vorauszahlungen;
                         if expected != z {
                             return Err(garde::Error::new(format!(
-                                "gesamtbrutto - vorausgezahlt - rabatt_brutto \
-                                 ({expected}) must equal zu_zahlen ({z})"
+                                "gesamtbrutto ({b}) - rabatt_netto ({rabatt}) \
+                                 - vorauszahlungen ({vorauszahlungen}) = {expected}, \
+                                 but zu_zahlen is {z}"
                             )));
                         }
                     }
@@ -349,7 +357,7 @@ macro_rules! impl_validators {
 }
 
 #[cfg(feature = "versioned")]
-impl_validators!(v202501);
+impl_validators!(v202607);
 
 /// A single structured validation failure, extracted from a [`garde::Report`].
 ///
@@ -376,7 +384,7 @@ pub struct ValidationFailure {
 /// # Example
 /// ```rust,ignore
 /// use rubo4e::validation::{Validated, report_errors};
-/// use rubo4e::v202501::Marktlokation;
+/// use rubo4e::v202607::Marktlokation;
 ///
 /// let malo = Marktlokation::default();
 /// if let Err(report) = Validated::new(malo) {

@@ -1,6 +1,6 @@
 # Schema Versioning
 
-`rubo4e` exposes a single stable BO4E schema series (`v202501`), compiled
+`rubo4e` exposes a single stable BO4E schema series (`v202607`), compiled
 conditionally behind the `versioned` feature flag.
 
 ---
@@ -10,9 +10,9 @@ conditionally behind the `versioned` feature flag.
 With the `versioned` feature enabled:
 
 ```rust
-rubo4e::v202501::Vertrag       // v202501 series — pinned, stable across crate updates
-rubo4e::v202501::Adresse
-rubo4e::v202501::Sparte
+rubo4e::v202607::Vertrag       // v202607 series — pinned, stable across crate updates
+rubo4e::v202607::Adresse
+rubo4e::v202607::Sparte
 
 rubo4e::current::Vertrag       // moving alias — always the latest stable series
 ```
@@ -25,33 +25,28 @@ feature set (`serde` only) does not include versioned types.
 ## Feature Gate
 
 ```toml
-# Enable version modules (no external deps; controls conditional compilation only)
-rubo4e = { version = "...", features = ["versioned"] }
+# Enable version modules (pure conditional-compilation; no external deps)
+rubo4e = { version = "0.4", features = ["versioned"] }
 ```
-
-This is a **pure conditional-compilation flag**.  Enabling `versioned` makes the
-compiler include the `v202501` module.  No external dependencies are added.
 
 ---
 
 ## Known Schema Series
 
-| Series  | Pinned tag    | Status                              |
-|---------|---------------|-------------------------------------|
-| v202501 | v202501.0.0   | Current stable; released April 2025 |
+| Series  | Pinned tag    | Status          | Released     |
+|---------|---------------|-----------------|--------------|
+| v202607 | v202607.0.0   | Current stable  | July 2026    |
 
-### Versioning Scheme Explained
+### Versioning Scheme
 
-BO4E uses `vYYYYMM.minor.patch`.  The `MM` component is always `01` — it
-represents the release cycle, not the calendar month.  Module names use the
-`vYYYYMM` prefix only:
+BO4E uses `vYYYYMM.minor.patch`.  Module names use the `vYYYYMM` prefix only:
 
 ```
-v202501.0.0  →  module: v202501
-v202601.0.0  →  module: v202601
+v202607.0.0  →  module: v202607
+v202701.0.0  →  module: v202701   (hypothetical next series)
 ```
 
-Within a series, minor/patch bumps (e.g. `v202501.0.0` → `v202501.1.0`) are
+Within a series, minor/patch bumps (e.g. `v202607.0.0` → `v202607.1.0`) are
 additive.  The generator pins the full semver tag for reproducibility but exposes
 only the series prefix in the public API.
 
@@ -64,44 +59,47 @@ series.  Use it when you always want the newest types and do not need to pin to 
 specific version.
 
 ```rust
-use rubo4e::current::Vertrag;   // equivalent to rubo4e::v202501::Vertrag today
+use rubo4e::current::Vertrag;   // equivalent to rubo4e::v202607::Vertrag today
 ```
 
-Pin to a concrete module (`rubo4e::v202501`) if you need version-stability across
-crate updates:
+Pin to a concrete module if you need version-stability across crate updates:
 
 ```rust
-use rubo4e::v202501::Vertrag;   // stable even if rubo4e::current advances
+use rubo4e::v202607::Vertrag;   // stable even if rubo4e::current advances
 ```
 
 ---
 
 ## Adding a New Schema Version
 
-When a new BO4E schema release arrives (e.g. `v202601.0.0`) with new or changed types:
+When a new BO4E schema release arrives with new or changed types:
 
-1. Download the schema snapshot:
+1. **Download the schema snapshot** using the provided script:
+   ```bash
+   just download-schemas v202701.0.0
    ```
-   just download-schemas v202601.0.0
+2. **Run the generator:**
+   ```bash
+   just generate v202701.0.0
    ```
-2. Run the generator targeting the new version:
-   ```
-   just generate v202601.0.0
-   ```
-3. The generator writes `src/generated/v202601/` and appends `pub mod v202601;`
-   to `src/generated/mod.rs`.
+3. The generator writes `src/generated/v202701/` with all types and automatically
+   updates `src/generated/mod.rs` (by re-scanning the directory — no manual edit
+   needed).
 4. In `src/lib.rs`, add a versioned re-export module:
    ```rust
    #[cfg(feature = "versioned")]
-   pub mod v202601 {
-       pub use crate::generated::v202601::*;
+   pub mod v202701 {
+       pub use crate::generated::v202701::*;
    }
    ```
 5. Advance the `current` alias:
    ```rust
-   pub use v202601 as current;  // was: v202501
+   pub use v202701 as current;  // was: v202607
    ```
-6. Update the Known Schema Series table in this document.
+6. Update the convenience module (`src/convenience.rs`) if schema-breaking changes
+   require updating field references (e.g. renamed fields in `Rechnung`,
+   `Rechnungsposition`).
+7. Update the Known Schema Series table in this document.
 
 ---
 
@@ -109,3 +107,22 @@ When a new BO4E schema release arrives (e.g. `v202601.0.0`) with new or changed 
 
 COM and enum types live inside the versioned module alongside BO types.  They
 follow exactly the same conditional-compilation rules.
+
+---
+
+## Schema Breaking Changes
+
+The BO4E annual format-version cutover can introduce breaking changes.  Examples
+of what changed between series:
+
+| v202501 → v202607 | Change |
+|-------------------|--------|
+| `Rechnungsposition.lieferung_von` / `lieferung_bis` | Removed; replaced by `lieferungszeitraum: Zeitraum` |
+| `Rechnungsposition.teilsumme_netto` | Renamed to `gesamtpreis` |
+| `Rechnung.vorausgezahlt` / `rabatt_brutto` / `zu_zahlen` | Removed or restructured |
+| `Tarif.registeranzahl` / `sparte` / `tariftyp` | Changed from optional to required |
+| 14 types removed, 20 new types added | See schema diff in `generator/schemas/` |
+
+The generator's `STRUCT_FIELD_MAP` in `inference.rs` can override schema-declared
+types (e.g. fixing upstream `"format": "date-time"` fields that BDEW uses as
+date-only).

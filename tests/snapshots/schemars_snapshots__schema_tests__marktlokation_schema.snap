@@ -5,7 +5,7 @@ expression: "schema_json::<Marktlokation>()"
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Marktlokation",
-  "description": "Object containing information about a Marktlokation\n\n> **Note:** [Marktlokation JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202501.0.0/src/bo4e_schemas/bo/Marktlokation.json)",
+  "description": "Object containing information about a Marktlokation\n\n> **Note:** [Marktlokation JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/bo/Marktlokation.json)",
   "type": "object",
   "properties": {
     "_id": {
@@ -115,13 +115,6 @@ expression: "schema_json::<Marktlokation>()"
         {
           "type": "null"
         }
-      ]
-    },
-    "istUnterbrechbar": {
-      "description": "Gibt an, ob es sich um eine unterbrechbare Belieferung handelt",
-      "type": [
-        "boolean",
-        "null"
       ]
     },
     "katasterinformation": {
@@ -263,7 +256,7 @@ expression: "schema_json::<Marktlokation>()"
         "null"
       ],
       "items": {
-        "$ref": "#/$defs/Verbrauch"
+        "$ref": "#/$defs/Energiemenge"
       }
     },
     "zaehlwerke": {
@@ -321,7 +314,7 @@ expression: "schema_json::<Marktlokation>()"
       ]
     },
     "Adresse": {
-      "description": "Contains an address that can be used for most purposes.\n\n> **Note:** [Adresse JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202501.0.0/src/bo4e_schemas/com/Adresse.json)",
+      "description": "Contains an address that can be used for most purposes.\n\n> **Note:** [Adresse JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/com/Adresse.json)",
       "type": "object",
       "properties": {
         "_id": {
@@ -525,7 +518,6 @@ expression: "schema_json::<Marktlokation>()"
             "PREISBLATTUMLAGEN",
             "RECHNUNG",
             "REGION",
-            "REGIONALTARIF",
             "STANDORTEIGENSCHAFTEN",
             "TARIF",
             "TARIFINFO",
@@ -533,6 +525,7 @@ expression: "schema_json::<Marktlokation>()"
             "TARIFPREISBLATT",
             "VERTRAG",
             "ZAEHLER",
+            "ZAEHLZEITDEFINITION",
             "ZEITREIHE",
             "LOKATIONSZUORDNUNG"
           ]
@@ -555,13 +548,11 @@ expression: "schema_json::<Marktlokation>()"
             "ANGEBOTSTEIL",
             "ANGEBOTSVARIANTE",
             "AUFABSCHLAG",
-            "AUFABSCHLAGPROORT",
-            "AUFABSCHLAGREGIONAL",
-            "AUFABSCHLAGSTAFFELPROORT",
             "AUSSCHREIBUNGSDETAIL",
             "AUSSCHREIBUNGSLOS",
             "BETRAG",
             "DIENSTLEISTUNG",
+            "EINHEITSPREISPOSITION",
             "ENERGIEHERKUNFT",
             "ENERGIEMIX",
             "FREMDKOSTENBLOCK",
@@ -573,22 +564,20 @@ expression: "schema_json::<Marktlokation>()"
             "KONZESSIONSABGABE",
             "KOSTENBLOCK",
             "KOSTENPOSITION",
-            "KRITERIUMWERT",
             "LASTPROFIL",
+            "LASTVARIABLEPREISPOSITION",
             "MARKTGEBIETINFO",
             "MENGE",
-            "POSITIONSAUFABSCHLAG",
+            "MESSWERT",
             "PREIS",
             "PREISGARANTIE",
             "PREISPOSITION",
             "PREISSTAFFEL",
             "RECHNUNGSPOSITION",
-            "REGIONALEGUELTIGKEIT",
-            "REGIONALEPREISGARANTIE",
-            "REGIONALEPREISSTAFFEL",
-            "REGIONALERAUFABSCHLAG",
-            "REGIONALETARIFPREISPOSITION",
-            "REGIONSKRITERIUM",
+            "REGIONSOPERATION",
+            "REGIONSPREIS",
+            "REGIONSZEITSCHEIBE",
+            "RELATIVEPREISPOSITION",
             "SIGMOIDPARAMETER",
             "STANDORTEIGENSCHAFTENGAS",
             "STANDORTEIGENSCHAFTENSTROM",
@@ -598,17 +587,21 @@ expression: "schema_json::<Marktlokation>()"
             "TARIFEINSCHRAENKUNG",
             "TARIFPREIS",
             "TARIFPREISPOSITION",
-            "TARIFPREISPOSITIONPROORT",
-            "TARIFPREISSTAFFELPROORT",
+            "TARIFPREISZEITSCHEIBE",
+            "UMSCHALTZEIT",
             "UNTERSCHRIFT",
-            "VERBRAUCH",
             "VERTRAGSKONDITIONEN",
             "VERTRAGSTEIL",
             "VERWENDUNGSZWECKPROMARKTROLLE",
+            "VORAUSZAHLUNG",
             "ZAEHLWERK",
             "ZAEHLZEITREGISTER",
+            "ZAEHLZEITSAISON",
+            "ZAEHLZEITTAGTYP",
+            "ZAHLUNGSINFORMATION",
             "ZEITRAUM",
             "ZEITREIHENWERT",
+            "ZEITVARIABLEPREISPOSITION",
             "ZUSTAENDIGKEIT"
           ]
         },
@@ -620,7 +613,7 @@ expression: "schema_json::<Marktlokation>()"
       ]
     },
     "Dienstleistung": {
-      "description": "Abbildung einer abrechenbaren Dienstleistung.\n\n> **Note:** [Dienstleistung JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202501.0.0/src/bo4e_schemas/com/Dienstleistung.json)",
+      "description": "Abbildung einer abrechenbaren Dienstleistung.\n\n> **Note:** [Dienstleistung JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/com/Dienstleistung.json)",
       "type": "object",
       "properties": {
         "_id": {
@@ -750,6 +743,87 @@ expression: "schema_json::<Marktlokation>()"
       "description": "Energy Identification Code (EIC): 16-character code issued by ENTSO-E.\n\nStructure:\n- Positions 1–2:  Local Issuing Office (LIO) identifier (alphanumeric)\n- Position 3:     EIC type character (`A`, `T`, `V`, `W`, `X`, `Y`, or `Z`)\n- Positions 4–15: LIO-specific code body (alphanumeric or `-` as padding)\n- Position 16:    Check character computed by the ENTSO-E algorithm\n\n# Domain\n\nUse [`EicCode::domain`] to query whether this code is an Area or Party code.\nUse [`EicCode::type_char`] to get the raw type character (position 3).\n\n# Examples\n```\nuse rubo4e::identifiers::{EicCode, EicDomain};\n\n// 10YDE-EON------1 = E.ON Germany control area (type Y = Area).\nlet area = EicCode::new(\"10YDE-EON------1\").expect(\"valid area EIC\");\nassert_eq!(area.domain(), EicDomain::Area);\nassert_eq!(area.type_char(), 'Y');\n```",
       "type": "string"
     },
+    "Energiemenge": {
+      "description": "Abbildung von Mengen, die Lokationen zugeordnet sind\n\n> **Note:** [Energiemenge JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/bo/Energiemenge.json)",
+      "type": "object",
+      "properties": {
+        "_id": {
+          "description": "Eine generische ID, die für eigene Zwecke genutzt werden kann.\nZ.B. könnten hier UUIDs aus einer Datenbank stehen oder URLs zu einem Backend-System.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "_typ": {
+          "description": "BO type identifier — always `BoTyp::Energiemenge` for this struct.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BoTyp"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "_version": {
+          "description": "Version der BO-Struktur aka \"fachliche Versionierung\"",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "beschreibung": {
+          "description": "Ergänzende Beschreibung zur Energiemenge",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "menge": {
+          "description": "Die angefallene/gemessene Menge",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Menge"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "obisKennzahl": {
+          "description": "Die OBIS-Kennzahl der Energiemenge",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ObisCode"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "zeitraum": {
+          "description": "Zeitraum, in dem die Energiemenge angefallen ist/gemessen wurde",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Zeitraum"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "zusatzAttribute": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/$defs/ZusatzAttribut"
+          }
+        }
+      },
+      "additionalProperties": true
+    },
     "Energierichtung": {
       "description": "Spezifiziert die Energierichtung einer Markt- und/oder Messlokation",
       "oneOf": [
@@ -838,7 +912,7 @@ expression: "schema_json::<Marktlokation>()"
       ]
     },
     "Geokoordinaten": {
-      "description": "This component provides the geo-coordinates for a location.\n\n> **Note:** [Geokoordinaten JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202501.0.0/src/bo4e_schemas/com/Geokoordinaten.json)",
+      "description": "This component provides the geo-coordinates for a location.\n\n> **Note:** [Geokoordinaten JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/com/Geokoordinaten.json)",
       "type": "object",
       "properties": {
         "_id": {
@@ -895,7 +969,7 @@ expression: "schema_json::<Marktlokation>()"
       "additionalProperties": true
     },
     "Geraet": {
-      "description": "Mit diesem BO werden alle Geräte modelliert, die keine Zähler sind.\n\n> **Note:** [Geraet JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202501.0.0/src/bo4e_schemas/bo/Geraet.json)",
+      "description": "Mit diesem BO werden alle Geräte modelliert, die keine Zähler sind.\n\n> **Note:** [Geraet JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/bo/Geraet.json)",
       "type": "object",
       "properties": {
         "_id": {
@@ -1055,7 +1129,7 @@ expression: "schema_json::<Marktlokation>()"
       ]
     },
     "Geschaeftspartner": {
-      "description": "Mit diesem Objekt können Geschäftspartner übertragen werden.\nSowohl Unternehmen, als auch Privatpersonen können Geschäftspartner sein.\nHinweis: \"Marktteilnehmer\" haben ein eigenes BO, welches sich von diesem BO ableitet.\nHier sollte daher keine Zuordnung zu Marktrollen erfolgen.\n\n> **Note:** [Geschaeftspartner JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202501.0.0/src/bo4e_schemas/bo/Geschaeftspartner.json)",
+      "description": "Mit diesem Objekt können Geschäftspartner übertragen werden.\nSowohl Unternehmen, als auch Privatpersonen können Geschäftspartner sein.\nHinweis: \"Marktteilnehmer\" haben ein eigenes BO, welches sich von diesem BO ableitet.\nHier sollte daher keine Zuordnung zu Marktrollen erfolgen.\n\n> **Note:** [Geschaeftspartner JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/bo/Geschaeftspartner.json)",
       "type": "object",
       "properties": {
         "_id": {
@@ -1252,7 +1326,7 @@ expression: "schema_json::<Marktlokation>()"
       ]
     },
     "Katasteradresse": {
-      "description": "Dient der Adressierung über die Liegenschafts-Information.\n\n> **Note:** [Katasteradresse JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202501.0.0/src/bo4e_schemas/com/Katasteradresse.json)",
+      "description": "Dient der Adressierung über die Liegenschafts-Information.\n\n> **Note:** [Katasteradresse JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/com/Katasteradresse.json)",
       "type": "object",
       "properties": {
         "_id": {
@@ -1305,7 +1379,7 @@ expression: "schema_json::<Marktlokation>()"
       "additionalProperties": true
     },
     "Konfigurationsprodukt": {
-      "description": "Object containing information about a Konfigurationsprodukt\n\n> **Note:** [Konfigurationsprodukt JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202501.0.0/src/bo4e_schemas/bo/Konfigurationsprodukt.json)",
+      "description": "Object containing information about a Konfigurationsprodukt\n\n> **Note:** [Konfigurationsprodukt JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/bo/Konfigurationsprodukt.json)",
       "type": "object",
       "properties": {
         "_id": {
@@ -1394,7 +1468,7 @@ expression: "schema_json::<Marktlokation>()"
       ]
     },
     "Kontaktweg": {
-      "description": "Die Komponente wird dazu verwendet, die Kontaktwege innerhalb des BOs Person darzustellen\n\n> **Note:** [Kontakt JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202501.0.0/src/bo4e_schemas/com/Kontakt.json)",
+      "description": "Die Komponente wird dazu verwendet, die Kontaktwege innerhalb des BOs Person darzustellen\n\n> **Note:** [Kontakt JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/com/Kontakt.json)",
       "type": "object",
       "properties": {
         "_id": {
@@ -1469,7 +1543,7 @@ expression: "schema_json::<Marktlokation>()"
       "additionalProperties": true
     },
     "Konzessionsabgabe": {
-      "description": "Diese Komponente wird zur Übertagung der Details zu einer Konzessionsabgabe verwendet.\n\n> **Note:** [Konzessionsabgabe JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202501.0.0/src/bo4e_schemas/com/Konzessionsabgabe.json)",
+      "description": "Diese Komponente wird zur Übertagung der Details zu einer Konzessionsabgabe verwendet.\n\n> **Note:** [Konzessionsabgabe JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/com/Konzessionsabgabe.json)",
       "type": "object",
       "properties": {
         "_id": {
@@ -1831,7 +1905,7 @@ expression: "schema_json::<Marktlokation>()"
       ]
     },
     "Lokationszuordnung": {
-      "description": "Modell für die Abbildung der Referenz auf die Lokationsbündelstruktur. Diese gibt an welche Marktlokationen,\nMesslokationen, Netzlokationen, technische/steuerbaren Ressourcen an einer Lokation vorhanden sind.\n\n> **Note:** [Lokationszuordnung JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202501.0.0/src/bo4e_schemas/bo/Lokationszuordnung.json)",
+      "description": "Modell für die Abbildung der Referenz auf die Lokationsbündelstruktur. Diese gibt an welche Marktlokationen,\nMesslokationen, Netzlokationen, technische/steuerbaren Ressourcen an einer Lokation vorhanden sind.\n\n> **Note:** [Lokationszuordnung JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/bo/Lokationszuordnung.json)",
       "type": "object",
       "properties": {
         "_id": {
@@ -1928,7 +2002,7 @@ expression: "schema_json::<Marktlokation>()"
           }
         },
         "zuordnungstyp": {
-          "description": "Verknüpfungsrichtung z.B. Malo-Melo",
+          "description": "Verknüpfungsrichtung z.B. Malo-Melo [TODO: Eventuell anderer Datentyp]",
           "type": [
             "string",
             "null"
@@ -1991,7 +2065,7 @@ expression: "schema_json::<Marktlokation>()"
       ]
     },
     "Marktteilnehmer": {
-      "description": "Objekt zur Aufnahme der Information zu einem Marktteilnehmer\n\n> **Note:** [Marktteilnehmer JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202501.0.0/src/bo4e_schemas/bo/Marktteilnehmer.json)",
+      "description": "Objekt zur Aufnahme der Information zu einem Marktteilnehmer\n\n> **Note:** [Marktteilnehmer JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/bo/Marktteilnehmer.json)",
       "type": "object",
       "properties": {
         "_id": {
@@ -2105,7 +2179,7 @@ expression: "schema_json::<Marktlokation>()"
       "pattern": "^[A-Z]{2}[A-Za-z0-9]{31}$"
     },
     "Menge": {
-      "description": "Abbildung einer Menge mit Wert und Einheit.\n\n> **Note:** [Menge JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202501.0.0/src/bo4e_schemas/com/Menge.json)",
+      "description": "Abbildung einer Menge mit Wert und Einheit.\n\n> **Note:** [Menge JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/com/Menge.json)",
       "type": "object",
       "properties": {
         "_id": {
@@ -2205,7 +2279,7 @@ expression: "schema_json::<Marktlokation>()"
       ]
     },
     "Messlokation": {
-      "description": "Object containing information about a Messlokation\n\n> **Note:** [Messlokation JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202501.0.0/src/bo4e_schemas/bo/Messlokation.json)",
+      "description": "Object containing information about a Messlokation\n\n> **Note:** [Messlokation JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/bo/Messlokation.json)",
       "type": "object",
       "properties": {
         "_id": {
@@ -2387,22 +2461,87 @@ expression: "schema_json::<Marktlokation>()"
       },
       "additionalProperties": true
     },
-    "Messwerterfassung": {
-      "description": "Die Messwerterfassung des Zählers",
-      "oneOf": [
-        {
-          "type": "string",
-          "enum": [
-            "FERNAUSLESBAR",
-            "MANUELL_AUSGELESENE"
+    "Messwert": {
+      "description": "Abbildung eines Messwertes mit Stati, Zeitpunkt und Wert.\n\n> **Note:** [Messwert JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/com/Messwert.json)",
+      "type": "object",
+      "properties": {
+        "_id": {
+          "description": "Eine generische ID, die für eigene Zwecke genutzt werden kann.\nZ.B. könnten hier UUIDs aus einer Datenbank stehen oder URLs zu einem Backend-System.",
+          "type": [
+            "string",
+            "null"
           ]
         },
-        {
-          "description": "Unknown or future variant — produced when deserializing a value\nthat is not yet known to this version of the library.",
-          "type": "string",
-          "const": "UNKNOWN"
+        "_typ": {
+          "description": "COM type identifier for this struct.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ComTyp"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "_version": {
+          "description": "Version der COM-Struktur aka \"fachliche Versionierung\"",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "messwertstatus": {
+          "description": "Gibt den Status des Messwerts an.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Messwertstatus"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "messwertstatuszusatz": {
+          "description": "Gibt den Status Zusatz des Messwerts an.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Messwertstatuszusatz"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "wert": {
+          "description": "Gibt die gemessene Menge an.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Menge"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "zeitpunkt": {
+          "description": "Gibt den Zeitpunkt des Messwerts an.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "zusatzAttribute": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/$defs/ZusatzAttribut"
+          }
         }
-      ]
+      },
+      "additionalProperties": true
     },
     "Messwertstatus": {
       "description": "Der Status eines Zählerstandes",
@@ -2419,6 +2558,60 @@ expression: "schema_json::<Marktlokation>()"
             "VORLAEUFIGERWERT",
             "ENERGIEMENGESUMMIERT",
             "FEHLT"
+          ]
+        },
+        {
+          "description": "Unknown or future variant — produced when deserializing a value\nthat is not yet known to this version of the library.",
+          "type": "string",
+          "const": "UNKNOWN"
+        }
+      ]
+    },
+    "Messwertstatuszusatz": {
+      "description": "Aufzählung von zusätzlichen Informationen zum Status, beispielsweise in Lastgängen oder Zählwerkständen.",
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "Z84_LEERSTAND",
+            "Z85_REALERZAEHLERUEBERLAUFGEPRUEFT",
+            "Z86_PLAUSIBELWGKONTROLLABLESUNG",
+            "Z87_PLAUSIBELWGKUNDENHINWEIS",
+            "ZC3_AUSTAUSCHDESERSATZWERTES",
+            "Z88_VERGLEICHSMESSUNG(GEEICHT)",
+            "Z89_VERGLEICHSMESSUNG(NICHTGEEICHT)",
+            "Z90_MESSWERTNACHBILDUNGAUSGEEICHTENWERTEN",
+            "Z91_MESSWERTNACHBILDUNGAUSNICHTGEEICHTENWERTEN",
+            "Z92_INTERPOLATION",
+            "Z93_HALTEWERT",
+            "Z94_BILANZIERUNGNETZABSCHNITT",
+            "Z95_HISTORISCHEMESSWERTE",
+            "ZJ2_STATISTISCHEMETHODE",
+            "Z74_KEINZUGANG",
+            "Z75_KOMMUNIKATIONSSTOERUNG",
+            "Z76_NETZAUSFALL",
+            "Z77_SPANNUNGSAUSFALL",
+            "Z78_GERAETEWECHSEL",
+            "Z79_KALIBRIERUNG",
+            "Z80_GERAETARBEITETAUSSERHALBDERBETRIEBSBEDINGUNGEN",
+            "Z81_MESSEINRICHTUNGGESTOERT_DEFEKT",
+            "Z82_UNSICHERHEITMESSUNG",
+            "Z98_BERUECKSICHTIGUNGSTOERMENGENZAEHLWERK",
+            "Z99_MENGENUMWERTUNGUNVOLLSTAENDIG",
+            "ZA0_UHRZEITGESTELLT_SYNCHRONISATION",
+            "ZA1_MESSWERTUNPLAUSIBEL",
+            "ZC2_TARIFSCHALTGERAETDEFEKT",
+            "ZC4_IMPULSWERTIGKEITNICHTAUSREICHEND",
+            "ZA3_FALSCHERWANDLERFAKTOR",
+            "ZA4_FEHLERHAFTEABLESUNG",
+            "ZA5_AENDERUNGDERBERECHNUNG",
+            "ZA6_UMBAUDERMESSLOKATION",
+            "ZA7_DATENBEARBEITUNGSFEHLER",
+            "ZA8_BRENNWERTKORREKTUR",
+            "ZA9_Z-ZAHL-KORREKTUR",
+            "ZB0_STOERUNG_DEFEKTMESSEINRICHTUNG",
+            "ZB9_AENDERUNGTARIFSCHALTZEITEN",
+            "ZG3_UMSTELLUNGGASQUALITAET"
           ]
         },
         {
@@ -2458,7 +2651,7 @@ expression: "schema_json::<Marktlokation>()"
       ]
     },
     "Netzlokation": {
-      "description": "Object containing information about a Netzlokation\n\n> **Note:** [Netzlokation JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202501.0.0/src/bo4e_schemas/bo/Netzlokation.json)",
+      "description": "Object containing information about a Netzlokation\n\n> **Note:** [Netzlokation JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/bo/Netzlokation.json)",
       "type": "object",
       "properties": {
         "_id": {
@@ -2629,7 +2822,7 @@ expression: "schema_json::<Marktlokation>()"
       ]
     },
     "Person": {
-      "description": "Object containing information about a Person\n\n> **Note:** [Person JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202501.0.0/src/bo4e_schemas/bo/Person.json)",
+      "description": "Object containing information about a Person\n\n> **Note:** [Person JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/bo/Person.json)",
       "type": "object",
       "properties": {
         "_id": {
@@ -2840,7 +3033,7 @@ expression: "schema_json::<Marktlokation>()"
       "type": "string"
     },
     "SteuerbareRessource": {
-      "description": "Object containing information about a steuerbare Ressource\n\n> **Note:** [SteuerbareRessource JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202501.0.0/src/bo4e_schemas/bo/SteuerbareRessource.json)",
+      "description": "Object containing information about a steuerbare Ressource\n\n> **Note:** [SteuerbareRessource JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/bo/SteuerbareRessource.json)",
       "type": "object",
       "properties": {
         "_id": {
@@ -2969,7 +3162,7 @@ expression: "schema_json::<Marktlokation>()"
       ]
     },
     "TechnischeRessource": {
-      "description": "Object containing information about a technische Ressource\n\n> **Note:** [TechnischeRessource JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202501.0.0/src/bo4e_schemas/bo/TechnischeRessource.json)",
+      "description": "Object containing information about a technische Ressource\n\n> **Note:** [TechnischeRessource JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/bo/TechnischeRessource.json)",
       "type": "object",
       "properties": {
         "_id": {
@@ -3017,6 +3210,20 @@ expression: "schema_json::<Marktlokation>()"
             {
               "type": "null"
             }
+          ]
+        },
+        "istFernschaltbar": {
+          "description": "Fernschaltbarkeit",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "istUnterbrechbar": {
+          "description": "Unterbrechbarkeit",
+          "type": [
+            "boolean",
+            "null"
           ]
         },
         "lokationsbuendelObjektcode": {
@@ -3292,105 +3499,6 @@ expression: "schema_json::<Marktlokation>()"
       "description": "Technische-Ressource-ID (TR-ID): 11-digit string validated by BDEW checksum.\n\nUses the same alternating-weight checksum algorithm as [`MaloId`](super::MaloId).",
       "type": "string"
     },
-    "Verbrauch": {
-      "description": "Abbildung eines zeitlich abgegrenzten Verbrauchs\n\n> **Note:** [Verbrauch JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202501.0.0/src/bo4e_schemas/com/Verbrauch.json)",
-      "type": "object",
-      "properties": {
-        "_id": {
-          "description": "Eine generische ID, die für eigene Zwecke genutzt werden kann.\nZ.B. könnten hier UUIDs aus einer Datenbank stehen oder URLs zu einem Backend-System.",
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "_typ": {
-          "description": "COM type identifier for this struct.",
-          "anyOf": [
-            {
-              "$ref": "#/$defs/ComTyp"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "_version": {
-          "description": "Version der COM-Struktur aka \"fachliche Versionierung\"",
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "einheit": {
-          "description": "Gibt die Einheit zum jeweiligen Wert an",
-          "anyOf": [
-            {
-              "$ref": "#/$defs/Mengeneinheit"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "enddatum": {
-          "description": "Exklusives Ende des Zeitraumes, für den der Verbrauch angegeben wird",
-          "type": [
-            "string",
-            "null"
-          ],
-          "format": "date-time"
-        },
-        "messwertstatus": {
-          "description": "Messwertstatus includes the plausibility of the value",
-          "anyOf": [
-            {
-              "$ref": "#/$defs/Messwertstatus"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "obisKennzahl": {
-          "description": "Die OBIS-Kennzahl für den Wert, die festlegt, welche Größe mit dem Stand gemeldet wird, z.B. '1-0:",
-          "anyOf": [
-            {
-              "$ref": "#/$defs/ObisCode"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "startdatum": {
-          "description": "Inklusiver Beginn des Zeitraumes, für den der Verbrauch angegeben wird",
-          "type": [
-            "string",
-            "null"
-          ],
-          "format": "date-time"
-        },
-        "wert": {
-          "description": "Gibt den absoluten Wert der Menge an",
-          "type": [
-            "string",
-            "number",
-            "null"
-          ],
-          "pattern": "^-?\\d+(\\.\\d+)?([eE]\\d+)?$"
-        },
-        "zusatzAttribute": {
-          "type": [
-            "array",
-            "null"
-          ],
-          "items": {
-            "$ref": "#/$defs/ZusatzAttribut"
-          }
-        }
-      },
-      "additionalProperties": true
-    },
     "Verbrauchsart": {
       "description": "Verbrauchsart einer Marktlokation.",
       "oneOf": [
@@ -3433,7 +3541,7 @@ expression: "schema_json::<Marktlokation>()"
       ]
     },
     "VerwendungszweckProMarktrolle": {
-      "description": "Dient zur Identifizierung des Verwendungszwecks der Marktrolle an der Marktlokation, der die Werte zu übermitteln sind.\n\n> **Note:** [Verwendungszweck JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202501.0.0/src/bo4e_schemas/com/Verwendungszweck.json)",
+      "description": "Dient zur Identifizierung des Verwendungszwecks der Marktrolle an der Marktlokation, der die Werte zu übermitteln sind.\n\n> **Note:** [VerwendungszweckProMarktrolle JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/com/VerwendungszweckProMarktrolle.json)",
       "type": "object",
       "properties": {
         "_id": {
@@ -3513,7 +3621,7 @@ expression: "schema_json::<Marktlokation>()"
       ]
     },
     "Zaehler": {
-      "description": "Object containing information about a meter/\"Zaehler\".\n\n> **Note:** [Zaehler JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202501.0.0/src/bo4e_schemas/bo/Zaehler.json)",
+      "description": "Object containing information about a meter/\"Zaehler\".\n\n> **Note:** [Zaehler JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/bo/Zaehler.json)",
       "type": "object",
       "properties": {
         "_id": {
@@ -3570,8 +3678,8 @@ expression: "schema_json::<Marktlokation>()"
             "$ref": "#/$defs/Geraet"
           }
         },
-        "istFernschaltbar": {
-          "description": "Fernschaltung",
+        "istFernauslesbar": {
+          "description": "Fernauslesung",
           "type": [
             "boolean",
             "null"
@@ -3584,17 +3692,6 @@ expression: "schema_json::<Marktlokation>()"
             "null"
           ],
           "format": "date-time"
-        },
-        "messwerterfassung": {
-          "description": "Messwerterfassung des Zählers",
-          "anyOf": [
-            {
-              "$ref": "#/$defs/Messwerterfassung"
-            },
-            {
-              "type": "null"
-            }
-          ]
         },
         "registeranzahl": {
           "description": "Spezifikation bezüglich unterstützter Tarif",
@@ -3812,7 +3909,7 @@ expression: "schema_json::<Marktlokation>()"
       ]
     },
     "Zaehlwerk": {
-      "description": "Mit dieser Komponente werden Zählwerke modelliert.\n\n> **Note:** [Zaehlwerk JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202501.0.0/src/bo4e_schemas/com/Zaehlwerk.json)",
+      "description": "Mit dieser Komponente werden Zählwerke modelliert.\n\n> **Note:** [Zaehlwerk JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/com/Zaehlwerk.json)",
       "type": "object",
       "properties": {
         "_id": {
@@ -3887,13 +3984,6 @@ expression: "schema_json::<Marktlokation>()"
             "null"
           ]
         },
-        "istUnterbrechbar": {
-          "description": "Unterbrechbarkeit Marktlokation",
-          "type": [
-            "boolean",
-            "null"
-          ]
-        },
         "konzessionsabgabe": {
           "description": "Konzessionsabgabe",
           "anyOf": [
@@ -3904,6 +3994,16 @@ expression: "schema_json::<Marktlokation>()"
               "type": "null"
             }
           ]
+        },
+        "messwerte": {
+          "description": "Gemessene Werte des Zählwerks",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/$defs/Messwert"
+          }
         },
         "nachkommastelle": {
           "description": "Anzahl der Nachkommastellen",
@@ -4015,7 +4115,7 @@ expression: "schema_json::<Marktlokation>()"
       "additionalProperties": true
     },
     "Zaehlzeitregister": {
-      "description": "Mit dieser Komponente werden Zählzeitregister modelliert. Ein Zählzeitregister beschreibt eine erweiterte Definition der Zählzeit\nin Bezug auf ein Register. Dabei werden alle Codes dazu vom Netzbetreiber vergeben.\n\n> **Note:** [Zaehlzeitregister JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202501.0.0/src/bo4e_schemas/com/Zaehlzeitregister.json)",
+      "description": "Mit dieser Komponente werden Zählzeitregister modelliert. Ein Zählzeitregister beschreibt eine erweiterte Definition der Zählzeit\nin Bezug auf ein Register. Dabei werden alle Codes dazu vom Netzbetreiber vergeben.\n\n> **Note:** [Zaehlzeitregister JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/com/Zaehlzeitregister.json)",
       "type": "object",
       "properties": {
         "_id": {
@@ -4077,7 +4177,7 @@ expression: "schema_json::<Marktlokation>()"
       "additionalProperties": true
     },
     "Zeitraum": {
-      "description": "Diese Komponente wird zur Abbildung von Zeiträumen in Form von Dauern oder der Angabe von Start und Ende verwendet.\nEs muss daher eine der drei Möglichkeiten angegeben sein:\n- Einheit und Dauer oder\n- Zeitraum: Startdatum bis Enddatum oder\n- Zeitraum: Startzeitpunkt (Datum und Uhrzeit) bis Endzeitpunkt (Datum und Uhrzeit)\n\n> **Note:** [Zeitraum JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202501.0.0/src/bo4e_schemas/com/Zeitraum.json)",
+      "description": "Diese Komponente wird zur Abbildung von Zeiträumen in Form von Dauern oder der Angabe von Start und Ende verwendet.\nEs muss daher eine der drei Möglichkeiten angegeben sein:\n- Einheit und Dauer oder\n- Zeitraum: Startdatum bis Enddatum oder\n- Zeitraum: Startzeitpunkt (Datum und Uhrzeit) bis Endzeitpunkt (Datum und Uhrzeit)\n\n> **Note:** [Zeitraum JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/com/Zeitraum.json)",
       "type": "object",
       "properties": {
         "_id": {
@@ -4155,7 +4255,7 @@ expression: "schema_json::<Marktlokation>()"
       "additionalProperties": true
     },
     "ZusatzAttribut": {
-      "description": "Viele Datenobjekte weisen in unterschiedlichen Systemen eine eindeutige ID (Kundennummer, GP-Nummer etc.) auf.\nBeim Austausch von Datenobjekten zwischen verschiedenen Systemen ist es daher hilfreich,\nsich die eindeutigen IDs der anzubindenden Systeme zu merken.\n\n> **Note:** [ZusatzAttribut JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202501.0.0/src/bo4e_schemas/ZusatzAttribut.json)",
+      "description": "Viele Datenobjekte weisen in unterschiedlichen Systemen eine eindeutige ID (Kundennummer, GP-Nummer etc.) auf.\nBeim Austausch von Datenobjekten zwischen verschiedenen Systemen ist es daher hilfreich,\nsich die eindeutigen IDs der anzubindenden Systeme zu merken.\n\n> **Note:** [ZusatzAttribut JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/ZusatzAttribut.json)",
       "type": "object",
       "properties": {
         "name": {
@@ -4169,7 +4269,7 @@ expression: "schema_json::<Marktlokation>()"
       "additionalProperties": true
     },
     "Zustaendigkeit": {
-      "description": "Enthält die zeitliche Zuordnung eines Ansprechpartners zu Abteilungen und Zuständigkeiten.\n\n> **Note:** [Zustaendigkeit JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202501.0.0/src/bo4e_schemas/com/Zustaendigkeit.json)",
+      "description": "Enthält die zeitliche Zuordnung eines Ansprechpartners zu Abteilungen und Zuständigkeiten.\n\n> **Note:** [Zustaendigkeit JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/com/Zustaendigkeit.json)",
       "type": "object",
       "properties": {
         "_id": {

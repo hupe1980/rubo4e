@@ -14,7 +14,7 @@
 
 #[cfg(all(feature = "json", feature = "versioned"))]
 mod golden_tests {
-    use rubo4e::v202501::{Marktlokation, Messlokation, Netzlokation, Rechnung, Vertrag};
+    use rubo4e::v202607::{Marktlokation, Messlokation, Netzlokation, Rechnung, Vertrag};
 
     macro_rules! golden_roundtrip {
         ($name:ident, $ty:ty, $file:literal) => {

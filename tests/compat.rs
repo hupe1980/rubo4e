@@ -13,7 +13,7 @@
 
 #[cfg(all(feature = "json", feature = "versioned"))]
 mod compat_tests {
-    use rubo4e::v202501::{Marktlokation, Messlokation, Rechnung, Vertrag};
+    use rubo4e::v202607::{Marktlokation, Messlokation, Rechnung, Vertrag};
 
     // ── Python vectors ────────────────────────────────────────────────────────
 

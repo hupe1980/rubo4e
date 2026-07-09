@@ -5,7 +5,7 @@
 
 use rubo4e::{
     json::Bo4eJsonExt,
-    v202501::{Bilanzierungsmethode, Energierichtung, Marktlokation, Menge, Mengeneinheit, Sparte},
+    v202607::{Bilanzierungsmethode, Energierichtung, Marktlokation, Menge, Mengeneinheit, Sparte},
 };
 use rust_decimal::Decimal;
 use std::str::FromStr;

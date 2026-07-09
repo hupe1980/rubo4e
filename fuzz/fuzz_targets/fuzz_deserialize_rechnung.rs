@@ -8,10 +8,10 @@ fuzz_target!(|data: &[u8]| {
     // Rechnung has complex arithmetic invariants (multi-Betrag cross-field checks), making
     // it a high-value target for fuzzing: malformed or edge-case decimal values should
     // never panic — only produce Err.
-    let _ = serde_json::from_slice::<rubo4e::v202501::Rechnung>(data);
+    let _ = serde_json::from_slice::<rubo4e::v202607::Rechnung>(data);
 
     if let Ok(s) = std::str::from_utf8(data) {
-        let _ = rubo4e::v202501::Rechnung::from_json_german_hardened(
+        let _ = rubo4e::v202607::Rechnung::from_json_german_hardened(
             s,
             JsonParseLimits::untrusted_defaults(),
         );

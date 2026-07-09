@@ -64,23 +64,23 @@ fn generate_one(schema_version: &str, category: &str, file_stem: &str) -> String
 
 /// `Menge` is a small, stable COM type — a good canary for emitter changes.
 #[test]
-fn v202501_menge_snapshot() {
-    let generated = generate_one("v202501.0.0", "com", "Menge");
-    let expected = load_snapshot("v202501_menge.rs");
+fn v202607_menge_snapshot() {
+    let generated = generate_one("v202607.0.0", "com", "Menge");
+    let expected = load_snapshot("v202607_menge.rs");
     if generated != expected {
         eprintln!("=== EXPECTED ===\n{expected}\n=== GENERATED ===\n{generated}");
         panic!(
             "Generator output for Menge changed!\n\
-             If this is intentional, update generator/tests/snapshots/v202501_menge.rs."
+             If this is intentional, update generator/tests/snapshots/v202607_menge.rs."
         );
     }
 }
 
 /// Smoke-test: every schema in v202501 must parse without error.
 #[test]
-fn v202501_all_schemas_parse() {
+fn v202607_all_schemas_parse() {
     let root = workspace_root();
-    let schema_root = root.join("generator/schemas/v202501.0.0");
+    let schema_root = root.join("generator/schemas/v202607.0.0");
     let mut total = 0usize;
 
     for category in ["bo", "com", "enum"] {
@@ -100,17 +100,17 @@ fn v202501_all_schemas_parse() {
     }
 
     assert!(
-        total >= 192,
-        "expected at least 192 schema nodes, got {total}"
+        total >= 191,
+        "expected at least 191 schema nodes, got {total}"
     );
 }
 
 /// Smoke-test: every parsed schema node must emit valid Rust source (no panics,
 /// no emitter errors) for v202501.
 #[test]
-fn v202501_all_schemas_emit() {
+fn v202607_all_schemas_emit() {
     let root = workspace_root();
-    let schema_root = root.join("generator/schemas/v202501.0.0");
+    let schema_root = root.join("generator/schemas/v202607.0.0");
     let mut nodes = Vec::new();
 
     for category in ["bo", "com", "enum"] {
@@ -132,7 +132,7 @@ fn v202501_all_schemas_emit() {
     let errors: Vec<String> = nodes
         .iter()
         .filter_map(|n| {
-            emitter::emit_node(n, "v202501.0.0")
+            emitter::emit_node(n, "v202607.0.0")
                 .err()
                 .map(|e| format!("{}: {e}", n.name()))
         })
@@ -143,16 +143,16 @@ fn v202501_all_schemas_emit() {
 
 // ─── AST shape tests ───────────────────────────────────────────────────────
 
-/// Verifies that `Vertrag.json` from v202501.0.0 parses into the expected AST shape.
+/// Verifies that `Vertrag.json` from v202607.0.0 parses into the expected AST shape.
 ///
 /// This test guards against parser regressions: if a field is silently dropped or its
 /// type inference changes, the assertion will catch it.
 #[test]
-fn v202501_vertrag_ast_shape() {
+fn v202607_vertrag_ast_shape() {
     use bo4e_generator::ast::{FieldType, PrimitiveType, SchemaNode};
 
     let root = workspace_root();
-    let bo_dir = root.join("generator/schemas/v202501.0.0/bo");
+    let bo_dir = root.join("generator/schemas/v202607.0.0/bo");
     let nodes = parser::parse_dir(&bo_dir).expect("parse bo dir");
 
     let vertrag = nodes
@@ -226,18 +226,18 @@ fn v202501_vertrag_ast_shape() {
 // ─── Inference audit ───────────────────────────────────────────────────────
 
 /// Verifies that the inference table correctly maps specific high-value fields
-/// across the real v202501.0.0 BO/COM schemas, guarding against regressions
+/// across the real v202607.0.0 BO/COM schemas, guarding against regressions
 /// where a schema change or parser update silently switches a field's type.
 ///
 /// Covers: identifier newtypes, OffsetDateTime, Decimal, and JsonValue fields.
 /// When a field is not present in a schema, the test simply skips it — this
 /// keeps the test forward-compatible with schema versions that drop optional fields.
 #[test]
-fn v202501_inference_audit() {
+fn v202607_inference_audit() {
     use bo4e_generator::ast::{FieldType, PrimitiveType, SchemaNode};
 
     let root = workspace_root();
-    let schema_root = root.join("generator/schemas/v202501.0.0");
+    let schema_root = root.join("generator/schemas/v202607.0.0");
 
     // Collect all BO and COM nodes.
     let mut nodes: Vec<SchemaNode> = Vec::new();
@@ -420,7 +420,7 @@ fn v202501_inference_audit() {
 
 // ─── Unknown-variant guard ─────────────────────────────────────────────────
 
-/// Asserts that no BO4E v202501.0.0 enum schema defines a variant literally
+/// Asserts that no BO4E v202607.0.0 enum schema defines a variant literally
 /// named `"UNKNOWN"`.
 ///
 /// The generated catch-all `Unknown` variant serializes as `"UNKNOWN"` — this
@@ -428,11 +428,11 @@ fn v202501_inference_audit() {
 /// runs at test time so any future schema addition of `"UNKNOWN"` is caught
 /// immediately rather than causing silent data-loss or misrouted dispatch.
 #[test]
-fn v202501_no_enum_schema_has_unknown_variant() {
+fn v202607_no_enum_schema_has_unknown_variant() {
     use bo4e_generator::ast::SchemaNode;
 
     let root = workspace_root();
-    let enum_dir = root.join("generator/schemas/v202501.0.0/enum");
+    let enum_dir = root.join("generator/schemas/v202607.0.0/enum");
 
     let nodes = parser::parse_dir(&enum_dir).expect("parse enum dir");
 

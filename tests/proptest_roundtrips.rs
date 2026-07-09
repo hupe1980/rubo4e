@@ -208,13 +208,13 @@ mod enum_roundtrips {
     use std::str::FromStr;
     use strum::IntoEnumIterator as _;
 
-    fn any_sparte() -> impl Strategy<Value = rubo4e::v202501::Sparte> {
-        let variants: Vec<_> = rubo4e::v202501::Sparte::iter().collect();
+    fn any_sparte() -> impl Strategy<Value = rubo4e::v202607::Sparte> {
+        let variants: Vec<_> = rubo4e::v202607::Sparte::iter().collect();
         proptest::sample::select(variants)
     }
 
-    fn any_bo_typ() -> impl Strategy<Value = rubo4e::v202501::BoTyp> {
-        let variants: Vec<_> = rubo4e::v202501::BoTyp::iter().collect();
+    fn any_bo_typ() -> impl Strategy<Value = rubo4e::v202607::BoTyp> {
+        let variants: Vec<_> = rubo4e::v202607::BoTyp::iter().collect();
         proptest::sample::select(variants)
     }
 
@@ -222,7 +222,7 @@ mod enum_roundtrips {
         #[test]
         fn sparte_display_from_str_roundtrip(variant in any_sparte()) {
             let displayed = variant.to_string();
-            let parsed = rubo4e::v202501::Sparte::from_str(&displayed)
+            let parsed = rubo4e::v202607::Sparte::from_str(&displayed)
                 .expect("Sparte::from_str should succeed for any Display output");
             prop_assert_eq!(variant, parsed);
         }
@@ -230,7 +230,7 @@ mod enum_roundtrips {
         #[test]
         fn bo_typ_display_from_str_roundtrip(variant in any_bo_typ()) {
             let displayed = variant.to_string();
-            let parsed = rubo4e::v202501::BoTyp::from_str(&displayed)
+            let parsed = rubo4e::v202607::BoTyp::from_str(&displayed)
                 .expect("BoTyp::from_str should succeed for any Display output");
             prop_assert_eq!(variant, parsed);
         }

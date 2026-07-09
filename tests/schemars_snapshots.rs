@@ -23,7 +23,7 @@ mod schema_tests {
     /// Full content is snapshot-tested via insta below.
     #[test]
     fn schemas_are_non_empty() {
-        use rubo4e::v202501::{Marktlokation, Rechnung, Sparte, Vertrag};
+        use rubo4e::v202607::{Marktlokation, Rechnung, Sparte, Vertrag};
         for schema in [
             schema_json::<Vertrag>(),
             schema_json::<Marktlokation>(),
@@ -41,7 +41,7 @@ mod schema_tests {
 
     #[test]
     fn sparte_schema_is_enum_of_strings() {
-        use rubo4e::v202501::Sparte;
+        use rubo4e::v202607::Sparte;
         let schema = schema_json::<Sparte>();
         // Enum of strings should list known variants
         assert!(
@@ -63,19 +63,19 @@ mod schema_tests {
 
     #[test]
     fn snapshot_vertrag() {
-        use rubo4e::v202501::Vertrag;
+        use rubo4e::v202607::Vertrag;
         insta::assert_snapshot!("vertrag_schema", schema_json::<Vertrag>());
     }
 
     #[test]
     fn snapshot_marktlokation() {
-        use rubo4e::v202501::Marktlokation;
+        use rubo4e::v202607::Marktlokation;
         insta::assert_snapshot!("marktlokation_schema", schema_json::<Marktlokation>());
     }
 
     #[test]
     fn snapshot_sparte() {
-        use rubo4e::v202501::Sparte;
+        use rubo4e::v202607::Sparte;
         insta::assert_snapshot!("sparte_schema", schema_json::<Sparte>());
     }
 }

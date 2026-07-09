@@ -27,7 +27,7 @@ mod identifier_tests {
 #[cfg(all(feature = "validate", feature = "versioned"))]
 mod marktlokation_tests {
     use garde::Validate as _;
-    use rubo4e::v202501::{Adresse, Geokoordinaten, Katasteradresse, Marktlokation};
+    use rubo4e::v202607::{Adresse, Geokoordinaten, Katasteradresse, Marktlokation};
 
     fn base() -> Marktlokation {
         Marktlokation::default()
@@ -92,7 +92,7 @@ mod marktlokation_tests {
 #[cfg(all(feature = "validate", feature = "versioned"))]
 mod messlokation_tests {
     use garde::Validate as _;
-    use rubo4e::v202501::{Adresse, Geokoordinaten, Messlokation};
+    use rubo4e::v202607::{Adresse, Geokoordinaten, Messlokation};
 
     #[test]
     fn xor_messadresse_ok() {
@@ -123,7 +123,7 @@ mod messlokation_tests {
 #[cfg(all(feature = "validate", feature = "versioned", feature = "time"))]
 mod vertrag_tests {
     use garde::Validate as _;
-    use rubo4e::v202501::Vertrag;
+    use rubo4e::v202607::Vertrag;
     use time::OffsetDateTime;
 
     #[test]
@@ -160,7 +160,7 @@ mod vertrag_tests {
 #[cfg(all(feature = "validate", feature = "versioned", feature = "decimal"))]
 mod rechnung_tests {
     use garde::Validate as _;
-    use rubo4e::v202501::{Betrag, Rechnung};
+    use rubo4e::v202607::{Betrag, Rechnung};
     use rust_decimal::prelude::FromStr as _;
     use rust_decimal::Decimal;
 
@@ -181,7 +181,6 @@ mod rechnung_tests {
             gesamtnetto: betrag(dec("100.00")),
             gesamtsteuer: betrag(dec("19.00")),
             gesamtbrutto: betrag(dec("119.00")),
-            zu_zahlen: betrag(dec("119.00")),
             ..Default::default()
         };
         assert!(r.validate().is_ok());
@@ -193,10 +192,65 @@ mod rechnung_tests {
             gesamtnetto: betrag(dec("100.00")),
             gesamtsteuer: betrag(dec("19.00")),
             gesamtbrutto: betrag(dec("120.00")), // off by 1
-            zu_zahlen: betrag(dec("120.00")),
             ..Default::default()
         };
         assert!(r.validate().is_err());
+    }
+
+    #[test]
+    fn partial_totals_fails() {
+        // Only two of the three totals — validation must reject this.
+        let r = Rechnung {
+            gesamtnetto: betrag(dec("100.00")),
+            gesamtsteuer: betrag(dec("19.00")),
+            ..Default::default()
+        };
+        assert!(r.validate().is_err());
+    }
+
+    #[test]
+    fn zu_zahlen_simple_ok() {
+        // no discount, no advance payments → zu_zahlen == gesamtbrutto
+        let r = Rechnung {
+            gesamtnetto: betrag(dec("100.00")),
+            gesamtsteuer: betrag(dec("19.00")),
+            gesamtbrutto: betrag(dec("119.00")),
+            zu_zahlen: betrag(dec("119.00")),
+            ..Default::default()
+        };
+        assert!(r.validate().is_ok());
+    }
+
+    #[test]
+    fn zu_zahlen_with_discount_ok() {
+        // gesamtbrutto 119 - rabatt_netto 10 = 109
+        let r = Rechnung {
+            gesamtnetto: betrag(dec("100.00")),
+            gesamtsteuer: betrag(dec("19.00")),
+            gesamtbrutto: betrag(dec("119.00")),
+            rabatt_netto: betrag(dec("10.00")),
+            zu_zahlen: betrag(dec("109.00")),
+            ..Default::default()
+        };
+        assert!(r.validate().is_ok());
+    }
+
+    #[test]
+    fn zu_zahlen_with_advance_ok() {
+        use rubo4e::v202607::Vorauszahlung;
+        // gesamtbrutto 119 - vorauszahlung 20 = 99
+        let r = Rechnung {
+            gesamtnetto: betrag(dec("100.00")),
+            gesamtsteuer: betrag(dec("19.00")),
+            gesamtbrutto: betrag(dec("119.00")),
+            vorauszahlungen: Some(vec![Vorauszahlung {
+                betrag: betrag(dec("20.00")),
+                ..Default::default()
+            }]),
+            zu_zahlen: betrag(dec("99.00")),
+            ..Default::default()
+        };
+        assert!(r.validate().is_ok());
     }
 
     #[test]
@@ -210,25 +264,12 @@ mod rechnung_tests {
         };
         assert!(r.validate().is_err());
     }
-
-    #[test]
-    fn invoice_with_prepayment_ok() {
-        let r = Rechnung {
-            gesamtnetto: betrag(dec("100.00")),
-            gesamtsteuer: betrag(dec("19.00")),
-            gesamtbrutto: betrag(dec("119.00")),
-            vorausgezahlt: betrag(dec("20.00")),
-            zu_zahlen: betrag(dec("99.00")),
-            ..Default::default()
-        };
-        assert!(r.validate().is_ok());
-    }
 }
 
 #[cfg(all(feature = "validate", feature = "versioned"))]
 mod report_errors_tests {
     use garde::Validate as _;
-    use rubo4e::v202501::Marktlokation;
+    use rubo4e::v202607::Marktlokation;
     use rubo4e::validation::report_errors;
 
     #[test]
@@ -263,7 +304,7 @@ mod report_errors_tests {
 
     #[test]
     fn report_errors_empty_for_valid_type() {
-        use rubo4e::v202501::Adresse;
+        use rubo4e::v202607::Adresse;
         let malo = Marktlokation {
             lokationsadresse: Some(Adresse::default()),
             ..Default::default()
@@ -285,7 +326,7 @@ mod report_errors_tests {
 #[cfg(all(feature = "validate", feature = "versioned", feature = "time"))]
 mod zeitraum_tests {
     use garde::Validate as _;
-    use rubo4e::v202501::Zeitraum;
+    use rubo4e::v202607::Zeitraum;
     use time::macros::date;
 
     fn zeitraum(start: Option<time::Date>, end: Option<time::Date>) -> Zeitraum {
@@ -347,7 +388,7 @@ mod zeitraum_tests {
     fn no_dates_but_dauer_ok() {
         // Zeitraum with only dauer (no start/end dates) passes the date-ordering
         // check, which only fires when BOTH startdatum and enddatum are present.
-        let z = rubo4e::v202501::Zeitraum {
+        let z = rubo4e::v202607::Zeitraum {
             dauer: Some("15".to_owned()),
             ..Default::default()
         };
@@ -374,7 +415,7 @@ mod zeitraum_tests {
 
 #[cfg(all(feature = "versioned", feature = "time"))]
 mod convenience_tests {
-    use rubo4e::v202501::{PreisblattNetznutzung, Rechnung, Zeitraum};
+    use rubo4e::v202607::{PreisblattNetznutzung, Rechnung, Zeitraum};
     use time::macros::date;
 
     fn closed_zeitraum() -> Zeitraum {

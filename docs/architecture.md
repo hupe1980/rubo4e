@@ -24,7 +24,7 @@ rubo4e/
 │   ├── validation/          — garde-based cross-field validators
 │   └── generated/           — written by generator; never pub outside crate
 │       ├── mod.rs           — re-exports v202501
-│       └── v202501/         — flat .rs files, one per BO/COM/enum type
+│       └── v202607/         — flat .rs files, one per BO/COM/enum type
 │           ├── mod.rs       — re-exports all types + BoTyp / ComTyp discriminants
 │           ├── marktlokation.rs
 │           ├── vertrag.rs
@@ -38,7 +38,7 @@ rubo4e/
 │   │   ├── inference.rs     — semantic type inference (suffix-based heuristics)
 │   │   └── emitter.rs       — AST → Rust source
 │   ├── schemas/
-│   │   └── v202501.0.0/     — pinned schema snapshot
+│   │   └── v202607.0.0/     — pinned schema snapshot
 │   └── tests/
 │       ├── round_trip.rs    — generator snapshot tests
 │       └── snapshots/       — expected generator output
@@ -71,7 +71,7 @@ graph TD
     end
 
     generator -->|"writes to"| generated["src/generated/v202501/"]
-    generated -->|"flat re-export via"| versioned["src/lib.rs versioned module\nrubo4e::v202501"]
+    generated -->|"flat re-export via"| versioned["src/lib.rs versioned module\nrubo4e::v202607"]
     versioned -->|"aliased as"| current["rubo4e::current (moving alias)"]
 
     subgraph features["Feature Gates"]
@@ -110,7 +110,7 @@ graph TD
 | `builder` | — | `typed-builder` | none | Typed builder derives on all BO/COM structs |
 | `validate` | — | `garde` | **1.87** | `.validate()` method on all structs |
 | `schemars` | — | `schemars` | none | `JsonSchema` derive on all types; enables `rubo4e::schema_helpers` |
-| `versioned` | — | none | none | Conditional compilation of `v202501` and `current` modules; enables `rubo4e::convenience` |
+| `versioned` | — | none | none | Conditional compilation of `v202607` and `current` modules; enables `rubo4e::convenience` |
 | `sqlx` | — | `sqlx` | none | `sqlx::Type`/`Encode`/`Decode` for identifiers and enums |
 | `utoipa` | — | `utoipa` | none | `ToSchema` derive on all types |
 | `strum` | — | `strum` | none | `Display`/`FromStr` on all enums |
@@ -145,9 +145,8 @@ Generated code is **committed to the repository** so that:
 
 The `generated/` subtree is never `pub` beyond the crate boundary. All public types
 are flat-re-exported through `src/generated/v<version>/mod.rs`, which is then
-re-exported from the version-gated module in `src/lib.rs` (e.g., `pub mod v202501`).
-There are no hand-curated `bo/`, `com/`, or `enums/` wrapper modules — all types
-live in the flat generated directory.
+re-exported from the version-gated module in `src/lib.rs` (e.g., `pub mod v202607`).
+
 
 ---
 

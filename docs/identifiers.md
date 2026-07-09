@@ -208,10 +208,38 @@ let bad  = ObisCode::new("not-an-obis");   // Err(InvalidFormat { … })
 ## MarktpartnerId — Marktpartner-ID (BDEW-code)
 
 **Format:** 13 decimal digits  
-**Checksum:** none (length + digit-only check)
+**Checksum:** none for BDEW/DVGW codes; GS1 GLNs carry an EAN-13 check digit but
+`MarktpartnerId` does not validate it (BDEW and DVGW codes share the same 13-digit
+format without being GLNs)
+
+The 13-digit Marktpartner-ID is issued by three different authorities with distinct
+EDIFACT encoding:
+
+| Prefix | Issued by              | NAD DE3055 | UNB DE0007 |
+|--------|------------------------|-----------|------------|
+| `99…`  | BDEW (Strom)           | `"293"`   | `"500"`    |
+| `98…`  | DVGW (Gas)             | `"332"`   | `"502"`    |
+| other  | GS1 (GLN)              | `"9"`     | `"14"`     |
 
 ```rust
 let mp = MarktpartnerId::new("9900743000009")?;
+```
+
+### EDIFACT Agency Code Helpers
+
+```rust
+let mp = MarktpartnerId::new("9900357000004")?;
+
+// Classification
+assert!(mp.is_bdew());   // prefix "99" — BDEW Strom
+assert!(!mp.is_dvgw());  // prefix "98" — DVGW Gas
+assert!(!mp.is_gln());   // everything else — GS1 GLN
+
+// EDIFACT NAD segment: NAD+MS+<id>::293
+assert_eq!(mp.nad_agency_code(), "293");
+
+// EDIFACT UNB header: UNB+UNOC:3+<id>:500+...
+assert_eq!(mp.unb_agency_code(), "500");
 ```
 
 ### Integer Conversion

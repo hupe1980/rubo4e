@@ -66,7 +66,7 @@ mod identifier_sizes {
 
 #[cfg(all(target_pointer_width = "64", feature = "versioned", feature = "serde"))]
 mod generated_type_sizes {
-    use rubo4e::v202501::*;
+    use rubo4e::v202607::*;
     use std::mem::size_of;
 
     /// `BoTyp` is a fieldless repr(u8) enum — 1 byte on its own, but alignment

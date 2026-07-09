@@ -1,0 +1,92 @@
+{
+    "additionalProperties": true,
+    "description": "Die Einheits-Preisposition modelliert Preispositionen ohne Variabilität\n(bis auf die übergeordnete Variabilität durch eine Zeitscheibe und einer Region).\n\nDies kann z.B. ein Arbeitspreis sein. Der Bezug wird dabei durch die Preisreferenz angegeben.\n\n.. raw:: html\n\n    <object data=\"../_static/images/bo4e/com/EinheitsPreisposition.svg\" type=\"image/svg+xml\"></object>\n\n.. HINT::\n    `EinheitsPreisposition JSON Schema <https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/com/EinheitsPreisposition.json>`_",
+    "properties": {
+        "_id": {
+            "anyOf": [
+                {
+                    "type": "string"
+                },
+                {
+                    "type": "null"
+                }
+            ],
+            "default": null,
+            "description": "Eine generische ID, die für eigene Zwecke genutzt werden kann.\nZ.B. könnten hier UUIDs aus einer Datenbank stehen oder URLs zu einem Backend-System.",
+            "title": "Id"
+        },
+        "_typ": {
+            "const": "EINHEITSPREISPOSITION",
+            "default": "EINHEITSPREISPOSITION",
+            "title": "Typ",
+            "type": "string"
+        },
+        "_version": {
+            "anyOf": [
+                {
+                    "type": "string"
+                },
+                {
+                    "type": "null"
+                }
+            ],
+            "default": "202607.0.0",
+            "description": "Version der COM-Struktur aka \"fachliche Versionierung\"",
+            "title": "Version"
+        },
+        "bezeichnung": {
+            "anyOf": [
+                {
+                    "type": "string"
+                },
+                {
+                    "type": "null"
+                }
+            ],
+            "default": null,
+            "description": "Eine (beliebige) Bezeichnung für die Preisposition.",
+            "title": "Bezeichnung"
+        },
+        "preis": {
+            "anyOf": [
+                {
+                    "$ref": "https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/com/Preis.json"
+                },
+                {
+                    "type": "null"
+                }
+            ],
+            "default": null,
+            "description": "Der Preis für diese Position."
+        },
+        "preisreferenz": {
+            "anyOf": [
+                {
+                    "$ref": "https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/enum/Preisreferenz.json"
+                },
+                {
+                    "type": "null"
+                }
+            ],
+            "default": null,
+            "description": "Die Referenz worauf sich der Preis bezieht.\nDie explizite Einheit wird durch das Feld `bezugswert` im `COM Preis` angegeben."
+        },
+        "zusatzAttribute": {
+            "anyOf": [
+                {
+                    "items": {
+                        "$ref": "https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/ZusatzAttribut.json"
+                    },
+                    "type": "array"
+                },
+                {
+                    "type": "null"
+                }
+            ],
+            "default": null,
+            "title": "Zusatzattribute"
+        }
+    },
+    "title": "EinheitsPreisposition",
+    "type": "object"
+}

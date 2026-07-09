@@ -5,7 +5,7 @@ expression: "schema_json::<Vertrag>()"
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Vertrag",
-  "description": "Modell für die Abbildung von Vertragsbeziehungen;\nDas Objekt dient dazu, alle Arten von Verträgen, die in der Energiewirtschaft Verwendung finden, abzubilden.\n\n> **Note:** [Vertrag JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202501.0.0/src/bo4e_schemas/bo/Vertrag.json)",
+  "description": "Modell für die Abbildung von Vertragsbeziehungen;\nDas Objekt dient dazu, alle Arten von Verträgen, die in der Energiewirtschaft Verwendung finden, abzubilden.\n\n> **Note:** [Vertrag JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/bo/Vertrag.json)",
   "type": "object",
   "properties": {
     "_id": {
@@ -172,7 +172,7 @@ expression: "schema_json::<Vertrag>()"
   "additionalProperties": true,
   "$defs": {
     "Adresse": {
-      "description": "Contains an address that can be used for most purposes.\n\n> **Note:** [Adresse JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202501.0.0/src/bo4e_schemas/com/Adresse.json)",
+      "description": "Contains an address that can be used for most purposes.\n\n> **Note:** [Adresse JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/com/Adresse.json)",
       "type": "object",
       "properties": {
         "_id": {
@@ -335,7 +335,6 @@ expression: "schema_json::<Vertrag>()"
             "PREISBLATTUMLAGEN",
             "RECHNUNG",
             "REGION",
-            "REGIONALTARIF",
             "STANDORTEIGENSCHAFTEN",
             "TARIF",
             "TARIFINFO",
@@ -343,6 +342,7 @@ expression: "schema_json::<Vertrag>()"
             "TARIFPREISBLATT",
             "VERTRAG",
             "ZAEHLER",
+            "ZAEHLZEITDEFINITION",
             "ZEITREIHE",
             "LOKATIONSZUORDNUNG"
           ]
@@ -365,13 +365,11 @@ expression: "schema_json::<Vertrag>()"
             "ANGEBOTSTEIL",
             "ANGEBOTSVARIANTE",
             "AUFABSCHLAG",
-            "AUFABSCHLAGPROORT",
-            "AUFABSCHLAGREGIONAL",
-            "AUFABSCHLAGSTAFFELPROORT",
             "AUSSCHREIBUNGSDETAIL",
             "AUSSCHREIBUNGSLOS",
             "BETRAG",
             "DIENSTLEISTUNG",
+            "EINHEITSPREISPOSITION",
             "ENERGIEHERKUNFT",
             "ENERGIEMIX",
             "FREMDKOSTENBLOCK",
@@ -383,22 +381,20 @@ expression: "schema_json::<Vertrag>()"
             "KONZESSIONSABGABE",
             "KOSTENBLOCK",
             "KOSTENPOSITION",
-            "KRITERIUMWERT",
             "LASTPROFIL",
+            "LASTVARIABLEPREISPOSITION",
             "MARKTGEBIETINFO",
             "MENGE",
-            "POSITIONSAUFABSCHLAG",
+            "MESSWERT",
             "PREIS",
             "PREISGARANTIE",
             "PREISPOSITION",
             "PREISSTAFFEL",
             "RECHNUNGSPOSITION",
-            "REGIONALEGUELTIGKEIT",
-            "REGIONALEPREISGARANTIE",
-            "REGIONALEPREISSTAFFEL",
-            "REGIONALERAUFABSCHLAG",
-            "REGIONALETARIFPREISPOSITION",
-            "REGIONSKRITERIUM",
+            "REGIONSOPERATION",
+            "REGIONSPREIS",
+            "REGIONSZEITSCHEIBE",
+            "RELATIVEPREISPOSITION",
             "SIGMOIDPARAMETER",
             "STANDORTEIGENSCHAFTENGAS",
             "STANDORTEIGENSCHAFTENSTROM",
@@ -408,17 +404,21 @@ expression: "schema_json::<Vertrag>()"
             "TARIFEINSCHRAENKUNG",
             "TARIFPREIS",
             "TARIFPREISPOSITION",
-            "TARIFPREISPOSITIONPROORT",
-            "TARIFPREISSTAFFELPROORT",
+            "TARIFPREISZEITSCHEIBE",
+            "UMSCHALTZEIT",
             "UNTERSCHRIFT",
-            "VERBRAUCH",
             "VERTRAGSKONDITIONEN",
             "VERTRAGSTEIL",
             "VERWENDUNGSZWECKPROMARKTROLLE",
+            "VORAUSZAHLUNG",
             "ZAEHLWERK",
             "ZAEHLZEITREGISTER",
+            "ZAEHLZEITSAISON",
+            "ZAEHLZEITTAGTYP",
+            "ZAHLUNGSINFORMATION",
             "ZEITRAUM",
             "ZEITREIHENWERT",
+            "ZEITVARIABLEPREISPOSITION",
             "ZUSTAENDIGKEIT"
           ]
         },
@@ -430,7 +430,7 @@ expression: "schema_json::<Vertrag>()"
       ]
     },
     "Geschaeftspartner": {
-      "description": "Mit diesem Objekt können Geschäftspartner übertragen werden.\nSowohl Unternehmen, als auch Privatpersonen können Geschäftspartner sein.\nHinweis: \"Marktteilnehmer\" haben ein eigenes BO, welches sich von diesem BO ableitet.\nHier sollte daher keine Zuordnung zu Marktrollen erfolgen.\n\n> **Note:** [Geschaeftspartner JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202501.0.0/src/bo4e_schemas/bo/Geschaeftspartner.json)",
+      "description": "Mit diesem Objekt können Geschäftspartner übertragen werden.\nSowohl Unternehmen, als auch Privatpersonen können Geschäftspartner sein.\nHinweis: \"Marktteilnehmer\" haben ein eigenes BO, welches sich von diesem BO ableitet.\nHier sollte daher keine Zuordnung zu Marktrollen erfolgen.\n\n> **Note:** [Geschaeftspartner JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/bo/Geschaeftspartner.json)",
       "type": "object",
       "properties": {
         "_id": {
@@ -647,7 +647,7 @@ expression: "schema_json::<Vertrag>()"
       ]
     },
     "Kontaktweg": {
-      "description": "Die Komponente wird dazu verwendet, die Kontaktwege innerhalb des BOs Person darzustellen\n\n> **Note:** [Kontakt JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202501.0.0/src/bo4e_schemas/com/Kontakt.json)",
+      "description": "Die Komponente wird dazu verwendet, die Kontaktwege innerhalb des BOs Person darzustellen\n\n> **Note:** [Kontakt JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/com/Kontakt.json)",
       "type": "object",
       "properties": {
         "_id": {
@@ -986,7 +986,7 @@ expression: "schema_json::<Vertrag>()"
       ]
     },
     "Menge": {
-      "description": "Abbildung einer Menge mit Wert und Einheit.\n\n> **Note:** [Menge JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202501.0.0/src/bo4e_schemas/com/Menge.json)",
+      "description": "Abbildung einer Menge mit Wert und Einheit.\n\n> **Note:** [Menge JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/com/Menge.json)",
       "type": "object",
       "properties": {
         "_id": {
@@ -1105,7 +1105,7 @@ expression: "schema_json::<Vertrag>()"
       ]
     },
     "Person": {
-      "description": "Object containing information about a Person\n\n> **Note:** [Person JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202501.0.0/src/bo4e_schemas/bo/Person.json)",
+      "description": "Object containing information about a Person\n\n> **Note:** [Person JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/bo/Person.json)",
       "type": "object",
       "properties": {
         "_id": {
@@ -1351,7 +1351,7 @@ expression: "schema_json::<Vertrag>()"
       ]
     },
     "Unterschrift": {
-      "description": "Modellierung einer Unterschrift, z.B. für Verträge, Angebote etc.\n\n> **Note:** [Unterschrift JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202501.0.0/src/bo4e_schemas/com/Unterschrift.json)",
+      "description": "Modellierung einer Unterschrift, z.B. für Verträge, Angebote etc.\n\n> **Note:** [Unterschrift JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/com/Unterschrift.json)",
       "type": "object",
       "properties": {
         "_id": {
@@ -1434,7 +1434,7 @@ expression: "schema_json::<Vertrag>()"
       ]
     },
     "Vertragskonditionen": {
-      "description": "Abbildung für Vertragskonditionen. Die Komponente wird sowohl im Vertrag als auch im Tarif verwendet.\n\n> **Note:** [Vertragskonditionen JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202501.0.0/src/bo4e_schemas/com/Vertragskonditionen.json)",
+      "description": "Abbildung für Vertragskonditionen. Die Komponente wird sowohl im Vertrag als auch im Tarif verwendet.\n\n> **Note:** [Vertragskonditionen JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/com/Vertragskonditionen.json)",
       "type": "object",
       "properties": {
         "_id": {
@@ -1559,7 +1559,7 @@ expression: "schema_json::<Vertrag>()"
       ]
     },
     "Vertragsteil": {
-      "description": "Abbildung für einen Vertragsteil. Der Vertragsteil wird dazu verwendet,\neine vertragliche Leistung in Bezug zu einer Lokation (Markt- oder Messlokation) festzulegen.\n\n> **Note:** [Vertragsteil JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202501.0.0/src/bo4e_schemas/com/Vertragsteil.json)",
+      "description": "Abbildung für einen Vertragsteil. Der Vertragsteil wird dazu verwendet,\neine vertragliche Leistung in Bezug zu einer Lokation (Markt- oder Messlokation) festzulegen.\n\n> **Note:** [Vertragsteil JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/com/Vertragsteil.json)",
       "type": "object",
       "properties": {
         "_id": {
@@ -1656,7 +1656,7 @@ expression: "schema_json::<Vertrag>()"
       "additionalProperties": true
     },
     "Zeitraum": {
-      "description": "Diese Komponente wird zur Abbildung von Zeiträumen in Form von Dauern oder der Angabe von Start und Ende verwendet.\nEs muss daher eine der drei Möglichkeiten angegeben sein:\n- Einheit und Dauer oder\n- Zeitraum: Startdatum bis Enddatum oder\n- Zeitraum: Startzeitpunkt (Datum und Uhrzeit) bis Endzeitpunkt (Datum und Uhrzeit)\n\n> **Note:** [Zeitraum JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202501.0.0/src/bo4e_schemas/com/Zeitraum.json)",
+      "description": "Diese Komponente wird zur Abbildung von Zeiträumen in Form von Dauern oder der Angabe von Start und Ende verwendet.\nEs muss daher eine der drei Möglichkeiten angegeben sein:\n- Einheit und Dauer oder\n- Zeitraum: Startdatum bis Enddatum oder\n- Zeitraum: Startzeitpunkt (Datum und Uhrzeit) bis Endzeitpunkt (Datum und Uhrzeit)\n\n> **Note:** [Zeitraum JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/com/Zeitraum.json)",
       "type": "object",
       "properties": {
         "_id": {
@@ -1734,7 +1734,7 @@ expression: "schema_json::<Vertrag>()"
       "additionalProperties": true
     },
     "ZusatzAttribut": {
-      "description": "Viele Datenobjekte weisen in unterschiedlichen Systemen eine eindeutige ID (Kundennummer, GP-Nummer etc.) auf.\nBeim Austausch von Datenobjekten zwischen verschiedenen Systemen ist es daher hilfreich,\nsich die eindeutigen IDs der anzubindenden Systeme zu merken.\n\n> **Note:** [ZusatzAttribut JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202501.0.0/src/bo4e_schemas/ZusatzAttribut.json)",
+      "description": "Viele Datenobjekte weisen in unterschiedlichen Systemen eine eindeutige ID (Kundennummer, GP-Nummer etc.) auf.\nBeim Austausch von Datenobjekten zwischen verschiedenen Systemen ist es daher hilfreich,\nsich die eindeutigen IDs der anzubindenden Systeme zu merken.\n\n> **Note:** [ZusatzAttribut JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/ZusatzAttribut.json)",
       "type": "object",
       "properties": {
         "name": {
@@ -1748,7 +1748,7 @@ expression: "schema_json::<Vertrag>()"
       "additionalProperties": true
     },
     "Zustaendigkeit": {
-      "description": "Enthält die zeitliche Zuordnung eines Ansprechpartners zu Abteilungen und Zuständigkeiten.\n\n> **Note:** [Zustaendigkeit JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202501.0.0/src/bo4e_schemas/com/Zustaendigkeit.json)",
+      "description": "Enthält die zeitliche Zuordnung eines Ansprechpartners zu Abteilungen und Zuständigkeiten.\n\n> **Note:** [Zustaendigkeit JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/com/Zustaendigkeit.json)",
       "type": "object",
       "properties": {
         "_id": {

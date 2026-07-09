@@ -1,0 +1,87 @@
+{
+    "additionalProperties": true,
+    "description": "Mit dieser Komponente wird ein aus mehreren Positionen zusammengesetzter Preis regionsaufgelöst dargestellt.\nZu jedem Zeitpunkt darf es nur eine gültige Region und einen gültigen Preis geben.\n\n.. raw:: html\n\n    <object data=\"../_static/images/bo4e/com/Regionspreis.svg\" type=\"image/svg+xml\"></object>\n\n.. HINT::\n    `Regionspreis JSON Schema <https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/com/Regionspreis.json>`_",
+    "properties": {
+        "_id": {
+            "anyOf": [
+                {
+                    "type": "string"
+                },
+                {
+                    "type": "null"
+                }
+            ],
+            "default": null,
+            "description": "Eine generische ID, die für eigene Zwecke genutzt werden kann.\nZ.B. könnten hier UUIDs aus einer Datenbank stehen oder URLs zu einem Backend-System.",
+            "title": "Id"
+        },
+        "_typ": {
+            "const": "REGIONSPREIS",
+            "default": "REGIONSPREIS",
+            "title": "Typ",
+            "type": "string"
+        },
+        "_version": {
+            "anyOf": [
+                {
+                    "type": "string"
+                },
+                {
+                    "type": "null"
+                }
+            ],
+            "default": "202607.0.0",
+            "description": "Version der COM-Struktur aka \"fachliche Versionierung\"",
+            "title": "Version"
+        },
+        "regionszeitscheiben": {
+            "anyOf": [
+                {
+                    "items": {
+                        "$ref": "https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/com/Regionszeitscheibe.json"
+                    },
+                    "type": "array"
+                },
+                {
+                    "type": "null"
+                }
+            ],
+            "default": null,
+            "description": "Eine Liste von mit Zeitscheiben versehenen Regionen.\nDie Zeitscheiben sollten sich nicht überschneiden.",
+            "title": "Regionszeitscheiben"
+        },
+        "tarifpreiszeitscheiben": {
+            "anyOf": [
+                {
+                    "items": {
+                        "$ref": "https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/com/Tarifpreiszeitscheibe.json"
+                    },
+                    "type": "array"
+                },
+                {
+                    "type": "null"
+                }
+            ],
+            "default": null,
+            "description": "Eine Liste von mit Zeitscheiben versehenen Tarifpreisen.\nDie Zeitscheiben sollten sich nicht überschneiden.\nDie Tarifpreise sind aus mehreren Tarifpreispositionen zusammengesetzt.",
+            "title": "Tarifpreiszeitscheiben"
+        },
+        "zusatzAttribute": {
+            "anyOf": [
+                {
+                    "items": {
+                        "$ref": "https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/ZusatzAttribut.json"
+                    },
+                    "type": "array"
+                },
+                {
+                    "type": "null"
+                }
+            ],
+            "default": null,
+            "title": "Zusatzattribute"
+        }
+    },
+    "title": "Regionspreis",
+    "type": "object"
+}

@@ -436,6 +436,16 @@ fn emit_default_impl(s: &mut String, name: &str, bo_typ_variant: &str, fields: &
     // H-05: BO types with a `_typ` field get a custom Default impl that pre-fills `typ`
     // so that `Default::default()` produces structurally valid BO4E JSON with `"_typ"`
     // present, matching the BO4E specification requirement for the type discriminant.
+    //
+    // Guard: only emit Default when every non-`_typ` field is optional.  Required
+    // fields (is_optional == false) may have enum types that don't implement Default,
+    // so generating `field: Default::default()` would fail to compile.  Structs with
+    // required fields have no valid "empty" state and should not implement Default.
+    let has_required_non_typ = fields.iter().any(|f| f.name != "_typ" && !f.is_optional);
+    if has_required_non_typ {
+        return;
+    }
+
     s.push_str(&format!(
         "\nimpl Default for {name} {{\n    fn default() -> Self {{\n        Self {{\n"
     ));
@@ -1059,23 +1069,63 @@ fn clean_description(desc: &str) -> String {
         let converted = convert_rst_links(trimmed);
         // Wrap bare URLs (not already inside `<...>` or `(...)`) so rustdoc creates hyperlinks.
         let converted = wrap_bare_urls(&converted);
-        // Indent bare `= [...]` continuation lines that follow numbered list items
-        // (schema descriptions sometimes use this formatting without indentation,
-        // which triggers clippy::doc_lazy_continuation).
-        let converted = if converted.starts_with("= [") || converted.starts_with("= (") {
-            format!("   {converted}")
-        } else {
-            converted
-        };
         output.push(converted);
     }
 
-    // Trim trailing blank lines.
-    while output.last().is_some_and(|l: &String| l.trim().is_empty()) {
-        output.pop();
+    // Post-process: indent list-item continuation lines so rustdoc can parse the
+    // list correctly and clippy::doc_lazy_continuation /
+    // doc_list_item_without_indentation don't fire.
+    //
+    // Rules (Markdown / rustdoc):
+    //   Bullet list  (`* ` / `- `)  → continuation indented 2 spaces
+    //   Numbered list (`N. `)        → continuation indented 3 spaces (len of "1. ")
+    //
+    // A line is a "continuation" when it is non-empty, not blank, not a new list
+    // item, and immediately follows a list-item line.
+    let mut result: Vec<String> = Vec::with_capacity(output.len());
+    // None = not in list; Some(n) = in list, continuation indent = n spaces
+    let mut list_indent: Option<usize> = None;
+    for line in &output {
+        let is_blank = line.trim().is_empty();
+
+        // Detect bullet list item: starts with `* ` or `- `
+        let is_bullet = line.starts_with("* ") || line.starts_with("- ");
+        // Detect numbered list item: one or more digits followed by `. `
+        let is_numbered = {
+            let dot_pos = line.find(". ");
+            dot_pos.is_some_and(|i| i > 0 && line[..i].chars().all(|c| c.is_ascii_digit()))
+        };
+        // Already-indented line (from the schema source or a prior pass)
+        let already_indented = line.starts_with("  ");
+
+        if is_bullet {
+            list_indent = Some(2);
+            result.push(line.clone());
+        } else if is_numbered {
+            list_indent = Some(3);
+            result.push(line.clone());
+        } else if is_blank {
+            list_indent = None;
+            result.push(line.clone());
+        } else if let Some(indent) = list_indent {
+            if already_indented {
+                // Already indented enough — keep as-is but stay in list context.
+                result.push(line.clone());
+            } else {
+                // Continuation line — prepend the required indent.
+                result.push(format!("{}{line}", " ".repeat(indent)));
+            }
+        } else {
+            result.push(line.clone());
+        }
     }
 
-    output.join("\n")
+    // Trim trailing blank lines.
+    while result.last().is_some_and(|l: &String| l.trim().is_empty()) {
+        result.pop();
+    }
+
+    result.join("\n")
 }
 
 /// Wraps bare `http://` / `https://` URLs that are not already inside `<...>`,
