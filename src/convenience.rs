@@ -415,9 +415,7 @@ mod preisblatt_netznutzung_impl {
         /// ```
         #[must_use]
         pub fn is_valid_at(&self, date: Date) -> bool {
-            self.gueltigkeit
-                .as_ref()
-                .is_some_and(|z| z.contains(date))
+            self.gueltigkeit.as_ref().is_some_and(|z| z.contains(date))
         }
     }
 }
