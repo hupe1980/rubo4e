@@ -318,12 +318,12 @@ fn v202501_inference_audit() {
         (
             "Rechnung",
             "rechnungsdatum",
-            FieldType::Primitive(PrimitiveType::OffsetDateTime),
+            FieldType::Primitive(PrimitiveType::Date),
         ),
         (
             "Rechnung",
             "faelligkeitsdatum",
-            FieldType::Primitive(PrimitiveType::OffsetDateTime),
+            FieldType::Primitive(PrimitiveType::Date),
         ),
         // ── Decimal fields ─────────────────────────────────────────────────
         (
