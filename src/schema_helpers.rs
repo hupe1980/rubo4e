@@ -55,3 +55,35 @@ pub fn opt_date_schema(_gen: &mut schemars::SchemaGenerator) -> schemars::Schema
         "format": "date"
     })
 }
+
+// ── Identifier schemas ────────────────────────────────────────────────────────
+
+/// JSON Schema for [`MaloId`](crate::identifiers::MaloId): 11-digit BDEW MaLo-ID.
+pub fn malo_id_schema(_gen: &mut schemars::SchemaGenerator) -> schemars::Schema {
+    schemars::json_schema!({
+        "type": "string",
+        "pattern": "^[0-9]{11}$",
+        "description": "11-stellige BDEW Marktlokations-ID mit alternierend gewichtetem BDEW-Prüfziffer",
+        "examples": ["51238696780"]
+    })
+}
+
+/// JSON Schema for [`MeloId`](crate::identifiers::MeloId): 33-character MeLo-ID.
+pub fn melo_id_schema(_gen: &mut schemars::SchemaGenerator) -> schemars::Schema {
+    schemars::json_schema!({
+        "type": "string",
+        "pattern": "^[A-Z]{2}[A-Za-z0-9]{31}$",
+        "description": "33-stellige Messlokations-ID: 2-stelliger ISO-3166-1-Ländercode + 31 alphanumerische Zeichen",
+        "examples": ["DE0000000000000000000000000000001"]
+    })
+}
+
+/// JSON Schema for [`MarktpartnerId`](crate::identifiers::MarktpartnerId): 13-digit MP-ID.
+pub fn marktpartner_id_schema(_gen: &mut schemars::SchemaGenerator) -> schemars::Schema {
+    schemars::json_schema!({
+        "type": "string",
+        "pattern": "^[0-9]{13}$",
+        "description": "13-stellige Marktpartner-ID (BDEW-Codenummer Strom mit Prefix 99, DVGW-Codenummer Gas mit Prefix 98, oder GS1 GLN)",
+        "examples": ["9900357000004"]
+    })
+}

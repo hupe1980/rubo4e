@@ -27,9 +27,17 @@ fn validate(s: &str) -> Result<(), IdentifierError> {
 #[cfg_attr(feature = "validate", derive(garde::Validate))]
 #[cfg_attr(feature = "validate", garde(allow_unvalidated))]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
-#[cfg_attr(feature = "schemars", schemars(with = "String"))]
+#[cfg_attr(
+    feature = "schemars",
+    schemars(schema_with = "crate::schema_helpers::marktpartner_id_schema")
+)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
-#[cfg_attr(feature = "utoipa", schema(value_type = String))]
+#[cfg_attr(feature = "utoipa", schema(
+    value_type = String,
+    pattern = r"^[0-9]{13}$",
+    example = "9900357000004",
+    description = "13-stellige Marktpartner-ID: BDEW-Codenummer Strom (Prefix 99), DVGW-Codenummer Gas (Prefix 98) oder GS1 GLN"
+))]
 pub struct MarktpartnerId(
     #[cfg_attr(feature = "validate", garde(custom(check_marktpartner_id)))] Box<str>,
 );
@@ -70,6 +78,126 @@ impl MarktpartnerId {
         self.0
             .parse::<i64>()
             .expect("MarktpartnerId is validated as 13 ASCII digits; parse to i64 cannot fail")
+    }
+
+    /// Returns `true` if this ID was issued by BDEW (prefix `"99"`).
+    ///
+    /// BDEW-Codenummern for the German electricity market start with `99`.
+    ///
+    /// # Examples
+    /// ```
+    /// use rubo4e::identifiers::MarktpartnerId;
+    ///
+    /// assert!(MarktpartnerId::new("9900357000004").unwrap().is_bdew());
+    /// assert!(!MarktpartnerId::new("9812345000003").unwrap().is_bdew());
+    /// ```
+    #[must_use]
+    pub fn is_bdew(&self) -> bool {
+        self.0.starts_with("99")
+    }
+
+    /// Returns `true` if this ID was issued by DVGW (prefix `"98"`).
+    ///
+    /// DVGW-Codenummern for the German gas market start with `98`.
+    ///
+    /// # Examples
+    /// ```
+    /// use rubo4e::identifiers::MarktpartnerId;
+    ///
+    /// assert!(MarktpartnerId::new("9812345000003").unwrap().is_dvgw());
+    /// assert!(!MarktpartnerId::new("9900357000004").unwrap().is_dvgw());
+    /// ```
+    #[must_use]
+    pub fn is_dvgw(&self) -> bool {
+        self.0.starts_with("98")
+    }
+
+    /// Returns `true` if this ID is a GS1 Global Location Number (GLN).
+    ///
+    /// A 13-digit Marktpartner-ID that does **not** start with `"98"` or `"99"` is
+    /// treated as a GS1 GLN.  Note that GS1 GLNs carry an EAN-13 check digit while
+    /// BDEW/DVGW codes do not; `MarktpartnerId` validates only digit-only format and
+    /// length, not the EAN-13 check.
+    ///
+    /// # Examples
+    /// ```
+    /// use rubo4e::identifiers::MarktpartnerId;
+    ///
+    /// assert!(MarktpartnerId::new("4012345678901").unwrap().is_gln());
+    /// assert!(!MarktpartnerId::new("9900357000004").unwrap().is_gln());
+    /// ```
+    #[must_use]
+    pub fn is_gln(&self) -> bool {
+        !self.is_bdew() && !self.is_dvgw()
+    }
+
+    /// Returns the EDIFACT **NAD DE3055** agency code for this identifier.
+    ///
+    /// | Prefix | Authority          | NAD DE3055 |
+    /// |--------|--------------------|------------|
+    /// | `99…`  | BDEW Strom         | `"293"`    |
+    /// | `98…`  | DVGW Gas           | `"332"`    |
+    /// | other  | GS1 GLN            | `"9"`      |
+    ///
+    /// Use this code in EDIFACT NAD segments (e.g. `NAD+MS+<id>::293`).
+    ///
+    /// # Examples
+    /// ```
+    /// use rubo4e::identifiers::MarktpartnerId;
+    ///
+    /// let bdew = MarktpartnerId::new("9900357000004").unwrap();
+    /// assert_eq!(bdew.nad_agency_code(), "293");
+    ///
+    /// let dvgw = MarktpartnerId::new("9812345000003").unwrap();
+    /// assert_eq!(dvgw.nad_agency_code(), "332");
+    ///
+    /// let gln = MarktpartnerId::new("4012345678901").unwrap();
+    /// assert_eq!(gln.nad_agency_code(), "9");
+    /// ```
+    #[must_use]
+    pub fn nad_agency_code(&self) -> &'static str {
+        if self.is_bdew() {
+            "293"
+        } else if self.is_dvgw() {
+            "332"
+        } else {
+            "9"
+        }
+    }
+
+    /// Returns the EDIFACT **UNB DE0007** sender/receiver qualifier for this identifier.
+    ///
+    /// | Prefix | Authority          | UNB DE0007 |
+    /// |--------|--------------------|------------|
+    /// | `99…`  | BDEW Strom         | `"500"`    |
+    /// | `98…`  | DVGW Gas           | `"502"`    |
+    /// | other  | GS1 GLN            | `"14"`     |
+    ///
+    /// Use this code in the EDIFACT UNB interchange header
+    /// (e.g. `UNB+UNOC:3+<id>:500+...`).
+    ///
+    /// # Examples
+    /// ```
+    /// use rubo4e::identifiers::MarktpartnerId;
+    ///
+    /// let bdew = MarktpartnerId::new("9900357000004").unwrap();
+    /// assert_eq!(bdew.unb_agency_code(), "500");
+    ///
+    /// let dvgw = MarktpartnerId::new("9812345000003").unwrap();
+    /// assert_eq!(dvgw.unb_agency_code(), "502");
+    ///
+    /// let gln = MarktpartnerId::new("4012345678901").unwrap();
+    /// assert_eq!(gln.unb_agency_code(), "14");
+    /// ```
+    #[must_use]
+    pub fn unb_agency_code(&self) -> &'static str {
+        if self.is_bdew() {
+            "500"
+        } else if self.is_dvgw() {
+            "502"
+        } else {
+            "14"
+        }
     }
 }
 
@@ -120,7 +248,9 @@ impl<'de> serde::Deserialize<'de> for MarktpartnerId {
         impl<'de> serde::de::Visitor<'de> for Visitor {
             type Value = MarktpartnerId;
             fn expecting(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                f.write_str("a 13-digit Marktpartner-ID (ILN / GLN)")
+                f.write_str(
+                    "a 13-digit Marktpartner-ID (BDEW-Codenummer, DVGW-Codenummer oder GS1 GLN)",
+                )
             }
             fn visit_str<E: serde::de::Error>(self, v: &str) -> Result<MarktpartnerId, E> {
                 MarktpartnerId::new(v).map_err(|e| {

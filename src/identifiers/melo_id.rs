@@ -51,9 +51,17 @@ fn validate(s: &str) -> Result<(), IdentifierError> {
 #[cfg_attr(feature = "validate", derive(garde::Validate))]
 #[cfg_attr(feature = "validate", garde(allow_unvalidated))]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
-#[cfg_attr(feature = "schemars", schemars(with = "String"))]
+#[cfg_attr(
+    feature = "schemars",
+    schemars(schema_with = "crate::schema_helpers::melo_id_schema")
+)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
-#[cfg_attr(feature = "utoipa", schema(value_type = String))]
+#[cfg_attr(feature = "utoipa", schema(
+    value_type = String,
+    pattern = r"^[A-Z]{2}[A-Za-z0-9]{31}$",
+    example = "DE0000000000000000000000000000001",
+    description = "33-stellige Messlokations-ID: 2-stelliger ISO-3166-1-Ländercode + 31 alphanumerische Zeichen"
+))]
 pub struct MeloId(#[cfg_attr(feature = "validate", garde(custom(check_melo_id)))] Box<str>);
 
 #[cfg(feature = "validate")]

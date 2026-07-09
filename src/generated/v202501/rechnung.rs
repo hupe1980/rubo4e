@@ -26,23 +26,23 @@ pub struct Rechnung {
     #[cfg_attr(feature = "serde", serde(default))]
     #[cfg_attr(
         feature = "schemars",
-        schemars(schema_with = "crate::schema_helpers::opt_datetime_schema")
+        schemars(schema_with = "crate::schema_helpers::opt_date_schema")
     )]
     #[cfg_attr(
         all(feature = "serde", feature = "time"),
-        serde(with = "time::serde::rfc3339::option")
+        serde(with = "crate::time_serde::opt_date_serde")
     )]
     #[cfg(feature = "time")]
-    pub faelligkeitsdatum: Option<time::OffsetDateTime>,
-    /// Requires the `time` feature for the `time::OffsetDateTime` representation.
-    /// Without `time`, stores the ISO-8601 string value unchanged.
+    pub faelligkeitsdatum: Option<time::Date>,
+    /// Requires the `time` feature for the `time::Date` representation.
+    /// Without `time`, stores the ISO 8601 date string (`YYYY-MM-DD`) unchanged.
     #[cfg_attr(feature = "serde", serde(rename = "faelligkeitsdatum"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "serde", serde(default))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     #[cfg_attr(
         feature = "schemars",
-        schemars(schema_with = "crate::schema_helpers::opt_datetime_schema")
+        schemars(schema_with = "crate::schema_helpers::opt_date_schema")
     )]
     #[cfg(not(feature = "time"))]
     pub faelligkeitsdatum: Option<String>,
@@ -120,23 +120,23 @@ pub struct Rechnung {
     #[cfg_attr(feature = "serde", serde(default))]
     #[cfg_attr(
         feature = "schemars",
-        schemars(schema_with = "crate::schema_helpers::opt_datetime_schema")
+        schemars(schema_with = "crate::schema_helpers::opt_date_schema")
     )]
     #[cfg_attr(
         all(feature = "serde", feature = "time"),
-        serde(with = "time::serde::rfc3339::option")
+        serde(with = "crate::time_serde::opt_date_serde")
     )]
     #[cfg(feature = "time")]
-    pub rechnungsdatum: Option<time::OffsetDateTime>,
-    /// Requires the `time` feature for the `time::OffsetDateTime` representation.
-    /// Without `time`, stores the ISO-8601 string value unchanged.
+    pub rechnungsdatum: Option<time::Date>,
+    /// Requires the `time` feature for the `time::Date` representation.
+    /// Without `time`, stores the ISO 8601 date string (`YYYY-MM-DD`) unchanged.
     #[cfg_attr(feature = "serde", serde(rename = "rechnungsdatum"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "serde", serde(default))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     #[cfg_attr(
         feature = "schemars",
-        schemars(schema_with = "crate::schema_helpers::opt_datetime_schema")
+        schemars(schema_with = "crate::schema_helpers::opt_date_schema")
     )]
     #[cfg(not(feature = "time"))]
     pub rechnungsdatum: Option<String>,

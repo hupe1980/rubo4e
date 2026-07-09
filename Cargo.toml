@@ -13,7 +13,7 @@ anyhow     = "1"
 
 [package]
 name        = "rubo4e"
-version     = "0.3.0"
+version     = "0.4.0"
 edition     = "2021"
 rust-version = "1.87"
 description = "Rust implementation of the BO4E energy-market data standard"

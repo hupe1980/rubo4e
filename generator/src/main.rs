@@ -62,9 +62,15 @@ fn main() -> Result<()> {
         write_if_changed(&dest, &source)?
     }
 
-    // Write mod.rs.
+    // Write mod.rs for this version's subdirectory.
     let mod_rs = emitter::emit_mod_rs(&all_nodes, &args.schema_version)?;
     write_if_changed(&out_root.join("mod.rs"), &mod_rs)?;
+
+    // Write the parent src/generated/mod.rs by scanning all version
+    // subdirectories that exist on disk.  This keeps the file fully generated
+    // and avoids the need for manual edits every time a new series is added.
+    let generated_root = args.repo_root.join("src").join("generated");
+    write_generated_root_mod(&generated_root)?;
 
     eprintln!(
         "Done. {} files written to {}",
@@ -76,6 +82,34 @@ fn main() -> Result<()> {
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
+
+/// Writes `src/generated/mod.rs` by scanning all version subdirectories that
+/// contain a `mod.rs` file.
+///
+/// This makes `src/generated/mod.rs` a fully generated file — no manual edits
+/// are needed when a new schema series (e.g. `v202601`) is added or removed.
+fn write_generated_root_mod(generated_root: &Path) -> Result<()> {
+    let mut series: Vec<String> = std::fs::read_dir(generated_root)
+        .with_context(|| format!("reading {}", generated_root.display()))?
+        .filter_map(|e| e.ok())
+        .filter(|e| e.path().is_dir() && e.path().join("mod.rs").exists())
+        .filter_map(|e| e.file_name().into_string().ok())
+        .collect();
+
+    series.sort();
+
+    let mut content = String::from(
+        "// @generated \u{2014} do not edit by hand.\n\
+         // This file is maintained by the code generator (`just generate`).\n\n",
+    );
+    for s in &series {
+        content.push_str(&format!("pub mod {s};\n"));
+    }
+
+    let dest = generated_root.join("mod.rs");
+    write_if_changed(&dest, &content)?;
+    Ok(())
+}
 
 /// Extracts the 7-character series prefix from a full version tag.
 ///

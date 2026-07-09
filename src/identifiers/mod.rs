@@ -6,6 +6,38 @@
 //! - implements `Display`, `FromStr`, `TryFrom<&str>`, `TryFrom<String>`, `AsRef<str>`,
 //!   `Debug`, `Clone`, `Hash`, `Eq`, `PartialEq`, `Ord`, `PartialOrd`
 //! - conditionally derives `Serialize` / `Deserialize` via the `serde` feature gate
+//!
+//! ## Validation at construction vs. `validate` feature
+//!
+//! All identifier types **always** validate the structural constraints (length,
+//! character set) at construction time — this happens regardless of whether the
+//! `validate` feature is enabled.
+//!
+//! The `validate` feature adds [`garde`]-based validation attributes so that
+//! `Validated<T>` (and `#[derive(garde::Validate)]` on parent structs) can
+//! re-run the same checks via the garde report API.  The actual validation logic
+//! is identical in both paths.
+//!
+//! ### Per-type validation rules
+//!
+//! | Type | Always validated | Notes |
+//! |------|-----------------|-------|
+//! | [`MaloId`] | 11 digits, BDEW alternating-weight check digit (11th digit) | Check digit is the primary guard against typos |
+//! | [`MeloId`] | 33 chars, first 2 uppercase ASCII (country code), rest alphanumeric | No checksum — format-only |
+//! | [`MarktpartnerId`] | 13 digits, numeric only | **No EAN-13 check digit** for BDEW/DVGW codes. GS1 GLNs carry an EAN-13 check digit, but `MarktpartnerId` does not validate it (the check algorithm is the same as EAN-13, but BDEW codes use the same 13-digit format without being GLNs). |
+//! | [`NeloId`] | 11 digits, same BDEW alternating-weight algorithm as `MaloId` | |
+//! | [`SrId`] | 11 digits, BDEW alternating-weight check digit | |
+//! | [`TrId`] | 11 digits, BDEW alternating-weight check digit | |
+//! | [`EicCode`] | 16 chars, uppercase alphanumeric + `-`, last char is EIC check char | |
+//! | [`ObisCode`] | `A-B:C.D.E*F` format, C ≥ 1 | |
+//!
+//! ### `validate` feature and `garde`
+//!
+//! When `validate` is enabled, each identifier derives `garde::Validate` with a
+//! `custom(check_*)` validator that delegates to the same `validate()` function
+//! used at construction.  This means `Validated::<Marktlokation>::new(malo)` will
+//! re-validate all nested identifier fields (e.g. `marktlokations_id`) through
+//! garde's recursive report API.
 
 #[cfg(feature = "serde")]
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -36,8 +68,9 @@ pub use tr_id::TrId;
 /// Serde adapter module for encoding [`MarktpartnerId`] as a JSON integer (`i64`).
 ///
 /// Use `#[serde(with = "rubo4e::identifiers::marktpartner_id_as_i64")]` on struct
-/// fields that must round-trip through APIs which mandate integer encoding for GLN /
-/// Rollencodenummern (e.g. BDEW API-Webdienste Strom).
+/// fields that must round-trip through APIs which mandate integer encoding for
+/// Marktpartner-IDs (BDEW-Codenummern, DVGW-Codenummern, GS1 GLNs) — e.g. BDEW
+/// API-Webdienste Strom.
 #[cfg(feature = "serde")]
 #[cfg_attr(docsrs, doc(cfg(feature = "serde")))]
 pub use marktpartner_id::serde_as_i64 as marktpartner_id_as_i64;

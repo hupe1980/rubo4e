@@ -23,9 +23,17 @@ use crate::error::LengthExpectation;
 #[cfg_attr(feature = "validate", derive(garde::Validate))]
 #[cfg_attr(feature = "validate", garde(allow_unvalidated))]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
-#[cfg_attr(feature = "schemars", schemars(with = "String"))]
+#[cfg_attr(
+    feature = "schemars",
+    schemars(schema_with = "crate::schema_helpers::malo_id_schema")
+)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
-#[cfg_attr(feature = "utoipa", schema(value_type = String))]
+#[cfg_attr(feature = "utoipa", schema(
+    value_type = String,
+    pattern = r"^[0-9]{11}$",
+    example = "51238696780",
+    description = "11-stellige BDEW Marktlokations-ID mit BDEW-Prüfziffer (11. Stelle)"
+))]
 pub struct MaloId(#[cfg_attr(feature = "validate", garde(custom(check_malo_id)))] Box<str>);
 
 #[cfg(feature = "validate")]

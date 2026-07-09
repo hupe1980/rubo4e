@@ -1,14 +1,101 @@
-//! Convenience methods on generated BO4E types.
+//! Convenience methods and extension traits on generated BO4E types.
 //!
 //! These are hand-written extension `impl` blocks on generated structs.
 //! The generated files are annotated `// @generated — do not edit by hand`,
 //! so all ergonomic additions live here instead.
 //!
-//! All methods are guarded by the feature flags that make the return type
+//! All items are guarded by the feature flags that make their return types
 //! available:
 //!
 //! - `versioned` — the generated BO/COM structs
 //! - `time` — `time::Date` / `time::OffsetDateTime` return types
+//! - `decimal` — `rust_decimal::Decimal` return types
+//!
+//! ## Extension traits
+//!
+//! [`BetragExt`], [`MengeExt`], and [`PreisExt`] are the primary ergonomic
+//! entry points for the common `Option<Com> → Option<Decimal>` pattern.  They
+//! eliminate the repetitive `.as_ref().and_then(|x| x.wert)` chain:
+//!
+//! ```rust,ignore
+//! use rubo4e::prelude::*;  // re-exports BetragExt, MengeExt, PreisExt
+//!
+//! // Before (requires two-level unwrap):
+//! let net = pos.teilsumme_netto.as_ref().and_then(|b| b.wert);
+//! // After:
+//! let net = pos.teilsumme_netto.wert_decimal();
+//! ```
+//!
+//! Import via `use rubo4e::prelude::*` or individually via
+//! `use rubo4e::convenience::{BetragExt, MengeExt, PreisExt}`.
+
+// ── Extension traits: Option<Com> → Option<Decimal> ─────────────────────────
+//
+// These resolve B-01: `Option<Betrag/Menge/Preis>` → `Option<Decimal>` in one
+// method call. Gated on both `versioned` (the struct) and `decimal` (the type).
+
+/// Ergonomic access to the `wert` field of an [`Option<Betrag>`][crate::v202501::Betrag].
+///
+/// Eliminates the `.as_ref().and_then(|b| b.wert)` chain that appears wherever
+/// monetary amounts are read from `Betrag`-typed optional fields.
+///
+/// Automatically available with `use rubo4e::prelude::*`.
+#[cfg(all(feature = "versioned", feature = "decimal"))]
+#[cfg_attr(docsrs, doc(cfg(all(feature = "versioned", feature = "decimal"))))]
+pub trait BetragExt {
+    /// Returns `wert` from the inner `Betrag`, or `None` if the outer `Option`
+    /// is empty or `wert` itself is `None`.
+    fn wert_decimal(&self) -> Option<rust_decimal::Decimal>;
+}
+
+#[cfg(all(feature = "versioned", feature = "decimal"))]
+impl BetragExt for Option<crate::generated::v202501::Betrag> {
+    fn wert_decimal(&self) -> Option<rust_decimal::Decimal> {
+        self.as_ref().and_then(|b| b.wert)
+    }
+}
+
+/// Ergonomic access to the `wert` field of an [`Option<Menge>`][crate::v202501::Menge].
+///
+/// Eliminates the `.as_ref().and_then(|m| m.wert)` chain that appears wherever
+/// quantities are read from `Menge`-typed optional fields.
+///
+/// Automatically available with `use rubo4e::prelude::*`.
+#[cfg(all(feature = "versioned", feature = "decimal"))]
+#[cfg_attr(docsrs, doc(cfg(all(feature = "versioned", feature = "decimal"))))]
+pub trait MengeExt {
+    /// Returns `wert` from the inner `Menge`, or `None` if the outer `Option`
+    /// is empty or `wert` itself is `None`.
+    fn wert_decimal(&self) -> Option<rust_decimal::Decimal>;
+}
+
+#[cfg(all(feature = "versioned", feature = "decimal"))]
+impl MengeExt for Option<crate::generated::v202501::Menge> {
+    fn wert_decimal(&self) -> Option<rust_decimal::Decimal> {
+        self.as_ref().and_then(|m| m.wert)
+    }
+}
+
+/// Ergonomic access to the `wert` field of an [`Option<Preis>`][crate::v202501::Preis].
+///
+/// Eliminates the `.as_ref().and_then(|p| p.wert)` chain that appears wherever
+/// unit prices are read from `Preis`-typed optional fields.
+///
+/// Automatically available with `use rubo4e::prelude::*`.
+#[cfg(all(feature = "versioned", feature = "decimal"))]
+#[cfg_attr(docsrs, doc(cfg(all(feature = "versioned", feature = "decimal"))))]
+pub trait PreisExt {
+    /// Returns `wert` from the inner `Preis`, or `None` if the outer `Option`
+    /// is empty or `wert` itself is `None`.
+    fn wert_decimal(&self) -> Option<rust_decimal::Decimal>;
+}
+
+#[cfg(all(feature = "versioned", feature = "decimal"))]
+impl PreisExt for Option<crate::generated::v202501::Preis> {
+    fn wert_decimal(&self) -> Option<rust_decimal::Decimal> {
+        self.as_ref().and_then(|p| p.wert)
+    }
+}
 
 // ── Zeitraum ─────────────────────────────────────────────────────────────────
 
@@ -59,6 +146,30 @@ mod zeitraum_impl {
         pub fn as_half_open_range(&self) -> Option<(Date, Option<Date>)> {
             Some((self.startdatum?, self.enddatum))
         }
+
+        /// Returns `true` if `date` falls within `[startdatum, enddatum)`.
+        ///
+        /// Absent boundaries are treated as **unbounded**: a missing `startdatum`
+        /// means "valid since forever"; a missing `enddatum` means "valid until
+        /// further notice".  An entirely empty `Zeitraum` (both absent) returns
+        /// `true` for any date.
+        ///
+        /// ```no_run
+        /// # #[cfg(all(feature = "versioned", feature = "time"))] {
+        /// # use rubo4e::v202501::Zeitraum;
+        /// # use time::macros::date;
+        /// let z: Zeitraum = todo!();
+        /// if z.contains(date!(2026-01-15)) {
+        ///     println!("active on 2026-01-15");
+        /// }
+        /// # }
+        /// ```
+        #[must_use]
+        pub fn contains(&self, date: Date) -> bool {
+            let start_ok = self.startdatum.map_or(true, |d| date >= d);
+            let end_ok = self.enddatum.map_or(true, |d| date < d);
+            start_ok && end_ok
+        }
     }
 }
 
@@ -88,6 +199,172 @@ mod rechnung_impl {
         #[must_use]
         pub fn billing_period(&self) -> Option<(Date, Date)> {
             self.rechnungsperiode.as_ref()?.as_closed_range()
+        }
+
+        /// Billing period start date (shorthand for `billing_period().map(|(s,_)| s)`).
+        ///
+        /// Returns `None` when `rechnungsperiode` is absent or `startdatum` is missing.
+        #[must_use]
+        pub fn period_start(&self) -> Option<Date> {
+            self.rechnungsperiode.as_ref()?.startdatum
+        }
+
+        /// Billing period end date (shorthand for `billing_period().map(|(_,e)| e)`).
+        ///
+        /// Returns `None` when `rechnungsperiode` is absent or `enddatum` is missing.
+        #[must_use]
+        pub fn period_end(&self) -> Option<Date> {
+            self.rechnungsperiode.as_ref()?.enddatum
+        }
+
+        /// Invoice issue date (`rechnungsdatum`).
+        ///
+        /// Convenience alias for the `rechnungsdatum` field.  BDEW INVOIC DTM+137
+        /// is a date-only value (qualifier 102), so this returns `time::Date`.
+        #[must_use]
+        pub fn rechnungsdatum_date(&self) -> Option<Date> {
+            self.rechnungsdatum
+        }
+    }
+}
+
+// ── Rechnung — decimal accessors ─────────────────────────────────────────────
+
+#[cfg(all(feature = "versioned", feature = "decimal"))]
+mod rechnung_decimal_impl {
+    use crate::generated::v202501::Rechnung;
+
+    impl Rechnung {
+        /// Net total (`gesamtnetto.wert`) as `Decimal`.
+        ///
+        /// Returns `None` when `gesamtnetto` is absent or its `wert` is `None`.
+        ///
+        /// ```no_run
+        /// # #[cfg(all(feature = "versioned", feature = "decimal"))] {
+        /// # use rubo4e::v202501::Rechnung;
+        /// let r: Rechnung = todo!();
+        /// if let Some(net) = r.gesamtnetto_decimal() {
+        ///     println!("net total: {net}");
+        /// }
+        /// # }
+        /// ```
+        #[must_use]
+        pub fn gesamtnetto_decimal(&self) -> Option<rust_decimal::Decimal> {
+            self.gesamtnetto.as_ref()?.wert
+        }
+
+        /// Gross total (`gesamtbrutto.wert`) as `Decimal`.
+        ///
+        /// Returns `None` when `gesamtbrutto` is absent or its `wert` is `None`.
+        #[must_use]
+        pub fn gesamtbrutto_decimal(&self) -> Option<rust_decimal::Decimal> {
+            self.gesamtbrutto.as_ref()?.wert
+        }
+
+        /// Total tax amount (`gesamtsteuer.wert`) as `Decimal`.
+        ///
+        /// Returns `None` when `gesamtsteuer` is absent or its `wert` is `None`.
+        #[must_use]
+        pub fn gesamtsteuer_decimal(&self) -> Option<rust_decimal::Decimal> {
+            self.gesamtsteuer.as_ref()?.wert
+        }
+    }
+}
+
+// ── Rechnung — versioned-only accessors ──────────────────────────────────────
+
+#[cfg(feature = "versioned")]
+mod rechnung_versioned_impl {
+    use crate::generated::v202501::{Rechnung, Rechnungsposition};
+
+    impl Rechnung {
+        /// Iterates over all invoice line items (`rechnungspositionen`).
+        ///
+        /// Yields nothing when `rechnungspositionen` is `None` or empty.
+        /// Eliminates the repetitive `.as_deref().into_iter().flatten()` pattern.
+        ///
+        /// ```no_run
+        /// # #[cfg(feature = "versioned")] {
+        /// # use rubo4e::v202501::Rechnung;
+        /// let r: Rechnung = todo!();
+        /// for pos in r.positions() {
+        ///     println!("pos {}: {:?}", pos.positionsnummer.unwrap_or(0), pos.positionstext);
+        /// }
+        /// # }
+        /// ```
+        pub fn positions(&self) -> impl Iterator<Item = &Rechnungsposition> {
+            self.rechnungspositionen.as_deref().into_iter().flatten()
+        }
+    }
+}
+
+// ── Rechnungsposition — time accessors ───────────────────────────────────────
+
+#[cfg(all(feature = "versioned", feature = "time"))]
+mod rechnungsposition_time_impl {
+    use crate::generated::v202501::Rechnungsposition;
+    use time::Date;
+
+    impl Rechnungsposition {
+        /// Delivery period start (`lieferung_von`) as `Date`.
+        ///
+        /// BDEW INVOIC DTM+163 is transmitted as a date-only value (qualifier 102).
+        /// This is a direct accessor for the `lieferung_von` field.
+        #[must_use]
+        pub fn lieferung_von_date(&self) -> Option<Date> {
+            self.lieferung_von
+        }
+
+        /// Delivery period end (`lieferung_bis`) as `Date`.
+        ///
+        /// BDEW INVOIC DTM+164 is transmitted as a date-only value (qualifier 102).
+        /// This is a direct accessor for the `lieferung_bis` field.
+        #[must_use]
+        pub fn lieferung_bis_date(&self) -> Option<Date> {
+            self.lieferung_bis
+        }
+    }
+}
+
+// ── Rechnungsposition — decimal accessors ────────────────────────────────────
+
+#[cfg(all(feature = "versioned", feature = "decimal"))]
+mod rechnungsposition_decimal_impl {
+    use crate::generated::v202501::Rechnungsposition;
+
+    impl Rechnungsposition {
+        /// Net line amount (`teilsumme_netto.wert`) as `Decimal`.
+        ///
+        /// Returns `None` when `teilsumme_netto` is absent or its `wert` is `None`.
+        ///
+        /// ```no_run
+        /// # #[cfg(all(feature = "versioned", feature = "decimal"))] {
+        /// # use rubo4e::v202501::Rechnungsposition;
+        /// let pos: Rechnungsposition = todo!();
+        /// if let Some(net) = pos.teilsumme_netto_decimal() {
+        ///     println!("net: {net}");
+        /// }
+        /// # }
+        /// ```
+        #[must_use]
+        pub fn teilsumme_netto_decimal(&self) -> Option<rust_decimal::Decimal> {
+            self.teilsumme_netto.as_ref()?.wert
+        }
+
+        /// Unit price (`einzelpreis.wert`) as `Decimal`.
+        ///
+        /// Returns `None` when `einzelpreis` is absent or its `wert` is `None`.
+        #[must_use]
+        pub fn einzelpreis_decimal(&self) -> Option<rust_decimal::Decimal> {
+            self.einzelpreis.as_ref()?.wert
+        }
+
+        /// Quantity (`positions_menge.wert`) as `Decimal`.
+        ///
+        /// Returns `None` when `positions_menge` is absent or its `wert` is `None`.
+        #[must_use]
+        pub fn positions_menge_decimal(&self) -> Option<rust_decimal::Decimal> {
+            self.positions_menge.as_ref()?.wert
         }
     }
 }
@@ -120,6 +397,27 @@ mod preisblatt_netznutzung_impl {
         #[must_use]
         pub fn validity(&self) -> Option<(Date, Option<Date>)> {
             self.gueltigkeit.as_ref()?.as_half_open_range()
+        }
+
+        /// Returns `true` if this price sheet's validity period contains `date`.
+        ///
+        /// Uses [`Zeitraum::contains`] — a missing `gueltigkeit` is treated as
+        /// "always invalid" (returns `false`).
+        ///
+        /// ```no_run
+        /// # #[cfg(all(feature = "versioned", feature = "time"))] {
+        /// # use rubo4e::v202501::PreisblattNetznutzung;
+        /// # use time::macros::date;
+        /// let sheets: Vec<PreisblattNetznutzung> = todo!();
+        /// let billing_date = date!(2026-03-15);
+        /// let valid = sheets.iter().find(|s| s.is_valid_at(billing_date));
+        /// # }
+        /// ```
+        #[must_use]
+        pub fn is_valid_at(&self, date: Date) -> bool {
+            self.gueltigkeit
+                .as_ref()
+                .map_or(false, |z| z.contains(date))
         }
     }
 }

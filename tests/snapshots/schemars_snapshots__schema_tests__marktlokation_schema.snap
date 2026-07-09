@@ -1948,11 +1948,19 @@ expression: "schema_json::<Marktlokation>()"
     },
     "MaloId": {
       "description": "Marktlokations-ID (MaLo-ID): 11-digit string validated by BDEW checksum.\n\nThe 11th digit is a check digit computed from the first ten digits using the\nBDEW alternating-weight algorithm.\n\n# Examples\n```\nuse rubo4e::identifiers::MaloId;\n\nlet id = MaloId::new(\"51238696780\").unwrap();\nassert_eq!(id.as_ref(), \"51238696780\");\n```",
-      "type": "string"
+      "type": "string",
+      "examples": [
+        "51238696780"
+      ],
+      "pattern": "^[0-9]{11}$"
     },
     "MarktpartnerId": {
       "description": "Marktpartner-ID (Rollencodenummer): 13-digit numeric string.\n\nNo checksum is applied; all 13 characters must be decimal digits `[0-9]`.",
-      "type": "string"
+      "type": "string",
+      "examples": [
+        "9900357000004"
+      ],
+      "pattern": "^[0-9]{13}$"
     },
     "Marktrolle": {
       "description": "Diese Rollen kann ein Marktteilnehmer einnehmen.",
@@ -2090,7 +2098,11 @@ expression: "schema_json::<Marktlokation>()"
     },
     "MeloId": {
       "description": "Messlokations-ID (MeLo-ID): 33-character string.\n\nStructure (per BDEW specification):\n- **Positions 1–2**: ISO 3166-1 alpha-2 country code, uppercase (e.g. `\"DE\"`, `\"AT\"`)\n- **Positions 3–33**: alphanumeric body `[A-Za-z0-9]` (31 characters)\n\nNo checksum is applied.\n\n# Examples\n```\nuse rubo4e::identifiers::MeloId;\n\nlet id = MeloId::new(\"DE0000000000000000000000000000001\").unwrap();\nassert_eq!(id.as_ref(), \"DE0000000000000000000000000000001\");\n```",
-      "type": "string"
+      "type": "string",
+      "examples": [
+        "DE0000000000000000000000000000001"
+      ],
+      "pattern": "^[A-Z]{2}[A-Za-z0-9]{31}$"
     },
     "Menge": {
       "description": "Abbildung einer Menge mit Wert und Einheit.\n\n> **Note:** [Menge JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202501.0.0/src/bo4e_schemas/com/Menge.json)",

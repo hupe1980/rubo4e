@@ -20,14 +20,56 @@ use crate::ast::{FieldType, PrimitiveType};
 ///
 /// Used for fields where the general-purpose inference rules produce the wrong
 /// type for a specific struct.  Takes priority over `EXACT_MAP` and `SUFFIX_MAP`.
+///
+/// **Schema-override entries** (marked with a `!`) also override the parser's
+/// schema-format detection (normally authoritative for `date`/`date-time` fields).
+/// Use sparingly — only when upstream schema has `"format": "date-time"` but
+/// BDEW practice is date-only (e.g. INVOIC DTM segments with qualifier 102).
 static STRUCT_FIELD_MAP: LazyLock<HashMap<(&'static str, &'static str), FieldType>> =
     LazyLock::new(|| {
         HashMap::from([
             // ZusatzAttribut.wert is a free-form JSON value — string, number, boolean,
             // or object.  The "Wert" suffix rule (→ Decimal) must not apply here.
             (("ZusatzAttribut", "wert"), FieldType::JsonValue),
+            // ── Schema overrides: date-only BDEW fields ─────────────────────
+            // These fields carry `"format": "date-time"` in the upstream BO4E schema
+            // but BDEW INVOIC AHB uses date-only qualifiers (DTM qualifier 102,
+            // YYYYMMDD). Using `time::Date` avoids silent timezone assumptions and
+            // aligns with Zeitraum.startdatum/enddatum (which already use Date).
+
+            // Rechnung.faelligkeitsdatum — INVOIC DTM+92 (qualifier 102)
+            (
+                ("Rechnung", "faelligkeitsdatum"),
+                FieldType::Primitive(PrimitiveType::Date),
+            ),
+            // Rechnung.rechnungsdatum — INVOIC DTM+137 (qualifier 102)
+            (
+                ("Rechnung", "rechnungsdatum"),
+                FieldType::Primitive(PrimitiveType::Date),
+            ),
+            // Rechnungsposition.lieferungBis — INVOIC DTM+164 (qualifier 102)
+            (
+                ("Rechnungsposition", "lieferungBis"),
+                FieldType::Primitive(PrimitiveType::Date),
+            ),
+            // Rechnungsposition.lieferungVon — INVOIC DTM+163 (qualifier 102)
+            (
+                ("Rechnungsposition", "lieferungVon"),
+                FieldType::Primitive(PrimitiveType::Date),
+            ),
         ])
     });
+
+/// Checks for a **struct-specific field override** that must take priority
+/// even over schema-format-detected types.
+///
+/// Unlike [`infer_with_parent`], this function only checks [`STRUCT_FIELD_MAP`]
+/// and requires a parent struct name.  Use this in the parser after resolving
+/// the schema type to allow targeted schema corrections (e.g. `"date-time"` →
+/// `Date` for BDEW date-only fields).
+pub fn infer_schema_override(parent: &str, json_name: &str) -> Option<FieldType> {
+    STRUCT_FIELD_MAP.get(&(parent, json_name)).cloned()
+}
 
 /// Exact-name → FieldType mapping.
 ///

@@ -202,10 +202,19 @@ fn parse_field(
     let field_type = match &schema_type {
         // $ref types are authoritative — never override with name-based inference.
         FieldType::Bo(_) | FieldType::Com(_) => schema_type,
-        // Schema-detected datetime/date types are authoritative — name-based inference
-        // must not downgrade or change a type already established from the schema format.
+        // Schema-detected datetime/date types are normally authoritative over
+        // name-based inference.  However, STRUCT_FIELD_MAP schema-override entries
+        // take priority even here: they correct upstream schema mistakes where BDEW
+        // practice differs from the JSON Schema annotation (e.g. fields that carry
+        // `"format": "date-time"` but are transmitted as date-only in EDIFACT).
         FieldType::Primitive(PrimitiveType::OffsetDateTime)
-        | FieldType::Primitive(PrimitiveType::Date) => schema_type,
+        | FieldType::Primitive(PrimitiveType::Date) => {
+            if let Some(p) = parent_name {
+                inference::infer_schema_override(p, json_name).unwrap_or(schema_type)
+            } else {
+                schema_type
+            }
+        }
         _ => inference::infer_with_parent(parent_name, json_name).unwrap_or(schema_type),
     };
 
