@@ -166,8 +166,8 @@ mod zeitraum_impl {
         /// ```
         #[must_use]
         pub fn contains(&self, date: Date) -> bool {
-            let start_ok = self.startdatum.map_or(true, |d| date >= d);
-            let end_ok = self.enddatum.map_or(true, |d| date < d);
+            let start_ok = self.startdatum.is_none_or(|d| date >= d);
+            let end_ok = self.enddatum.is_none_or(|d| date < d);
             start_ok && end_ok
         }
     }
@@ -417,7 +417,7 @@ mod preisblatt_netznutzung_impl {
         pub fn is_valid_at(&self, date: Date) -> bool {
             self.gueltigkeit
                 .as_ref()
-                .map_or(false, |z| z.contains(date))
+                .is_some_and(|z| z.contains(date))
         }
     }
 }
