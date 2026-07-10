@@ -174,8 +174,7 @@ pub(super) fn validate_ascii_id(
             .into(),
         });
     }
-    for i in 1..10 {
-        let b = bytes[i];
+    for (i, &b) in bytes.iter().enumerate().skip(1).take(9) {
         if !b.is_ascii_uppercase() && !b.is_ascii_digit() {
             return Err(IdentifierError::InvalidCharacter {
                 position: i,
@@ -225,8 +224,7 @@ pub(super) fn compute_ascii_id_from_base(
             .into(),
         });
     }
-    for i in 1..10 {
-        let b = bytes[i];
+    for (i, &b) in bytes.iter().enumerate().skip(1).take(9) {
         if !b.is_ascii_uppercase() && !b.is_ascii_digit() {
             return Err(IdentifierError::InvalidCharacter {
                 position: i,
