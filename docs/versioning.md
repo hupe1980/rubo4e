@@ -5,6 +5,37 @@ conditionally behind the `versioned` feature flag.
 
 ---
 
+## Multi-version Dispatch
+
+When your storage layer persists a `bo4e_version` column alongside the JSON payload
+(common in JSONB-column designs), the idiomatic dispatch pattern is a plain `match`:
+
+```rust
+use rubo4e::{v202607, Bo4eObject as _};
+
+fn process_rechnung(json: &str, bo4e_version: &str) -> Result<(), Box<dyn std::error::Error>> {
+    match bo4e_version {
+        "v202607.0.0" => {
+            let r: v202607::Rechnung = serde_json::from_str(json)?;
+            // r.schema_version() == "v202607.0.0"  ← always matches this arm
+            handle_v202607(r)
+        }
+        // When v202801 ships, add one arm and a migration shim if needed:
+        // "v202801.0.0" => handle_v202801(serde_json::from_str::<v202801::Rechnung>(json)?),
+        _ => Err(format!("unsupported schema version: {bo4e_version}").into()),
+    }
+}
+```
+
+Key points:
+- `schema_version()` is already on every BO type via the `Bo4eObject` trait — no new API needed
+- Each new schema version is exactly one `match` arm
+- Business logic (`handle_v202607`, `handle_v202801`, …) only handles the version it was written for
+- Older versions can be migrated before the branch (`FROM v202607 TO v202801`) or handled by a thin shim inside the arm
+- No trait objects, no `Any*` enums required for this straightforward branching
+
+---
+
 ## Version Module Layout
 
 With the `versioned` feature enabled:

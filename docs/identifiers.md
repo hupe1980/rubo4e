@@ -123,37 +123,70 @@ assert!(!at.is_german());
 
 ## NeloId — Netzlokations-ID
 
-**Format:** 11 alphanumeric characters  
-**Checksum:** none
+**Source:** BDEW "Identifikatoren in der Marktkommunikation" v1.2 (February 2025), §4  
+**Format:** 11 characters  
+**Structure:**
+- Position 1: Codetyp `'E'` (Netzlokation, per BNetzA-Festlegung BK6-22-128)
+- Positions 2–10: uppercase alphanumeric body `[A-Z0-9]`
+- Position 11: numeric check digit `[0-9]`  
+**Checksum:** ASCII-Verfahren (§8.2)
+
+> **Note:** Do not confuse `NeloId` with `EicCode`. EIC codes (e.g. `10YDE-EON------1`,
+> 16 chars) identify Bilanzierungsgebiete / Regelzonen and appear on
+> `Marktlokation.marktgebiet`. NeLo-IDs identify the physical grid asset
+> (transformer, line segment) in Redispatch 2.0.
+
+### ASCII-Verfahren Check Digit
+
+Given positions $p_1 \ldots p_{11}$ where letters map to their ASCII code (A=65…Z=90)
+and digits map to their numeric value (0–9):
+
+$$\text{check} = \Bigl(10 - \bigl((\textstyle\sum_{i \text{ odd}} p_i + 2 \cdot \sum_{i \text{ even}} p_i) \bmod 10\bigr)\Bigr) \bmod 10$$
 
 ```rust
-let nelo = NeloId::new("NELO1234567")?;
+let nelo = NeloId::new("E0000000019")?;  // Ok
+let bad  = NeloId::new("10YDE-EON------1"); // Err — that's an EicCode, not a NeloId
+let bad  = NeloId::new("9900000000001");   // Err — that's a MarktpartnerId
+
+// Build from 10-char base (Codetyp + 9 alphanumeric):
+let nelo = NeloId::from_base("E000000001")?;  // → NeloId("E0000000019")
+let c    = NeloId::check_digit("E111111111")?; // → 7u8
 ```
 
 ---
 
 ## SrId — Steuerbare-Ressource-ID
 
-**Format:** 11 decimal digits  
-**Checksum:** same alternating-weight algorithm as `MaloId`
+**Source:** BDEW "Identifikatoren in der Marktkommunikation" v1.2 (February 2025), §6.3/§6.6  
+**Format:** 11 characters  
+**Structure:**
+- Position 1: Codetyp `'C'` (Steuerbare Ressource)
+- Positions 2–10: uppercase alphanumeric body `[A-Z0-9]`
+- Position 11: numeric check digit `[0-9]`  
+**Checksum:** ASCII-Verfahren (§8.2) — same algorithm as `NeloId` and `TrId`
 
 ```rust
-let sr = SrId::new("51238696780")?;
-let sr = SrId::from_base("5123869678")?;  // compute check digit from base
-let c  = SrId::check_digit("5123869678")?; // → 0u8
+let sr = SrId::new("C0000000003")?;
+let sr = SrId::from_base("C000000000")?;  // → SrId("C0000000003")
+let c  = SrId::check_digit("C000000000")?; // → 3u8
 ```
 
 ---
 
 ## TrId — Technische-Ressource-ID
 
-**Format:** 11 decimal digits  
-**Checksum:** same alternating-weight algorithm as `MaloId`
+**Source:** BDEW "Identifikatoren in der Marktkommunikation" v1.2 (February 2025), §6.2/§6.6  
+**Format:** 11 characters  
+**Structure:**
+- Position 1: Codetyp `'D'` (Technische Ressource)
+- Positions 2–10: uppercase alphanumeric body `[A-Z0-9]`
+- Position 11: numeric check digit `[0-9]`  
+**Checksum:** ASCII-Verfahren (§8.2) — same algorithm as `NeloId` and `SrId`
 
 ```rust
-let tr = TrId::new("51238696780")?;
-let tr = TrId::from_base("5123869678")?;  // compute check digit from base
-let c  = TrId::check_digit("5123869678")?; // → 0u8
+let tr = TrId::new("D0000000002")?;
+let tr = TrId::from_base("D000000000")?;  // → TrId("D0000000002")
+let c  = TrId::check_digit("D000000000")?; // → 2u8
 ```
 
 ---
@@ -185,24 +218,34 @@ let eic = EicCode::new("10XDE-EON-NETZ---W")?;
 
 ## ObisCode — OBIS Identification Code
 
-**Format:** `A-B:C.D.E` (with optional `*F` channel suffix)  
-**Structure:** Media-Channel-Measurement.Type.Tariff groups
+**Format:** `[A-B:]C.D[.E][*F]`  
+**Structure:**
 
 ```
-A = medium (1 = electricity, 7 = gas, …)
-B = channel (0 = total)
-C = physical quantity (1 = active energy forward, …)
+A = medium (1 = electricity, 7 = gas, …)  [optional]
+B = channel (0 = total)                   [optional, requires A]
+C = physical quantity (0 = general metering group per IEC 62056-61; 1 = active energy fwd, …)
 D = measurement type
-E = tariff
-F = billing period (optional)
+E = tariff                                [optional]
+F = billing period (*F or &F; & normalised to *)  [optional]
 ```
+
+`C = 0` is **permitted** — it identifies the general metering data group per IEC 62056-21
+§5.4 and IEC 62056-61 §4.2 (status, date/time, administrative objects).
 
 ```rust
 let obis = ObisCode::new("1-0:1.8.1")?;   // electricity, active energy forward, tariff 1
 let obis = ObisCode::new("7-0:3.1.0")?;   // gas, volume
+let obis = ObisCode::new("0-0:0.0.0")?;   // C=0 — general metering group
 let bad  = ObisCode::new("not-an-obis");   // Err(InvalidFormat { … })
-```
 
+// F-separator normalisation — & is accepted and stored as *
+assert_eq!(ObisCode::new("1.8.1&255")?, ObisCode::new("1.8.1*255")?);
+
+// Structured accessors (F6)
+assert_eq!(ObisCode::new("1-0:1.8.0*255")?.to_pia_string(),  "1-0:1.8.0");    // F stripped
+assert_eq!(ObisCode::new("1-0:1.8.0*255")?.to_bo4e_string(), "1-0:1.8.0*255"); // F kept
+```
 ---
 
 ## MarktpartnerId — Marktpartner-ID (BDEW-code)

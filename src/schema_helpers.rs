@@ -87,3 +87,45 @@ pub fn marktpartner_id_schema(_gen: &mut schemars::SchemaGenerator) -> schemars:
         "examples": ["9900357000004"]
     })
 }
+
+/// JSON Schema for [`NeloId`](crate::identifiers::NeloId): 11-character BDEW NeLo-ID.
+///
+/// Format: Codetyp `'E'` (position 1) + 9 uppercase alphanumeric characters
+/// (positions 2–10) + 1 numeric ASCII-Verfahren check digit (position 11).
+/// Defined by BDEW "Identifikatoren in der Marktkommunikation" v1.2 (February 2025), §4.
+pub fn nelo_id_schema(_gen: &mut schemars::SchemaGenerator) -> schemars::Schema {
+    schemars::json_schema!({
+        "type": "string",
+        "pattern": "^E[A-Z0-9]{9}[0-9]$",
+        "description": "11-stellige BDEW Netzlokations-ID (NeLo-ID): Codetyp 'E' + 9 alphanumerische Zeichen [A-Z0-9] + ASCII-Verfahren-Prüfziffer",
+        "examples": ["E0000000019"]
+    })
+}
+
+/// JSON Schema for [`SrId`](crate::identifiers::SrId): 11-character Steuerbare-Ressource-ID.
+///
+/// Format: Codetyp `'C'` (position 1) + 9 uppercase alphanumeric characters
+/// (positions 2–10) + 1 numeric ASCII-Verfahren check digit (position 11).
+/// Defined by BDEW "Identifikatoren in der Marktkommunikation" v1.2 (February 2025), §6.3/§6.6.
+pub fn sr_id_schema(_gen: &mut schemars::SchemaGenerator) -> schemars::Schema {
+    schemars::json_schema!({
+        "type": "string",
+        "pattern": "^C[A-Z0-9]{9}[0-9]$",
+        "description": "11-stellige Steuerbare-Ressource-ID (SR-ID): Codetyp 'C' + 9 alphanumerische Zeichen [A-Z0-9] + ASCII-Verfahren-Prüfziffer",
+        "examples": ["C0000000003"]
+    })
+}
+
+/// JSON Schema for [`TrId`](crate::identifiers::TrId): 11-character Technische-Ressource-ID.
+///
+/// Format: Codetyp `'D'` (position 1) + 9 uppercase alphanumeric characters
+/// (positions 2–10) + 1 numeric ASCII-Verfahren check digit (position 11).
+/// Defined by BDEW "Identifikatoren in der Marktkommunikation" v1.2 (February 2025), §6.2/§6.6.
+pub fn tr_id_schema(_gen: &mut schemars::SchemaGenerator) -> schemars::Schema {
+    schemars::json_schema!({
+        "type": "string",
+        "pattern": "^D[A-Z0-9]{9}[0-9]$",
+        "description": "11-stellige Technische-Ressource-ID (TR-ID): Codetyp 'D' + 9 alphanumerische Zeichen [A-Z0-9] + ASCII-Verfahren-Prüfziffer",
+        "examples": ["D0000000002"]
+    })
+}

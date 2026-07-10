@@ -13,7 +13,7 @@ anyhow     = "1"
 
 [package]
 name        = "rubo4e"
-version     = "0.5.0"
+version     = "0.6.0"
 edition     = "2021"
 rust-version = "1.87"
 description = "Rust implementation of the BO4E energy-market data standard"
@@ -29,9 +29,17 @@ rustdoc-args = ["--cfg", "docsrs"]
 
 [features]
 # ── Default ──────────────────────────────────────────────────────────────────
-default = ["serde"]
+default = ["identifiers"]
 
 # ── Core feature gates ───────────────────────────────────────────────────────
+# Identifier types only — MaloId, MeloId, NeloId, EicCode, ObisCode, etc.
+# with serde support but WITHOUT the versioned BO/COM schema types.
+# Ideal for parser and transport crates that need identifier validation
+# without the full 191-type schema overhead.
+#
+# Usage: rubo4e = { version = "...", default-features = false, features = ["identifiers"] }
+identifiers = ["serde"]
+
 # Wire-format / serialization
 serde      = ["dep:serde", "dep:indexmap"]
 json       = ["serde", "dep:serde_json"]

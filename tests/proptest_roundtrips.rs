@@ -10,7 +10,22 @@
 
 // ─── Inline strategies (no dependency on library-private Arbitrary impls) ────
 
-/// BDEW alternating-weight check digit (mirrors `src/identifiers/checksum.rs`).
+/// BDEW ASCII-Verfahren check digit (mirrors `src/identifiers/checksum.rs`).
+/// Letters use ASCII code value; digits use numeric value.
+fn ascii_check_digit(base: &[u8; 10]) -> u8 {
+    fn ascii_val(b: u8) -> u32 {
+        if b.is_ascii_digit() {
+            u32::from(b - b'0')
+        } else {
+            u32::from(b)
+        }
+    }
+    let odd: u32 = base.iter().step_by(2).map(|&b| ascii_val(b)).sum();
+    let even: u32 = base.iter().skip(1).step_by(2).map(|&b| ascii_val(b)).sum();
+    ((10 - ((odd + even * 2) % 10)) % 10) as u8
+}
+
+/// BDEW Lok-Waggon check digit used by MaLo-ID (mirrors `src/identifiers/checksum.rs`).
 fn bdew_check_digit(digits: &[u8; 10]) -> u8 {
     const WEIGHTS: [u8; 10] = [2, 1, 2, 1, 2, 1, 2, 1, 2, 1];
     let sum: u32 = digits
@@ -47,7 +62,57 @@ mod identifier_roundtrips {
     }
 
     fn valid_nelo_id() -> impl Strategy<Value = String> {
-        prop::string::string_regex("[A-Z0-9a-z]{11}").expect("valid NeloId regex")
+        const ALNUM: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+        prop::collection::vec(prop::sample::select(ALNUM), 9).prop_map(|body| {
+            let mut base = [0u8; 10];
+            base[0] = b'E';
+            for (i, &b) in body.iter().enumerate() {
+                base[i + 1] = b;
+            }
+            let check = super::ascii_check_digit(&base);
+            let mut s = String::with_capacity(11);
+            for &b in &base {
+                s.push(b as char);
+            }
+            s.push(char::from_digit(u32::from(check), 10).unwrap());
+            s
+        })
+    }
+
+    fn valid_sr_id() -> impl Strategy<Value = String> {
+        const ALNUM: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+        prop::collection::vec(prop::sample::select(ALNUM), 9).prop_map(|body| {
+            let mut base = [0u8; 10];
+            base[0] = b'C';
+            for (i, &b) in body.iter().enumerate() {
+                base[i + 1] = b;
+            }
+            let check = super::ascii_check_digit(&base);
+            let mut s = String::with_capacity(11);
+            for &b in &base {
+                s.push(b as char);
+            }
+            s.push(char::from_digit(u32::from(check), 10).unwrap());
+            s
+        })
+    }
+
+    fn valid_tr_id() -> impl Strategy<Value = String> {
+        const ALNUM: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+        prop::collection::vec(prop::sample::select(ALNUM), 9).prop_map(|body| {
+            let mut base = [0u8; 10];
+            base[0] = b'D';
+            for (i, &b) in body.iter().enumerate() {
+                base[i + 1] = b;
+            }
+            let check = super::ascii_check_digit(&base);
+            let mut s = String::with_capacity(11);
+            for &b in &base {
+                s.push(b as char);
+            }
+            s.push(char::from_digit(u32::from(check), 10).unwrap());
+            s
+        })
     }
 
     fn valid_obis_code() -> impl Strategy<Value = String> {
@@ -111,7 +176,7 @@ mod identifier_roundtrips {
         }
 
         #[test]
-        fn sr_id_display_from_str_roundtrip(s in valid_11digit()) {
+        fn sr_id_display_from_str_roundtrip(s in valid_sr_id()) {
             let id = rubo4e::identifiers::SrId::new(&s).expect("valid SrId");
             let displayed = id.to_string();
             let parsed: rubo4e::identifiers::SrId = displayed.parse()
@@ -120,7 +185,7 @@ mod identifier_roundtrips {
         }
 
         #[test]
-        fn tr_id_display_from_str_roundtrip(s in valid_11digit()) {
+        fn tr_id_display_from_str_roundtrip(s in valid_tr_id()) {
             let id = rubo4e::identifiers::TrId::new(&s).expect("valid TrId");
             let displayed = id.to_string();
             let parsed: rubo4e::identifiers::TrId = displayed.parse()

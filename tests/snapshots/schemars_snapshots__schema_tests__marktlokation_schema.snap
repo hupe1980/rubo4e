@@ -2622,8 +2622,12 @@ expression: "schema_json::<Marktlokation>()"
       ]
     },
     "NeloId": {
-      "description": "Netzlokations-ID (NeLo-ID): 11-character alphanumeric string.\n\nCharacters must be in `[A-Za-z0-9]`. No checksum is applied.",
-      "type": "string"
+      "description": "Netzlokations-ID (NeLo-ID): 11-character identifier for a grid element.\n\nDefined by **BNetzA-Festlegung BK6-22-128** and **BDEW \"Identifikatoren in\nder Marktkommunikation\" v1.2** (February 2025), §4.\n\n## Format (§4.2)\n\n| Position | Content | Character set |\n|----------|---------|---------------|\n| 1        | Codetyp — always `'E'` (Netzlokation) | `{E}` |\n| 2–10     | Alphanumeric body (issued by Energie Codes und Services GmbH) | `[A-Z0-9]` |\n| 11       | Check digit (ASCII-Verfahren, §8.2) | `[0-9]` |\n\n## Check digit — ASCII-Verfahren (§8.2)\n\n1. Each character is mapped: digit → numeric value (0–9);\n   uppercase letter → ASCII code (A = 65 … Z = 90).\n2. Values at odd positions (1, 3, 5, 7, 9) are summed.\n3. Values at even positions (2, 4, 6, 8, 10) are summed and multiplied by 2.\n4. check = (10 − ((odd + even × 2) % 10)) % 10.\n\n## Common confusion\n\n`10YDE-EON------1` is an **[`EicCode`](super::EicCode)** for a\n`Bilanzierungsgebiet` / `Regelzone` (control area) — **not** a NeLo-ID.\nEIC codes appear on `Marktlokation.marktgebiet`; NeLo-IDs identify the\nphysical grid asset (transformer, line segment) in Redispatch 2.0.\n\n## Examples\n```\nuse rubo4e::identifiers::NeloId;\n\nlet id = NeloId::new(\"E0000000019\").unwrap();\nassert_eq!(id.to_string(), \"E0000000019\");\n\nlet id = NeloId::from_base(\"E000000001\").unwrap();\nassert_eq!(id.as_ref(), \"E0000000019\");\nassert_eq!(NeloId::check_digit(\"E000000001\").unwrap(), 9);\n```",
+      "type": "string",
+      "examples": [
+        "E0000000019"
+      ],
+      "pattern": "^E[A-Z0-9]{9}[0-9]$"
     },
     "Netzebene": {
       "description": "Auflistung möglicher Netzebenen innerhalb der Energiearten Strom und Gas.",
@@ -2799,7 +2803,7 @@ expression: "schema_json::<Marktlokation>()"
       "additionalProperties": true
     },
     "ObisCode": {
-      "description": "OBIS identifier (IEC 62056-61 / BDEW): compact reference for metering values.\n\nGrammar: `[A-B:]C.D[.E][*F]`\n\nAll components are non-negative integers.  Components `A`, `B`, `E`, and `F`\nare optional; `C` and `D` are mandatory.\n\nThe stored string is **normalised** at construction time: the alternative `&`\nseparator for the F component is converted to `*`.  Two codes that differ\nonly in separator are therefore equal.\n\nUse [`ObisCode::components`] to access the parsed values.\n\n# Examples\n```\nuse rubo4e::identifiers::ObisCode;\n\nObisCode::new(\"1-0:1.8.1\").unwrap();   // A-B:C.D.E\nObisCode::new(\"1-0:1.8.0*255\").unwrap(); // with F component\nObisCode::new(\"1:1.8\").unwrap();           // A-only prefix (B absent)\nObisCode::new(\"1.8.1\").unwrap();          // C.D.E only\nObisCode::new(\"1.8\").unwrap();            // C.D only\n// & separator is accepted and normalised to *\nassert_eq!(ObisCode::new(\"1.8.1&255\").unwrap(), ObisCode::new(\"1.8.1*255\").unwrap());\n// A-only: components() returns b = None\nlet c = ObisCode::new(\"1:1.8\").unwrap().components();\nassert_eq!(c.a, Some(1));\nassert_eq!(c.b, None);\nassert_eq!(c.c, 1);\nassert_eq!(c.d, 8);\n```",
+      "description": "OBIS identifier (IEC 62056-61 / BDEW): compact reference for metering values.\n\nGrammar: `[A-B:]C.D[.E][*F]`\n\nAll numeric components are non-negative integers.  `C` and `D` are mandatory;\n`A`, `B`, `E`, and `F` are optional.  `C = 0` is permitted and identifies the\ngeneral metering data group (IEC 62056-21 / IEC 62056-61).\n\nThe stored string is **normalised** at construction time: the alternative `&`\nseparator for the F component is converted to `*`.  Two codes that differ\nonly in separator are therefore equal.\n\nUse [`ObisCode::components`] to access the parsed values.\nUse [`ObisCode::to_pia_string`] to emit the A-B:C.D[.E] form (F stripped).\nUse [`ObisCode::to_bo4e_string`] to emit the canonical BO4E form.\n\n# Examples\n```\nuse rubo4e::identifiers::ObisCode;\n\nObisCode::new(\"1-0:1.8.1\").unwrap();          // A-B:C.D.E\nObisCode::new(\"1-0:1.8.0*255\").unwrap();      // with F component\nObisCode::new(\"0-0:0.0.0\").unwrap();          // C=0 (general metering group)\nObisCode::new(\"1:1.8\").unwrap();              // A-only prefix (B absent)\nObisCode::new(\"1.8.1\").unwrap();              // C.D.E only\n// & separator is accepted and normalised to *\nassert_eq!(ObisCode::new(\"1.8.1&255\").unwrap(), ObisCode::new(\"1.8.1*255\").unwrap());\n```",
       "type": "string"
     },
     "Organisationstyp": {
@@ -3029,8 +3033,12 @@ expression: "schema_json::<Marktlokation>()"
       ]
     },
     "SrId": {
-      "description": "Steuerbare-Ressource-ID (SR-ID): 11-digit string validated by BDEW checksum.\n\nUses the same alternating-weight checksum algorithm as [`MaloId`](super::MaloId).\n\n# Examples\n```\nuse rubo4e::identifiers::SrId;\n\nlet id_str = \"51238696780\"; // valid check digit = 0\n// SrId::new(id_str) succeeds for any correctly-checksummed 11-digit string.\n```",
-      "type": "string"
+      "description": "Steuerbare-Ressource-ID (SR-ID): 11-character identifier for a controllable resource.\n\nDefined by BDEW \"Identifikatoren in der Marktkommunikation\" v1.2\n(February 2025), §6.3 and §6.6.  Used in Redispatch 2.0 to identify\nsteuerbare Ressourcen (controllable generation/load assets).\n\n## Format (§6.6)\n\n| Position | Content | Character set |\n|----------|---------|---------------|\n| 1        | Codetyp — always `'C'` (Steuerbare Ressource) | `{C}` |\n| 2–10     | Alphanumeric body | `[A-Z0-9]` |\n| 11       | Check digit (ASCII-Verfahren, §8.2) | `[0-9]` |\n\nUses the same ASCII-Verfahren check digit algorithm as [`NeloId`](super::NeloId)\nand [`TrId`](super::TrId).\n\n# Examples\n```\nuse rubo4e::identifiers::SrId;\n\nlet id = SrId::new(\"C0000000003\").unwrap();\nassert_eq!(id.to_string(), \"C0000000003\");\n\nlet id = SrId::from_base(\"C000000000\").unwrap();\nassert_eq!(id.as_ref(), \"C0000000003\");\n```",
+      "type": "string",
+      "examples": [
+        "C0000000003"
+      ],
+      "pattern": "^C[A-Z0-9]{9}[0-9]$"
     },
     "SteuerbareRessource": {
       "description": "Object containing information about a steuerbare Ressource\n\n> **Note:** [SteuerbareRessource JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/bo/SteuerbareRessource.json)",
@@ -3496,8 +3504,12 @@ expression: "schema_json::<Marktlokation>()"
       ]
     },
     "TrId": {
-      "description": "Technische-Ressource-ID (TR-ID): 11-digit string validated by BDEW checksum.\n\nUses the same alternating-weight checksum algorithm as [`MaloId`](super::MaloId).",
-      "type": "string"
+      "description": "Technische-Ressource-ID (TR-ID): 11-character identifier for a technical resource.\n\nDefined by BDEW \"Identifikatoren in der Marktkommunikation\" v1.2\n(February 2025), §6.2 and §6.6.  Used in Redispatch 2.0 to identify\ntechnische Ressourcen (physical generation/consumption units).\n\n## Format (§6.6)\n\n| Position | Content | Character set |\n|----------|---------|---------------|\n| 1        | Codetyp — always `'D'` (Technische Ressource) | `{D}` |\n| 2–10     | Alphanumeric body | `[A-Z0-9]` |\n| 11       | Check digit (ASCII-Verfahren, §8.2) | `[0-9]` |\n\nUses the same ASCII-Verfahren check digit algorithm as [`NeloId`](super::NeloId)\nand [`SrId`](super::SrId).\n\n# Examples\n```\nuse rubo4e::identifiers::TrId;\n\nlet id = TrId::new(\"D0000000002\").unwrap();\nassert_eq!(id.to_string(), \"D0000000002\");\n\nlet id = TrId::from_base(\"D000000000\").unwrap();\nassert_eq!(id.as_ref(), \"D0000000002\");\n```",
+      "type": "string",
+      "examples": [
+        "D0000000002"
+      ],
+      "pattern": "^D[A-Z0-9]{9}[0-9]$"
     },
     "Verbrauchsart": {
       "description": "Verbrauchsart einer Marktlokation.",

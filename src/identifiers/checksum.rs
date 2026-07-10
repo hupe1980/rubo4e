@@ -108,3 +108,149 @@ pub(super) fn compute_11digit_from_base(
     result.push(char::from_digit(u32::from(check), 10).expect("check digit is 0..=9"));
     Ok(result)
 }
+
+// ─── ASCII-Verfahren (NeLo-ID, SR-ID, TR-ID, NeBe-ID, Paket-ID) ─────────────
+
+/// Maps a byte to its numeric value for the BDEW ASCII-Verfahren (§8.2).
+///
+/// - Uppercase letters (`A`–`Z`): raw ASCII code value (A = 65 … Z = 90).
+/// - Decimal digits (`0`–`9`): numeric value (0–9).
+#[inline]
+fn ascii_val(b: u8) -> u32 {
+    if b.is_ascii_digit() {
+        u32::from(b - b'0')
+    } else {
+        u32::from(b)
+    }
+}
+
+/// Computes the BDEW ASCII-Verfahren check digit for a 10-byte base.
+///
+/// Used by NeLo-ID, NeBe-ID, Ressourcen-ID (TR-ID, SR-ID, SG-ID, CR-ID),
+/// and Paket-ID.
+///
+/// Algorithm (BDEW "Identifikatoren in der Marktkommunikation" v1.2, §8.2):
+/// 1. Map each character: digit → numeric value (0–9); letter → ASCII code value.
+/// 2. Sum mapped values at **odd** positions (1-indexed: 1, 3, 5, 7, 9
+///    → 0-indexed: 0, 2, 4, 6, 8).
+/// 3. Sum mapped values at **even** positions (1-indexed: 2, 4, 6, 8, 10
+///    → 0-indexed: 1, 3, 5, 7, 9), multiply by 2.
+/// 4. check digit = (10 − ((step 2 + step 3) % 10)) % 10.
+///
+/// **Reference example** (§8.2): base `A113735592` → check digit `5`.
+pub(super) fn ascii_check_digit(base: &[u8; 10]) -> u8 {
+    let odd_sum: u32 = base.iter().step_by(2).map(|&b| ascii_val(b)).sum();
+    let even_sum: u32 = base.iter().skip(1).step_by(2).map(|&b| ascii_val(b)).sum();
+    ((10 - ((odd_sum + even_sum * 2) % 10)) % 10) as u8
+}
+
+/// Validates an 11-character alphanumeric BDEW ID using the ASCII-Verfahren.
+///
+/// Constraints:
+/// - Length must be exactly 11.
+/// - `s[0]` must equal `type_char` (Codetyp).
+/// - `s[1..=9]` must be `[A-Z0-9]` (uppercase alphanumeric).
+/// - `s[10]` must be a decimal digit `[0-9]` (the check digit).
+/// - The check digit must match the ASCII-Verfahren result for the 10-byte base.
+pub(super) fn validate_ascii_id(
+    s: &str,
+    type_char: u8,
+) -> Result<(), crate::error::IdentifierError> {
+    use crate::error::{IdentifierError, LengthExpectation};
+
+    if s.len() != 11 {
+        return Err(IdentifierError::InvalidLength {
+            expected: LengthExpectation::Exact(11),
+            actual: s.len(),
+        });
+    }
+    let bytes = s.as_bytes();
+    if bytes[0] != type_char {
+        return Err(IdentifierError::InvalidFormat {
+            description: format!(
+                "first character (Codetyp) must be '{}', got '{}'",
+                type_char as char, bytes[0] as char,
+            )
+            .into(),
+        });
+    }
+    for i in 1..10 {
+        let b = bytes[i];
+        if !b.is_ascii_uppercase() && !b.is_ascii_digit() {
+            return Err(IdentifierError::InvalidCharacter {
+                position: i,
+                character: b as char,
+            });
+        }
+    }
+    let last = bytes[10];
+    if !last.is_ascii_digit() {
+        return Err(IdentifierError::InvalidCharacter {
+            position: 10,
+            character: last as char,
+        });
+    }
+    let base_arr: [u8; 10] = bytes[..10].try_into().expect("verified 10 bytes above");
+    if last - b'0' != ascii_check_digit(&base_arr) {
+        return Err(IdentifierError::InvalidChecksum);
+    }
+    Ok(())
+}
+
+/// Constructs a valid 11-character ASCII-Verfahren ID from a 10-character base.
+///
+/// - `base[0]` must equal `type_char` (Codetyp).
+/// - `base[1..=9]` must be `[A-Z0-9]` (uppercase alphanumeric).
+///
+/// Returns the full 11-character string (base + computed check digit).
+pub(super) fn compute_ascii_id_from_base(
+    base: &str,
+    type_char: u8,
+) -> Result<String, crate::error::IdentifierError> {
+    use crate::error::{IdentifierError, LengthExpectation};
+
+    if base.len() != 10 {
+        return Err(IdentifierError::InvalidLength {
+            expected: LengthExpectation::Exact(10),
+            actual: base.len(),
+        });
+    }
+    let bytes = base.as_bytes();
+    if bytes[0] != type_char {
+        return Err(IdentifierError::InvalidFormat {
+            description: format!(
+                "base must start with '{}' (Codetyp), got '{}'",
+                type_char as char, bytes[0] as char,
+            )
+            .into(),
+        });
+    }
+    for i in 1..10 {
+        let b = bytes[i];
+        if !b.is_ascii_uppercase() && !b.is_ascii_digit() {
+            return Err(IdentifierError::InvalidCharacter {
+                position: i,
+                character: b as char,
+            });
+        }
+    }
+    let arr: [u8; 10] = bytes.try_into().expect("verified 10 bytes above");
+    let check = ascii_check_digit(&arr);
+    let mut result = base.to_owned();
+    result.push(char::from_digit(u32::from(check), 10).expect("check digit is 0..=9"));
+    Ok(result)
+}
+
+#[cfg(test)]
+pub(super) fn make_valid_ascii_id(type_char: u8, body: &[u8; 9]) -> String {
+    let mut base = [0u8; 10];
+    base[0] = type_char;
+    base[1..].copy_from_slice(body);
+    let check = ascii_check_digit(&base);
+    let mut s = String::with_capacity(11);
+    for &b in &base {
+        s.push(b as char);
+    }
+    s.push(char::from_digit(u32::from(check), 10).unwrap());
+    s
+}

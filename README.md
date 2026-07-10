@@ -30,13 +30,13 @@ the canonical data model for the German energy industry.
 
 ```toml
 [dependencies]
-rubo4e = "0.4"
+rubo4e = "0.6"
 ```
 
 Enable optional features as needed:
 
 ```toml
-rubo4e = { version = "0.4", features = ["versioned", "time", "decimal", "json", "validate"] }
+rubo4e = { version = "0.6", features = ["versioned", "time", "decimal", "json", "validate"] }
 ```
 
 ---
@@ -71,9 +71,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 ## Feature Gates
 
-| Feature     | Default | Description                                       |
-|-------------|:-------:|--------------------------------------------------|
-| `serde`     | ✓       | Serde derives + extension-data map                |
+| Feature       | Default | Description                                       |
+|---------------|:-------:|--------------------------------------------------|
+| `identifiers` | ✓       | Identifier types (`MaloId`, `EicCode`, `ObisCode`, …) + serde — zero schema overhead |
+| `serde`       | ✓       | Serde derives + extension-data map                |
 | `json`      |         | `serde_json` helpers (`to_json_german()`, …)      |
 | `simd-json` |         | SIMD-accelerated JSON parsing backend             |
 | `time`      |         | `time` crate — `Date` for date fields, `OffsetDateTime` for timestamps |
@@ -90,7 +91,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 > **Typical full setup:**
 > ```toml
-> rubo4e = { version = "0.4", features = ["versioned", "time", "decimal", "json", "validate", "builder"] }
+> rubo4e = { version = "0.6", features = ["versioned", "time", "decimal", "json", "validate", "builder"] }
 > ```
 
 ---
@@ -115,18 +116,23 @@ All domain identifiers validate their format at construction time. There are no 
 | Type             | Format / Rule                                              |
 |------------------|------------------------------------------------------------|
 | `MaloId`         | 11 digits, BDEW alternating-weight check digit             |
-| `SrId`           | 11 digits, same algorithm as `MaloId`                      |
-| `TrId`           | 11 digits, same algorithm as `MaloId`                      |
+| `NeloId`         | 11 chars: Codetyp `'E'` + 9 `[A-Z0-9]` + ASCII-Verfahren check digit (BDEW §4.2) |
+| `SrId`           | 11 chars: Codetyp `'C'` + 9 `[A-Z0-9]` + ASCII-Verfahren check digit (BDEW §6.6) |
+| `TrId`           | 11 chars: Codetyp `'D'` + 9 `[A-Z0-9]` + ASCII-Verfahren check digit (BDEW §6.6) |
 | `MeloId`         | 33 chars: 2-char ISO country code + 31 alphanumeric        |
-| `NeloId`         | 11 alphanumeric characters                                 |
 | `EicCode`        | 16-char EIC with ENTSO-E check character                   |
-| `ObisCode`       | `A-B:C.D.E` or `A-B:C.D.E*F`; C ≥ 1 enforced             |
+| `ObisCode`       | `[A-B:]C.D[.E][*F]`; C=0 permitted (IEC 62056-61 general metering group) |
 | `MarktpartnerId` | 13 decimal digits — BDEW (prefix 99), DVGW (prefix 98), or GS1 GLN |
 
 ```rust
 // Build from base (check digit computed automatically)
 let malo = MaloId::from_base("5123869678")?;   // → "51238696780"
 let c    = MaloId::check_digit("5123869678")?; // → 0u8
+
+// NeloId / SrId / TrId — same from_base pattern
+let nelo = NeloId::from_base("E000000001")?;  // → "E0000000019" (ASCII-Verfahren check)
+let sr   = SrId::from_base("C000000000")?;   // → "C0000000003"
+let tr   = TrId::from_base("D000000000")?;   // → "D0000000002"
 
 // Country code extraction (MeloId)
 let melo = MeloId::new("DE00001234567890123456789012345")?;
@@ -147,11 +153,55 @@ assert_eq!(mp.to_i64(), 9_900_357_000_004_i64);
 pub partner_id: MarktpartnerId,
 ```
 
-### `validate` feature
+### OBIS codes (EDIFACT support)
 
-When the `validate` feature is enabled, all identifier types also derive
-`garde::Validate` so that `Validated::<ParentStruct>::new(value)` re-validates
-nested identifiers through the garde report API.
+```rust
+// Standard OBIS codes
+let obis = ObisCode::new("1-0:1.8.0")?;       // active energy total
+let obis = ObisCode::new("0-0:0.0.0")?;       // C=0 — general metering group (IEC 62056-61)
+
+// F separator normalisation — & is accepted and stored as *
+assert_eq!(ObisCode::new("1.8.1&255")?, ObisCode::new("1.8.1*255")?);
+
+// Structured accessors
+assert_eq!(ObisCode::new("1-0:1.8.0*255")?.to_pia_string(),  "1-0:1.8.0");    // F stripped
+assert_eq!(ObisCode::new("1-0:1.8.0*255")?.to_bo4e_string(), "1-0:1.8.0*255"); // F kept
+```
+
+---
+
+## Multi-version Dispatch (F4)
+
+When a storage layer (e.g. PostgreSQL `JSONB`) writes a `bo4e_version` column alongside
+BO4E JSON, the idiomatic dispatch pattern is a plain `match`:
+
+```rust
+use rubo4e::{v202607, Bo4eObject as _};
+
+fn process_rechnung(
+    json: &str,
+    bo4e_version: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+    match bo4e_version {
+        "v202607.0.0" => {
+            let r: v202607::Rechnung = serde_json::from_str(json)?;
+            // r.schema_version() == "v202607.0.0"
+            handle_v202607(r)
+        }
+        // When v202801 ships, add one arm:
+        // "v202801.0.0" => handle_v202801(serde_json::from_str::<v202801::Rechnung>(json)?),
+        _ => Err(format!("unsupported schema version: {bo4e_version}").into()),
+    }
+}
+```
+
+This pattern:
+- Requires no new rubo4e API — `schema_version()` is already on every BO type via `Bo4eObject`
+- Is trivially extensible: each new schema version is one `match` arm
+- Localises migration to the storage layer; business logic only handles the current version
+- Avoids over-engineering (`trait` objects, `Any*` enums) for a straightforward branch
+
+See [docs/versioning.md](docs/versioning.md) for the full upgrade workflow.
 
 ---
 

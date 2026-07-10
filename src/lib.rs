@@ -8,22 +8,36 @@
 //!
 //! ## Feature gates
 //!
-//! | Feature      | Default | Description                                                    |
-//! |--------------|---------|----------------------------------------------------------------|
-//! | `serde`      | ✓       | Serde derives + extension-data map (opt out with `default-features = false`) |
-//! | `json`       |         | `serde_json` helpers (`to_json_*`, `from_json_*`)              |
-//! | `simd-json`  |         | SIMD parser backend for `from_json_*` (workload-dependent)    |
-//! | `time`       |         | `time` crate for timestamps                                    |
-//! | `decimal`    |         | `rust_decimal::Decimal` for amounts/prices (see note below)   |
-//! | `builder`    |         | `typed-builder` derives with `setter(into)` — accepts both `T` and `Option<T>`  |
-//! | `validate`   |         | `garde` validation                                             |
-//! | `schemars`   |         | JSON Schema generation                                         |
-//! | `sqlx`       |         | `sqlx` type integrations                                       |
-//! | `utoipa`     |         | `utoipa` OpenAPI integrations                                  |
-//! | `strum`      |         | Enum iteration and string conversion                           |
-//! | `versioned`  |         | Expose the versioned schema module (`v202607`)              |
-//! | `tracing`    |         | Structured diagnostics via the `tracing` crate                 |
-//! | `metrics`    |         | Optional export hooks via the `metrics` crate                  |
+//! | Feature        | Default | Description                                                    |
+//! |----------------|---------|----------------------------------------------------------------|
+//! | `identifiers`  | ✓       | Identifier types (`MaloId`, `EicCode`, `ObisCode`, …) + serde  |
+//! | `serde`        | ✓       | Serde derives + extension-data map                             |
+//! | `json`         |         | `serde_json` helpers (`to_json_*`, `from_json_*`)              |
+//! | `simd-json`    |         | SIMD parser backend for `from_json_*` (workload-dependent)    |
+//! | `time`         |         | `time` crate for timestamps                                    |
+//! | `decimal`      |         | `rust_decimal::Decimal` for amounts/prices (see note below)   |
+//! | `builder`      |         | `typed-builder` derives with `setter(into)` — accepts both `T` and `Option<T>`  |
+//! | `validate`     |         | `garde` validation                                             |
+//! | `schemars`     |         | JSON Schema generation                                         |
+//! | `sqlx`         |         | `sqlx` type integrations                                       |
+//! | `utoipa`       |         | `utoipa` OpenAPI integrations                                  |
+//! | `strum`        |         | Enum iteration and string conversion                           |
+//! | `versioned`    |         | Expose the versioned schema module (`v202607`)                 |
+//! | `tracing`      |         | Structured diagnostics via the `tracing` crate                 |
+//! | `metrics`      |         | Optional export hooks via the `metrics` crate                  |
+//!
+//! ## Identifiers without schema overhead
+//!
+//! All identifier types (`MaloId`, `MeloId`, `NeloId`, `EicCode`, `ObisCode`,
+//! `MarktpartnerId`, `SrId`, `TrId`) **always** provide `Display`, `FromStr`,
+//! `TryFrom<&str>`, `TryFrom<String>`, and `AsRef<str>` without any feature
+//! flags — the minimum needed for EDIFACT wire-format encoding/decoding.
+//!
+//! To use only identifier types without pulling in the versioned BO4E schema:
+//! ```toml
+//! rubo4e = { version = "...", default-features = false, features = ["identifiers"] }
+//! ```
+//! This gives `serde` support on all identifiers with zero versioned-schema overhead.
 //!
 //! ## `serde` is enabled by default
 //!

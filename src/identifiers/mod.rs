@@ -25,11 +25,18 @@
 //! | [`MaloId`] | 11 digits, BDEW alternating-weight check digit (11th digit) | Check digit is the primary guard against typos |
 //! | [`MeloId`] | 33 chars, first 2 uppercase ASCII (country code), rest alphanumeric | No checksum — format-only |
 //! | [`MarktpartnerId`] | 13 digits, numeric only | **No EAN-13 check digit** for BDEW/DVGW codes. GS1 GLNs carry an EAN-13 check digit, but `MarktpartnerId` does not validate it (the check algorithm is the same as EAN-13, but BDEW codes use the same 13-digit format without being GLNs). |
-//! | [`NeloId`] | 11 digits, same BDEW alternating-weight algorithm as `MaloId` | |
-//! | [`SrId`] | 11 digits, BDEW alternating-weight check digit | |
-//! | [`TrId`] | 11 digits, BDEW alternating-weight check digit | |
+//! | [`NeloId`] | 11 chars: Codetyp `'E'` + 9 `[A-Z0-9]` + ASCII-Verfahren check digit (§8.2) | BDEW "Identifikatoren in der Marktkommunikation" v1.2 §4 |
+//! | [`SrId`] | 11 chars: Codetyp `'C'` + 9 `[A-Z0-9]` + ASCII-Verfahren check digit | BDEW §6.3/§6.6 — Redispatch 2.0 Steuerbare Ressource |
+//! | [`TrId`] | 11 chars: Codetyp `'D'` + 9 `[A-Z0-9]` + ASCII-Verfahren check digit | BDEW §6.2/§6.6 — Redispatch 2.0 Technische Ressource |
 //! | [`EicCode`] | 16 chars, uppercase alphanumeric + `-`, last char is EIC check char | |
-//! | [`ObisCode`] | `A-B:C.D.E*F` format, C ≥ 1 | |
+//! | [`ObisCode`] | `[A-B:]C.D[.E][*F]` format | C=0 permitted (general metering data group, IEC 62056-61) |
+//!
+//! ### Wire-format traits without feature flags
+//!
+//! All identifier types unconditionally implement `Display`, `FromStr`,
+//! `TryFrom<&str>`, `TryFrom<String>`, and `AsRef<str>` regardless of which
+//! features are enabled.  These are the minimum needed for EDIFACT wire-format
+//! encoding/decoding and are **not** gated on `serde` or any other feature.
 //!
 //! ### `validate` feature and `garde`
 //!

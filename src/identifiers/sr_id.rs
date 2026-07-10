@@ -1,68 +1,101 @@
-use super::checksum::{compute_11digit_from_base, validate_11digit_bdew};
+use super::checksum::{compute_ascii_id_from_base, validate_ascii_id};
 use crate::error::IdentifierError;
 #[cfg(test)]
 use crate::error::LengthExpectation;
 
-/// Steuerbare-Ressource-ID (SR-ID): 11-digit string validated by BDEW checksum.
+/// Steuerbare-Ressource-ID (SR-ID): 11-character identifier for a controllable resource.
 ///
-/// Uses the same alternating-weight checksum algorithm as [`MaloId`](super::MaloId).
+/// Defined by BDEW "Identifikatoren in der Marktkommunikation" v1.2
+/// (February 2025), §6.3 and §6.6.  Used in Redispatch 2.0 to identify
+/// steuerbare Ressourcen (controllable generation/load assets).
+///
+/// ## Format (§6.6)
+///
+/// | Position | Content | Character set |
+/// |----------|---------|---------------|
+/// | 1        | Codetyp — always `'C'` (Steuerbare Ressource) | `{C}` |
+/// | 2–10     | Alphanumeric body | `[A-Z0-9]` |
+/// | 11       | Check digit (ASCII-Verfahren, §8.2) | `[0-9]` |
+///
+/// Uses the same ASCII-Verfahren check digit algorithm as [`NeloId`](super::NeloId)
+/// and [`TrId`](super::TrId).
 ///
 /// # Examples
 /// ```
 /// use rubo4e::identifiers::SrId;
 ///
-/// let id_str = "51238696780"; // valid check digit = 0
-/// // SrId::new(id_str) succeeds for any correctly-checksummed 11-digit string.
+/// let id = SrId::new("C0000000003").unwrap();
+/// assert_eq!(id.to_string(), "C0000000003");
+///
+/// let id = SrId::from_base("C000000000").unwrap();
+/// assert_eq!(id.as_ref(), "C0000000003");
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "validate", derive(garde::Validate))]
 #[cfg_attr(feature = "validate", garde(allow_unvalidated))]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
-#[cfg_attr(feature = "schemars", schemars(with = "String"))]
+#[cfg_attr(
+    feature = "schemars",
+    schemars(schema_with = "crate::schema_helpers::sr_id_schema")
+)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "utoipa", schema(value_type = String))]
 pub struct SrId(#[cfg_attr(feature = "validate", garde(custom(check_sr_id)))] Box<str>);
 
 #[cfg(feature = "validate")]
 fn check_sr_id(value: &str, _: &()) -> Result<(), garde::Error> {
-    validate_11digit_bdew(value).map_err(garde::Error::from)
+    validate_ascii_id(value, b'C').map_err(garde::Error::from)
 }
 
 impl SrId {
-    /// Creates a new `SrId` after validating the BDEW checksum.
+    /// Creates a new `SrId` after full validation.
     ///
     /// # Errors
     /// - [`IdentifierError::InvalidLength`] if `s` is not exactly 11 characters.
-    /// - [`IdentifierError::InvalidCharacter`] if any character is not a decimal digit.
-    /// - [`IdentifierError::InvalidChecksum`] if the 11th digit does not match.
+    /// - [`IdentifierError::InvalidFormat`] if the first character is not `'C'`.
+    /// - [`IdentifierError::InvalidCharacter`] if positions 2–10 contain characters
+    ///   outside `[A-Z0-9]`, or position 11 is not a decimal digit.
+    /// - [`IdentifierError::InvalidChecksum`] if the 11th digit does not match the
+    ///   ASCII-Verfahren check digit.
     #[must_use = "the validated identifier is returned; ignoring it discards the result"]
     pub fn new(s: &str) -> Result<Self, IdentifierError> {
-        validate_11digit_bdew(s)?;
+        validate_ascii_id(s, b'C')?;
         Ok(Self(Box::from(s)))
     }
 
-    /// Constructs a valid `SrId` from a 10-digit numeric base by computing the
-    /// BDEW alternating-weight check digit and appending it.
+    /// Constructs a valid `SrId` from a 10-character base string by computing
+    /// and appending the ASCII-Verfahren check digit.
+    ///
+    /// `base[0]` must be `'C'`; `base[1..=9]` must be `[A-Z0-9]`.
     ///
     /// # Errors
     /// - [`IdentifierError::InvalidLength`] if `base` is not exactly 10 characters.
-    /// - [`IdentifierError::InvalidCharacter`] if any character is not a decimal digit.
+    /// - [`IdentifierError::InvalidFormat`] if `base[0]` is not `'C'`.
+    /// - [`IdentifierError::InvalidCharacter`] if positions 2–10 are not `[A-Z0-9]`.
+    ///
+    /// # Examples
+    /// ```
+    /// use rubo4e::identifiers::SrId;
+    ///
+    /// let id = SrId::from_base("C000000000").unwrap();
+    /// assert_eq!(id.as_ref(), "C0000000003");
+    /// ```
     pub fn from_base(base: &str) -> Result<Self, IdentifierError> {
-        let full = compute_11digit_from_base(base)?;
+        let full = compute_ascii_id_from_base(base, b'C')?;
         Ok(Self(Box::from(full.as_str())))
     }
 
-    /// Computes the BDEW check digit for a 10-digit numeric base string.
+    /// Computes the ASCII-Verfahren check digit for a 10-character SR-ID base.
     ///
-    /// Returns the single check digit (`0..=9`) on success.
+    /// Returns the check digit value (`0`–`9`) without constructing an `SrId`.
     ///
     /// # Errors
     /// - [`IdentifierError::InvalidLength`] if `base` is not exactly 10 characters.
-    /// - [`IdentifierError::InvalidCharacter`] if any character is not a decimal digit.
+    /// - [`IdentifierError::InvalidFormat`] if `base[0]` is not `'C'`.
+    /// - [`IdentifierError::InvalidCharacter`] if positions 2–10 are not `[A-Z0-9]`.
     pub fn check_digit(base: &str) -> Result<u8, IdentifierError> {
-        let full = compute_11digit_from_base(base)?;
-        let check = full.as_bytes().last().copied().expect("11 chars") - b'0';
-        Ok(check)
+        let full = compute_ascii_id_from_base(base, b'C')?;
+        Ok(full.as_bytes().last().copied().expect("11 chars") - b'0')
     }
 }
 
@@ -113,7 +146,10 @@ impl<'de> serde::Deserialize<'de> for SrId {
         impl<'de> serde::de::Visitor<'de> for Visitor {
             type Value = SrId;
             fn expecting(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                f.write_str("an 11-digit Steuerbare-Ressource-ID (BDEW checksum)")
+                f.write_str(
+                    "an 11-character Steuerbare-Ressource-ID \
+                     (Codetyp 'C' + 9 alphanumeric + ASCII-Verfahren check digit)",
+                )
             }
             fn visit_str<E: serde::de::Error>(self, v: &str) -> Result<SrId, E> {
                 SrId::new(v).map_err(|e| {
@@ -128,48 +164,84 @@ impl<'de> serde::Deserialize<'de> for SrId {
 
 #[cfg(test)]
 mod tests {
-    use super::super::checksum::make_valid_11digit;
+    use super::super::checksum::make_valid_ascii_id;
     use super::*;
 
+    // All expected values verified against BDEW ASCII-Verfahren §8.2
+    // with Codetyp 'C' (ASCII 67).
+
+    // ── from_base / check_digit ──────────────────────────────────────────
+
     #[test]
-    fn valid_ids_pass() {
-        let prefixes: &[[u8; 10]] = &[
-            [5, 1, 2, 3, 8, 6, 9, 6, 7, 8],
-            [1, 2, 3, 4, 5, 6, 7, 8, 9, 0],
-            [9, 8, 7, 6, 5, 4, 3, 2, 1, 0],
-            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+    fn from_base_all_zeros() {
+        // C=67 at idx0; zeros elsewhere.  odd=67, even=0 → total=67 → check=3
+        let id = SrId::from_base("C000000000").unwrap();
+        assert_eq!(id.as_ref(), "C0000000003");
+    }
+
+    #[test]
+    fn from_base_trailing_one() {
+        // odd=67, even=(0+0+0+0+1)×2=2 → total=69 → check=1
+        let id = SrId::from_base("C000000001").unwrap();
+        assert_eq!(id.as_ref(), "C0000000011");
+    }
+
+    #[test]
+    fn from_base_all_ones_body() {
+        // C=67, body=1×9.  odd=67+1+1+1+1=71, even=(1+1+1+1+1)×2=10 → 81 → check=9
+        let id = SrId::from_base("C111111111").unwrap();
+        assert_eq!(id.as_ref(), "C1111111119");
+    }
+
+    #[test]
+    fn check_digit_method() {
+        assert_eq!(SrId::check_digit("C000000000").unwrap(), 3);
+        assert_eq!(SrId::check_digit("C000000001").unwrap(), 1);
+    }
+
+    // ── make_valid_ascii_id helper ───────────────────────────────────────
+
+    #[test]
+    fn valid_ids_from_helper_pass() {
+        let bodies: &[[u8; 9]] = &[
+            [b'0', b'0', b'0', b'0', b'0', b'0', b'0', b'0', b'0'],
+            [b'0', b'0', b'0', b'0', b'0', b'0', b'0', b'0', b'1'],
+            [b'1', b'1', b'1', b'1', b'1', b'1', b'1', b'1', b'1'],
+            [b'9', b'8', b'7', b'6', b'5', b'4', b'3', b'2', b'1'],
+            [b'A', b'B', b'C', b'D', b'E', b'F', b'0', b'1', b'2'],
         ];
-        for prefix in prefixes {
-            let s = make_valid_11digit(prefix);
-            assert!(SrId::new(&s).is_ok(), "{s} should be valid");
+        for body in bodies {
+            let s = make_valid_ascii_id(b'C', body);
+            SrId::new(&s).unwrap_or_else(|e| panic!("{s} should be valid: {e}"));
         }
     }
+
+    // ── new / round-trip ─────────────────────────────────────────────────
+
+    #[test]
+    fn round_trip() {
+        let s = "C0000000003";
+        assert_eq!(s.parse::<SrId>().unwrap().to_string(), s);
+    }
+
+    // ── validation error paths ───────────────────────────────────────────
 
     #[test]
     fn wrong_length_fails() {
         assert!(matches!(
-            SrId::new("1234567890").unwrap_err(),
+            SrId::new("C123456789").unwrap_err(),
             IdentifierError::InvalidLength {
                 expected: LengthExpectation::Exact(11),
                 actual: 10
             }
         ));
-    }
-
-    #[test]
-    fn too_long_fails() {
         assert!(matches!(
-            SrId::new("123456789012").unwrap_err(),
+            SrId::new("C12345678901").unwrap_err(),
             IdentifierError::InvalidLength {
                 expected: LengthExpectation::Exact(11),
                 actual: 12
             }
         ));
-    }
-
-    #[test]
-    fn empty_string_fails() {
         assert!(matches!(
             SrId::new("").unwrap_err(),
             IdentifierError::InvalidLength {
@@ -180,20 +252,39 @@ mod tests {
     }
 
     #[test]
-    fn non_digit_fails() {
-        let err = SrId::new("1234A678901").unwrap_err();
+    fn wrong_type_char_fails() {
+        // E = NeLo-ID, D = TR-ID — not valid SR-ID prefixes
+        for s in ["E0000000019", "D0000000002"] {
+            assert!(
+                matches!(
+                    SrId::new(s).unwrap_err(),
+                    IdentifierError::InvalidFormat { .. }
+                ),
+                "{s} should fail with InvalidFormat"
+            );
+        }
+        // A purely numeric 11-digit string (old format) is also rejected
+        assert!(matches!(
+            SrId::new("51238696780").unwrap_err(),
+            IdentifierError::InvalidFormat { .. }
+        ));
+    }
+
+    #[test]
+    fn lowercase_body_fails() {
+        let err = SrId::new("C000a000003").unwrap_err();
         assert!(matches!(
             err,
             IdentifierError::InvalidCharacter {
                 position: 4,
-                character: 'A'
+                character: 'a'
             }
         ));
     }
 
     #[test]
     fn space_character_fails() {
-        let err = SrId::new("1234 678901").unwrap_err();
+        let err = SrId::new("C000 000003").unwrap_err();
         assert!(matches!(
             err,
             IdentifierError::InvalidCharacter {
@@ -205,21 +296,15 @@ mod tests {
 
     #[test]
     fn wrong_check_digit_fails() {
-        let valid = make_valid_11digit(&[5, 1, 2, 3, 8, 6, 9, 6, 7, 8]);
-        // Flip the last digit
-        let last = valid.chars().last().unwrap();
-        let wrong_check = char::from_digit((last.to_digit(10).unwrap() + 1) % 10, 10).unwrap();
-        let invalid: String = valid[..10].to_string() + &wrong_check.to_string();
-        assert!(matches!(
-            SrId::new(&invalid).unwrap_err(),
-            IdentifierError::InvalidChecksum
-        ));
-    }
-
-    #[test]
-    fn round_trip() {
-        let s = make_valid_11digit(&[2, 4, 6, 8, 0, 1, 3, 5, 7, 9]);
-        let id = SrId::new(&s).unwrap();
-        assert_eq!(id.to_string().parse::<SrId>().unwrap(), id);
+        // "C0000000003" is valid (check=3); other last digits must fail
+        for wrong in ["C0000000000", "C0000000001", "C0000000002", "C0000000009"] {
+            assert!(
+                matches!(
+                    SrId::new(wrong).unwrap_err(),
+                    IdentifierError::InvalidChecksum
+                ),
+                "{wrong} should fail with InvalidChecksum"
+            );
+        }
     }
 }

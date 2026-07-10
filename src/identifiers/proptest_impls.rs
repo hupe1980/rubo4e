@@ -30,8 +30,15 @@ impl Arbitrary for SrId {
     type Parameters = ();
     type Strategy = BoxedStrategy<Self>;
     fn arbitrary_with(_: Self::Parameters) -> Self::Strategy {
-        valid_11digit_strategy()
-            .prop_map(|s| SrId::new(&s).expect("generated SrId must be valid"))
+        const ALNUM: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+        prop::collection::vec(prop::sample::select(ALNUM), 9)
+            .prop_map(|body| {
+                let s = super::checksum::make_valid_ascii_id(
+                    b'C',
+                    body.as_slice().try_into().expect("9 bytes"),
+                );
+                SrId::new(&s).expect("generated SrId must be valid")
+            })
             .boxed()
     }
 }
@@ -40,8 +47,15 @@ impl Arbitrary for TrId {
     type Parameters = ();
     type Strategy = BoxedStrategy<Self>;
     fn arbitrary_with(_: Self::Parameters) -> Self::Strategy {
-        valid_11digit_strategy()
-            .prop_map(|s| TrId::new(&s).expect("generated TrId must be valid"))
+        const ALNUM: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+        prop::collection::vec(prop::sample::select(ALNUM), 9)
+            .prop_map(|body| {
+                let s = super::checksum::make_valid_ascii_id(
+                    b'D',
+                    body.as_slice().try_into().expect("9 bytes"),
+                );
+                TrId::new(&s).expect("generated TrId must be valid")
+            })
             .boxed()
     }
 }
@@ -72,16 +86,19 @@ impl Arbitrary for MeloId {
     }
 }
 
-// ─── NeloId (11-char alphanumeric) ────────────────────────────────────────────
+// ─── NeloId (E prefix + 9 [A-Z0-9] + ASCII-Verfahren check digit) ─────────────
 
 impl Arbitrary for NeloId {
     type Parameters = ();
     type Strategy = BoxedStrategy<Self>;
     fn arbitrary_with(_: Self::Parameters) -> Self::Strategy {
-        const CHARS: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-        prop::collection::vec(prop::sample::select(CHARS), 11)
-            .prop_map(|bytes| {
-                let s: String = bytes.iter().map(|&b| b as char).collect();
+        const ALNUM: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+        prop::collection::vec(prop::sample::select(ALNUM), 9)
+            .prop_map(|body| {
+                let s = super::checksum::make_valid_ascii_id(
+                    b'E',
+                    body.as_slice().try_into().expect("9 bytes"),
+                );
                 NeloId::new(&s).expect("generated NeloId must be valid")
             })
             .boxed()
@@ -144,7 +161,7 @@ impl Arbitrary for ObisCode {
         (
             any::<u8>(), // A medium
             any::<u8>(), // B channel
-            1u8..=99u8,  // C value type (1–99 are well-defined)
+            any::<u8>(), // C value type (0–255; C=0 = general metering group, valid per IEC 62056-61)
             any::<u8>(), // D measurement type
             any::<u8>(), // E tariff
             any::<u8>(), // F billing
