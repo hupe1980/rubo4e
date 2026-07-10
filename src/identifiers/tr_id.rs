@@ -204,10 +204,10 @@ mod tests {
     #[test]
     fn valid_ids_from_helper_pass() {
         let bodies: &[[u8; 9]] = &[
-            [b'0', b'0', b'0', b'0', b'0', b'0', b'0', b'0', b'0'],
-            [b'0', b'0', b'0', b'0', b'0', b'0', b'0', b'0', b'1'],
-            [b'1', b'1', b'1', b'1', b'1', b'1', b'1', b'1', b'1'],
-            [b'9', b'8', b'7', b'6', b'5', b'4', b'3', b'2', b'1'],
+            *b"000000000",
+            *b"000000001",
+            *b"111111111",
+            *b"987654321",
         ];
         for body in bodies {
             let s = make_valid_ascii_id(b'D', body);
