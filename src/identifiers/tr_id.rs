@@ -203,12 +203,7 @@ mod tests {
 
     #[test]
     fn valid_ids_from_helper_pass() {
-        let bodies: &[[u8; 9]] = &[
-            *b"000000000",
-            *b"000000001",
-            *b"111111111",
-            *b"987654321",
-        ];
+        let bodies: &[[u8; 9]] = &[*b"000000000", *b"000000001", *b"111111111", *b"987654321"];
         for body in bodies {
             let s = make_valid_ascii_id(b'D', body);
             TrId::new(&s).unwrap_or_else(|e| panic!("{s} should be valid: {e}"));
