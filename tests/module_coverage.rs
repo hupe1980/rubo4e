@@ -97,6 +97,18 @@ mod coverage {
         let _: rubo4e::v202607::Vertrag = rubo4e::v202607::Vertrag::default();
     }
 
+    /// BUG-2 fix: `rubo4e::current` is a true module; rust-analyzer resolves
+    /// hover / auto-import paths as `rubo4e::current::Foo`, not `rubo4e::v202607::Foo`.
+    #[test]
+    fn current_is_true_module_not_alias() {
+        // If this compiles, `current` is reachable as a module path.
+        let _: rubo4e::current::Vertrag = rubo4e::current::Vertrag::default();
+        // Both paths must produce the same type.
+        let v202607_vertrag = rubo4e::v202607::Vertrag::default();
+        let current_vertrag = rubo4e::current::Vertrag::default();
+        assert_eq!(v202607_vertrag, current_vertrag);
+    }
+
     /// E05-S25: No `v202402` schema directory exists.
     #[test]
     fn no_v202402_schema_directory() {

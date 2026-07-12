@@ -62,6 +62,29 @@ mod identifier_sizes {
             "MarktpartnerId should be 16 bytes"
         );
     }
+
+    #[test]
+    fn bilanzkreis_id_size() {
+        assert_eq!(
+            size_of::<BilanzkreisId>(),
+            BOX_STR,
+            "BilanzkreisId should be 16 bytes"
+        );
+    }
+
+    #[test]
+    fn akiv_id_size() {
+        assert_eq!(size_of::<AkivId>(), BOX_STR, "AkivId should be 16 bytes");
+    }
+
+    #[test]
+    fn tranchennummer_id_size() {
+        assert_eq!(
+            size_of::<TranchennummerId>(),
+            BOX_STR,
+            "TranchennummerId should be 16 bytes"
+        );
+    }
 }
 
 #[cfg(all(target_pointer_width = "64", feature = "versioned", feature = "serde"))]

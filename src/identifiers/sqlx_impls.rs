@@ -89,7 +89,10 @@ macro_rules! impl_sqlx_text {
     )+};
 }
 
-use crate::identifiers::{EicCode, MaloId, MarktpartnerId, MeloId, NeloId, ObisCode, SrId, TrId};
+use crate::identifiers::{
+    AkivId, BilanzkreisId, EicCode, MaloId, MarktpartnerId, MeloId, NeloId, ObisCode, SrId, TrId,
+    TranchennummerId,
+};
 
 impl_sqlx_text!(
     MaloId,
@@ -99,5 +102,8 @@ impl_sqlx_text!(
     TrId,
     EicCode,
     MarktpartnerId,
-    ObisCode
+    ObisCode,
+    BilanzkreisId,
+    AkivId,
+    TranchennummerId
 );

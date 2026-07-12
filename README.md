@@ -11,6 +11,16 @@ the canonical data model for the German energy industry.
 [![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](LICENSE-MIT)
 [![Rust 1.87+](https://img.shields.io/badge/rust-1.87%2B-orange.svg)](https://www.rust-lang.org/)
 
+## MSRV Policy
+
+The **minimum supported Rust version** is `1.87`, encoded in `Cargo.toml` as
+`rust-version = "1.87"`.
+
+We target **stable + 2 releases** — MSRV advances when the current floor has been
+superseded by two stable releases.  MSRV bumps are treated as **minor** version
+changes (not patch).  The `rust-version` field in `Cargo.toml` is the authoritative
+source; the README badge is kept in sync.
+
 ---
 
 ## Features
@@ -113,16 +123,19 @@ use rubo4e::current::Marktlokation;  // always the latest stable — advances wi
 
 All domain identifiers validate their format at construction time. There are no panicking constructors.
 
-| Type             | Format / Rule                                              |
-|------------------|------------------------------------------------------------|
-| `MaloId`         | 11 digits, BDEW alternating-weight check digit             |
-| `NeloId`         | 11 chars: Codetyp `'E'` + 9 `[A-Z0-9]` + ASCII-Verfahren check digit (BDEW §4.2) |
-| `SrId`           | 11 chars: Codetyp `'C'` + 9 `[A-Z0-9]` + ASCII-Verfahren check digit (BDEW §6.6) |
-| `TrId`           | 11 chars: Codetyp `'D'` + 9 `[A-Z0-9]` + ASCII-Verfahren check digit (BDEW §6.6) |
-| `MeloId`         | 33 chars: 2-char ISO country code + 31 alphanumeric        |
-| `EicCode`        | 16-char EIC with ENTSO-E check character                   |
-| `ObisCode`       | `[A-B:]C.D[.E][*F]`; C=0 permitted (IEC 62056-61 general metering group) |
-| `MarktpartnerId` | 13 decimal digits — BDEW (prefix 99), DVGW (prefix 98), or GS1 GLN |
+| Type                | Format / Rule                                              |
+|---------------------|------------------------------------------------------------|
+| `MaloId`            | 11 digits, BDEW alternating-weight check digit             |
+| `NeloId`            | 11 chars: Codetyp `'E'` + 9 `[A-Z0-9]` + ASCII-Verfahren check digit (BDEW §4.2) |
+| `SrId`              | 11 chars: Codetyp `'C'` + 9 `[A-Z0-9]` + ASCII-Verfahren check digit (BDEW §6.6) |
+| `TrId`              | 11 chars: Codetyp `'D'` + 9 `[A-Z0-9]` + ASCII-Verfahren check digit (BDEW §6.6) |
+| `MeloId`            | 33 chars: 2-char ISO country code + 31 alphanumeric        |
+| `EicCode`           | 16-char EIC with ENTSO-E check character                   |
+| `BilanzkreisId`     | 16-char EIC restricted to type `'Z'` (Bilanzierungszone) — GaBi Gas / MABIS |
+| `ObisCode`          | `[A-B:]C.D[.E][*F]`; C=0 permitted (IEC 62056-61 general metering group) |
+| `MarktpartnerId`    | 13 decimal digits — BDEW (prefix 99), DVGW (prefix 98), or GS1 GLN |
+| `AkivId`            | 1–35 printable ASCII chars — Aktivierungsidentifikator Redispatch 2.0 (BK6-24-174) |
+| `TranchennummerId`  | 1–6 decimal digits, no leading zeros — MABIS Bilanzkreisabrechnung (PID 13003) |
 
 ```rust
 // Build from base (check digit computed automatically)

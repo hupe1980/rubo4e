@@ -6,7 +6,10 @@
 
 use proptest::prelude::*;
 
-use crate::identifiers::{EicCode, MaloId, MarktpartnerId, MeloId, NeloId, ObisCode, SrId, TrId};
+use crate::identifiers::{
+    AkivId, BilanzkreisId, EicCode, MaloId, MarktpartnerId, MeloId, NeloId, ObisCode, SrId, TrId,
+    TranchennummerId,
+};
 
 // ─── 11-digit BDEW identifiers (MaloId, SrId, TrId) ─────────────────────────
 
@@ -170,6 +173,66 @@ impl Arbitrary for ObisCode {
                 let s = format!("{a}-{b}:{c}.{d}.{e}*{f}");
                 ObisCode::new(&s).expect("generated ObisCode must be valid")
             })
+            .boxed()
+    }
+}
+
+// ─── BilanzkreisId (EIC type 'Z') ────────────────────────────────────────────
+
+impl Arbitrary for BilanzkreisId {
+    type Parameters = ();
+    type Strategy = BoxedStrategy<Self>;
+    fn arbitrary_with(_: Self::Parameters) -> Self::Strategy {
+        // Positions 1-2: LIO identifier [A-Z0-9]
+        // Position 3:    fixed 'Z'
+        // Positions 4-15: body [A-Z0-9-]
+        // Position 16:   check char (computed)
+        const LIO: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+        const BODY: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-";
+        (
+            prop::array::uniform2(prop::sample::select(LIO)),
+            prop::collection::vec(prop::sample::select(BODY), 12),
+        )
+            .prop_filter_map(
+                "BilanzkreisId check char computation",
+                |(lio, body_bytes)| {
+                    let body: String = body_bytes.iter().map(|&b| b as char).collect();
+                    let prefix = format!("{}{}Z{}", lio[0] as char, lio[1] as char, body);
+                    BilanzkreisId::from_prefix(&prefix).ok()
+                },
+            )
+            .boxed()
+    }
+}
+
+// ─── AkivId (1–36 printable ASCII) ───────────────────────────────────────────
+
+impl Arbitrary for AkivId {
+    type Parameters = ();
+    type Strategy = BoxedStrategy<Self>;
+    fn arbitrary_with(_: Self::Parameters) -> Self::Strategy {
+        // Printable ASCII: 0x21 ('!') through 0x7E ('~'), excluding space (0x20).
+        const PRINTABLE: &[u8] =
+            b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_./";
+        (1usize..=crate::identifiers::AKIV_ID_MAX_LEN)
+            .prop_flat_map(|len| {
+                prop::collection::vec(prop::sample::select(PRINTABLE), len).prop_map(|chars| {
+                    let s: String = chars.iter().map(|&b| b as char).collect();
+                    AkivId::new(&s).expect("generated AkivId must be valid")
+                })
+            })
+            .boxed()
+    }
+}
+
+// ─── TranchennummerId (0–999 999) ─────────────────────────────────────────────
+
+impl Arbitrary for TranchennummerId {
+    type Parameters = ();
+    type Strategy = BoxedStrategy<Self>;
+    fn arbitrary_with(_: Self::Parameters) -> Self::Strategy {
+        (0u32..=crate::identifiers::TRANCHENNUMMER_MAX)
+            .prop_map(|v| TranchennummerId::from_value(v).expect("value in range"))
             .boxed()
     }
 }

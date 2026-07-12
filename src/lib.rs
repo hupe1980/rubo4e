@@ -156,9 +156,22 @@ pub mod v202607 {
     pub use crate::generated::v202607::*;
 }
 
-/// Alias to the current BO4E schema version (`v202607`).
+/// Current stable BO4E schema version — always resolves to the latest stable schema
+/// (`v202607` in this release).
+///
+/// Prefer `use rubo4e::current::Foo` over `use rubo4e::v202607::Foo` so that
+/// imports remain valid across schema version bumps without any code changes.
+///
+/// # rust-analyzer / IDE note
+///
+/// Because this is a true `pub mod` (not a `pub use … as` alias), IDE tooling
+/// and rust-analyzer resolve hover types and auto-import suggestions as
+/// `rubo4e::current::Foo` rather than the underlying versioned path.
 #[cfg(feature = "versioned")]
-pub use v202607 as current;
+#[cfg_attr(docsrs, doc(cfg(feature = "versioned")))]
+pub mod current {
+    pub use crate::generated::v202607::*;
+}
 
 #[cfg(feature = "versioned")]
 /// Marker trait implemented by every generated BO4E business object (Geschäftsobjekt).
@@ -227,8 +240,8 @@ pub mod bo4e_object_sealed {
 pub mod prelude {
     pub use crate::error::IdentifierError;
     pub use crate::identifiers::{
-        EicCode, EicDomain, MaloId, MarktpartnerId, MeloId, NeloId, ObisCode, ObisComponents, SrId,
-        TrId,
+        AkivId, BilanzkreisId, EicCode, EicDomain, MaloId, MarktpartnerId, MeloId, NeloId,
+        ObisCode, ObisComponents, SrId, TrId, TranchennummerId,
     };
 
     #[cfg(feature = "validate")]

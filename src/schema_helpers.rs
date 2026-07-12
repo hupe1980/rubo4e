@@ -129,3 +129,38 @@ pub fn tr_id_schema(_gen: &mut schemars::SchemaGenerator) -> schemars::Schema {
         "examples": ["D0000000002"]
     })
 }
+
+/// JSON Schema for [`BilanzkreisId`](crate::identifiers::BilanzkreisId): 16-character EIC
+/// code restricted to type character `'Z'` (Bilanzierungszone).
+pub fn bilanzkreis_id_schema(_gen: &mut schemars::SchemaGenerator) -> schemars::Schema {
+    schemars::json_schema!({
+        "type": "string",
+        "pattern": "^[A-Z0-9]{2}Z[A-Z0-9-]{12}[A-Z0-9]$",
+        "description": "16-stellige EIC-Code mit Typ 'Z' (Bilanzkreis-ID / Bilanzierungszone): Positions-1+2 LIO-Kennung + 'Z' + 12 Zeichen Körper + ENTSO-E-Prüfzeichen",
+        "examples": ["11ZVEW---------O"]
+    })
+}
+
+/// JSON Schema for [`AkivId`](crate::identifiers::AkivId): Aktivierungsidentifikator
+/// für Redispatch 2.0 (BDEW WiM AHB BK6-24-174, §14a EnWG).
+pub fn akiv_id_schema(_gen: &mut schemars::SchemaGenerator) -> schemars::Schema {
+    schemars::json_schema!({
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 36,
+        "pattern": "^[!-~]{1,36}$",
+        "description": "Aktivierungsidentifikator für Redispatch 2.0 und §14a EnWG Modul 3 (BDEW WiM AHB BK6-24-174): 1–36 druckbare ASCII-Zeichen (UUID-kompatibel)",
+        "examples": ["550e8400-e29b-41d4-a716-446655440000"]
+    })
+}
+
+/// JSON Schema for [`TranchennummerId`](crate::identifiers::TranchennummerId): 1–6 digit
+/// numeric tranche identifier for MABIS Bilanzkreisabrechnung (PID 13003).
+pub fn tranchennummer_id_schema(_gen: &mut schemars::SchemaGenerator) -> schemars::Schema {
+    schemars::json_schema!({
+        "type": "string",
+        "pattern": "^(0|[1-9][0-9]{0,5})$",
+        "description": "Tranchennummer für MABIS Bilanzkreisabrechnung (PID 13003): 1–6-stellige Dezimalzahl ohne führende Nullen (Wertebereich 0–999 999)",
+        "examples": ["1", "42", "999999"]
+    })
+}

@@ -308,6 +308,96 @@ pub partner_id: MarktpartnerId,
 
 ---
 
+## BilanzkreisId — Bilanzkreis-ID
+
+**Source:** ENTSO-E EIC Reference Manual v5.5 + GaBi Gas BK7-14-020 + MABIS BK6-06-009  
+**Format:** 16-character EIC code  
+**Constraint:** Position 3 (EIC type character) must be `'Z'` (Bilanzierungszone)  
+**Checksum:** ENTSO-E check character at position 16 (same algorithm as [`EicCode`])
+
+A `BilanzkreisId` is a type-safe restriction of `EicCode` for balance-group (Bilanzkreis)
+identifiers used in:
+- **GaBi Gas** (BK7-14-020) — gas Bilanzkreis in settlement processes
+- **MABIS** (BK6-06-009) — power balance-group accounting
+- EDIFACT `NAD+LOC` segments with qualifier `Z01`/`Z02`
+
+```rust
+// Build from a 15-character prefix — check character is computed automatically.
+let bk = BilanzkreisId::from_prefix("11ZVEW---------").unwrap();
+assert_eq!(&bk.as_ref()[2..3], "Z");
+
+// Infallible downcast to the broader EicCode type
+let eic: EicCode = bk.clone().into();
+assert_eq!(eic.type_char(), 'Z');
+
+// Fallible upcast from EicCode (rejects non-Z EIC codes)
+let back = BilanzkreisId::try_from(eic).unwrap();
+assert_eq!(bk, back);
+
+// Reject a non-Bilanzkreis EIC code (type 'Y' = control area)
+assert!(BilanzkreisId::new("10YDE-EON------1").is_err());
+```
+
+---
+
+## AkivId — Aktivierungsidentifikator
+
+**Source:** BDEW WiM AHB BK6-24-174 (§14a EnWG Modul 3, Redispatch 2.0 BK6-20-059)  
+**Format:** 1–36 printable ASCII characters (`!` through `~`, no spaces or control chars)  
+**Checksum:** none — opaque reference identifier
+
+The Aktivierungsidentifikator uniquely identifies a single activation event of a
+controllable resource (`SteuerbareRessource`). It appears in:
+- BDEW UTILTS PID 55168 (`RFF+ACD` segment) — Verpflichtungsanfrage
+- BDEW ORDERS/ORDRSP Steuerungsauftrag — activation acknowledgement
+
+In practice, UUIDs (36 chars) are commonly used:
+
+```rust
+// UUID-format activation ID
+let id = AkivId::new("550e8400-e29b-41d4-a716-446655440000").unwrap();
+
+// Shorter form
+let id = AkivId::new("AKIV-2026-00001").unwrap();
+
+// Into<String> for ergonomic conversion
+let s: String = id.into();
+```
+
+---
+
+## TranchennummerId — Tranchennummer
+
+**Source:** MABIS Bilanzkreisabrechnung PID 13003 (BK6-06-009)  
+**Format:** 1–6 decimal digits (`[0-9]`), no leading zeros (except the literal `"0"`)  
+**Range:** `0`–`999 999`  
+**Checksum:** none
+
+The Tranchennummer identifies tranches within a balance-group settlement period.
+It appears in EDIFACT `RFF+TN:` (reference qualifier `TN` = Tranche Number).
+
+```rust
+let t = TranchennummerId::new("1").unwrap();
+assert_eq!(t.value(), 1u32);
+
+// Build from an integer
+let t = TranchennummerId::from_value(42).unwrap();
+assert_eq!(t.as_ref(), "42");
+
+// Infallible numeric conversion
+let n: u32 = t.into();  // From<TranchennummerId> for u32
+assert_eq!(n, 42u32);
+
+// Reject leading zeros (except "0")
+assert!(TranchennummerId::new("007").is_err());
+assert!(TranchennummerId::new("0").is_ok());
+
+// Reject out-of-range values
+assert!(TranchennummerId::from_value(1_000_000).is_err());
+```
+
+---
+
 ## Serialization
 
 All identifiers serialize as plain JSON strings (no wrapper object):

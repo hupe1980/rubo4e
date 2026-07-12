@@ -29,7 +29,10 @@
 //! | [`SrId`] | 11 chars: Codetyp `'C'` + 9 `[A-Z0-9]` + ASCII-Verfahren check digit | BDEW §6.3/§6.6 — Redispatch 2.0 Steuerbare Ressource |
 //! | [`TrId`] | 11 chars: Codetyp `'D'` + 9 `[A-Z0-9]` + ASCII-Verfahren check digit | BDEW §6.2/§6.6 — Redispatch 2.0 Technische Ressource |
 //! | [`EicCode`] | 16 chars, uppercase alphanumeric + `-`, last char is EIC check char | |
+//! | [`BilanzkreisId`] | 16-char EIC restricted to type `'Z'` (Bilanzierungszone) | GaBi Gas BK7-14-020, MABIS BK6-06-009 |
 //! | [`ObisCode`] | `[A-B:]C.D[.E][*F]` format | C=0 permitted (general metering data group, IEC 62056-61) |
+//! | [`AkivId`] | 1–36 printable ASCII chars | Aktivierungsidentifikator Redispatch 2.0, BDEW WiM AHB BK6-24-174 |
+//! | [`TranchennummerId`] | 1–6 decimal digits, no leading zeros (0–999 999) | MABIS Bilanzkreisabrechnung PID 13003 (BK6-06-009) |
 //!
 //! ### Wire-format traits without feature flags
 //!
@@ -49,6 +52,8 @@
 #[cfg(feature = "serde")]
 use std::sync::atomic::{AtomicU64, Ordering};
 
+mod akiv_id;
+mod bilanzkreis_id;
 mod checksum;
 mod eic_code;
 mod malo_id;
@@ -62,7 +67,10 @@ mod proptest_impls;
 mod sqlx_impls;
 mod sr_id;
 mod tr_id;
+mod tranchennummer_id;
 
+pub use akiv_id::{AkivId, AKIV_ID_MAX_LEN};
+pub use bilanzkreis_id::BilanzkreisId;
 pub use eic_code::{EicCode, EicDomain};
 pub use malo_id::MaloId;
 pub use marktpartner_id::MarktpartnerId;
@@ -71,6 +79,7 @@ pub use nelo_id::NeloId;
 pub use obis_code::{ObisCode, ObisComponents};
 pub use sr_id::SrId;
 pub use tr_id::TrId;
+pub use tranchennummer_id::{TranchennummerId, TRANCHENNUMMER_MAX};
 
 /// Serde adapter module for encoding [`MarktpartnerId`] as a JSON integer (`i64`).
 ///

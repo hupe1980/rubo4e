@@ -13,7 +13,7 @@ anyhow     = "1"
 
 [package]
 name        = "rubo4e"
-version     = "0.6.0"
+version     = "0.7.0"
 edition     = "2021"
 rust-version = "1.87"
 description = "Rust implementation of the BO4E energy-market data standard"
@@ -100,7 +100,11 @@ thiserror = "2"
 serde         = { workspace = true, optional = true }
 serde_json    = { workspace = true, optional = true }
 rust_decimal  = { version = "1",    features = ["serde-with-str"],       optional = true }
-time          = { version = "0.3.53",  features = ["serde", "serde-well-known", "formatting", "parsing", "macros"], optional = true }
+# BUG-1 fix: use "0.3" (>=0.3.0, <0.4.0) so that crates with exact-pinned older
+# patch versions (e.g. lance-namespace-impls = "=0.3.47") can share the same
+# resolved version.  The minimum APIs we need (BorrowedFormatItem, format_description!)
+# are available since 0.3.35.
+time          = { version = "0.3",    features = ["serde", "serde-well-known", "formatting", "parsing", "macros"], optional = true }
 indexmap      = { workspace = true, optional = true }
 typed-builder = { version = "0.23", optional = true }
 garde         = { version = "0.23", features = ["derive"],                optional = true }
