@@ -57,7 +57,7 @@ feature set (`serde` only) does not include versioned types.
 
 ```toml
 # Enable version modules (pure conditional-compilation; no external deps)
-rubo4e = { version = "0.4", features = ["versioned"] }
+rubo4e = { version = "0.8", features = ["versioned"] }
 ```
 
 ---
@@ -85,9 +85,10 @@ only the series prefix in the public API.
 
 ## `rubo4e::current` — Moving Alias
 
-`rubo4e::current` is a type alias that always points to the latest stable schema
-series.  Use it when you always want the newest types and do not need to pin to a
-specific version.
+`rubo4e::current` is a moving re-export module (a real `pub mod`, not a
+`pub use … as` alias) that always points to the latest stable schema series.  Use
+it when you always want the newest types and do not need to pin to a specific
+version.
 
 ```rust
 use rubo4e::current::Vertrag;   // equivalent to rubo4e::v202607::Vertrag today
@@ -98,6 +99,53 @@ Pin to a concrete module if you need version-stability across crate updates:
 ```rust
 use rubo4e::v202607::Vertrag;   // stable even if rubo4e::current advances
 ```
+
+### Semver contract for `current` vs. pinned modules
+
+| Path                    | Stability across a **minor** `rubo4e` bump                                   |
+|-------------------------|------------------------------------------------------------------------------|
+| `rubo4e::v202607::Foo`  | **Pinned.** Type shape and enum membership are fixed for the `v202607` series. New schema series arrive as *new* modules (`v2027xx`), never by mutating this one. |
+| `rubo4e::current::Foo`  | **Moving.** Re-exports the newest stable series. A minor bump can advance it to a new series, which may add enum variants or codelist codes. |
+
+Because enum membership can grow under `current` without a source change on your
+side, **anything whose shape you guard must pin to a version module**:
+
+- SQL `CHECK (col IN (...))` lists generated from an enum's variants
+- Exhaustive `match`/mapping tables over an enum
+- Variant-count assertions (`assert_eq!(T::COUNT, N)`)
+
+Use the `strum`-free introspection surface on a **pinned** type to build those
+guards structurally instead of by hand:
+
+```rust
+use rubo4e::{Bo4eEnum, v202607::Zaehlertyp};
+
+// Structural drift guard — no magic number:
+#[test]
+fn sql_check_list_covers_every_variant() {
+    let sql: Vec<&str> = load_check_list();                 // your migration's CHECK list
+    for v in Zaehlertyp::VARIANTS {                         // pinned → stable
+        assert!(sql.contains(&v.as_wire()), "CHECK list missing {}", v.as_wire());
+    }
+}
+```
+
+### Schema-delta changelog
+
+Every release that changes schema-derived enum membership or codelist coverage
+records it in the [`CHANGELOG.md`](../CHANGELOG.md) **Schema deltas** section, in
+the form:
+
+```
+### Schema deltas   (v202607 → v2027xx)
+- Zaehlertyp        +2  (NEW_VARIANT_A, NEW_VARIANT_B)
+- BdewArtikelnummer +N  (...)
+- Gasqualitaet      +1  (H2_BLEND)
+```
+
+This is the signal to update pinned guards deliberately, rather than discovering
+drift at runtime. `T::COUNT` and `T::VARIANTS` make the drift a compile-/test-time
+failure the moment you bump to a series with new members.
 
 ---
 
@@ -123,14 +171,24 @@ When a new BO4E schema release arrives with new or changed types:
        pub use crate::generated::v202701::*;
    }
    ```
-5. Advance the `current` alias:
+5. Advance the `current` module to re-export the new series (it is a real
+   `pub mod`, not a `pub use … as` alias, so IDE tooling resolves hovers as
+   `rubo4e::current::Foo`):
    ```rust
-   pub use v202701 as current;  // was: v202607
+   #[cfg(feature = "versioned")]
+   pub mod current {
+       pub use crate::generated::v202701::*;  // was: v202607
+   }
    ```
 6. Update the convenience module (`src/convenience.rs`) if schema-breaking changes
    require updating field references (e.g. renamed fields in `Rechnung`,
    `Rechnungsposition`).
 7. Update the Known Schema Series table in this document.
+8. Record a **Schema deltas** section in [`CHANGELOG.md`](../CHANGELOG.md) listing
+   every enum whose membership changed and every codelist code added/removed
+   (e.g. `Zaehlertyp +2 (…)`). Downstream projects rely on this to update pinned
+   guards deliberately. Diffing `T::VARIANTS` between the old and new series makes
+   this mechanical.
 
 ---
 

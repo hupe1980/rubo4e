@@ -2,13 +2,7 @@
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(
     feature = "strum",
-    derive(
-        strum::Display,
-        strum::EnumString,
-        strum::EnumIter,
-        strum::IntoStaticStr,
-        strum::AsRefStr
-    )
+    derive(strum::EnumString, strum::EnumIter, strum::IntoStaticStr)
 )]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
@@ -120,23 +114,195 @@ pub enum Leistungstyp {
     Unknown,
 }
 impl Leistungstyp {
+    /// All variants defined by the BO4E schema, in declaration order.
+    ///
+    /// Excludes the forward-compatibility [`Leistungstyp::Unknown`] catch-all, so this
+    /// is exactly the set of values that appear on the wire.  Available **without**
+    /// the `strum` feature — use it to drift-guard SQL `CHECK` lists and mappings.
+    pub const VARIANTS: &'static [Self] = &[
+        Self::ArbeitspreisWirkarbeit,
+        Self::LeistungspreisWirkleistung,
+        Self::ArbeitspreisBlindarbeitInd,
+        Self::ArbeitspreisBlindarbeitKap,
+        Self::Grundpreis,
+        Self::GrundpreisArbeit,
+        Self::GrundpreisLeistung,
+        Self::Mehrmindermenge,
+        Self::Messstellenbetrieb,
+        Self::Messdienstleistung,
+        Self::MessdienstleistungInklMessung,
+        Self::Abrechnung,
+        Self::KonzessionsAbgabe,
+        Self::KwkUmlage,
+        Self::OffshoreUmlage,
+        Self::AblavUmlage,
+        Self::SonderkundenUmlage,
+        Self::RegelenergieUmlage,
+        Self::BilanzierungUmlage,
+        Self::AuslesungZusaetzlich,
+        Self::AblesungZusaetzlich,
+        Self::AbrechnungZusaetzlich,
+        Self::Sperrung,
+        Self::Entsperrung,
+        Self::Mahnkosten,
+        Self::Inkassokosten,
+        Self::EegUmlage,
+        Self::Energiesteuer,
+        Self::Netzpreis,
+        Self::Messpreis,
+        Self::SonstigerPreis,
+        Self::Dienstleistung,
+    ];
+    /// Number of schema-defined variants (equal to `VARIANTS.len()`), excluding the
+    /// [`Leistungstyp::Unknown`] catch-all.  Stable for this schema version.
+    pub const COUNT: usize = Self::VARIANTS.len();
     /// Returns an iterator over all **known** variants of `Leistungstyp`.
     ///
-    /// Unlike [`strum::IntoEnumIterator`] which includes the [`Leistungstyp::Unknown`]
-    /// catch-all, this method yields only variants that correspond to values defined
-    /// in the BO4E schema.  Use this when building dropdowns, lookup tables, or
-    /// generating reports that should only include valid schema values.
+    /// Yields only variants that correspond to values defined in the BO4E schema
+    /// (i.e. [`Self::VARIANTS`]), never the [`Leistungstyp::Unknown`] catch-all.
+    /// Available **without** the `strum` feature.
     ///
     /// # Example
     /// ```rust,ignore
     /// for v in Leistungstyp::iter_known() {
-    ///     println!("{v}");
+    ///     println!("{}", v.as_wire());
     /// }
     /// ```
-    #[cfg(feature = "strum")]
-    pub fn iter_known() -> impl Iterator<Item = Self> {
-        use strum::IntoEnumIterator as _;
-        Self::iter().filter(|v| !matches!(v, Self::Unknown))
+    pub fn iter_known() -> impl Iterator<Item = Self> + Clone {
+        Self::VARIANTS.iter().copied()
+    }
+    /// Returns the canonical BO4E wire string (SCREAMING_SNAKE_CASE) for this value.
+    ///
+    /// [`Leistungstyp::Unknown`] renders as `"UNKNOWN"`, matching its serialized form.
+    pub const fn as_wire(&self) -> &'static str {
+        match self {
+            Self::ArbeitspreisWirkarbeit => "ARBEITSPREIS_WIRKARBEIT",
+            Self::LeistungspreisWirkleistung => "LEISTUNGSPREIS_WIRKLEISTUNG",
+            Self::ArbeitspreisBlindarbeitInd => "ARBEITSPREIS_BLINDARBEIT_IND",
+            Self::ArbeitspreisBlindarbeitKap => "ARBEITSPREIS_BLINDARBEIT_KAP",
+            Self::Grundpreis => "GRUNDPREIS",
+            Self::GrundpreisArbeit => "GRUNDPREIS_ARBEIT",
+            Self::GrundpreisLeistung => "GRUNDPREIS_LEISTUNG",
+            Self::Mehrmindermenge => "MEHRMINDERMENGE",
+            Self::Messstellenbetrieb => "MESSSTELLENBETRIEB",
+            Self::Messdienstleistung => "MESSDIENSTLEISTUNG",
+            Self::MessdienstleistungInklMessung => "MESSDIENSTLEISTUNG_INKL_MESSUNG",
+            Self::Abrechnung => "ABRECHNUNG",
+            Self::KonzessionsAbgabe => "KONZESSIONS_ABGABE",
+            Self::KwkUmlage => "KWK_UMLAGE",
+            Self::OffshoreUmlage => "OFFSHORE_UMLAGE",
+            Self::AblavUmlage => "ABLAV_UMLAGE",
+            Self::SonderkundenUmlage => "SONDERKUNDEN_UMLAGE",
+            Self::RegelenergieUmlage => "REGELENERGIE_UMLAGE",
+            Self::BilanzierungUmlage => "BILANZIERUNG_UMLAGE",
+            Self::AuslesungZusaetzlich => "AUSLESUNG_ZUSAETZLICH",
+            Self::AblesungZusaetzlich => "ABLESUNG_ZUSAETZLICH",
+            Self::AbrechnungZusaetzlich => "ABRECHNUNG_ZUSAETZLICH",
+            Self::Sperrung => "SPERRUNG",
+            Self::Entsperrung => "ENTSPERRUNG",
+            Self::Mahnkosten => "MAHNKOSTEN",
+            Self::Inkassokosten => "INKASSOKOSTEN",
+            Self::EegUmlage => "EEG_UMLAGE",
+            Self::Energiesteuer => "ENERGIESTEUER",
+            Self::Netzpreis => "NETZPREIS",
+            Self::Messpreis => "MESSPREIS",
+            Self::SonstigerPreis => "SONSTIGER_PREIS",
+            Self::Dienstleistung => "DIENSTLEISTUNG",
+            Self::Unknown => "UNKNOWN",
+        }
+    }
+    /// **Strictly** parses a BO4E wire string into a known variant.
+    ///
+    /// Unlike the lenient `serde` / [`FromStr`](std::str::FromStr) path — which maps
+    /// any unrecognized value (a typo, a legacy code, or a value from a newer schema)
+    /// to [`Leistungstyp::Unknown`] — this returns
+    /// [`Err`](crate::error::UnknownVariant) for values not defined in this schema
+    /// version, including the literal `"UNKNOWN"`.  Use it at the ingest boundary to
+    /// reject bad values instead of silently degrading them.
+    ///
+    /// # Example
+    /// ```rust,ignore
+    /// assert!(Leistungstyp::from_wire("NOT_A_REAL_VALUE").is_err());
+    /// ```
+    pub fn from_wire(s: &str) -> Result<Self, crate::error::UnknownVariant> {
+        match s {
+            "ARBEITSPREIS_WIRKARBEIT" => Ok(Self::ArbeitspreisWirkarbeit),
+            "LEISTUNGSPREIS_WIRKLEISTUNG" => Ok(Self::LeistungspreisWirkleistung),
+            "ARBEITSPREIS_BLINDARBEIT_IND" => Ok(Self::ArbeitspreisBlindarbeitInd),
+            "ARBEITSPREIS_BLINDARBEIT_KAP" => Ok(Self::ArbeitspreisBlindarbeitKap),
+            "GRUNDPREIS" => Ok(Self::Grundpreis),
+            "GRUNDPREIS_ARBEIT" => Ok(Self::GrundpreisArbeit),
+            "GRUNDPREIS_LEISTUNG" => Ok(Self::GrundpreisLeistung),
+            "MEHRMINDERMENGE" => Ok(Self::Mehrmindermenge),
+            "MESSSTELLENBETRIEB" => Ok(Self::Messstellenbetrieb),
+            "MESSDIENSTLEISTUNG" => Ok(Self::Messdienstleistung),
+            "MESSDIENSTLEISTUNG_INKL_MESSUNG" => Ok(Self::MessdienstleistungInklMessung),
+            "ABRECHNUNG" => Ok(Self::Abrechnung),
+            "KONZESSIONS_ABGABE" => Ok(Self::KonzessionsAbgabe),
+            "KWK_UMLAGE" => Ok(Self::KwkUmlage),
+            "OFFSHORE_UMLAGE" => Ok(Self::OffshoreUmlage),
+            "ABLAV_UMLAGE" => Ok(Self::AblavUmlage),
+            "SONDERKUNDEN_UMLAGE" => Ok(Self::SonderkundenUmlage),
+            "REGELENERGIE_UMLAGE" => Ok(Self::RegelenergieUmlage),
+            "BILANZIERUNG_UMLAGE" => Ok(Self::BilanzierungUmlage),
+            "AUSLESUNG_ZUSAETZLICH" => Ok(Self::AuslesungZusaetzlich),
+            "ABLESUNG_ZUSAETZLICH" => Ok(Self::AblesungZusaetzlich),
+            "ABRECHNUNG_ZUSAETZLICH" => Ok(Self::AbrechnungZusaetzlich),
+            "SPERRUNG" => Ok(Self::Sperrung),
+            "ENTSPERRUNG" => Ok(Self::Entsperrung),
+            "MAHNKOSTEN" => Ok(Self::Mahnkosten),
+            "INKASSOKOSTEN" => Ok(Self::Inkassokosten),
+            "EEG_UMLAGE" => Ok(Self::EegUmlage),
+            "ENERGIESTEUER" => Ok(Self::Energiesteuer),
+            "NETZPREIS" => Ok(Self::Netzpreis),
+            "MESSPREIS" => Ok(Self::Messpreis),
+            "SONSTIGER_PREIS" => Ok(Self::SonstigerPreis),
+            "DIENSTLEISTUNG" => Ok(Self::Dienstleistung),
+            other => Err(crate::error::UnknownVariant::new(other)),
+        }
+    }
+    /// Returns `true` if this value is the forward-compatibility
+    /// [`Leistungstyp::Unknown`] catch-all (an out-of-schema value).
+    pub const fn is_unknown(&self) -> bool {
+        matches!(self, Self::Unknown)
+    }
+    /// Returns `true` if this value is a known, schema-defined variant.
+    pub const fn is_known(&self) -> bool {
+        !self.is_unknown()
+    }
+}
+impl std::fmt::Display for Leistungstyp {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_wire())
+    }
+}
+impl AsRef<str> for Leistungstyp {
+    fn as_ref(&self) -> &str {
+        self.as_wire()
+    }
+}
+#[cfg(feature = "versioned")]
+impl crate::bo4e_enum_sealed::Sealed for Leistungstyp {}
+#[cfg(feature = "versioned")]
+impl crate::Bo4eEnum for Leistungstyp {
+    const VARIANTS: &'static [Self] = Self::VARIANTS;
+    const COUNT: usize = Self::COUNT;
+    fn as_wire(&self) -> &'static str {
+        Self::as_wire(self)
+    }
+    fn from_wire(s: &str) -> Result<Self, crate::error::UnknownVariant> {
+        Self::from_wire(s)
+    }
+    fn is_unknown(&self) -> bool {
+        Self::is_unknown(self)
+    }
+}
+#[cfg(feature = "versioned")]
+impl crate::Bo4eStrict for Leistungstyp {
+    fn collect_unknown_enums(&self, path: &str, out: &mut Vec<String>) {
+        if self.is_unknown() {
+            out.push(path.to_owned());
+        }
     }
 }
 #[cfg(all(feature = "sqlx", feature = "json"))]
@@ -145,30 +311,16 @@ impl sqlx::Type<sqlx::Postgres> for Leistungstyp {
         <String as sqlx::Type<sqlx::Postgres>>::type_info()
     }
 }
-/// Strum fast path: `AsRef<str>` returns the canonical string without a
+/// Encode via the canonical wire string (`as_wire`, always available) — no
 /// `serde_json::Value` intermediate, saving an allocation per encode (M-07).
-#[cfg(all(feature = "sqlx", feature = "json", feature = "strum"))]
+#[cfg(all(feature = "sqlx", feature = "json"))]
 impl<'q> sqlx::Encode<'q, sqlx::Postgres> for Leistungstyp {
     fn encode_by_ref(
         &self,
         buf: &mut <sqlx::Postgres as sqlx::Database>::ArgumentBuffer<'q>,
     ) -> Result<sqlx::encode::IsNull, sqlx::error::BoxDynError> {
-        let s: &str = self.as_ref();
+        let s: &str = self.as_wire();
         <&str as sqlx::Encode<'q, sqlx::Postgres>>::encode_by_ref(&s, buf)
-    }
-}
-/// Fallback when `strum` is not active: serialize via `serde_json`.
-#[cfg(all(feature = "sqlx", feature = "json", not(feature = "strum")))]
-impl<'q> sqlx::Encode<'q, sqlx::Postgres> for Leistungstyp {
-    fn encode_by_ref(
-        &self,
-        buf: &mut <sqlx::Postgres as sqlx::Database>::ArgumentBuffer<'q>,
-    ) -> Result<sqlx::encode::IsNull, sqlx::error::BoxDynError> {
-        let s = serde_json::to_value(self)?
-            .as_str()
-            .ok_or("enum variant did not serialize to a JSON string")?
-            .to_owned();
-        <String as sqlx::Encode<'q, sqlx::Postgres>>::encode_by_ref(&s, buf)
     }
 }
 #[cfg(all(feature = "sqlx", feature = "json"))]
@@ -181,14 +333,12 @@ impl<'r> sqlx::Decode<'r, sqlx::Postgres> for Leistungstyp {
             .map_err(|e| Box::new(e) as sqlx::error::BoxDynError)
     }
 }
-#[cfg(all(test, feature = "strum"))]
+#[cfg(test)]
 impl proptest::arbitrary::Arbitrary for Leistungstyp {
     type Parameters = ();
     type Strategy = proptest::strategy::BoxedStrategy<Self>;
     fn arbitrary_with(_: Self::Parameters) -> Self::Strategy {
         use proptest::prelude::*;
-        use strum::IntoEnumIterator as _;
-        let variants: Vec<Self> = Self::iter().collect();
-        proptest::sample::select(variants).boxed()
+        proptest::sample::select(Self::VARIANTS.to_vec()).boxed()
     }
 }

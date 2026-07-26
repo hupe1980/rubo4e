@@ -48,6 +48,27 @@ fmt:
 ci: fmt-check lint test test-minimal test-minimal-versioned check-docs-drift deny-check
     @echo "All CI checks passed."
 
+# Fail only if regenerating changes the generated output (true drift), regardless
+# of any other uncommitted edits in the working tree.  Snapshots src/generated/,
+# regenerates + formats, and compares against the snapshot — so it passes on an
+# already-regenerated (but uncommitted) tree and fails only when the on-disk code
+# genuinely differs from what the generator + schemas produce.
+check-docs-drift:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    snapshot="$(mktemp -d)"
+    trap 'rm -rf "$snapshot"' EXIT
+    cp -R src/generated "$snapshot/before"
+    cargo run -p bo4e-generator -- --schema-version v202607.0.0
+    cargo fmt --all
+    if diff -rq "$snapshot/before" src/generated >/dev/null; then
+        echo "src/generated/ is in sync with the generator."
+    else
+        echo "DRIFT: regenerating changed src/generated/. Review and commit the update:"
+        diff -ru "$snapshot/before" src/generated || true
+        exit 1
+    fi
+
 # Run cargo-deny license/advisory/ban checks
 deny-check:
     cargo deny check

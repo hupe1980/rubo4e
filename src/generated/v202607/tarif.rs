@@ -214,3 +214,125 @@ impl std::fmt::Display for Tarif {
         }
     }
 }
+impl crate::Bo4eStrict for Tarif {
+    fn collect_unknown_enums(&self, path: &str, out: &mut Vec<String>) {
+        if let Some(v) = &self.anbieter {
+            crate::Bo4eStrict::collect_unknown_enums(
+                &**v,
+                &crate::strict::field_path(path, "anbieter"),
+                out,
+            );
+        }
+        crate::Bo4eStrict::collect_unknown_enums(
+            &self.berechnungsparameter,
+            &crate::strict::field_path(path, "berechnungsparameter"),
+            out,
+        );
+        {
+            let items = &self.energiemix;
+            let child = crate::strict::field_path(path, "energiemix");
+            for (i, item) in items.iter().enumerate() {
+                crate::Bo4eStrict::collect_unknown_enums(
+                    item,
+                    &crate::strict::index_path(&child, i),
+                    out,
+                );
+            }
+        }
+        {
+            let items = &self.kundentypen;
+            let child = crate::strict::field_path(path, "kundentypen");
+            for (i, item) in items.iter().enumerate() {
+                crate::Bo4eStrict::collect_unknown_enums(
+                    item,
+                    &crate::strict::index_path(&child, i),
+                    out,
+                );
+            }
+        }
+        crate::Bo4eStrict::collect_unknown_enums(
+            &self.preisgarantie,
+            &crate::strict::field_path(path, "preisgarantie"),
+            out,
+        );
+        if let Some(items) = &self.regionspreise {
+            let child = crate::strict::field_path(path, "regionspreise");
+            for (i, item) in items.iter().enumerate() {
+                crate::Bo4eStrict::collect_unknown_enums(
+                    item,
+                    &crate::strict::index_path(&child, i),
+                    out,
+                );
+            }
+        }
+        crate::Bo4eStrict::collect_unknown_enums(
+            &self.registeranzahl,
+            &crate::strict::field_path(path, "registeranzahl"),
+            out,
+        );
+        crate::Bo4eStrict::collect_unknown_enums(
+            &self.sparte,
+            &crate::strict::field_path(path, "sparte"),
+            out,
+        );
+        if let Some(v) = &self.tarifeinschraenkung {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "tarifeinschraenkung"),
+                out,
+            );
+        }
+        {
+            let items = &self.tarifmerkmale;
+            let child = crate::strict::field_path(path, "tarifmerkmale");
+            for (i, item) in items.iter().enumerate() {
+                crate::Bo4eStrict::collect_unknown_enums(
+                    item,
+                    &crate::strict::index_path(&child, i),
+                    out,
+                );
+            }
+        }
+        crate::Bo4eStrict::collect_unknown_enums(
+            &self.tariftyp,
+            &crate::strict::field_path(path, "tariftyp"),
+            out,
+        );
+        crate::Bo4eStrict::collect_unknown_enums(
+            &self.vertragskonditionen,
+            &crate::strict::field_path(path, "vertragskonditionen"),
+            out,
+        );
+        if let Some(v) = &self.zeitliche_gueltigkeit {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "zeitlicheGueltigkeit"),
+                out,
+            );
+        }
+        if let Some(v) = &self.zeitraum_belieferbarkeit {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "zeitraumBelieferbarkeit"),
+                out,
+            );
+        }
+        if let Some(v) = &self.zeitraum_vermarktung {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "zeitraumVermarktung"),
+                out,
+            );
+        }
+        if let Some(items) = &self.zusatz_attribute {
+            let child = crate::strict::field_path(path, "zusatzAttribute");
+            for (i, item) in items.iter().enumerate() {
+                crate::Bo4eStrict::collect_unknown_enums(
+                    item,
+                    &crate::strict::index_path(&child, i),
+                    out,
+                );
+            }
+        }
+    }
+}

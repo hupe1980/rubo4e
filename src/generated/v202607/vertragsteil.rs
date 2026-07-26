@@ -143,3 +143,38 @@ impl std::fmt::Display for Vertragsteil {
         }
     }
 }
+impl crate::Bo4eStrict for Vertragsteil {
+    fn collect_unknown_enums(&self, path: &str, out: &mut Vec<String>) {
+        if let Some(v) = &self.maximale_abnahmemenge {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "maximaleAbnahmemenge"),
+                out,
+            );
+        }
+        if let Some(v) = &self.minimale_abnahmemenge {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "minimaleAbnahmemenge"),
+                out,
+            );
+        }
+        if let Some(v) = &self.vertraglich_fixierte_menge {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "vertraglichFixierteMenge"),
+                out,
+            );
+        }
+        if let Some(items) = &self.zusatz_attribute {
+            let child = crate::strict::field_path(path, "zusatzAttribute");
+            for (i, item) in items.iter().enumerate() {
+                crate::Bo4eStrict::collect_unknown_enums(
+                    item,
+                    &crate::strict::index_path(&child, i),
+                    out,
+                );
+            }
+        }
+    }
+}

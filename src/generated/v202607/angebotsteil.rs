@@ -102,3 +102,58 @@ impl std::fmt::Display for Angebotsteil {
         }
     }
 }
+impl crate::Bo4eStrict for Angebotsteil {
+    fn collect_unknown_enums(&self, path: &str, out: &mut Vec<String>) {
+        if let Some(v) = &self.gesamtkostenangebotsteil {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "gesamtkostenangebotsteil"),
+                out,
+            );
+        }
+        if let Some(v) = &self.gesamtmengeangebotsteil {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "gesamtmengeangebotsteil"),
+                out,
+            );
+        }
+        if let Some(items) = &self.lieferstellenangebotsteil {
+            let child = crate::strict::field_path(path, "lieferstellenangebotsteil");
+            for (i, item) in items.iter().enumerate() {
+                crate::Bo4eStrict::collect_unknown_enums(
+                    &**item,
+                    &crate::strict::index_path(&child, i),
+                    out,
+                );
+            }
+        }
+        if let Some(v) = &self.lieferzeitraum {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "lieferzeitraum"),
+                out,
+            );
+        }
+        if let Some(items) = &self.positionen {
+            let child = crate::strict::field_path(path, "positionen");
+            for (i, item) in items.iter().enumerate() {
+                crate::Bo4eStrict::collect_unknown_enums(
+                    item,
+                    &crate::strict::index_path(&child, i),
+                    out,
+                );
+            }
+        }
+        if let Some(items) = &self.zusatz_attribute {
+            let child = crate::strict::field_path(path, "zusatzAttribute");
+            for (i, item) in items.iter().enumerate() {
+                crate::Bo4eStrict::collect_unknown_enums(
+                    item,
+                    &crate::strict::index_path(&child, i),
+                    out,
+                );
+            }
+        }
+    }
+}

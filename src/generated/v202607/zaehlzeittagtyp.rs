@@ -85,3 +85,34 @@ impl std::fmt::Display for Zaehlzeittagtyp {
         }
     }
 }
+impl crate::Bo4eStrict for Zaehlzeittagtyp {
+    fn collect_unknown_enums(&self, path: &str, out: &mut Vec<String>) {
+        if let Some(v) = &self.tagtyp {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "tagtyp"),
+                out,
+            );
+        }
+        if let Some(items) = &self.umschaltzeiten {
+            let child = crate::strict::field_path(path, "umschaltzeiten");
+            for (i, item) in items.iter().enumerate() {
+                crate::Bo4eStrict::collect_unknown_enums(
+                    item,
+                    &crate::strict::index_path(&child, i),
+                    out,
+                );
+            }
+        }
+        if let Some(items) = &self.zusatz_attribute {
+            let child = crate::strict::field_path(path, "zusatzAttribute");
+            for (i, item) in items.iter().enumerate() {
+                crate::Bo4eStrict::collect_unknown_enums(
+                    item,
+                    &crate::strict::index_path(&child, i),
+                    out,
+                );
+            }
+        }
+    }
+}

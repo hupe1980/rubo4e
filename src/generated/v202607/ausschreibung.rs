@@ -184,3 +184,69 @@ impl std::fmt::Display for Ausschreibung {
         }
     }
 }
+impl crate::Bo4eStrict for Ausschreibung {
+    fn collect_unknown_enums(&self, path: &str, out: &mut Vec<String>) {
+        if let Some(v) = &self.abgabefrist {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "abgabefrist"),
+                out,
+            );
+        }
+        if let Some(v) = &self.ausschreibender {
+            crate::Bo4eStrict::collect_unknown_enums(
+                &**v,
+                &crate::strict::field_path(path, "ausschreibender"),
+                out,
+            );
+        }
+        if let Some(v) = &self.ausschreibungportal {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "ausschreibungportal"),
+                out,
+            );
+        }
+        if let Some(v) = &self.ausschreibungsstatus {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "ausschreibungsstatus"),
+                out,
+            );
+        }
+        if let Some(v) = &self.ausschreibungstyp {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "ausschreibungstyp"),
+                out,
+            );
+        }
+        if let Some(v) = &self.bindefrist {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "bindefrist"),
+                out,
+            );
+        }
+        if let Some(items) = &self.lose {
+            let child = crate::strict::field_path(path, "lose");
+            for (i, item) in items.iter().enumerate() {
+                crate::Bo4eStrict::collect_unknown_enums(
+                    item,
+                    &crate::strict::index_path(&child, i),
+                    out,
+                );
+            }
+        }
+        if let Some(items) = &self.zusatz_attribute {
+            let child = crate::strict::field_path(path, "zusatzAttribute");
+            for (i, item) in items.iter().enumerate() {
+                crate::Bo4eStrict::collect_unknown_enums(
+                    item,
+                    &crate::strict::index_path(&child, i),
+                    out,
+                );
+            }
+        }
+    }
+}

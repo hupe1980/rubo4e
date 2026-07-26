@@ -2,13 +2,7 @@
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(
     feature = "strum",
-    derive(
-        strum::Display,
-        strum::EnumString,
-        strum::EnumIter,
-        strum::IntoStaticStr,
-        strum::AsRefStr
-    )
+    derive(strum::EnumString, strum::EnumIter, strum::IntoStaticStr)
 )]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
@@ -202,23 +196,279 @@ pub enum ComTyp {
     Unknown,
 }
 impl ComTyp {
+    /// All variants defined by the BO4E schema, in declaration order.
+    ///
+    /// Excludes the forward-compatibility [`ComTyp::Unknown`] catch-all, so this
+    /// is exactly the set of values that appear on the wire.  Available **without**
+    /// the `strum` feature — use it to drift-guard SQL `CHECK` lists and mappings.
+    pub const VARIANTS: &'static [Self] = &[
+        Self::Adresse,
+        Self::Angebotsposition,
+        Self::Angebotsteil,
+        Self::Angebotsvariante,
+        Self::Aufabschlag,
+        Self::Ausschreibungsdetail,
+        Self::Ausschreibungslos,
+        Self::Betrag,
+        Self::Dienstleistung,
+        Self::Einheitspreisposition,
+        Self::Energieherkunft,
+        Self::Energiemix,
+        Self::Fremdkostenblock,
+        Self::Fremdkostenposition,
+        Self::Geokoordinaten,
+        Self::Katasteradresse,
+        Self::Konfigurationsprodukt,
+        Self::Kontaktweg,
+        Self::Konzessionsabgabe,
+        Self::Kostenblock,
+        Self::Kostenposition,
+        Self::Lastprofil,
+        Self::Lastvariablepreisposition,
+        Self::Marktgebietinfo,
+        Self::Menge,
+        Self::Messwert,
+        Self::Preis,
+        Self::Preisgarantie,
+        Self::Preisposition,
+        Self::Preisstaffel,
+        Self::Rechnungsposition,
+        Self::Regionsoperation,
+        Self::Regionspreis,
+        Self::Regionszeitscheibe,
+        Self::Relativepreisposition,
+        Self::Sigmoidparameter,
+        Self::Standorteigenschaftengas,
+        Self::Standorteigenschaftenstrom,
+        Self::Steuerbetrag,
+        Self::Tagesparameter,
+        Self::Tarifberechnungsparameter,
+        Self::Tarifeinschraenkung,
+        Self::Tarifpreis,
+        Self::Tarifpreisposition,
+        Self::Tarifpreiszeitscheibe,
+        Self::Umschaltzeit,
+        Self::Unterschrift,
+        Self::Vertragskonditionen,
+        Self::Vertragsteil,
+        Self::Verwendungszweckpromarktrolle,
+        Self::Vorauszahlung,
+        Self::Zaehlwerk,
+        Self::Zaehlzeitregister,
+        Self::Zaehlzeitsaison,
+        Self::Zaehlzeittagtyp,
+        Self::Zahlungsinformation,
+        Self::Zeitraum,
+        Self::Zeitreihenwert,
+        Self::Zeitvariablepreisposition,
+        Self::Zustaendigkeit,
+    ];
+    /// Number of schema-defined variants (equal to `VARIANTS.len()`), excluding the
+    /// [`ComTyp::Unknown`] catch-all.  Stable for this schema version.
+    pub const COUNT: usize = Self::VARIANTS.len();
     /// Returns an iterator over all **known** variants of `ComTyp`.
     ///
-    /// Unlike [`strum::IntoEnumIterator`] which includes the [`ComTyp::Unknown`]
-    /// catch-all, this method yields only variants that correspond to values defined
-    /// in the BO4E schema.  Use this when building dropdowns, lookup tables, or
-    /// generating reports that should only include valid schema values.
+    /// Yields only variants that correspond to values defined in the BO4E schema
+    /// (i.e. [`Self::VARIANTS`]), never the [`ComTyp::Unknown`] catch-all.
+    /// Available **without** the `strum` feature.
     ///
     /// # Example
     /// ```rust,ignore
     /// for v in ComTyp::iter_known() {
-    ///     println!("{v}");
+    ///     println!("{}", v.as_wire());
     /// }
     /// ```
-    #[cfg(feature = "strum")]
-    pub fn iter_known() -> impl Iterator<Item = Self> {
-        use strum::IntoEnumIterator as _;
-        Self::iter().filter(|v| !matches!(v, Self::Unknown))
+    pub fn iter_known() -> impl Iterator<Item = Self> + Clone {
+        Self::VARIANTS.iter().copied()
+    }
+    /// Returns the canonical BO4E wire string (SCREAMING_SNAKE_CASE) for this value.
+    ///
+    /// [`ComTyp::Unknown`] renders as `"UNKNOWN"`, matching its serialized form.
+    pub const fn as_wire(&self) -> &'static str {
+        match self {
+            Self::Adresse => "ADRESSE",
+            Self::Angebotsposition => "ANGEBOTSPOSITION",
+            Self::Angebotsteil => "ANGEBOTSTEIL",
+            Self::Angebotsvariante => "ANGEBOTSVARIANTE",
+            Self::Aufabschlag => "AUFABSCHLAG",
+            Self::Ausschreibungsdetail => "AUSSCHREIBUNGSDETAIL",
+            Self::Ausschreibungslos => "AUSSCHREIBUNGSLOS",
+            Self::Betrag => "BETRAG",
+            Self::Dienstleistung => "DIENSTLEISTUNG",
+            Self::Einheitspreisposition => "EINHEITSPREISPOSITION",
+            Self::Energieherkunft => "ENERGIEHERKUNFT",
+            Self::Energiemix => "ENERGIEMIX",
+            Self::Fremdkostenblock => "FREMDKOSTENBLOCK",
+            Self::Fremdkostenposition => "FREMDKOSTENPOSITION",
+            Self::Geokoordinaten => "GEOKOORDINATEN",
+            Self::Katasteradresse => "KATASTERADRESSE",
+            Self::Konfigurationsprodukt => "KONFIGURATIONSPRODUKT",
+            Self::Kontaktweg => "KONTAKTWEG",
+            Self::Konzessionsabgabe => "KONZESSIONSABGABE",
+            Self::Kostenblock => "KOSTENBLOCK",
+            Self::Kostenposition => "KOSTENPOSITION",
+            Self::Lastprofil => "LASTPROFIL",
+            Self::Lastvariablepreisposition => "LASTVARIABLEPREISPOSITION",
+            Self::Marktgebietinfo => "MARKTGEBIETINFO",
+            Self::Menge => "MENGE",
+            Self::Messwert => "MESSWERT",
+            Self::Preis => "PREIS",
+            Self::Preisgarantie => "PREISGARANTIE",
+            Self::Preisposition => "PREISPOSITION",
+            Self::Preisstaffel => "PREISSTAFFEL",
+            Self::Rechnungsposition => "RECHNUNGSPOSITION",
+            Self::Regionsoperation => "REGIONSOPERATION",
+            Self::Regionspreis => "REGIONSPREIS",
+            Self::Regionszeitscheibe => "REGIONSZEITSCHEIBE",
+            Self::Relativepreisposition => "RELATIVEPREISPOSITION",
+            Self::Sigmoidparameter => "SIGMOIDPARAMETER",
+            Self::Standorteigenschaftengas => "STANDORTEIGENSCHAFTENGAS",
+            Self::Standorteigenschaftenstrom => "STANDORTEIGENSCHAFTENSTROM",
+            Self::Steuerbetrag => "STEUERBETRAG",
+            Self::Tagesparameter => "TAGESPARAMETER",
+            Self::Tarifberechnungsparameter => "TARIFBERECHNUNGSPARAMETER",
+            Self::Tarifeinschraenkung => "TARIFEINSCHRAENKUNG",
+            Self::Tarifpreis => "TARIFPREIS",
+            Self::Tarifpreisposition => "TARIFPREISPOSITION",
+            Self::Tarifpreiszeitscheibe => "TARIFPREISZEITSCHEIBE",
+            Self::Umschaltzeit => "UMSCHALTZEIT",
+            Self::Unterschrift => "UNTERSCHRIFT",
+            Self::Vertragskonditionen => "VERTRAGSKONDITIONEN",
+            Self::Vertragsteil => "VERTRAGSTEIL",
+            Self::Verwendungszweckpromarktrolle => "VERWENDUNGSZWECKPROMARKTROLLE",
+            Self::Vorauszahlung => "VORAUSZAHLUNG",
+            Self::Zaehlwerk => "ZAEHLWERK",
+            Self::Zaehlzeitregister => "ZAEHLZEITREGISTER",
+            Self::Zaehlzeitsaison => "ZAEHLZEITSAISON",
+            Self::Zaehlzeittagtyp => "ZAEHLZEITTAGTYP",
+            Self::Zahlungsinformation => "ZAHLUNGSINFORMATION",
+            Self::Zeitraum => "ZEITRAUM",
+            Self::Zeitreihenwert => "ZEITREIHENWERT",
+            Self::Zeitvariablepreisposition => "ZEITVARIABLEPREISPOSITION",
+            Self::Zustaendigkeit => "ZUSTAENDIGKEIT",
+            Self::Unknown => "UNKNOWN",
+        }
+    }
+    /// **Strictly** parses a BO4E wire string into a known variant.
+    ///
+    /// Unlike the lenient `serde` / [`FromStr`](std::str::FromStr) path — which maps
+    /// any unrecognized value (a typo, a legacy code, or a value from a newer schema)
+    /// to [`ComTyp::Unknown`] — this returns
+    /// [`Err`](crate::error::UnknownVariant) for values not defined in this schema
+    /// version, including the literal `"UNKNOWN"`.  Use it at the ingest boundary to
+    /// reject bad values instead of silently degrading them.
+    ///
+    /// # Example
+    /// ```rust,ignore
+    /// assert!(ComTyp::from_wire("NOT_A_REAL_VALUE").is_err());
+    /// ```
+    pub fn from_wire(s: &str) -> Result<Self, crate::error::UnknownVariant> {
+        match s {
+            "ADRESSE" => Ok(Self::Adresse),
+            "ANGEBOTSPOSITION" => Ok(Self::Angebotsposition),
+            "ANGEBOTSTEIL" => Ok(Self::Angebotsteil),
+            "ANGEBOTSVARIANTE" => Ok(Self::Angebotsvariante),
+            "AUFABSCHLAG" => Ok(Self::Aufabschlag),
+            "AUSSCHREIBUNGSDETAIL" => Ok(Self::Ausschreibungsdetail),
+            "AUSSCHREIBUNGSLOS" => Ok(Self::Ausschreibungslos),
+            "BETRAG" => Ok(Self::Betrag),
+            "DIENSTLEISTUNG" => Ok(Self::Dienstleistung),
+            "EINHEITSPREISPOSITION" => Ok(Self::Einheitspreisposition),
+            "ENERGIEHERKUNFT" => Ok(Self::Energieherkunft),
+            "ENERGIEMIX" => Ok(Self::Energiemix),
+            "FREMDKOSTENBLOCK" => Ok(Self::Fremdkostenblock),
+            "FREMDKOSTENPOSITION" => Ok(Self::Fremdkostenposition),
+            "GEOKOORDINATEN" => Ok(Self::Geokoordinaten),
+            "KATASTERADRESSE" => Ok(Self::Katasteradresse),
+            "KONFIGURATIONSPRODUKT" => Ok(Self::Konfigurationsprodukt),
+            "KONTAKTWEG" => Ok(Self::Kontaktweg),
+            "KONZESSIONSABGABE" => Ok(Self::Konzessionsabgabe),
+            "KOSTENBLOCK" => Ok(Self::Kostenblock),
+            "KOSTENPOSITION" => Ok(Self::Kostenposition),
+            "LASTPROFIL" => Ok(Self::Lastprofil),
+            "LASTVARIABLEPREISPOSITION" => Ok(Self::Lastvariablepreisposition),
+            "MARKTGEBIETINFO" => Ok(Self::Marktgebietinfo),
+            "MENGE" => Ok(Self::Menge),
+            "MESSWERT" => Ok(Self::Messwert),
+            "PREIS" => Ok(Self::Preis),
+            "PREISGARANTIE" => Ok(Self::Preisgarantie),
+            "PREISPOSITION" => Ok(Self::Preisposition),
+            "PREISSTAFFEL" => Ok(Self::Preisstaffel),
+            "RECHNUNGSPOSITION" => Ok(Self::Rechnungsposition),
+            "REGIONSOPERATION" => Ok(Self::Regionsoperation),
+            "REGIONSPREIS" => Ok(Self::Regionspreis),
+            "REGIONSZEITSCHEIBE" => Ok(Self::Regionszeitscheibe),
+            "RELATIVEPREISPOSITION" => Ok(Self::Relativepreisposition),
+            "SIGMOIDPARAMETER" => Ok(Self::Sigmoidparameter),
+            "STANDORTEIGENSCHAFTENGAS" => Ok(Self::Standorteigenschaftengas),
+            "STANDORTEIGENSCHAFTENSTROM" => Ok(Self::Standorteigenschaftenstrom),
+            "STEUERBETRAG" => Ok(Self::Steuerbetrag),
+            "TAGESPARAMETER" => Ok(Self::Tagesparameter),
+            "TARIFBERECHNUNGSPARAMETER" => Ok(Self::Tarifberechnungsparameter),
+            "TARIFEINSCHRAENKUNG" => Ok(Self::Tarifeinschraenkung),
+            "TARIFPREIS" => Ok(Self::Tarifpreis),
+            "TARIFPREISPOSITION" => Ok(Self::Tarifpreisposition),
+            "TARIFPREISZEITSCHEIBE" => Ok(Self::Tarifpreiszeitscheibe),
+            "UMSCHALTZEIT" => Ok(Self::Umschaltzeit),
+            "UNTERSCHRIFT" => Ok(Self::Unterschrift),
+            "VERTRAGSKONDITIONEN" => Ok(Self::Vertragskonditionen),
+            "VERTRAGSTEIL" => Ok(Self::Vertragsteil),
+            "VERWENDUNGSZWECKPROMARKTROLLE" => Ok(Self::Verwendungszweckpromarktrolle),
+            "VORAUSZAHLUNG" => Ok(Self::Vorauszahlung),
+            "ZAEHLWERK" => Ok(Self::Zaehlwerk),
+            "ZAEHLZEITREGISTER" => Ok(Self::Zaehlzeitregister),
+            "ZAEHLZEITSAISON" => Ok(Self::Zaehlzeitsaison),
+            "ZAEHLZEITTAGTYP" => Ok(Self::Zaehlzeittagtyp),
+            "ZAHLUNGSINFORMATION" => Ok(Self::Zahlungsinformation),
+            "ZEITRAUM" => Ok(Self::Zeitraum),
+            "ZEITREIHENWERT" => Ok(Self::Zeitreihenwert),
+            "ZEITVARIABLEPREISPOSITION" => Ok(Self::Zeitvariablepreisposition),
+            "ZUSTAENDIGKEIT" => Ok(Self::Zustaendigkeit),
+            other => Err(crate::error::UnknownVariant::new(other)),
+        }
+    }
+    /// Returns `true` if this value is the forward-compatibility
+    /// [`ComTyp::Unknown`] catch-all (an out-of-schema value).
+    pub const fn is_unknown(&self) -> bool {
+        matches!(self, Self::Unknown)
+    }
+    /// Returns `true` if this value is a known, schema-defined variant.
+    pub const fn is_known(&self) -> bool {
+        !self.is_unknown()
+    }
+}
+impl std::fmt::Display for ComTyp {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_wire())
+    }
+}
+impl AsRef<str> for ComTyp {
+    fn as_ref(&self) -> &str {
+        self.as_wire()
+    }
+}
+#[cfg(feature = "versioned")]
+impl crate::bo4e_enum_sealed::Sealed for ComTyp {}
+#[cfg(feature = "versioned")]
+impl crate::Bo4eEnum for ComTyp {
+    const VARIANTS: &'static [Self] = Self::VARIANTS;
+    const COUNT: usize = Self::COUNT;
+    fn as_wire(&self) -> &'static str {
+        Self::as_wire(self)
+    }
+    fn from_wire(s: &str) -> Result<Self, crate::error::UnknownVariant> {
+        Self::from_wire(s)
+    }
+    fn is_unknown(&self) -> bool {
+        Self::is_unknown(self)
+    }
+}
+#[cfg(feature = "versioned")]
+impl crate::Bo4eStrict for ComTyp {
+    fn collect_unknown_enums(&self, path: &str, out: &mut Vec<String>) {
+        if self.is_unknown() {
+            out.push(path.to_owned());
+        }
     }
 }
 #[cfg(all(feature = "sqlx", feature = "json"))]
@@ -227,30 +477,16 @@ impl sqlx::Type<sqlx::Postgres> for ComTyp {
         <String as sqlx::Type<sqlx::Postgres>>::type_info()
     }
 }
-/// Strum fast path: `AsRef<str>` returns the canonical string without a
+/// Encode via the canonical wire string (`as_wire`, always available) — no
 /// `serde_json::Value` intermediate, saving an allocation per encode (M-07).
-#[cfg(all(feature = "sqlx", feature = "json", feature = "strum"))]
+#[cfg(all(feature = "sqlx", feature = "json"))]
 impl<'q> sqlx::Encode<'q, sqlx::Postgres> for ComTyp {
     fn encode_by_ref(
         &self,
         buf: &mut <sqlx::Postgres as sqlx::Database>::ArgumentBuffer<'q>,
     ) -> Result<sqlx::encode::IsNull, sqlx::error::BoxDynError> {
-        let s: &str = self.as_ref();
+        let s: &str = self.as_wire();
         <&str as sqlx::Encode<'q, sqlx::Postgres>>::encode_by_ref(&s, buf)
-    }
-}
-/// Fallback when `strum` is not active: serialize via `serde_json`.
-#[cfg(all(feature = "sqlx", feature = "json", not(feature = "strum")))]
-impl<'q> sqlx::Encode<'q, sqlx::Postgres> for ComTyp {
-    fn encode_by_ref(
-        &self,
-        buf: &mut <sqlx::Postgres as sqlx::Database>::ArgumentBuffer<'q>,
-    ) -> Result<sqlx::encode::IsNull, sqlx::error::BoxDynError> {
-        let s = serde_json::to_value(self)?
-            .as_str()
-            .ok_or("enum variant did not serialize to a JSON string")?
-            .to_owned();
-        <String as sqlx::Encode<'q, sqlx::Postgres>>::encode_by_ref(&s, buf)
     }
 }
 #[cfg(all(feature = "sqlx", feature = "json"))]
@@ -263,14 +499,12 @@ impl<'r> sqlx::Decode<'r, sqlx::Postgres> for ComTyp {
             .map_err(|e| Box::new(e) as sqlx::error::BoxDynError)
     }
 }
-#[cfg(all(test, feature = "strum"))]
+#[cfg(test)]
 impl proptest::arbitrary::Arbitrary for ComTyp {
     type Parameters = ();
     type Strategy = proptest::strategy::BoxedStrategy<Self>;
     fn arbitrary_with(_: Self::Parameters) -> Self::Strategy {
         use proptest::prelude::*;
-        use strum::IntoEnumIterator as _;
-        let variants: Vec<Self> = Self::iter().collect();
-        proptest::sample::select(variants).boxed()
+        proptest::sample::select(Self::VARIANTS.to_vec()).boxed()
     }
 }

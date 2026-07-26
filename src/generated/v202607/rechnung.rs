@@ -388,3 +388,262 @@ impl std::fmt::Display for Rechnung {
         }
     }
 }
+impl crate::Bo4eStrict for Rechnung {
+    fn collect_unknown_enums(&self, path: &str, out: &mut Vec<String>) {
+        if let Some(v) = &self.aktueller_verbrauch {
+            crate::Bo4eStrict::collect_unknown_enums(
+                &**v,
+                &crate::strict::field_path(path, "aktuellerVerbrauch"),
+                out,
+            );
+        }
+        if let Some(v) = &self.anfangszaehlerstand {
+            crate::Bo4eStrict::collect_unknown_enums(
+                &**v,
+                &crate::strict::field_path(path, "anfangszaehlerstand"),
+                out,
+            );
+        }
+        if let Some(v) = &self.endzaehlerstand {
+            crate::Bo4eStrict::collect_unknown_enums(
+                &**v,
+                &crate::strict::field_path(path, "endzaehlerstand"),
+                out,
+            );
+        }
+        if let Some(v) = &self.fremdkosten {
+            crate::Bo4eStrict::collect_unknown_enums(
+                &**v,
+                &crate::strict::field_path(path, "fremdkosten"),
+                out,
+            );
+        }
+        if let Some(v) = &self.gesamtbrutto {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "gesamtbrutto"),
+                out,
+            );
+        }
+        if let Some(v) = &self.gesamtnetto {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "gesamtnetto"),
+                out,
+            );
+        }
+        if let Some(v) = &self.gesamtsteuer {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "gesamtsteuer"),
+                out,
+            );
+        }
+        if let Some(v) = &self.jahresverbrauch {
+            crate::Bo4eStrict::collect_unknown_enums(
+                &**v,
+                &crate::strict::field_path(path, "jahresverbrauch"),
+                out,
+            );
+        }
+        if let Some(v) = &self.marktlokation {
+            crate::Bo4eStrict::collect_unknown_enums(
+                &**v,
+                &crate::strict::field_path(path, "marktlokation"),
+                out,
+            );
+        }
+        if let Some(v) = &self.messlokation {
+            crate::Bo4eStrict::collect_unknown_enums(
+                &**v,
+                &crate::strict::field_path(path, "messlokation"),
+                out,
+            );
+        }
+        if let Some(v) = &self.messstellenbetreiber {
+            crate::Bo4eStrict::collect_unknown_enums(
+                &**v,
+                &crate::strict::field_path(path, "messstellenbetreiber"),
+                out,
+            );
+        }
+        if let Some(v) = &self.netzbetreiber {
+            crate::Bo4eStrict::collect_unknown_enums(
+                &**v,
+                &crate::strict::field_path(path, "netzbetreiber"),
+                out,
+            );
+        }
+        if let Some(v) = &self.netznutzungrechnungsart {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "netznutzungrechnungsart"),
+                out,
+            );
+        }
+        if let Some(v) = &self.netznutzungrechnungstyp {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "netznutzungrechnungstyp"),
+                out,
+            );
+        }
+        if let Some(v) = &self.rabatt_netto {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "rabattNetto"),
+                out,
+            );
+        }
+        if let Some(v) = &self.rechnungsempfaenger {
+            crate::Bo4eStrict::collect_unknown_enums(
+                &**v,
+                &crate::strict::field_path(path, "rechnungsempfaenger"),
+                out,
+            );
+        }
+        if let Some(v) = &self.rechnungsersteller {
+            crate::Bo4eStrict::collect_unknown_enums(
+                &**v,
+                &crate::strict::field_path(path, "rechnungsersteller"),
+                out,
+            );
+        }
+        if let Some(v) = &self.rechnungsperiode {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "rechnungsperiode"),
+                out,
+            );
+        }
+        if let Some(items) = &self.rechnungspositionen {
+            let child = crate::strict::field_path(path, "rechnungspositionen");
+            for (i, item) in items.iter().enumerate() {
+                crate::Bo4eStrict::collect_unknown_enums(
+                    item,
+                    &crate::strict::index_path(&child, i),
+                    out,
+                );
+            }
+        }
+        if let Some(v) = &self.rechnungsstatus {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "rechnungsstatus"),
+                out,
+            );
+        }
+        if let Some(v) = &self.rechnungstyp {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "rechnungstyp"),
+                out,
+            );
+        }
+        if let Some(items) = &self.referenzverbraeuche {
+            let child = crate::strict::field_path(path, "referenzverbraeuche");
+            for (i, item) in items.iter().enumerate() {
+                crate::Bo4eStrict::collect_unknown_enums(
+                    &**item,
+                    &crate::strict::index_path(&child, i),
+                    out,
+                );
+            }
+        }
+        if let Some(v) = &self.sparte {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "sparte"),
+                out,
+            );
+        }
+        if let Some(items) = &self.steuerbetraege {
+            let child = crate::strict::field_path(path, "steuerbetraege");
+            for (i, item) in items.iter().enumerate() {
+                crate::Bo4eStrict::collect_unknown_enums(
+                    item,
+                    &crate::strict::index_path(&child, i),
+                    out,
+                );
+            }
+        }
+        if let Some(items) = &self.teilrechnungen {
+            let child = crate::strict::field_path(path, "teilrechnungen");
+            for (i, item) in items.iter().enumerate() {
+                crate::Bo4eStrict::collect_unknown_enums(
+                    &**item,
+                    &crate::strict::index_path(&child, i),
+                    out,
+                );
+            }
+        }
+        if let Some(v) = &self.vertrag {
+            crate::Bo4eStrict::collect_unknown_enums(
+                &**v,
+                &crate::strict::field_path(path, "vertrag"),
+                out,
+            );
+        }
+        if let Some(items) = &self.vorauszahlungen {
+            let child = crate::strict::field_path(path, "vorauszahlungen");
+            for (i, item) in items.iter().enumerate() {
+                crate::Bo4eStrict::collect_unknown_enums(
+                    item,
+                    &crate::strict::index_path(&child, i),
+                    out,
+                );
+            }
+        }
+        if let Some(v) = &self.vorjahresverbrauch {
+            crate::Bo4eStrict::collect_unknown_enums(
+                &**v,
+                &crate::strict::field_path(path, "vorjahresverbrauch"),
+                out,
+            );
+        }
+        if let Some(items) = &self.zaehler {
+            let child = crate::strict::field_path(path, "zaehler");
+            for (i, item) in items.iter().enumerate() {
+                crate::Bo4eStrict::collect_unknown_enums(
+                    &**item,
+                    &crate::strict::index_path(&child, i),
+                    out,
+                );
+            }
+        }
+        if let Some(items) = &self.zahlungsinformationen {
+            let child = crate::strict::field_path(path, "zahlungsinformationen");
+            for (i, item) in items.iter().enumerate() {
+                crate::Bo4eStrict::collect_unknown_enums(
+                    item,
+                    &crate::strict::index_path(&child, i),
+                    out,
+                );
+            }
+        }
+        if let Some(v) = &self.zu_zahlen {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "zuZahlen"),
+                out,
+            );
+        }
+        if let Some(v) = &self.zukuenftiger_abschlag {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "zukuenftigerAbschlag"),
+                out,
+            );
+        }
+        if let Some(items) = &self.zusatz_attribute {
+            let child = crate::strict::field_path(path, "zusatzAttribute");
+            for (i, item) in items.iter().enumerate() {
+                crate::Bo4eStrict::collect_unknown_enums(
+                    item,
+                    &crate::strict::index_path(&child, i),
+                    out,
+                );
+            }
+        }
+    }
+}

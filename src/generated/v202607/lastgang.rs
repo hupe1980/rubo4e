@@ -114,3 +114,60 @@ impl std::fmt::Display for Lastgang {
         }
     }
 }
+impl crate::Bo4eStrict for Lastgang {
+    fn collect_unknown_enums(&self, path: &str, out: &mut Vec<String>) {
+        if let Some(v) = &self.marktlokation {
+            crate::Bo4eStrict::collect_unknown_enums(
+                &**v,
+                &crate::strict::field_path(path, "marktlokation"),
+                out,
+            );
+        }
+        if let Some(v) = &self.messgroesse {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "messgroesse"),
+                out,
+            );
+        }
+        if let Some(v) = &self.messlokation {
+            crate::Bo4eStrict::collect_unknown_enums(
+                &**v,
+                &crate::strict::field_path(path, "messlokation"),
+                out,
+            );
+        }
+        if let Some(v) = &self.sparte {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "sparte"),
+                out,
+            );
+        }
+        if let Some(items) = &self.werte {
+            let child = crate::strict::field_path(path, "werte");
+            for (i, item) in items.iter().enumerate() {
+                crate::Bo4eStrict::collect_unknown_enums(
+                    item,
+                    &crate::strict::index_path(&child, i),
+                    out,
+                );
+            }
+        }
+        crate::Bo4eStrict::collect_unknown_enums(
+            &self.zeit_intervall_laenge,
+            &crate::strict::field_path(path, "zeitIntervallLaenge"),
+            out,
+        );
+        if let Some(items) = &self.zusatz_attribute {
+            let child = crate::strict::field_path(path, "zusatzAttribute");
+            for (i, item) in items.iter().enumerate() {
+                crate::Bo4eStrict::collect_unknown_enums(
+                    item,
+                    &crate::strict::index_path(&child, i),
+                    out,
+                );
+            }
+        }
+    }
+}

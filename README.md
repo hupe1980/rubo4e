@@ -28,7 +28,9 @@ source; the README badge is kept in sync.
 - **Generated types** from the official BO4E JSON Schema (v202607)
 - **Strong domain identifiers** — `MaloId`, `MeloId`, `EicCode`, `ObisCode`, `MarktpartnerId`, … with embedded validation and domain helpers
 - **Three-layer validation** — constructor checks, `garde` struct rules, cross-field business logic
-- **Typed builders** — compile-time required-field enforcement via `typed-builder`; optional-field setters accept both `T` and `Option<T>`
+- **Strict enum parsing & introspection** — `from_wire` (reject out-of-schema values), `VARIANTS` / `COUNT` / `iter_known`, `Display` / `AsRef<str>`, `is_unknown`, unified by the `Bo4eEnum` trait — all **without** the `strum` feature
+- **Recursive strict decoding** — `Bo4eStrict::ensure_known_enums()` rejects any `Unknown` enum value anywhere in a deserialized payload, with JSON-paths — one call replaces hand-written per-field checks
+- **Typed builders** — readable, diffable construction via `typed-builder`; setters accept both `T` and `Option<T>` (note: BO4E BO fields are schema-optional, so AHB-mandatory contracts are enforced by your ingest layer, not the type system)
 - **German / snake_case / canonical JSON** — BO4E wire format out of the box
 - **Ergonomic convenience API** — extension traits, billing-period helpers, EDIFACT agency codes
 - **JSON Schema** via `schemars`, OpenAPI via `utoipa`, PostgreSQL via `sqlx`
@@ -40,13 +42,13 @@ source; the README badge is kept in sync.
 
 ```toml
 [dependencies]
-rubo4e = "0.6"
+rubo4e = "0.8"
 ```
 
 Enable optional features as needed:
 
 ```toml
-rubo4e = { version = "0.6", features = ["versioned", "time", "decimal", "json", "validate"] }
+rubo4e = { version = "0.8", features = ["versioned", "time", "decimal", "json", "validate"] }
 ```
 
 ---
@@ -58,7 +60,8 @@ use rubo4e::prelude::*;          // identifiers, BetragExt, MengeExt, PreisExt, 
 use rubo4e::v202607::{Vertrag, Sparte};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Typed builder with compile-time required-field enforcement (requires `builder` feature)
+    // Typed builder — readable, diffable construction (requires `builder` feature).
+    // BO4E BO fields are schema-optional, so any field you omit defaults to None.
     let vertrag = Vertrag::builder()
         .sparte(Sparte::Strom)
         .beschreibung("Jahresvertrag Strom".to_string())
@@ -101,7 +104,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 > **Typical full setup:**
 > ```toml
-> rubo4e = { version = "0.6", features = ["versioned", "time", "decimal", "json", "validate", "builder"] }
+> rubo4e = { version = "0.8", features = ["versioned", "time", "decimal", "json", "validate", "builder"] }
 > ```
 
 ---
@@ -116,6 +119,86 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 use rubo4e::v202607::Marktlokation;  // pin to v202607
 use rubo4e::current::Marktlokation;  // always the latest stable — advances with crate updates
 ```
+
+**Versioning contract.** `rubo4e::current` re-exports the newest stable schema
+series. A minor `rubo4e` bump *can* therefore change enum membership or codelist
+coverage under `current` (a new variant, a new code) without a source change on
+your side. **Pin to the version module (`rubo4e::v202607::…`) for anything whose
+shape you guard** (SQL `CHECK` lists, exhaustive mappings, variant-count
+assertions); use `current` for code that should always track the latest series.
+Every release that changes schema-derived membership records it in the
+[CHANGELOG](CHANGELOG.md) **Schema deltas** section. See
+[docs/versioning.md](docs/versioning.md) for the full contract.
+
+---
+
+## Enum Introspection & Strict Parsing
+
+Every generated BO4E enum carries an `Unknown` forward-compatibility catch-all,
+so the lenient `serde` / `FromStr` path never fails on an unrecognized wire value
+— it maps to `Unknown`. That is the right default for forward-compatibility, but
+the wrong default at an ingest boundary that must reject typos, legacy codes, or
+values from a newer schema. Every enum therefore also exposes a uniform,
+**`strum`-free** surface (also unified by the [`Bo4eEnum`] trait for generic use):
+
+```rust
+use rubo4e::{Bo4eEnum, current::Zaehlertyp};
+
+// Introspection without `strum` — drift-guard SQL CHECK lists & mappings:
+assert_eq!(Zaehlertyp::COUNT, Zaehlertyp::VARIANTS.len());
+for v in Zaehlertyp::iter_known() {           // never yields Unknown
+    println!("{}", v.as_wire());              // canonical BO4E wire string
+}
+
+// Strict parsing at the boundary — Err instead of a silent Unknown:
+assert_eq!(Zaehlertyp::from_wire("WASSERZAEHLER"), Ok(Zaehlertyp::Wasserzaehler));
+assert!(Zaehlertyp::from_wire("LFG").is_err());          // legacy/typo rejected
+assert!(Zaehlertyp::from_wire("UNKNOWN").is_err());      // catch-all is not a real value
+
+// Detect lenient-decode fall-through after a serde round-trip, in one call:
+let z: Zaehlertyp = serde_json::from_value(serde_json::json!("BOGUS")).unwrap();
+assert!(z.is_unknown());
+```
+
+| Member                       | Feature | Purpose                                                        |
+|------------------------------|---------|----------------------------------------------------------------|
+| `T::VARIANTS`                | none    | `&'static [T]` of known variants (excludes `Unknown`)          |
+| `T::COUNT`                   | none    | stable per-version variant count                               |
+| `T::iter_known()`            | none    | iterator over known variants                                   |
+| `T::as_wire(&self)`          | none    | canonical BO4E wire string                                     |
+| `T::from_wire(s)`            | none    | **strict** parse → `Result<T, UnknownVariant>`                 |
+| `T::is_known` / `is_unknown` | none    | detect the `Unknown` catch-all                                 |
+| `Display`, `AsRef<str>`      | none    | canonical wire string — now available **without** `strum`      |
+| `Bo4eEnum` trait             | `versioned` | the above, generic over the enum type                      |
+
+> `Display`, `AsRef<str>`, `as_wire`, `from_wire`, `VARIANTS`, `COUNT`, and
+> `iter_known` are all feature-independent. The `strum` feature now only adds
+> `FromStr`, `EnumIter`, and `Into<&'static str>`.
+
+### Strict decoding of whole payloads (`Bo4eStrict`)
+
+Per-enum `from_wire` is strict at the *field* level. But the common pattern is a
+lenient whole-object decode (`serde_json::from_value::<Rechnung>()`) used as a
+schema gate — and that decode silently turns every unrecognized enum value into
+`Unknown`, anywhere in the tree. `Bo4eStrict` closes that gap: **one call** finds
+every out-of-schema enum value in a nested value and reports its JSON-path.
+
+```rust
+use rubo4e::{Bo4eStrict, current::Netzlokation};
+
+let nelo: Netzlokation = serde_json::from_value(body)?;   // lenient decode (never fails on enums)
+nelo.ensure_known_enums()?;                               // Err lists e.g. ["zaehler[1].zaehlertyp"]
+```
+
+`ensure_known_enums()` returns [`StrictError`] with the dotted, index-bracketed
+paths of every `Unknown` enum value; `unknown_enum_paths()` returns them directly.
+Implemented for every BO, COM, enum, and `AnyBo`. This replaces the hand-written
+`record.field == T::Unknown` re-checks a strict ingest boundary would otherwise
+need. Unlike `Bo4eObject`/`Bo4eEnum`, `Bo4eStrict` is **not sealed**, so you can
+implement it on your own domain wrappers to extend the recursive check.
+
+[`Bo4eEnum`]: https://docs.rs/rubo4e/latest/rubo4e/trait.Bo4eEnum.html
+[`StrictError`]: https://docs.rs/rubo4e/latest/rubo4e/strict/struct.StrictError.html
 
 ---
 

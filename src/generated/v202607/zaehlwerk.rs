@@ -172,3 +172,79 @@ impl std::fmt::Display for Zaehlwerk {
         }
     }
 }
+impl crate::Bo4eStrict for Zaehlwerk {
+    fn collect_unknown_enums(&self, path: &str, out: &mut Vec<String>) {
+        if let Some(v) = &self.einheit {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "einheit"),
+                out,
+            );
+        }
+        if let Some(v) = &self.konzessionsabgabe {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "konzessionsabgabe"),
+                out,
+            );
+        }
+        if let Some(items) = &self.messwerte {
+            let child = crate::strict::field_path(path, "messwerte");
+            for (i, item) in items.iter().enumerate() {
+                crate::Bo4eStrict::collect_unknown_enums(
+                    item,
+                    &crate::strict::index_path(&child, i),
+                    out,
+                );
+            }
+        }
+        if let Some(v) = &self.richtung {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "richtung"),
+                out,
+            );
+        }
+        if let Some(v) = &self.verbrauchsart {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "verbrauchsart"),
+                out,
+            );
+        }
+        if let Some(items) = &self.verwendungszwecke {
+            let child = crate::strict::field_path(path, "verwendungszwecke");
+            for (i, item) in items.iter().enumerate() {
+                crate::Bo4eStrict::collect_unknown_enums(
+                    item,
+                    &crate::strict::index_path(&child, i),
+                    out,
+                );
+            }
+        }
+        if let Some(v) = &self.waermenutzung {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "waermenutzung"),
+                out,
+            );
+        }
+        if let Some(v) = &self.zaehlzeitregister {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "zaehlzeitregister"),
+                out,
+            );
+        }
+        if let Some(items) = &self.zusatz_attribute {
+            let child = crate::strict::field_path(path, "zusatzAttribute");
+            for (i, item) in items.iter().enumerate() {
+                crate::Bo4eStrict::collect_unknown_enums(
+                    item,
+                    &crate::strict::index_path(&child, i),
+                    out,
+                );
+            }
+        }
+    }
+}

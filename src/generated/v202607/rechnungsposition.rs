@@ -129,3 +129,73 @@ impl std::fmt::Display for Rechnungsposition {
         }
     }
 }
+impl crate::Bo4eStrict for Rechnungsposition {
+    fn collect_unknown_enums(&self, path: &str, out: &mut Vec<String>) {
+        if let Some(v) = &self.artikelnummer {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "artikelnummer"),
+                out,
+            );
+        }
+        if let Some(v) = &self.einzelpreis {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "einzelpreis"),
+                out,
+            );
+        }
+        if let Some(v) = &self.gesamtpreis {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "gesamtpreis"),
+                out,
+            );
+        }
+        if let Some(v) = &self.lieferungszeitraum {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "lieferungszeitraum"),
+                out,
+            );
+        }
+        if let Some(v) = &self.positions_menge {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "positionsMenge"),
+                out,
+            );
+        }
+        if let Some(v) = &self.steuerbetrag {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "steuerbetrag"),
+                out,
+            );
+        }
+        if let Some(v) = &self.zeitbezogene_menge {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "zeitbezogeneMenge"),
+                out,
+            );
+        }
+        if let Some(v) = &self.zeiteinheit {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "zeiteinheit"),
+                out,
+            );
+        }
+        if let Some(items) = &self.zusatz_attribute {
+            let child = crate::strict::field_path(path, "zusatzAttribute");
+            for (i, item) in items.iter().enumerate() {
+                crate::Bo4eStrict::collect_unknown_enums(
+                    item,
+                    &crate::strict::index_path(&child, i),
+                    out,
+                );
+            }
+        }
+    }
+}

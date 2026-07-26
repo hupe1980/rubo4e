@@ -96,3 +96,38 @@ impl std::fmt::Display for ZeitvariablePreisposition {
         }
     }
 }
+impl crate::Bo4eStrict for ZeitvariablePreisposition {
+    fn collect_unknown_enums(&self, path: &str, out: &mut Vec<String>) {
+        if let Some(v) = &self.preis {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "preis"),
+                out,
+            );
+        }
+        if let Some(v) = &self.preisreferenz {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "preisreferenz"),
+                out,
+            );
+        }
+        if let Some(v) = &self.zaehlzeitdefinition {
+            crate::Bo4eStrict::collect_unknown_enums(
+                &**v,
+                &crate::strict::field_path(path, "zaehlzeitdefinition"),
+                out,
+            );
+        }
+        if let Some(items) = &self.zusatz_attribute {
+            let child = crate::strict::field_path(path, "zusatzAttribute");
+            for (i, item) in items.iter().enumerate() {
+                crate::Bo4eStrict::collect_unknown_enums(
+                    item,
+                    &crate::strict::index_path(&child, i),
+                    out,
+                );
+            }
+        }
+    }
+}

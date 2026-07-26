@@ -148,7 +148,26 @@ fn emit_any_bo(bo_names: &[String]) -> String {
     s.push_str("#[cfg(feature = \"json\")]\n");
     s.push_str("impl crate::json::sealed::Sealed for AnyBo {}\n");
     s.push_str("#[cfg(feature = \"json\")]\n");
-    s.push_str("impl crate::json::Bo4eJsonExt for AnyBo {}\n");
+    s.push_str("impl crate::json::Bo4eJsonExt for AnyBo {}\n\n");
+
+    // ── Bo4eStrict — delegate to the inner BO; an unresolved `_typ` is itself
+    // an out-of-schema value and is reported at the `_typ` path.
+    s.push_str("#[cfg(feature = \"versioned\")]\n");
+    s.push_str("impl crate::Bo4eStrict for AnyBo {\n");
+    s.push_str("    fn collect_unknown_enums(&self, path: &str, out: &mut Vec<String>) {\n");
+    s.push_str("        match self {\n");
+    for name in bo_names {
+        s.push_str(&format!(
+            "            AnyBo::{name}(v) => crate::Bo4eStrict::collect_unknown_enums(&**v, path, out),\n"
+        ));
+    }
+    s.push_str("            #[cfg(feature = \"json\")]\n");
+    s.push_str(
+        "            AnyBo::Unknown { .. } => out.push(crate::strict::field_path(path, \"_typ\")),\n",
+    );
+    s.push_str("        }\n");
+    s.push_str("    }\n");
+    s.push_str("}\n");
 
     s
 }
@@ -373,7 +392,7 @@ fn emit_struct(
         emit_default_impl(&mut s, name, &bo_typ_variant, fields);
     }
 
-    emit_struct_impls(&mut s, name, is_bo, &bo_typ_variant, schema_version);
+    emit_struct_impls(&mut s, name, is_bo, &bo_typ_variant, schema_version, fields);
 
     format_source(s)
 }
@@ -465,14 +484,111 @@ fn emit_default_impl(s: &mut String, name: &str, bo_typ_variant: &str, fields: &
     s.push_str("        }\n    }\n}\n");
 }
 
+/// Emits the recursive `Bo4eStrict` walker for a struct.
+///
+/// The generated `collect_unknown_enums` descends into every enum, BO, and COM
+/// field (through `Option`s and `Vec`s), recording the JSON-path of any enum that
+/// decoded to its `Unknown` catch-all.  Scalar / identifier / date / decimal /
+/// raw-JSON fields carry no schema enum and are skipped, so the walker body is
+/// identical regardless of the `time` / `decimal` / `json` feature set.  The
+/// structural `_typ` field is skipped (it is set by construction).
+fn emit_strict_struct_impl(s: &mut String, name: &str, fields: &[Field]) {
+    let mut stmts: Vec<String> = Vec::new();
+    for field in fields {
+        if let Some(stmt) = strict_field_stmt(field) {
+            stmts.push(stmt);
+        }
+    }
+    s.push_str(&format!("\nimpl crate::Bo4eStrict for {name} {{\n"));
+    if stmts.is_empty() {
+        // No enum/BO/COM fields to descend into — `path`/`out` would be unused.
+        s.push_str("    #[allow(unused_variables)]\n");
+        s.push_str("    fn collect_unknown_enums(&self, path: &str, out: &mut Vec<String>) {}\n");
+    } else {
+        s.push_str("    fn collect_unknown_enums(&self, path: &str, out: &mut Vec<String>) {\n");
+        for stmt in &stmts {
+            s.push_str("        ");
+            s.push_str(stmt);
+            s.push('\n');
+        }
+        s.push_str("    }\n");
+    }
+    s.push_str("}\n");
+}
+
+/// Returns the recursion statement for one struct field, or `None` when the field
+/// carries no descendable schema type (scalar, identifier, date, decimal, JSON).
+fn strict_field_stmt(field: &Field) -> Option<String> {
+    // `_typ` is a structural discriminant set at construction; never a data enum.
+    if field.name == "_typ" {
+        return None;
+    }
+    // Whether this schema type is one the walker can descend into at all.
+    fn descendable(ft: &FieldType) -> bool {
+        matches!(
+            ft,
+            FieldType::Bo(_) | FieldType::Com(_) | FieldType::BoEnum(_)
+        )
+    }
+    let json = &field.name; // BO4E wire (camelCase) name for the reported path
+    let rust = &field.rust_name; // struct accessor
+                                 // `Bo4eStrict::collect_unknown_enums` takes `&self`, and BO references are
+                                 // boxed, so each emitted expression must resolve to exactly `&impl Bo4eStrict`:
+                                 //   BO field  `Box<T>`  → `&**` ;  COM/enum field `T` → `&` ;
+                                 //   `Vec` element from `.iter()` is already `&E`  → `item` (or `&**item` for BO).
+    match &field.field_type {
+        FieldType::Array(inner) if descendable(inner) => {
+            let elem = if matches!(inner.as_ref(), FieldType::Bo(_)) {
+                "&**item"
+            } else {
+                "item"
+            };
+            let loop_body = format!(
+                "let child = crate::strict::field_path(path, \"{json}\"); \
+                 for (i, item) in items.iter().enumerate() {{ \
+                 crate::Bo4eStrict::collect_unknown_enums({elem}, &crate::strict::index_path(&child, i), out); }}"
+            );
+            if field.is_optional {
+                Some(format!(
+                    "if let Some(items) = &self.{rust} {{ {loop_body} }}"
+                ))
+            } else {
+                Some(format!("{{ let items = &self.{rust}; {loop_body} }}"))
+            }
+        }
+        other if descendable(other) => {
+            let is_bo = matches!(other, FieldType::Bo(_));
+            if field.is_optional {
+                // `v` from `if let Some(v) = &self.f` is `&Inner`; a BO is `&Box<T>`.
+                let expr = if is_bo { "&**v" } else { "v" };
+                Some(format!(
+                    "if let Some(v) = &self.{rust} {{ crate::Bo4eStrict::collect_unknown_enums({expr}, &crate::strict::field_path(path, \"{json}\"), out); }}"
+                ))
+            } else {
+                // `self.f` is `Box<T>` (BO) or `T` (COM/enum).
+                let expr = if is_bo {
+                    format!("&**self.{rust}")
+                } else {
+                    format!("&self.{rust}")
+                };
+                Some(format!(
+                    "crate::Bo4eStrict::collect_unknown_enums({expr}, &crate::strict::field_path(path, \"{json}\"), out);"
+                ))
+            }
+        }
+        _ => None,
+    }
+}
+
 /// Emits all trait impls for a generated struct: `Bo4eObject`, `Bo4eJsonExt`, `Sealed`,
-/// `Bo4eExtensionData`, and `Display`.
+/// `Bo4eExtensionData`, `Display`, and `Bo4eStrict`.
 fn emit_struct_impls(
     s: &mut String,
     name: &str,
     is_bo: bool,
     bo_typ_variant: &str,
     schema_version: &str,
+    fields: &[Field],
 ) {
     // Bo4eObject impl — only BO types carry the BoTyp discriminant.
     // `type BoTyp = BoTyp;` binds the associated type from crate::Bo4eObject to the
@@ -524,6 +640,9 @@ fn emit_struct_impls(
     s.push_str("        }\n");
     s.push_str("    }\n");
     s.push_str("}\n");
+
+    // Bo4eStrict: recursive out-of-schema (Unknown) enum-value detection.
+    emit_strict_struct_impl(s, name, fields);
 }
 
 fn emit_field(s: &mut String, field: &Field) {
@@ -798,7 +917,10 @@ fn emit_enum(en: &EnumNode) -> Result<String> {
 
     s.push_str("#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]\n");
     s.push_str("#[cfg_attr(feature = \"serde\", derive(serde::Serialize, serde::Deserialize))]\n");
-    s.push_str("#[cfg_attr(feature = \"strum\", derive(strum::Display, strum::EnumString, strum::EnumIter, strum::IntoStaticStr, strum::AsRefStr))]\n");
+    // `Display` and `AsRef<str>` are emitted as always-on hand-written impls below
+    // (via `as_wire`), so they are NOT derived from strum here — deriving both would
+    // collide.  strum remains optional for `FromStr`, iteration, and `&'static str`.
+    s.push_str("#[cfg_attr(feature = \"strum\", derive(strum::EnumString, strum::EnumIter, strum::IntoStaticStr))]\n");
     s.push_str("#[cfg_attr(feature = \"schemars\", derive(schemars::JsonSchema))]\n");
     s.push_str("#[cfg_attr(feature = \"utoipa\", derive(utoipa::ToSchema))]\n");
 
@@ -807,17 +929,40 @@ fn emit_enum(en: &EnumNode) -> Result<String> {
             s.push_str(&format!("/// {}\n", line));
         }
     }
+    // Curated type-level provenance / interop notes for enums whose real-world
+    // usage carries a caveat not captured by the terse schema `description`
+    // (codelist provenance, upstream gaps, forward-compat wire strings).
+    if let Some(note) = enum_type_note(&en.name) {
+        s.push_str("///\n");
+        for line in note.lines() {
+            if line.is_empty() {
+                s.push_str("///\n");
+            } else {
+                s.push_str(&format!("/// {line}\n"));
+            }
+        }
+    }
     // Prevents downstream exhaustive match arms; complements the `Unknown` catch-all
     // by enforcing compile-time forward-compatibility for external crates (L-07).
     s.push_str("#[non_exhaustive]\n");
     s.push_str(&format!("pub enum {} {{\n", en.name));
 
     let mut seen_variants: HashSet<String> = HashSet::new();
+    // Collected `(rust_variant_ident, wire_string)` pairs — drives the generated
+    // `VARIANTS`, `as_wire`, and `from_wire` members below.
+    let mut variant_pairs: Vec<(String, String)> = Vec::new();
 
     for (variant, doc) in &en.variants {
         if let Some(d) = doc {
             for line in clean_description(d).lines() {
                 s.push_str(&format!("    /// {}\n", line));
+            }
+        }
+        // Curated per-variant interop note (e.g. the cross-BO "Messsystem" spelling
+        // discrepancy) rendered right where a developer selecting the variant sees it.
+        if let Some(note) = enum_variant_note(&en.name, variant) {
+            for line in note.lines() {
+                s.push_str(&format!("    /// {line}\n"));
             }
         }
         let raw_rust = variant.to_upper_camel_case();
@@ -858,6 +1003,7 @@ fn emit_enum(en: &EnumNode) -> Result<String> {
             camel
         };
         seen_variants.insert(rust_variant.clone());
+        variant_pairs.push((rust_variant.clone(), variant.clone()));
         // Always emit serde(rename) so the serialized value is the canonical JSON string.
         // H-08: also emit strum(serialize) so strum::Display / AsRef / EnumString
         // produce the same canonical string as serde — not the Rust variant name.
@@ -887,29 +1033,142 @@ fn emit_enum(en: &EnumNode) -> Result<String> {
 
     s.push_str("}\n");
 
-    // iter_known() — gated on `strum` (requires `EnumIter`).  Returns only
-    // schema-defined variants, excluding the `Unknown` catch-all.
+    // Feature-independent introspection & strict-parsing surface.  Emitted for
+    // every enum without requiring `strum`, and mirrored by the `Bo4eEnum` trait
+    // impl below for generic use.  Provides strict `from_wire` and stable
+    // `VARIANTS` / `COUNT` for drift-guarding SQL CHECK lists.
     let enum_name = &en.name;
+    // `Self::A, Self::B, …` — known variants only, in schema declaration order.
+    let variants_list = variant_pairs
+        .iter()
+        .map(|(rust, _)| format!("Self::{rust}"))
+        .collect::<Vec<_>>()
+        .join(", ");
+    // `Self::A => "WIRE_A",` arms for the canonical wire string.
+    let as_wire_arms = variant_pairs
+        .iter()
+        .map(|(rust, wire)| format!("            Self::{rust} => \"{wire}\","))
+        .collect::<Vec<_>>()
+        .join("\n");
+    // `"WIRE_A" => Ok(Self::A),` arms for strict parsing.
+    let from_wire_arms = variant_pairs
+        .iter()
+        .map(|(rust, wire)| format!("            \"{wire}\" => Ok(Self::{rust}),"))
+        .collect::<Vec<_>>()
+        .join("\n");
     s.push_str(&format!(
         r#"
 impl {enum_name} {{
+    /// All variants defined by the BO4E schema, in declaration order.
+    ///
+    /// Excludes the forward-compatibility [`{enum_name}::Unknown`] catch-all, so this
+    /// is exactly the set of values that appear on the wire.  Available **without**
+    /// the `strum` feature — use it to drift-guard SQL `CHECK` lists and mappings.
+    pub const VARIANTS: &'static [Self] = &[{variants_list}];
+
+    /// Number of schema-defined variants (equal to `VARIANTS.len()`), excluding the
+    /// [`{enum_name}::Unknown`] catch-all.  Stable for this schema version.
+    pub const COUNT: usize = Self::VARIANTS.len();
+
     /// Returns an iterator over all **known** variants of `{enum_name}`.
     ///
-    /// Unlike [`strum::IntoEnumIterator`] which includes the [`{enum_name}::Unknown`]
-    /// catch-all, this method yields only variants that correspond to values defined
-    /// in the BO4E schema.  Use this when building dropdowns, lookup tables, or
-    /// generating reports that should only include valid schema values.
+    /// Yields only variants that correspond to values defined in the BO4E schema
+    /// (i.e. [`Self::VARIANTS`]), never the [`{enum_name}::Unknown`] catch-all.
+    /// Available **without** the `strum` feature.
     ///
     /// # Example
     /// ```rust,ignore
     /// for v in {enum_name}::iter_known() {{
-    ///     println!("{{v}}");
+    ///     println!("{{}}", v.as_wire());
     /// }}
     /// ```
-    #[cfg(feature = "strum")]
-    pub fn iter_known() -> impl Iterator<Item = Self> {{
-        use strum::IntoEnumIterator as _;
-        Self::iter().filter(|v| !matches!(v, Self::Unknown))
+    pub fn iter_known() -> impl Iterator<Item = Self> + Clone {{
+        Self::VARIANTS.iter().copied()
+    }}
+
+    /// Returns the canonical BO4E wire string (SCREAMING_SNAKE_CASE) for this value.
+    ///
+    /// [`{enum_name}::Unknown`] renders as `"UNKNOWN"`, matching its serialized form.
+    pub const fn as_wire(&self) -> &'static str {{
+        match self {{
+{as_wire_arms}
+            Self::Unknown => "UNKNOWN",
+        }}
+    }}
+
+    /// **Strictly** parses a BO4E wire string into a known variant.
+    ///
+    /// Unlike the lenient `serde` / [`FromStr`](std::str::FromStr) path — which maps
+    /// any unrecognized value (a typo, a legacy code, or a value from a newer schema)
+    /// to [`{enum_name}::Unknown`] — this returns
+    /// [`Err`](crate::error::UnknownVariant) for values not defined in this schema
+    /// version, including the literal `"UNKNOWN"`.  Use it at the ingest boundary to
+    /// reject bad values instead of silently degrading them.
+    ///
+    /// # Example
+    /// ```rust,ignore
+    /// assert!({enum_name}::from_wire("NOT_A_REAL_VALUE").is_err());
+    /// ```
+    pub fn from_wire(s: &str) -> Result<Self, crate::error::UnknownVariant> {{
+        match s {{
+{from_wire_arms}
+            other => Err(crate::error::UnknownVariant::new(other)),
+        }}
+    }}
+
+    /// Returns `true` if this value is the forward-compatibility
+    /// [`{enum_name}::Unknown`] catch-all (an out-of-schema value).
+    pub const fn is_unknown(&self) -> bool {{
+        matches!(self, Self::Unknown)
+    }}
+
+    /// Returns `true` if this value is a known, schema-defined variant.
+    pub const fn is_known(&self) -> bool {{
+        !self.is_unknown()
+    }}
+}}
+
+// `Display` / `AsRef<str>` — always available (no `strum` needed), yielding the
+// canonical BO4E wire string.  This gives non-`strum` builds ergonomic printing
+// and `&str` access, and lets the sqlx encode path avoid a `serde_json` round-trip.
+impl std::fmt::Display for {enum_name} {{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {{
+        f.write_str(self.as_wire())
+    }}
+}}
+impl AsRef<str> for {enum_name} {{
+    fn as_ref(&self) -> &str {{
+        self.as_wire()
+    }}
+}}
+
+// Uniform generic surface: `Bo4eEnum` forwards to the inherent members above so
+// callers can be generic over any BO4E enum (e.g. `fn coverage<T: Bo4eEnum>()`).
+#[cfg(feature = "versioned")]
+impl crate::bo4e_enum_sealed::Sealed for {enum_name} {{}}
+#[cfg(feature = "versioned")]
+impl crate::Bo4eEnum for {enum_name} {{
+    const VARIANTS: &'static [Self] = Self::VARIANTS;
+    const COUNT: usize = Self::COUNT;
+    fn as_wire(&self) -> &'static str {{
+        Self::as_wire(self)
+    }}
+    fn from_wire(s: &str) -> Result<Self, crate::error::UnknownVariant> {{
+        Self::from_wire(s)
+    }}
+    fn is_unknown(&self) -> bool {{
+        Self::is_unknown(self)
+    }}
+}}
+
+// Leaf of the recursive strict walk: an enum reports itself when it holds the
+// `Unknown` catch-all (an out-of-schema value produced by a lenient decode).
+#[cfg(feature = "versioned")]
+impl crate::Bo4eStrict for {enum_name} {{
+    fn collect_unknown_enums(&self, path: &str, out: &mut Vec<String>) {{
+        if self.is_unknown() {{
+            out.push(path.to_owned());
+        }}
     }}
 }}
 "#
@@ -927,30 +1186,16 @@ impl sqlx::Type<sqlx::Postgres> for {enum_name} {{
     }}
 }}
 
-/// Strum fast path: `AsRef<str>` returns the canonical string without a
+/// Encode via the canonical wire string (`as_wire`, always available) — no
 /// `serde_json::Value` intermediate, saving an allocation per encode (M-07).
-#[cfg(all(feature = "sqlx", feature = "json", feature = "strum"))]
+#[cfg(all(feature = "sqlx", feature = "json"))]
 impl<'q> sqlx::Encode<'q, sqlx::Postgres> for {enum_name} {{
     fn encode_by_ref(
         &self,
         buf: &mut <sqlx::Postgres as sqlx::Database>::ArgumentBuffer<'q>,
     ) -> Result<sqlx::encode::IsNull, sqlx::error::BoxDynError> {{
-        let s: &str = self.as_ref();
+        let s: &str = self.as_wire();
         <&str as sqlx::Encode<'q, sqlx::Postgres>>::encode_by_ref(&s, buf)
-    }}
-}}
-/// Fallback when `strum` is not active: serialize via `serde_json`.
-#[cfg(all(feature = "sqlx", feature = "json", not(feature = "strum")))]
-impl<'q> sqlx::Encode<'q, sqlx::Postgres> for {enum_name} {{
-    fn encode_by_ref(
-        &self,
-        buf: &mut <sqlx::Postgres as sqlx::Database>::ArgumentBuffer<'q>,
-    ) -> Result<sqlx::encode::IsNull, sqlx::error::BoxDynError> {{
-        let s = serde_json::to_value(self)?
-            .as_str()
-            .ok_or("enum variant did not serialize to a JSON string")?
-            .to_owned();
-        <String as sqlx::Encode<'q, sqlx::Postgres>>::encode_by_ref(&s, buf)
     }}
 }}
 
@@ -967,19 +1212,17 @@ impl<'r> sqlx::Decode<'r, sqlx::Postgres> for {enum_name} {{
 "#
     ));
 
-    // Proptest Arbitrary impl — uses strum::EnumIter to generate any known variant.
-    // Gated on test mode and `strum` feature (for EnumIter).
+    // Proptest Arbitrary impl — samples from the known-variant table.  No longer
+    // requires `strum`, since `VARIANTS` is now feature-independent.
     s.push_str(&format!(
         r#"
-#[cfg(all(test, feature = "strum"))]
+#[cfg(test)]
 impl proptest::arbitrary::Arbitrary for {enum_name} {{
     type Parameters = ();
     type Strategy = proptest::strategy::BoxedStrategy<Self>;
     fn arbitrary_with(_: Self::Parameters) -> Self::Strategy {{
         use proptest::prelude::*;
-        use strum::IntoEnumIterator as _;
-        let variants: Vec<Self> = Self::iter().collect();
-        proptest::sample::select(variants).boxed()
+        proptest::sample::select(Self::VARIANTS.to_vec()).boxed()
     }}
 }}
 "#
@@ -1007,6 +1250,82 @@ fn cross_field_validator(name: &str, ver: &str) -> Option<String> {
         "Kostenposition" => Some(format!(
             "crate::validation::{ver}::validate_kostenposition_arithmetic"
         )),
+        _ => None,
+    }
+}
+
+// ─── Curated interop / provenance notes ──────────────────────────────────────
+
+/// Returns extra type-level rustdoc for an enum whose real-world use carries a
+/// caveat the terse BO4E schema `description` does not capture: codelist
+/// provenance, an upstream gap, or a forward-compat wire string.
+///
+/// Keyed by the UpperCamelCase Rust enum name.  Blank lines are preserved so the
+/// note renders as proper Markdown paragraphs in rustdoc.
+fn enum_type_note(name: &str) -> Option<&'static str> {
+    match name {
+        // State the provenance so downstream can decide whether to keep a
+        // parse-coverage guard.  BO4E does not tag its enums with a BDEW Codeliste
+        // release, so we document the schema tag that is the actual source of truth.
+        "BdewArtikelnummer" => Some(
+            "# Provenance\n\
+             \n\
+             The variants are transcribed 1:1 from the `BdewArtikelnummer` enum of the\n\
+             pinned BO4E schema release (see the module's schema-version tag, e.g.\n\
+             `v202607.0.0`).  BO4E does not annotate this enum with the corresponding\n\
+             *BDEW Codeliste der Artikelnummern und Artikel-IDs* release, so treat the\n\
+             BO4E schema tag — not a BDEW Codeliste version — as the authoritative\n\
+             coverage signal.  New codes arrive only via a schema bump; the per-release\n\
+             CHANGELOG records enum additions.  Values absent from this version decode\n\
+             to [`BdewArtikelnummer::Unknown`]; use `from_wire` to reject them strictly.",
+        ),
+        // Gasqualitaet has no H2-blend variant in the current schema.
+        "Gasqualitaet" => Some(
+            "# Forward compatibility (H2 blends)\n\
+             \n\
+             As of the current schema this enum models only `H_GAS` / `L_GAS`.  Hydrogen\n\
+             blend qualities expected from the 2026–2028 DVGW G 260 / BNetzA wave are not\n\
+             yet standardized in BO4E; until they are, such wire values decode to\n\
+             [`Gasqualitaet::Unknown`].  Do **not** hard-code a speculative wire string —\n\
+             when BO4E adds the variant it will appear here (and in the CHANGELOG) with\n\
+             its canonical spelling, and lenient decoding will start resolving it.",
+        ),
+        // Rechnungstyp has no correction/reversal value.
+        "Rechnungstyp" => Some(
+            "# Correction / reversal invoices\n\
+             \n\
+             BO4E does not model a Korrektur/Storno value in this enum.  The sanctioned\n\
+             representation is a process label carried as a `ZusatzAttribut` on the\n\
+             `Rechnung` (e.g. `rechnungsart = \"KORREKTURRECHNUNG\"`) rather than a\n\
+             dedicated `Rechnungstyp` variant.  This is an upstream BO4E modelling gap;\n\
+             if a future schema introduces a correction value it will surface here.",
+        ),
+        _ => None,
+    }
+}
+
+/// Returns extra rustdoc for a specific `(enum, wire_value)` variant, rendered
+/// directly above the variant so it is visible at the point of selection.
+///
+/// Keyed by the UpperCamelCase enum name and the raw JSON wire value.
+fn enum_variant_note(enum_name: &str, wire_value: &str) -> Option<&'static str> {
+    match (enum_name, wire_value) {
+        // The same real-world "intelligentes Messsystem" concept is spelled with
+        // three `s` here but two `s` in `Geraetetyp` — faithful to BO4E v202607
+        // upstream, which is internally inconsistent.  Flag both sides so a payload
+        // is never built with the wrong spelling for the wrong BO.
+        ("Zaehlertyp", "INTELLIGENTES_MESSSYSTEM") => Some(
+            "\n**Wire spelling:** `INTELLIGENTES_MESSSYSTEM` (three `s`).  ⚠ BO4E spells the\n\
+             *same* iMSys concept differently across BOs: `Geraetetyp::IntelligentesMessystem`\n\
+             uses `INTELLIGENTES_MESSYSTEM` (two `s`).  This divergence is upstream, not a\n\
+             `rubo4e` transcription error; each BO keeps its own canonical spelling.",
+        ),
+        ("Geraetetyp", "INTELLIGENTES_MESSYSTEM") => Some(
+            "\n**Wire spelling:** `INTELLIGENTES_MESSYSTEM` (two `s`).  ⚠ BO4E spells the\n\
+             *same* iMSys concept differently across BOs: `Zaehlertyp::IntelligentesMesssystem`\n\
+             uses `INTELLIGENTES_MESSSYSTEM` (three `s`).  This divergence is upstream, not a\n\
+             `rubo4e` transcription error; each BO keeps its own canonical spelling.",
+        ),
         _ => None,
     }
 }

@@ -178,3 +178,45 @@ impl std::fmt::Display for Fremdkostenposition {
         }
     }
 }
+impl crate::Bo4eStrict for Fremdkostenposition {
+    fn collect_unknown_enums(&self, path: &str, out: &mut Vec<String>) {
+        if let Some(v) = &self.betrag_kostenposition {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "betragKostenposition"),
+                out,
+            );
+        }
+        if let Some(v) = &self.einzelpreis {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "einzelpreis"),
+                out,
+            );
+        }
+        if let Some(v) = &self.menge {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "menge"),
+                out,
+            );
+        }
+        if let Some(v) = &self.zeitmenge {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "zeitmenge"),
+                out,
+            );
+        }
+        if let Some(items) = &self.zusatz_attribute {
+            let child = crate::strict::field_path(path, "zusatzAttribute");
+            for (i, item) in items.iter().enumerate() {
+                crate::Bo4eStrict::collect_unknown_enums(
+                    item,
+                    &crate::strict::index_path(&child, i),
+                    out,
+                );
+            }
+        }
+    }
+}

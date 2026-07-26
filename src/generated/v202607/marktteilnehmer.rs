@@ -129,3 +129,45 @@ impl std::fmt::Display for Marktteilnehmer {
         }
     }
 }
+impl crate::Bo4eStrict for Marktteilnehmer {
+    fn collect_unknown_enums(&self, path: &str, out: &mut Vec<String>) {
+        if let Some(v) = &self.geschaeftspartner {
+            crate::Bo4eStrict::collect_unknown_enums(
+                &**v,
+                &crate::strict::field_path(path, "geschaeftspartner"),
+                out,
+            );
+        }
+        if let Some(v) = &self.marktrolle {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "marktrolle"),
+                out,
+            );
+        }
+        if let Some(v) = &self.rollencodetyp {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "rollencodetyp"),
+                out,
+            );
+        }
+        if let Some(v) = &self.sparte {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "sparte"),
+                out,
+            );
+        }
+        if let Some(items) = &self.zusatz_attribute {
+            let child = crate::strict::field_path(path, "zusatzAttribute");
+            for (i, item) in items.iter().enumerate() {
+                crate::Bo4eStrict::collect_unknown_enums(
+                    item,
+                    &crate::strict::index_path(&child, i),
+                    out,
+                );
+            }
+        }
+    }
+}

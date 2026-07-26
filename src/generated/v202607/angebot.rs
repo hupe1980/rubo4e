@@ -201,3 +201,62 @@ impl std::fmt::Display for Angebot {
         }
     }
 }
+impl crate::Bo4eStrict for Angebot {
+    fn collect_unknown_enums(&self, path: &str, out: &mut Vec<String>) {
+        if let Some(v) = &self.angebotsgeber {
+            crate::Bo4eStrict::collect_unknown_enums(
+                &**v,
+                &crate::strict::field_path(path, "angebotsgeber"),
+                out,
+            );
+        }
+        if let Some(v) = &self.angebotsnehmer {
+            crate::Bo4eStrict::collect_unknown_enums(
+                &**v,
+                &crate::strict::field_path(path, "angebotsnehmer"),
+                out,
+            );
+        }
+        if let Some(v) = &self.sparte {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "sparte"),
+                out,
+            );
+        }
+        if let Some(v) = &self.unterzeichner_angebotsgeber {
+            crate::Bo4eStrict::collect_unknown_enums(
+                &**v,
+                &crate::strict::field_path(path, "unterzeichnerAngebotsgeber"),
+                out,
+            );
+        }
+        if let Some(v) = &self.unterzeichner_angebotsnehmer {
+            crate::Bo4eStrict::collect_unknown_enums(
+                &**v,
+                &crate::strict::field_path(path, "unterzeichnerAngebotsnehmer"),
+                out,
+            );
+        }
+        if let Some(items) = &self.varianten {
+            let child = crate::strict::field_path(path, "varianten");
+            for (i, item) in items.iter().enumerate() {
+                crate::Bo4eStrict::collect_unknown_enums(
+                    item,
+                    &crate::strict::index_path(&child, i),
+                    out,
+                );
+            }
+        }
+        if let Some(items) = &self.zusatz_attribute {
+            let child = crate::strict::field_path(path, "zusatzAttribute");
+            for (i, item) in items.iter().enumerate() {
+                crate::Bo4eStrict::collect_unknown_enums(
+                    item,
+                    &crate::strict::index_path(&child, i),
+                    out,
+                );
+            }
+        }
+    }
+}

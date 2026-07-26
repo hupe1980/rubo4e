@@ -196,3 +196,90 @@ impl std::fmt::Display for TechnischeRessource {
         }
     }
 }
+impl crate::Bo4eStrict for TechnischeRessource {
+    fn collect_unknown_enums(&self, path: &str, out: &mut Vec<String>) {
+        if let Some(v) = &self.emobilitaetsart {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "emobilitaetsart"),
+                out,
+            );
+        }
+        if let Some(v) = &self.erzeugungsart {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "erzeugungsart"),
+                out,
+            );
+        }
+        if let Some(items) = &self.lokationszuordnungen {
+            let child = crate::strict::field_path(path, "lokationszuordnungen");
+            for (i, item) in items.iter().enumerate() {
+                crate::Bo4eStrict::collect_unknown_enums(
+                    &**item,
+                    &crate::strict::index_path(&child, i),
+                    out,
+                );
+            }
+        }
+        if let Some(v) = &self.nennleistungabgabe {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "nennleistungabgabe"),
+                out,
+            );
+        }
+        if let Some(v) = &self.nennleistungaufnahme {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "nennleistungaufnahme"),
+                out,
+            );
+        }
+        if let Some(v) = &self.speicherart {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "speicherart"),
+                out,
+            );
+        }
+        if let Some(v) = &self.speicherkapazitaet {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "speicherkapazitaet"),
+                out,
+            );
+        }
+        if let Some(v) = &self.technische_ressource_nutzung {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "technischeRessourceNutzung"),
+                out,
+            );
+        }
+        if let Some(v) = &self.technische_ressource_verbrauchsart {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "technischeRessourceVerbrauchsart"),
+                out,
+            );
+        }
+        if let Some(v) = &self.waermenutzung {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "waermenutzung"),
+                out,
+            );
+        }
+        if let Some(items) = &self.zusatz_attribute {
+            let child = crate::strict::field_path(path, "zusatzAttribute");
+            for (i, item) in items.iter().enumerate() {
+                crate::Bo4eStrict::collect_unknown_enums(
+                    item,
+                    &crate::strict::index_path(&child, i),
+                    out,
+                );
+            }
+        }
+    }
+}

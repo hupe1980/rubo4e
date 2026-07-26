@@ -1056,6 +1056,72 @@ impl crate::json::sealed::Sealed for AnyBo {}
 #[cfg(feature = "json")]
 impl crate::json::Bo4eJsonExt for AnyBo {}
 #[cfg(feature = "versioned")]
+impl crate::Bo4eStrict for AnyBo {
+    fn collect_unknown_enums(&self, path: &str, out: &mut Vec<String>) {
+        match self {
+            AnyBo::Angebot(v) => crate::Bo4eStrict::collect_unknown_enums(&**v, path, out),
+            AnyBo::Ausschreibung(v) => crate::Bo4eStrict::collect_unknown_enums(&**v, path, out),
+            AnyBo::Bilanzierung(v) => crate::Bo4eStrict::collect_unknown_enums(&**v, path, out),
+            AnyBo::Buendelvertrag(v) => crate::Bo4eStrict::collect_unknown_enums(&**v, path, out),
+            AnyBo::Energiemenge(v) => crate::Bo4eStrict::collect_unknown_enums(&**v, path, out),
+            AnyBo::Fremdkosten(v) => crate::Bo4eStrict::collect_unknown_enums(&**v, path, out),
+            AnyBo::Geraet(v) => crate::Bo4eStrict::collect_unknown_enums(&**v, path, out),
+            AnyBo::Geschaeftspartner(v) => {
+                crate::Bo4eStrict::collect_unknown_enums(&**v, path, out)
+            }
+            AnyBo::Kosten(v) => crate::Bo4eStrict::collect_unknown_enums(&**v, path, out),
+            AnyBo::Lastgang(v) => crate::Bo4eStrict::collect_unknown_enums(&**v, path, out),
+            AnyBo::Lokationszuordnung(v) => {
+                crate::Bo4eStrict::collect_unknown_enums(&**v, path, out)
+            }
+            AnyBo::Marktlokation(v) => crate::Bo4eStrict::collect_unknown_enums(&**v, path, out),
+            AnyBo::Marktteilnehmer(v) => crate::Bo4eStrict::collect_unknown_enums(&**v, path, out),
+            AnyBo::Messlokation(v) => crate::Bo4eStrict::collect_unknown_enums(&**v, path, out),
+            AnyBo::Netzlokation(v) => crate::Bo4eStrict::collect_unknown_enums(&**v, path, out),
+            AnyBo::Person(v) => crate::Bo4eStrict::collect_unknown_enums(&**v, path, out),
+            AnyBo::Preisblatt(v) => crate::Bo4eStrict::collect_unknown_enums(&**v, path, out),
+            AnyBo::PreisblattDienstleistung(v) => {
+                crate::Bo4eStrict::collect_unknown_enums(&**v, path, out)
+            }
+            AnyBo::PreisblattHardware(v) => {
+                crate::Bo4eStrict::collect_unknown_enums(&**v, path, out)
+            }
+            AnyBo::PreisblattKonzessionsabgabe(v) => {
+                crate::Bo4eStrict::collect_unknown_enums(&**v, path, out)
+            }
+            AnyBo::PreisblattMessung(v) => {
+                crate::Bo4eStrict::collect_unknown_enums(&**v, path, out)
+            }
+            AnyBo::PreisblattNetznutzung(v) => {
+                crate::Bo4eStrict::collect_unknown_enums(&**v, path, out)
+            }
+            AnyBo::Rechnung(v) => crate::Bo4eStrict::collect_unknown_enums(&**v, path, out),
+            AnyBo::Region(v) => crate::Bo4eStrict::collect_unknown_enums(&**v, path, out),
+            AnyBo::Standorteigenschaften(v) => {
+                crate::Bo4eStrict::collect_unknown_enums(&**v, path, out)
+            }
+            AnyBo::SteuerbareRessource(v) => {
+                crate::Bo4eStrict::collect_unknown_enums(&**v, path, out)
+            }
+            AnyBo::Tarif(v) => crate::Bo4eStrict::collect_unknown_enums(&**v, path, out),
+            AnyBo::Tarifinfo(v) => crate::Bo4eStrict::collect_unknown_enums(&**v, path, out),
+            AnyBo::Tarifkosten(v) => crate::Bo4eStrict::collect_unknown_enums(&**v, path, out),
+            AnyBo::Tarifpreisblatt(v) => crate::Bo4eStrict::collect_unknown_enums(&**v, path, out),
+            AnyBo::TechnischeRessource(v) => {
+                crate::Bo4eStrict::collect_unknown_enums(&**v, path, out)
+            }
+            AnyBo::Vertrag(v) => crate::Bo4eStrict::collect_unknown_enums(&**v, path, out),
+            AnyBo::Zaehler(v) => crate::Bo4eStrict::collect_unknown_enums(&**v, path, out),
+            AnyBo::Zaehlzeitdefinition(v) => {
+                crate::Bo4eStrict::collect_unknown_enums(&**v, path, out)
+            }
+            AnyBo::Zeitreihe(v) => crate::Bo4eStrict::collect_unknown_enums(&**v, path, out),
+            #[cfg(feature = "json")]
+            AnyBo::Unknown { .. } => out.push(crate::strict::field_path(path, "_typ")),
+        }
+    }
+}
+#[cfg(feature = "versioned")]
 const _: () = {
     impl crate::bo4e_object_sealed::Sealed for Angebot {}
     impl crate::bo4e_object_sealed::Sealed for Ausschreibung {}

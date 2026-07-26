@@ -235,3 +235,93 @@ impl std::fmt::Display for Zaehler {
         }
     }
 }
+impl crate::Bo4eStrict for Zaehler {
+    fn collect_unknown_enums(&self, path: &str, out: &mut Vec<String>) {
+        if let Some(v) = &self.befestigungsart {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "befestigungsart"),
+                out,
+            );
+        }
+        if let Some(items) = &self.geraete {
+            let child = crate::strict::field_path(path, "geraete");
+            for (i, item) in items.iter().enumerate() {
+                crate::Bo4eStrict::collect_unknown_enums(
+                    &**item,
+                    &crate::strict::index_path(&child, i),
+                    out,
+                );
+            }
+        }
+        if let Some(v) = &self.registeranzahl {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "registeranzahl"),
+                out,
+            );
+        }
+        if let Some(v) = &self.sparte {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "sparte"),
+                out,
+            );
+        }
+        if let Some(v) = &self.zaehlerauspraegung {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "zaehlerauspraegung"),
+                out,
+            );
+        }
+        if let Some(v) = &self.zaehlergroesse {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "zaehlergroesse"),
+                out,
+            );
+        }
+        if let Some(v) = &self.zaehlerhersteller {
+            crate::Bo4eStrict::collect_unknown_enums(
+                &**v,
+                &crate::strict::field_path(path, "zaehlerhersteller"),
+                out,
+            );
+        }
+        if let Some(v) = &self.zaehlertyp {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "zaehlertyp"),
+                out,
+            );
+        }
+        if let Some(v) = &self.zaehlertyp_spezifikation {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "zaehlertypSpezifikation"),
+                out,
+            );
+        }
+        if let Some(items) = &self.zaehlwerke {
+            let child = crate::strict::field_path(path, "zaehlwerke");
+            for (i, item) in items.iter().enumerate() {
+                crate::Bo4eStrict::collect_unknown_enums(
+                    item,
+                    &crate::strict::index_path(&child, i),
+                    out,
+                );
+            }
+        }
+        if let Some(items) = &self.zusatz_attribute {
+            let child = crate::strict::field_path(path, "zusatzAttribute");
+            for (i, item) in items.iter().enumerate() {
+                crate::Bo4eStrict::collect_unknown_enums(
+                    item,
+                    &crate::strict::index_path(&child, i),
+                    out,
+                );
+            }
+        }
+    }
+}

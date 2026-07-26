@@ -145,3 +145,66 @@ impl std::fmt::Display for Ausschreibungsdetail {
         }
     }
 }
+impl crate::Bo4eStrict for Ausschreibungsdetail {
+    fn collect_unknown_enums(&self, path: &str, out: &mut Vec<String>) {
+        if let Some(v) = &self.lieferzeitraum {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "lieferzeitraum"),
+                out,
+            );
+        }
+        if let Some(v) = &self.marktlokationsadresse {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "marktlokationsadresse"),
+                out,
+            );
+        }
+        if let Some(v) = &self.prognose_arbeit_lieferzeitraum {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "prognoseArbeitLieferzeitraum"),
+                out,
+            );
+        }
+        if let Some(v) = &self.prognose_jahresarbeit {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "prognoseJahresarbeit"),
+                out,
+            );
+        }
+        if let Some(v) = &self.prognose_leistung {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "prognoseLeistung"),
+                out,
+            );
+        }
+        if let Some(v) = &self.rechnungsadresse {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "rechnungsadresse"),
+                out,
+            );
+        }
+        if let Some(v) = &self.zaehlertechnik {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "zaehlertechnik"),
+                out,
+            );
+        }
+        if let Some(items) = &self.zusatz_attribute {
+            let child = crate::strict::field_path(path, "zusatzAttribute");
+            for (i, item) in items.iter().enumerate() {
+                crate::Bo4eStrict::collect_unknown_enums(
+                    item,
+                    &crate::strict::index_path(&child, i),
+                    out,
+                );
+            }
+        }
+    }
+}

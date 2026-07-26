@@ -871,7 +871,7 @@ expression: "schema_json::<Marktlokation>()"
       ]
     },
     "Gasqualitaet": {
-      "description": "Unterscheidung für hoch- und niedrig-kalorisches Gas.",
+      "description": "Unterscheidung für hoch- und niedrig-kalorisches Gas.\n\n# Forward compatibility (H2 blends)\n\nAs of the current schema this enum models only `H_GAS` / `L_GAS`.  Hydrogen\nblend qualities expected from the 2026–2028 DVGW G 260 / BNetzA wave are not\nyet standardized in BO4E; until they are, such wire values decode to\n[`Gasqualitaet::Unknown`].  Do **not** hard-code a speculative wire string —\nwhen BO4E adds the variant it will appear here (and in the CHANGELOG) with\nits canonical spelling, and lenient decoding will start resolving it.",
       "oneOf": [
         {
           "type": "string",
@@ -1088,7 +1088,6 @@ expression: "schema_json::<Marktlokation>()"
             "MODEM",
             "TELEKOMMUNIKATIONSEINRICHTUNG",
             "MODERNE_MESSEINRICHTUNG",
-            "INTELLIGENTES_MESSYSTEM",
             "STEUEREINRICHTUNG",
             "TARIFSCHALTGERAET",
             "RUNDSTEUEREMPFAENGER",
@@ -1120,6 +1119,11 @@ expression: "schema_json::<Marktlokation>()"
             "TEMPERATUR_MU",
             "ZUSTANDS_MU"
           ]
+        },
+        {
+          "description": "**Wire spelling:** `INTELLIGENTES_MESSYSTEM` (two `s`).  ⚠ BO4E spells the\n*same* iMSys concept differently across BOs: `Zaehlertyp::IntelligentesMesssystem`\nuses `INTELLIGENTES_MESSSYSTEM` (three `s`).  This divergence is upstream, not a\n`rubo4e` transcription error; each BO keeps its own canonical spelling.",
+          "type": "string",
+          "const": "INTELLIGENTES_MESSYSTEM"
         },
         {
           "description": "Unknown or future variant — produced when deserializing a value\nthat is not yet known to this version of the library.",
@@ -3887,11 +3891,15 @@ expression: "schema_json::<Marktlokation>()"
             "ULTRASCHALLGASZAEHLER",
             "WECHSELSTROMZAEHLER",
             "MODERNE_MESSEINRICHTUNG",
-            "INTELLIGENTES_MESSSYSTEM",
             "ELEKTRONISCHER_ZAEHLER",
             "WIRBELGASZAEHLER",
             "WASSERZAEHLER"
           ]
+        },
+        {
+          "description": "**Wire spelling:** `INTELLIGENTES_MESSSYSTEM` (three `s`).  ⚠ BO4E spells the\n*same* iMSys concept differently across BOs: `Geraetetyp::IntelligentesMessystem`\nuses `INTELLIGENTES_MESSYSTEM` (two `s`).  This divergence is upstream, not a\n`rubo4e` transcription error; each BO keeps its own canonical spelling.",
+          "type": "string",
+          "const": "INTELLIGENTES_MESSSYSTEM"
         },
         {
           "description": "Unknown or future variant — produced when deserializing a value\nthat is not yet known to this version of the library.",

@@ -143,3 +143,48 @@ impl std::fmt::Display for Angebotsvariante {
         }
     }
 }
+impl crate::Bo4eStrict for Angebotsvariante {
+    fn collect_unknown_enums(&self, path: &str, out: &mut Vec<String>) {
+        if let Some(v) = &self.angebotsstatus {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "angebotsstatus"),
+                out,
+            );
+        }
+        if let Some(v) = &self.gesamtkosten {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "gesamtkosten"),
+                out,
+            );
+        }
+        if let Some(v) = &self.gesamtmenge {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "gesamtmenge"),
+                out,
+            );
+        }
+        if let Some(items) = &self.teile {
+            let child = crate::strict::field_path(path, "teile");
+            for (i, item) in items.iter().enumerate() {
+                crate::Bo4eStrict::collect_unknown_enums(
+                    item,
+                    &crate::strict::index_path(&child, i),
+                    out,
+                );
+            }
+        }
+        if let Some(items) = &self.zusatz_attribute {
+            let child = crate::strict::field_path(path, "zusatzAttribute");
+            for (i, item) in items.iter().enumerate() {
+                crate::Bo4eStrict::collect_unknown_enums(
+                    item,
+                    &crate::strict::index_path(&child, i),
+                    out,
+                );
+            }
+        }
+    }
+}

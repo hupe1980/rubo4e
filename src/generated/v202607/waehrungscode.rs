@@ -2,13 +2,7 @@
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(
     feature = "strum",
-    derive(
-        strum::Display,
-        strum::EnumString,
-        strum::EnumIter,
-        strum::IntoStaticStr,
-        strum::AsRefStr
-    )
+    derive(strum::EnumString, strum::EnumIter, strum::IntoStaticStr)
 )]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
@@ -568,23 +562,645 @@ pub enum Waehrungscode {
     Unknown,
 }
 impl Waehrungscode {
+    /// All variants defined by the BO4E schema, in declaration order.
+    ///
+    /// Excludes the forward-compatibility [`Waehrungscode::Unknown`] catch-all, so this
+    /// is exactly the set of values that appear on the wire.  Available **without**
+    /// the `strum` feature — use it to drift-guard SQL `CHECK` lists and mappings.
+    pub const VARIANTS: &'static [Self] = &[
+        Self::Aed,
+        Self::Afn,
+        Self::All,
+        Self::Amd,
+        Self::Ang,
+        Self::Aoa,
+        Self::Ars,
+        Self::Aud,
+        Self::Awg,
+        Self::Azn,
+        Self::Bam,
+        Self::Bbd,
+        Self::Bdt,
+        Self::Bgn,
+        Self::Bhd,
+        Self::Bif,
+        Self::Bmd,
+        Self::Bnd,
+        Self::Bob,
+        Self::Bov,
+        Self::Brl,
+        Self::Bsd,
+        Self::Btn,
+        Self::Bwp,
+        Self::Byn,
+        Self::Byr,
+        Self::Bzd,
+        Self::Cad,
+        Self::Cdf,
+        Self::Che,
+        Self::Chf,
+        Self::Chw,
+        Self::Clf,
+        Self::Clp,
+        Self::Cny,
+        Self::Cop,
+        Self::Cou,
+        Self::Crc,
+        Self::Cuc,
+        Self::Cup,
+        Self::Cve,
+        Self::Czk,
+        Self::Djf,
+        Self::Dkk,
+        Self::Dop,
+        Self::Dzd,
+        Self::Egp,
+        Self::Ern,
+        Self::Etb,
+        Self::Eur,
+        Self::Fjd,
+        Self::Fkp,
+        Self::Gbp,
+        Self::Gel,
+        Self::Ghs,
+        Self::Gip,
+        Self::Gmd,
+        Self::Gnf,
+        Self::Gtq,
+        Self::Gyd,
+        Self::Hkd,
+        Self::Hnl,
+        Self::Hrk,
+        Self::Htg,
+        Self::Huf,
+        Self::Idr,
+        Self::Ils,
+        Self::Inr,
+        Self::Iqd,
+        Self::Irr,
+        Self::Isk,
+        Self::Jmd,
+        Self::Jod,
+        Self::Jpy,
+        Self::Kes,
+        Self::Kgs,
+        Self::Khr,
+        Self::Kmf,
+        Self::Kpw,
+        Self::Krw,
+        Self::Kwd,
+        Self::Kyd,
+        Self::Kzt,
+        Self::Lak,
+        Self::Lbp,
+        Self::Lkr,
+        Self::Lrd,
+        Self::Lsl,
+        Self::Ltl,
+        Self::Lyd,
+        Self::Mad,
+        Self::Mdl,
+        Self::Mga,
+        Self::Mkd,
+        Self::Mmk,
+        Self::Mnt,
+        Self::Mop,
+        Self::Mro,
+        Self::Mur,
+        Self::Mvr,
+        Self::Mwk,
+        Self::Mxn,
+        Self::Mxv,
+        Self::Myr,
+        Self::Mzn,
+        Self::Nad,
+        Self::Ngn,
+        Self::Nio,
+        Self::Nok,
+        Self::Npr,
+        Self::Nzd,
+        Self::Omr,
+        Self::Pab,
+        Self::Pen,
+        Self::Pgk,
+        Self::Php,
+        Self::Pkr,
+        Self::Pln,
+        Self::Pyg,
+        Self::Qar,
+        Self::Ron,
+        Self::Rsd,
+        Self::Rub,
+        Self::Rur,
+        Self::Rwf,
+        Self::Sar,
+        Self::Sbd,
+        Self::Scr,
+        Self::Sdg,
+        Self::Sek,
+        Self::Sgd,
+        Self::Shp,
+        Self::Sll,
+        Self::Sos,
+        Self::Srd,
+        Self::Ssp,
+        Self::Std,
+        Self::Svc,
+        Self::Syp,
+        Self::Szl,
+        Self::Thb,
+        Self::Tjs,
+        Self::Tmt,
+        Self::Tnd,
+        Self::Top,
+        Self::Try,
+        Self::Ttd,
+        Self::Twd,
+        Self::Tzs,
+        Self::Uah,
+        Self::Ugx,
+        Self::Usd,
+        Self::Usn,
+        Self::Uss,
+        Self::Uyi,
+        Self::Uyu,
+        Self::Uzs,
+        Self::Vef,
+        Self::Vnd,
+        Self::Vuv,
+        Self::Wst,
+        Self::Xaf,
+        Self::Xag,
+        Self::Xau,
+        Self::Xba,
+        Self::Xbb,
+        Self::Xbc,
+        Self::Xbd,
+        Self::Xcd,
+        Self::Xdr,
+        Self::Xof,
+        Self::Xpd,
+        Self::Xpf,
+        Self::Xpt,
+        Self::Xsu,
+        Self::Xts,
+        Self::Xua,
+        Self::Xxx,
+        Self::Yer,
+        Self::Zar,
+        Self::Zmw,
+        Self::Zwl,
+    ];
+    /// Number of schema-defined variants (equal to `VARIANTS.len()`), excluding the
+    /// [`Waehrungscode::Unknown`] catch-all.  Stable for this schema version.
+    pub const COUNT: usize = Self::VARIANTS.len();
     /// Returns an iterator over all **known** variants of `Waehrungscode`.
     ///
-    /// Unlike [`strum::IntoEnumIterator`] which includes the [`Waehrungscode::Unknown`]
-    /// catch-all, this method yields only variants that correspond to values defined
-    /// in the BO4E schema.  Use this when building dropdowns, lookup tables, or
-    /// generating reports that should only include valid schema values.
+    /// Yields only variants that correspond to values defined in the BO4E schema
+    /// (i.e. [`Self::VARIANTS`]), never the [`Waehrungscode::Unknown`] catch-all.
+    /// Available **without** the `strum` feature.
     ///
     /// # Example
     /// ```rust,ignore
     /// for v in Waehrungscode::iter_known() {
-    ///     println!("{v}");
+    ///     println!("{}", v.as_wire());
     /// }
     /// ```
-    #[cfg(feature = "strum")]
-    pub fn iter_known() -> impl Iterator<Item = Self> {
-        use strum::IntoEnumIterator as _;
-        Self::iter().filter(|v| !matches!(v, Self::Unknown))
+    pub fn iter_known() -> impl Iterator<Item = Self> + Clone {
+        Self::VARIANTS.iter().copied()
+    }
+    /// Returns the canonical BO4E wire string (SCREAMING_SNAKE_CASE) for this value.
+    ///
+    /// [`Waehrungscode::Unknown`] renders as `"UNKNOWN"`, matching its serialized form.
+    pub const fn as_wire(&self) -> &'static str {
+        match self {
+            Self::Aed => "AED",
+            Self::Afn => "AFN",
+            Self::All => "ALL",
+            Self::Amd => "AMD",
+            Self::Ang => "ANG",
+            Self::Aoa => "AOA",
+            Self::Ars => "ARS",
+            Self::Aud => "AUD",
+            Self::Awg => "AWG",
+            Self::Azn => "AZN",
+            Self::Bam => "BAM",
+            Self::Bbd => "BBD",
+            Self::Bdt => "BDT",
+            Self::Bgn => "BGN",
+            Self::Bhd => "BHD",
+            Self::Bif => "BIF",
+            Self::Bmd => "BMD",
+            Self::Bnd => "BND",
+            Self::Bob => "BOB",
+            Self::Bov => "BOV",
+            Self::Brl => "BRL",
+            Self::Bsd => "BSD",
+            Self::Btn => "BTN",
+            Self::Bwp => "BWP",
+            Self::Byn => "BYN",
+            Self::Byr => "BYR",
+            Self::Bzd => "BZD",
+            Self::Cad => "CAD",
+            Self::Cdf => "CDF",
+            Self::Che => "CHE",
+            Self::Chf => "CHF",
+            Self::Chw => "CHW",
+            Self::Clf => "CLF",
+            Self::Clp => "CLP",
+            Self::Cny => "CNY",
+            Self::Cop => "COP",
+            Self::Cou => "COU",
+            Self::Crc => "CRC",
+            Self::Cuc => "CUC",
+            Self::Cup => "CUP",
+            Self::Cve => "CVE",
+            Self::Czk => "CZK",
+            Self::Djf => "DJF",
+            Self::Dkk => "DKK",
+            Self::Dop => "DOP",
+            Self::Dzd => "DZD",
+            Self::Egp => "EGP",
+            Self::Ern => "ERN",
+            Self::Etb => "ETB",
+            Self::Eur => "EUR",
+            Self::Fjd => "FJD",
+            Self::Fkp => "FKP",
+            Self::Gbp => "GBP",
+            Self::Gel => "GEL",
+            Self::Ghs => "GHS",
+            Self::Gip => "GIP",
+            Self::Gmd => "GMD",
+            Self::Gnf => "GNF",
+            Self::Gtq => "GTQ",
+            Self::Gyd => "GYD",
+            Self::Hkd => "HKD",
+            Self::Hnl => "HNL",
+            Self::Hrk => "HRK",
+            Self::Htg => "HTG",
+            Self::Huf => "HUF",
+            Self::Idr => "IDR",
+            Self::Ils => "ILS",
+            Self::Inr => "INR",
+            Self::Iqd => "IQD",
+            Self::Irr => "IRR",
+            Self::Isk => "ISK",
+            Self::Jmd => "JMD",
+            Self::Jod => "JOD",
+            Self::Jpy => "JPY",
+            Self::Kes => "KES",
+            Self::Kgs => "KGS",
+            Self::Khr => "KHR",
+            Self::Kmf => "KMF",
+            Self::Kpw => "KPW",
+            Self::Krw => "KRW",
+            Self::Kwd => "KWD",
+            Self::Kyd => "KYD",
+            Self::Kzt => "KZT",
+            Self::Lak => "LAK",
+            Self::Lbp => "LBP",
+            Self::Lkr => "LKR",
+            Self::Lrd => "LRD",
+            Self::Lsl => "LSL",
+            Self::Ltl => "LTL",
+            Self::Lyd => "LYD",
+            Self::Mad => "MAD",
+            Self::Mdl => "MDL",
+            Self::Mga => "MGA",
+            Self::Mkd => "MKD",
+            Self::Mmk => "MMK",
+            Self::Mnt => "MNT",
+            Self::Mop => "MOP",
+            Self::Mro => "MRO",
+            Self::Mur => "MUR",
+            Self::Mvr => "MVR",
+            Self::Mwk => "MWK",
+            Self::Mxn => "MXN",
+            Self::Mxv => "MXV",
+            Self::Myr => "MYR",
+            Self::Mzn => "MZN",
+            Self::Nad => "NAD",
+            Self::Ngn => "NGN",
+            Self::Nio => "NIO",
+            Self::Nok => "NOK",
+            Self::Npr => "NPR",
+            Self::Nzd => "NZD",
+            Self::Omr => "OMR",
+            Self::Pab => "PAB",
+            Self::Pen => "PEN",
+            Self::Pgk => "PGK",
+            Self::Php => "PHP",
+            Self::Pkr => "PKR",
+            Self::Pln => "PLN",
+            Self::Pyg => "PYG",
+            Self::Qar => "QAR",
+            Self::Ron => "RON",
+            Self::Rsd => "RSD",
+            Self::Rub => "RUB",
+            Self::Rur => "RUR",
+            Self::Rwf => "RWF",
+            Self::Sar => "SAR",
+            Self::Sbd => "SBD",
+            Self::Scr => "SCR",
+            Self::Sdg => "SDG",
+            Self::Sek => "SEK",
+            Self::Sgd => "SGD",
+            Self::Shp => "SHP",
+            Self::Sll => "SLL",
+            Self::Sos => "SOS",
+            Self::Srd => "SRD",
+            Self::Ssp => "SSP",
+            Self::Std => "STD",
+            Self::Svc => "SVC",
+            Self::Syp => "SYP",
+            Self::Szl => "SZL",
+            Self::Thb => "THB",
+            Self::Tjs => "TJS",
+            Self::Tmt => "TMT",
+            Self::Tnd => "TND",
+            Self::Top => "TOP",
+            Self::Try => "TRY",
+            Self::Ttd => "TTD",
+            Self::Twd => "TWD",
+            Self::Tzs => "TZS",
+            Self::Uah => "UAH",
+            Self::Ugx => "UGX",
+            Self::Usd => "USD",
+            Self::Usn => "USN",
+            Self::Uss => "USS",
+            Self::Uyi => "UYI",
+            Self::Uyu => "UYU",
+            Self::Uzs => "UZS",
+            Self::Vef => "VEF",
+            Self::Vnd => "VND",
+            Self::Vuv => "VUV",
+            Self::Wst => "WST",
+            Self::Xaf => "XAF",
+            Self::Xag => "XAG",
+            Self::Xau => "XAU",
+            Self::Xba => "XBA",
+            Self::Xbb => "XBB",
+            Self::Xbc => "XBC",
+            Self::Xbd => "XBD",
+            Self::Xcd => "XCD",
+            Self::Xdr => "XDR",
+            Self::Xof => "XOF",
+            Self::Xpd => "XPD",
+            Self::Xpf => "XPF",
+            Self::Xpt => "XPT",
+            Self::Xsu => "XSU",
+            Self::Xts => "XTS",
+            Self::Xua => "XUA",
+            Self::Xxx => "XXX",
+            Self::Yer => "YER",
+            Self::Zar => "ZAR",
+            Self::Zmw => "ZMW",
+            Self::Zwl => "ZWL",
+            Self::Unknown => "UNKNOWN",
+        }
+    }
+    /// **Strictly** parses a BO4E wire string into a known variant.
+    ///
+    /// Unlike the lenient `serde` / [`FromStr`](std::str::FromStr) path — which maps
+    /// any unrecognized value (a typo, a legacy code, or a value from a newer schema)
+    /// to [`Waehrungscode::Unknown`] — this returns
+    /// [`Err`](crate::error::UnknownVariant) for values not defined in this schema
+    /// version, including the literal `"UNKNOWN"`.  Use it at the ingest boundary to
+    /// reject bad values instead of silently degrading them.
+    ///
+    /// # Example
+    /// ```rust,ignore
+    /// assert!(Waehrungscode::from_wire("NOT_A_REAL_VALUE").is_err());
+    /// ```
+    pub fn from_wire(s: &str) -> Result<Self, crate::error::UnknownVariant> {
+        match s {
+            "AED" => Ok(Self::Aed),
+            "AFN" => Ok(Self::Afn),
+            "ALL" => Ok(Self::All),
+            "AMD" => Ok(Self::Amd),
+            "ANG" => Ok(Self::Ang),
+            "AOA" => Ok(Self::Aoa),
+            "ARS" => Ok(Self::Ars),
+            "AUD" => Ok(Self::Aud),
+            "AWG" => Ok(Self::Awg),
+            "AZN" => Ok(Self::Azn),
+            "BAM" => Ok(Self::Bam),
+            "BBD" => Ok(Self::Bbd),
+            "BDT" => Ok(Self::Bdt),
+            "BGN" => Ok(Self::Bgn),
+            "BHD" => Ok(Self::Bhd),
+            "BIF" => Ok(Self::Bif),
+            "BMD" => Ok(Self::Bmd),
+            "BND" => Ok(Self::Bnd),
+            "BOB" => Ok(Self::Bob),
+            "BOV" => Ok(Self::Bov),
+            "BRL" => Ok(Self::Brl),
+            "BSD" => Ok(Self::Bsd),
+            "BTN" => Ok(Self::Btn),
+            "BWP" => Ok(Self::Bwp),
+            "BYN" => Ok(Self::Byn),
+            "BYR" => Ok(Self::Byr),
+            "BZD" => Ok(Self::Bzd),
+            "CAD" => Ok(Self::Cad),
+            "CDF" => Ok(Self::Cdf),
+            "CHE" => Ok(Self::Che),
+            "CHF" => Ok(Self::Chf),
+            "CHW" => Ok(Self::Chw),
+            "CLF" => Ok(Self::Clf),
+            "CLP" => Ok(Self::Clp),
+            "CNY" => Ok(Self::Cny),
+            "COP" => Ok(Self::Cop),
+            "COU" => Ok(Self::Cou),
+            "CRC" => Ok(Self::Crc),
+            "CUC" => Ok(Self::Cuc),
+            "CUP" => Ok(Self::Cup),
+            "CVE" => Ok(Self::Cve),
+            "CZK" => Ok(Self::Czk),
+            "DJF" => Ok(Self::Djf),
+            "DKK" => Ok(Self::Dkk),
+            "DOP" => Ok(Self::Dop),
+            "DZD" => Ok(Self::Dzd),
+            "EGP" => Ok(Self::Egp),
+            "ERN" => Ok(Self::Ern),
+            "ETB" => Ok(Self::Etb),
+            "EUR" => Ok(Self::Eur),
+            "FJD" => Ok(Self::Fjd),
+            "FKP" => Ok(Self::Fkp),
+            "GBP" => Ok(Self::Gbp),
+            "GEL" => Ok(Self::Gel),
+            "GHS" => Ok(Self::Ghs),
+            "GIP" => Ok(Self::Gip),
+            "GMD" => Ok(Self::Gmd),
+            "GNF" => Ok(Self::Gnf),
+            "GTQ" => Ok(Self::Gtq),
+            "GYD" => Ok(Self::Gyd),
+            "HKD" => Ok(Self::Hkd),
+            "HNL" => Ok(Self::Hnl),
+            "HRK" => Ok(Self::Hrk),
+            "HTG" => Ok(Self::Htg),
+            "HUF" => Ok(Self::Huf),
+            "IDR" => Ok(Self::Idr),
+            "ILS" => Ok(Self::Ils),
+            "INR" => Ok(Self::Inr),
+            "IQD" => Ok(Self::Iqd),
+            "IRR" => Ok(Self::Irr),
+            "ISK" => Ok(Self::Isk),
+            "JMD" => Ok(Self::Jmd),
+            "JOD" => Ok(Self::Jod),
+            "JPY" => Ok(Self::Jpy),
+            "KES" => Ok(Self::Kes),
+            "KGS" => Ok(Self::Kgs),
+            "KHR" => Ok(Self::Khr),
+            "KMF" => Ok(Self::Kmf),
+            "KPW" => Ok(Self::Kpw),
+            "KRW" => Ok(Self::Krw),
+            "KWD" => Ok(Self::Kwd),
+            "KYD" => Ok(Self::Kyd),
+            "KZT" => Ok(Self::Kzt),
+            "LAK" => Ok(Self::Lak),
+            "LBP" => Ok(Self::Lbp),
+            "LKR" => Ok(Self::Lkr),
+            "LRD" => Ok(Self::Lrd),
+            "LSL" => Ok(Self::Lsl),
+            "LTL" => Ok(Self::Ltl),
+            "LYD" => Ok(Self::Lyd),
+            "MAD" => Ok(Self::Mad),
+            "MDL" => Ok(Self::Mdl),
+            "MGA" => Ok(Self::Mga),
+            "MKD" => Ok(Self::Mkd),
+            "MMK" => Ok(Self::Mmk),
+            "MNT" => Ok(Self::Mnt),
+            "MOP" => Ok(Self::Mop),
+            "MRO" => Ok(Self::Mro),
+            "MUR" => Ok(Self::Mur),
+            "MVR" => Ok(Self::Mvr),
+            "MWK" => Ok(Self::Mwk),
+            "MXN" => Ok(Self::Mxn),
+            "MXV" => Ok(Self::Mxv),
+            "MYR" => Ok(Self::Myr),
+            "MZN" => Ok(Self::Mzn),
+            "NAD" => Ok(Self::Nad),
+            "NGN" => Ok(Self::Ngn),
+            "NIO" => Ok(Self::Nio),
+            "NOK" => Ok(Self::Nok),
+            "NPR" => Ok(Self::Npr),
+            "NZD" => Ok(Self::Nzd),
+            "OMR" => Ok(Self::Omr),
+            "PAB" => Ok(Self::Pab),
+            "PEN" => Ok(Self::Pen),
+            "PGK" => Ok(Self::Pgk),
+            "PHP" => Ok(Self::Php),
+            "PKR" => Ok(Self::Pkr),
+            "PLN" => Ok(Self::Pln),
+            "PYG" => Ok(Self::Pyg),
+            "QAR" => Ok(Self::Qar),
+            "RON" => Ok(Self::Ron),
+            "RSD" => Ok(Self::Rsd),
+            "RUB" => Ok(Self::Rub),
+            "RUR" => Ok(Self::Rur),
+            "RWF" => Ok(Self::Rwf),
+            "SAR" => Ok(Self::Sar),
+            "SBD" => Ok(Self::Sbd),
+            "SCR" => Ok(Self::Scr),
+            "SDG" => Ok(Self::Sdg),
+            "SEK" => Ok(Self::Sek),
+            "SGD" => Ok(Self::Sgd),
+            "SHP" => Ok(Self::Shp),
+            "SLL" => Ok(Self::Sll),
+            "SOS" => Ok(Self::Sos),
+            "SRD" => Ok(Self::Srd),
+            "SSP" => Ok(Self::Ssp),
+            "STD" => Ok(Self::Std),
+            "SVC" => Ok(Self::Svc),
+            "SYP" => Ok(Self::Syp),
+            "SZL" => Ok(Self::Szl),
+            "THB" => Ok(Self::Thb),
+            "TJS" => Ok(Self::Tjs),
+            "TMT" => Ok(Self::Tmt),
+            "TND" => Ok(Self::Tnd),
+            "TOP" => Ok(Self::Top),
+            "TRY" => Ok(Self::Try),
+            "TTD" => Ok(Self::Ttd),
+            "TWD" => Ok(Self::Twd),
+            "TZS" => Ok(Self::Tzs),
+            "UAH" => Ok(Self::Uah),
+            "UGX" => Ok(Self::Ugx),
+            "USD" => Ok(Self::Usd),
+            "USN" => Ok(Self::Usn),
+            "USS" => Ok(Self::Uss),
+            "UYI" => Ok(Self::Uyi),
+            "UYU" => Ok(Self::Uyu),
+            "UZS" => Ok(Self::Uzs),
+            "VEF" => Ok(Self::Vef),
+            "VND" => Ok(Self::Vnd),
+            "VUV" => Ok(Self::Vuv),
+            "WST" => Ok(Self::Wst),
+            "XAF" => Ok(Self::Xaf),
+            "XAG" => Ok(Self::Xag),
+            "XAU" => Ok(Self::Xau),
+            "XBA" => Ok(Self::Xba),
+            "XBB" => Ok(Self::Xbb),
+            "XBC" => Ok(Self::Xbc),
+            "XBD" => Ok(Self::Xbd),
+            "XCD" => Ok(Self::Xcd),
+            "XDR" => Ok(Self::Xdr),
+            "XOF" => Ok(Self::Xof),
+            "XPD" => Ok(Self::Xpd),
+            "XPF" => Ok(Self::Xpf),
+            "XPT" => Ok(Self::Xpt),
+            "XSU" => Ok(Self::Xsu),
+            "XTS" => Ok(Self::Xts),
+            "XUA" => Ok(Self::Xua),
+            "XXX" => Ok(Self::Xxx),
+            "YER" => Ok(Self::Yer),
+            "ZAR" => Ok(Self::Zar),
+            "ZMW" => Ok(Self::Zmw),
+            "ZWL" => Ok(Self::Zwl),
+            other => Err(crate::error::UnknownVariant::new(other)),
+        }
+    }
+    /// Returns `true` if this value is the forward-compatibility
+    /// [`Waehrungscode::Unknown`] catch-all (an out-of-schema value).
+    pub const fn is_unknown(&self) -> bool {
+        matches!(self, Self::Unknown)
+    }
+    /// Returns `true` if this value is a known, schema-defined variant.
+    pub const fn is_known(&self) -> bool {
+        !self.is_unknown()
+    }
+}
+impl std::fmt::Display for Waehrungscode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_wire())
+    }
+}
+impl AsRef<str> for Waehrungscode {
+    fn as_ref(&self) -> &str {
+        self.as_wire()
+    }
+}
+#[cfg(feature = "versioned")]
+impl crate::bo4e_enum_sealed::Sealed for Waehrungscode {}
+#[cfg(feature = "versioned")]
+impl crate::Bo4eEnum for Waehrungscode {
+    const VARIANTS: &'static [Self] = Self::VARIANTS;
+    const COUNT: usize = Self::COUNT;
+    fn as_wire(&self) -> &'static str {
+        Self::as_wire(self)
+    }
+    fn from_wire(s: &str) -> Result<Self, crate::error::UnknownVariant> {
+        Self::from_wire(s)
+    }
+    fn is_unknown(&self) -> bool {
+        Self::is_unknown(self)
+    }
+}
+#[cfg(feature = "versioned")]
+impl crate::Bo4eStrict for Waehrungscode {
+    fn collect_unknown_enums(&self, path: &str, out: &mut Vec<String>) {
+        if self.is_unknown() {
+            out.push(path.to_owned());
+        }
     }
 }
 #[cfg(all(feature = "sqlx", feature = "json"))]
@@ -593,30 +1209,16 @@ impl sqlx::Type<sqlx::Postgres> for Waehrungscode {
         <String as sqlx::Type<sqlx::Postgres>>::type_info()
     }
 }
-/// Strum fast path: `AsRef<str>` returns the canonical string without a
+/// Encode via the canonical wire string (`as_wire`, always available) — no
 /// `serde_json::Value` intermediate, saving an allocation per encode (M-07).
-#[cfg(all(feature = "sqlx", feature = "json", feature = "strum"))]
+#[cfg(all(feature = "sqlx", feature = "json"))]
 impl<'q> sqlx::Encode<'q, sqlx::Postgres> for Waehrungscode {
     fn encode_by_ref(
         &self,
         buf: &mut <sqlx::Postgres as sqlx::Database>::ArgumentBuffer<'q>,
     ) -> Result<sqlx::encode::IsNull, sqlx::error::BoxDynError> {
-        let s: &str = self.as_ref();
+        let s: &str = self.as_wire();
         <&str as sqlx::Encode<'q, sqlx::Postgres>>::encode_by_ref(&s, buf)
-    }
-}
-/// Fallback when `strum` is not active: serialize via `serde_json`.
-#[cfg(all(feature = "sqlx", feature = "json", not(feature = "strum")))]
-impl<'q> sqlx::Encode<'q, sqlx::Postgres> for Waehrungscode {
-    fn encode_by_ref(
-        &self,
-        buf: &mut <sqlx::Postgres as sqlx::Database>::ArgumentBuffer<'q>,
-    ) -> Result<sqlx::encode::IsNull, sqlx::error::BoxDynError> {
-        let s = serde_json::to_value(self)?
-            .as_str()
-            .ok_or("enum variant did not serialize to a JSON string")?
-            .to_owned();
-        <String as sqlx::Encode<'q, sqlx::Postgres>>::encode_by_ref(&s, buf)
     }
 }
 #[cfg(all(feature = "sqlx", feature = "json"))]
@@ -629,14 +1231,12 @@ impl<'r> sqlx::Decode<'r, sqlx::Postgres> for Waehrungscode {
             .map_err(|e| Box::new(e) as sqlx::error::BoxDynError)
     }
 }
-#[cfg(all(test, feature = "strum"))]
+#[cfg(test)]
 impl proptest::arbitrary::Arbitrary for Waehrungscode {
     type Parameters = ();
     type Strategy = proptest::strategy::BoxedStrategy<Self>;
     fn arbitrary_with(_: Self::Parameters) -> Self::Strategy {
         use proptest::prelude::*;
-        use strum::IntoEnumIterator as _;
-        let variants: Vec<Self> = Self::iter().collect();
-        proptest::sample::select(variants).boxed()
+        proptest::sample::select(Self::VARIANTS.to_vec()).boxed()
     }
 }

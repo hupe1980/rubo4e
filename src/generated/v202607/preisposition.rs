@@ -154,3 +154,83 @@ impl std::fmt::Display for Preisposition {
         }
     }
 }
+impl crate::Bo4eStrict for Preisposition {
+    fn collect_unknown_enums(&self, path: &str, out: &mut Vec<String>) {
+        if let Some(v) = &self.bdew_artikelnummer {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "bdewArtikelnummer"),
+                out,
+            );
+        }
+        if let Some(v) = &self.berechnungsmethode {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "berechnungsmethode"),
+                out,
+            );
+        }
+        if let Some(v) = &self.bezugsgroesse {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "bezugsgroesse"),
+                out,
+            );
+        }
+        if let Some(v) = &self.leistungstyp {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "leistungstyp"),
+                out,
+            );
+        }
+        if let Some(v) = &self.preiseinheit {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "preiseinheit"),
+                out,
+            );
+        }
+        if let Some(items) = &self.preisstaffeln {
+            let child = crate::strict::field_path(path, "preisstaffeln");
+            for (i, item) in items.iter().enumerate() {
+                crate::Bo4eStrict::collect_unknown_enums(
+                    item,
+                    &crate::strict::index_path(&child, i),
+                    out,
+                );
+            }
+        }
+        if let Some(v) = &self.tarifzeit {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "tarifzeit"),
+                out,
+            );
+        }
+        if let Some(v) = &self.zeitbasis {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "zeitbasis"),
+                out,
+            );
+        }
+        if let Some(v) = &self.zonungsgroesse {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "zonungsgroesse"),
+                out,
+            );
+        }
+        if let Some(items) = &self.zusatz_attribute {
+            let child = crate::strict::field_path(path, "zusatzAttribute");
+            for (i, item) in items.iter().enumerate() {
+                crate::Bo4eStrict::collect_unknown_enums(
+                    item,
+                    &crate::strict::index_path(&child, i),
+                    out,
+                );
+            }
+        }
+    }
+}

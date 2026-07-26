@@ -63,3 +63,7 @@ impl std::fmt::Display for ZusatzAttribut {
         }
     }
 }
+impl crate::Bo4eStrict for ZusatzAttribut {
+    #[allow(unused_variables)]
+    fn collect_unknown_enums(&self, path: &str, out: &mut Vec<String>) {}
+}

@@ -104,3 +104,34 @@ impl std::fmt::Display for Standorteigenschaften {
         }
     }
 }
+impl crate::Bo4eStrict for Standorteigenschaften {
+    fn collect_unknown_enums(&self, path: &str, out: &mut Vec<String>) {
+        if let Some(v) = &self.eigenschaften_gas {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "eigenschaftenGas"),
+                out,
+            );
+        }
+        if let Some(items) = &self.eigenschaften_strom {
+            let child = crate::strict::field_path(path, "eigenschaftenStrom");
+            for (i, item) in items.iter().enumerate() {
+                crate::Bo4eStrict::collect_unknown_enums(
+                    item,
+                    &crate::strict::index_path(&child, i),
+                    out,
+                );
+            }
+        }
+        if let Some(items) = &self.zusatz_attribute {
+            let child = crate::strict::field_path(path, "zusatzAttribute");
+            for (i, item) in items.iter().enumerate() {
+                crate::Bo4eStrict::collect_unknown_enums(
+                    item,
+                    &crate::strict::index_path(&child, i),
+                    out,
+                );
+            }
+        }
+    }
+}

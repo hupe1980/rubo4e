@@ -2,13 +2,7 @@
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(
     feature = "strum",
-    derive(
-        strum::Display,
-        strum::EnumString,
-        strum::EnumIter,
-        strum::IntoStaticStr,
-        strum::AsRefStr
-    )
+    derive(strum::EnumString, strum::EnumIter, strum::IntoStaticStr)
 )]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
@@ -42,6 +36,11 @@ pub enum Zaehlertyp {
     #[cfg_attr(feature = "serde", serde(rename = "MODERNE_MESSEINRICHTUNG"))]
     #[cfg_attr(feature = "strum", strum(serialize = "MODERNE_MESSEINRICHTUNG"))]
     ModerneMesseinrichtung,
+    ///
+    /// **Wire spelling:** `INTELLIGENTES_MESSSYSTEM` (three `s`).  ⚠ BO4E spells the
+    /// *same* iMSys concept differently across BOs: `Geraetetyp::IntelligentesMessystem`
+    /// uses `INTELLIGENTES_MESSYSTEM` (two `s`).  This divergence is upstream, not a
+    /// `rubo4e` transcription error; each BO keeps its own canonical spelling.
     #[cfg_attr(feature = "serde", serde(rename = "INTELLIGENTES_MESSSYSTEM"))]
     #[cfg_attr(feature = "strum", strum(serialize = "INTELLIGENTES_MESSSYSTEM"))]
     IntelligentesMesssystem,
@@ -61,23 +60,138 @@ pub enum Zaehlertyp {
     Unknown,
 }
 impl Zaehlertyp {
+    /// All variants defined by the BO4E schema, in declaration order.
+    ///
+    /// Excludes the forward-compatibility [`Zaehlertyp::Unknown`] catch-all, so this
+    /// is exactly the set of values that appear on the wire.  Available **without**
+    /// the `strum` feature — use it to drift-guard SQL `CHECK` lists and mappings.
+    pub const VARIANTS: &'static [Self] = &[
+        Self::Drehstromzaehler,
+        Self::Balgengaszaehler,
+        Self::Drehkolbenzaehler,
+        Self::Leistungszaehler,
+        Self::Maximumzaehler,
+        Self::Turbinenradgaszaehler,
+        Self::Ultraschallgaszaehler,
+        Self::Wechselstromzaehler,
+        Self::ModerneMesseinrichtung,
+        Self::IntelligentesMesssystem,
+        Self::ElektronischerZaehler,
+        Self::Wirbelgaszaehler,
+        Self::Wasserzaehler,
+    ];
+    /// Number of schema-defined variants (equal to `VARIANTS.len()`), excluding the
+    /// [`Zaehlertyp::Unknown`] catch-all.  Stable for this schema version.
+    pub const COUNT: usize = Self::VARIANTS.len();
     /// Returns an iterator over all **known** variants of `Zaehlertyp`.
     ///
-    /// Unlike [`strum::IntoEnumIterator`] which includes the [`Zaehlertyp::Unknown`]
-    /// catch-all, this method yields only variants that correspond to values defined
-    /// in the BO4E schema.  Use this when building dropdowns, lookup tables, or
-    /// generating reports that should only include valid schema values.
+    /// Yields only variants that correspond to values defined in the BO4E schema
+    /// (i.e. [`Self::VARIANTS`]), never the [`Zaehlertyp::Unknown`] catch-all.
+    /// Available **without** the `strum` feature.
     ///
     /// # Example
     /// ```rust,ignore
     /// for v in Zaehlertyp::iter_known() {
-    ///     println!("{v}");
+    ///     println!("{}", v.as_wire());
     /// }
     /// ```
-    #[cfg(feature = "strum")]
-    pub fn iter_known() -> impl Iterator<Item = Self> {
-        use strum::IntoEnumIterator as _;
-        Self::iter().filter(|v| !matches!(v, Self::Unknown))
+    pub fn iter_known() -> impl Iterator<Item = Self> + Clone {
+        Self::VARIANTS.iter().copied()
+    }
+    /// Returns the canonical BO4E wire string (SCREAMING_SNAKE_CASE) for this value.
+    ///
+    /// [`Zaehlertyp::Unknown`] renders as `"UNKNOWN"`, matching its serialized form.
+    pub const fn as_wire(&self) -> &'static str {
+        match self {
+            Self::Drehstromzaehler => "DREHSTROMZAEHLER",
+            Self::Balgengaszaehler => "BALGENGASZAEHLER",
+            Self::Drehkolbenzaehler => "DREHKOLBENZAEHLER",
+            Self::Leistungszaehler => "LEISTUNGSZAEHLER",
+            Self::Maximumzaehler => "MAXIMUMZAEHLER",
+            Self::Turbinenradgaszaehler => "TURBINENRADGASZAEHLER",
+            Self::Ultraschallgaszaehler => "ULTRASCHALLGASZAEHLER",
+            Self::Wechselstromzaehler => "WECHSELSTROMZAEHLER",
+            Self::ModerneMesseinrichtung => "MODERNE_MESSEINRICHTUNG",
+            Self::IntelligentesMesssystem => "INTELLIGENTES_MESSSYSTEM",
+            Self::ElektronischerZaehler => "ELEKTRONISCHER_ZAEHLER",
+            Self::Wirbelgaszaehler => "WIRBELGASZAEHLER",
+            Self::Wasserzaehler => "WASSERZAEHLER",
+            Self::Unknown => "UNKNOWN",
+        }
+    }
+    /// **Strictly** parses a BO4E wire string into a known variant.
+    ///
+    /// Unlike the lenient `serde` / [`FromStr`](std::str::FromStr) path — which maps
+    /// any unrecognized value (a typo, a legacy code, or a value from a newer schema)
+    /// to [`Zaehlertyp::Unknown`] — this returns
+    /// [`Err`](crate::error::UnknownVariant) for values not defined in this schema
+    /// version, including the literal `"UNKNOWN"`.  Use it at the ingest boundary to
+    /// reject bad values instead of silently degrading them.
+    ///
+    /// # Example
+    /// ```rust,ignore
+    /// assert!(Zaehlertyp::from_wire("NOT_A_REAL_VALUE").is_err());
+    /// ```
+    pub fn from_wire(s: &str) -> Result<Self, crate::error::UnknownVariant> {
+        match s {
+            "DREHSTROMZAEHLER" => Ok(Self::Drehstromzaehler),
+            "BALGENGASZAEHLER" => Ok(Self::Balgengaszaehler),
+            "DREHKOLBENZAEHLER" => Ok(Self::Drehkolbenzaehler),
+            "LEISTUNGSZAEHLER" => Ok(Self::Leistungszaehler),
+            "MAXIMUMZAEHLER" => Ok(Self::Maximumzaehler),
+            "TURBINENRADGASZAEHLER" => Ok(Self::Turbinenradgaszaehler),
+            "ULTRASCHALLGASZAEHLER" => Ok(Self::Ultraschallgaszaehler),
+            "WECHSELSTROMZAEHLER" => Ok(Self::Wechselstromzaehler),
+            "MODERNE_MESSEINRICHTUNG" => Ok(Self::ModerneMesseinrichtung),
+            "INTELLIGENTES_MESSSYSTEM" => Ok(Self::IntelligentesMesssystem),
+            "ELEKTRONISCHER_ZAEHLER" => Ok(Self::ElektronischerZaehler),
+            "WIRBELGASZAEHLER" => Ok(Self::Wirbelgaszaehler),
+            "WASSERZAEHLER" => Ok(Self::Wasserzaehler),
+            other => Err(crate::error::UnknownVariant::new(other)),
+        }
+    }
+    /// Returns `true` if this value is the forward-compatibility
+    /// [`Zaehlertyp::Unknown`] catch-all (an out-of-schema value).
+    pub const fn is_unknown(&self) -> bool {
+        matches!(self, Self::Unknown)
+    }
+    /// Returns `true` if this value is a known, schema-defined variant.
+    pub const fn is_known(&self) -> bool {
+        !self.is_unknown()
+    }
+}
+impl std::fmt::Display for Zaehlertyp {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_wire())
+    }
+}
+impl AsRef<str> for Zaehlertyp {
+    fn as_ref(&self) -> &str {
+        self.as_wire()
+    }
+}
+#[cfg(feature = "versioned")]
+impl crate::bo4e_enum_sealed::Sealed for Zaehlertyp {}
+#[cfg(feature = "versioned")]
+impl crate::Bo4eEnum for Zaehlertyp {
+    const VARIANTS: &'static [Self] = Self::VARIANTS;
+    const COUNT: usize = Self::COUNT;
+    fn as_wire(&self) -> &'static str {
+        Self::as_wire(self)
+    }
+    fn from_wire(s: &str) -> Result<Self, crate::error::UnknownVariant> {
+        Self::from_wire(s)
+    }
+    fn is_unknown(&self) -> bool {
+        Self::is_unknown(self)
+    }
+}
+#[cfg(feature = "versioned")]
+impl crate::Bo4eStrict for Zaehlertyp {
+    fn collect_unknown_enums(&self, path: &str, out: &mut Vec<String>) {
+        if self.is_unknown() {
+            out.push(path.to_owned());
+        }
     }
 }
 #[cfg(all(feature = "sqlx", feature = "json"))]
@@ -86,30 +200,16 @@ impl sqlx::Type<sqlx::Postgres> for Zaehlertyp {
         <String as sqlx::Type<sqlx::Postgres>>::type_info()
     }
 }
-/// Strum fast path: `AsRef<str>` returns the canonical string without a
+/// Encode via the canonical wire string (`as_wire`, always available) — no
 /// `serde_json::Value` intermediate, saving an allocation per encode (M-07).
-#[cfg(all(feature = "sqlx", feature = "json", feature = "strum"))]
+#[cfg(all(feature = "sqlx", feature = "json"))]
 impl<'q> sqlx::Encode<'q, sqlx::Postgres> for Zaehlertyp {
     fn encode_by_ref(
         &self,
         buf: &mut <sqlx::Postgres as sqlx::Database>::ArgumentBuffer<'q>,
     ) -> Result<sqlx::encode::IsNull, sqlx::error::BoxDynError> {
-        let s: &str = self.as_ref();
+        let s: &str = self.as_wire();
         <&str as sqlx::Encode<'q, sqlx::Postgres>>::encode_by_ref(&s, buf)
-    }
-}
-/// Fallback when `strum` is not active: serialize via `serde_json`.
-#[cfg(all(feature = "sqlx", feature = "json", not(feature = "strum")))]
-impl<'q> sqlx::Encode<'q, sqlx::Postgres> for Zaehlertyp {
-    fn encode_by_ref(
-        &self,
-        buf: &mut <sqlx::Postgres as sqlx::Database>::ArgumentBuffer<'q>,
-    ) -> Result<sqlx::encode::IsNull, sqlx::error::BoxDynError> {
-        let s = serde_json::to_value(self)?
-            .as_str()
-            .ok_or("enum variant did not serialize to a JSON string")?
-            .to_owned();
-        <String as sqlx::Encode<'q, sqlx::Postgres>>::encode_by_ref(&s, buf)
     }
 }
 #[cfg(all(feature = "sqlx", feature = "json"))]
@@ -122,14 +222,12 @@ impl<'r> sqlx::Decode<'r, sqlx::Postgres> for Zaehlertyp {
             .map_err(|e| Box::new(e) as sqlx::error::BoxDynError)
     }
 }
-#[cfg(all(test, feature = "strum"))]
+#[cfg(test)]
 impl proptest::arbitrary::Arbitrary for Zaehlertyp {
     type Parameters = ();
     type Strategy = proptest::strategy::BoxedStrategy<Self>;
     fn arbitrary_with(_: Self::Parameters) -> Self::Strategy {
         use proptest::prelude::*;
-        use strum::IntoEnumIterator as _;
-        let variants: Vec<Self> = Self::iter().collect();
-        proptest::sample::select(variants).boxed()
+        proptest::sample::select(Self::VARIANTS.to_vec()).boxed()
     }
 }

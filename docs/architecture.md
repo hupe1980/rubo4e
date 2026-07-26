@@ -110,10 +110,10 @@ graph TD
 | `builder` | — | `typed-builder` | none | Typed builder derives on all BO/COM structs |
 | `validate` | — | `garde` | **1.87** | `.validate()` method on all structs |
 | `schemars` | — | `schemars` | none | `JsonSchema` derive on all types; enables `rubo4e::schema_helpers` |
-| `versioned` | — | none | none | Conditional compilation of `v202607` and `current` modules; enables `rubo4e::convenience` |
+| `versioned` | — | none | none | Conditional compilation of `v202607` and `current` modules; enables `rubo4e::convenience`, `rubo4e::strict`, and the `Bo4eEnum` / `Bo4eStrict` traits |
 | `sqlx` | — | `sqlx` | none | `sqlx::Type`/`Encode`/`Decode` for identifiers and enums |
 | `utoipa` | — | `utoipa` | none | `ToSchema` derive on all types |
-| `strum` | — | `strum` | none | `Display`/`FromStr` on all enums |
+| `strum` | — | `strum` | none | `FromStr`, `EnumIter`, `Into<&'static str>` on all enums (`Display`/`AsRef<str>`/introspection are always on) |
 | `tracing` | — | `tracing` | none | Structured diagnostics (identifier failures, extension-data events) |
 | `metrics` | — | `metrics` | none | Counter export hooks (metrics ecosystem) |
 

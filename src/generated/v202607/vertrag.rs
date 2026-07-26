@@ -225,3 +225,89 @@ impl std::fmt::Display for Vertrag {
         }
     }
 }
+impl crate::Bo4eStrict for Vertrag {
+    fn collect_unknown_enums(&self, path: &str, out: &mut Vec<String>) {
+        if let Some(v) = &self.sparte {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "sparte"),
+                out,
+            );
+        }
+        if let Some(items) = &self.unterzeichnervp1 {
+            let child = crate::strict::field_path(path, "unterzeichnervp1");
+            for (i, item) in items.iter().enumerate() {
+                crate::Bo4eStrict::collect_unknown_enums(
+                    item,
+                    &crate::strict::index_path(&child, i),
+                    out,
+                );
+            }
+        }
+        if let Some(items) = &self.unterzeichnervp2 {
+            let child = crate::strict::field_path(path, "unterzeichnervp2");
+            for (i, item) in items.iter().enumerate() {
+                crate::Bo4eStrict::collect_unknown_enums(
+                    item,
+                    &crate::strict::index_path(&child, i),
+                    out,
+                );
+            }
+        }
+        if let Some(v) = &self.vertragsart {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "vertragsart"),
+                out,
+            );
+        }
+        if let Some(v) = &self.vertragskonditionen {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "vertragskonditionen"),
+                out,
+            );
+        }
+        if let Some(v) = &self.vertragspartner1 {
+            crate::Bo4eStrict::collect_unknown_enums(
+                &**v,
+                &crate::strict::field_path(path, "vertragspartner1"),
+                out,
+            );
+        }
+        if let Some(v) = &self.vertragspartner2 {
+            crate::Bo4eStrict::collect_unknown_enums(
+                &**v,
+                &crate::strict::field_path(path, "vertragspartner2"),
+                out,
+            );
+        }
+        if let Some(v) = &self.vertragsstatus {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "vertragsstatus"),
+                out,
+            );
+        }
+        if let Some(items) = &self.vertragsteile {
+            let child = crate::strict::field_path(path, "vertragsteile");
+            for (i, item) in items.iter().enumerate() {
+                crate::Bo4eStrict::collect_unknown_enums(
+                    item,
+                    &crate::strict::index_path(&child, i),
+                    out,
+                );
+            }
+        }
+        if let Some(items) = &self.zusatz_attribute {
+            let child = crate::strict::field_path(path, "zusatzAttribute");
+            for (i, item) in items.iter().enumerate() {
+                crate::Bo4eStrict::collect_unknown_enums(
+                    item,
+                    &crate::strict::index_path(&child, i),
+                    out,
+                );
+            }
+        }
+    }
+}

@@ -102,32 +102,37 @@ with the serde rename attributes and the BO4E wire format.
 
 ---
 
-## strum — Enum Display + FromStr
+## strum — Enum `FromStr` + iteration
 
 **Feature flag:** `strum`  
 **Dependency:** `strum = "0.28"` (with `derive` feature)
 
-Convert BO4E enum values to and from strings without a `match` expression.
-Useful for logging, debug output, CSV export, and non-JSON serialization.
+> **Note:** `Display`, `AsRef<str>`, `as_wire()`, `from_wire()`, `VARIANTS`,
+> `COUNT`, and `iter_known()` are **always available** — no `strum` needed. See
+> [Enum Introspection & Strict Parsing](../README.md#enum-introspection--strict-parsing).
+> The `strum` feature now only adds `FromStr`, `EnumIter` (iteration including
+> `Unknown`), and `Into<&'static str>`.
 
 ```toml
 rubo4e = { version = "...", features = ["strum"] }
 ```
 
 ```rust
-// Display — produces the BO4E SCREAMING_SNAKE_CASE wire value
-assert_eq!(Sparte::Strom.to_string(), "STROM");
-
-// FromStr — accepts the same wire value
+// FromStr — accepts the BO4E SCREAMING_SNAKE_CASE wire value (strum feature)
 let sparte: Sparte = "STROM".parse()?;
 assert_eq!(sparte, Sparte::Strom);
 
-// Static str reference (zero allocation)
+// Static str reference (zero allocation) — strum's IntoStaticStr
 let s: &'static str = Sparte::Strom.into();
+
+// Iterate every variant, including the Unknown catch-all — strum's EnumIter
+use strum::IntoEnumIterator as _;
+let n = Sparte::iter().count();
 ```
 
-Without the `strum` feature, `Sparte` does not implement `Display` or `FromStr`.
-Serde-based JSON serialization works independently of `strum`.
+Without `strum`, use the always-on equivalents instead: `to_string()` /
+`as_wire()` for the wire string, `from_wire()` for **strict** parsing, and
+`iter_known()` for iteration over the schema-defined variants.
 
 ### Unknown Variant
 

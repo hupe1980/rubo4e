@@ -258,3 +258,107 @@ impl std::fmt::Display for Bilanzierung {
         }
     }
 }
+impl crate::Bo4eStrict for Bilanzierung {
+    fn collect_unknown_enums(&self, path: &str, out: &mut Vec<String>) {
+        if let Some(v) = &self.abwicklungsmodell {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "abwicklungsmodell"),
+                out,
+            );
+        }
+        if let Some(v) = &self.aggregationsverantwortung {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "aggregationsverantwortung"),
+                out,
+            );
+        }
+        if let Some(items) = &self.details_prognosegrundlage {
+            let child = crate::strict::field_path(path, "detailsPrognosegrundlage");
+            for (i, item) in items.iter().enumerate() {
+                crate::Bo4eStrict::collect_unknown_enums(
+                    item,
+                    &crate::strict::index_path(&child, i),
+                    out,
+                );
+            }
+        }
+        if let Some(v) = &self.fallgruppenzuordnung {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "fallgruppenzuordnung"),
+                out,
+            );
+        }
+        if let Some(v) = &self.grund_wahlrecht_prognosegrundlage {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "grundWahlrechtPrognosegrundlage"),
+                out,
+            );
+        }
+        if let Some(v) = &self.jahresverbrauchsprognose {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "jahresverbrauchsprognose"),
+                out,
+            );
+        }
+        if let Some(v) = &self.kundenwert {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "kundenwert"),
+                out,
+            );
+        }
+        if let Some(items) = &self.lastprofil {
+            let child = crate::strict::field_path(path, "lastprofil");
+            for (i, item) in items.iter().enumerate() {
+                crate::Bo4eStrict::collect_unknown_enums(
+                    item,
+                    &crate::strict::index_path(&child, i),
+                    out,
+                );
+            }
+        }
+        if let Some(v) = &self.prognosegrundlage {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "prognosegrundlage"),
+                out,
+            );
+        }
+        if let Some(v) = &self.temperatur_arbeit {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "temperaturArbeit"),
+                out,
+            );
+        }
+        if let Some(v) = &self.wahlrecht_prognosegrundlage {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "wahlrechtPrognosegrundlage"),
+                out,
+            );
+        }
+        if let Some(v) = &self.zeitreihentyp {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "zeitreihentyp"),
+                out,
+            );
+        }
+        if let Some(items) = &self.zusatz_attribute {
+            let child = crate::strict::field_path(path, "zusatzAttribute");
+            for (i, item) in items.iter().enumerate() {
+                crate::Bo4eStrict::collect_unknown_enums(
+                    item,
+                    &crate::strict::index_path(&child, i),
+                    out,
+                );
+            }
+        }
+    }
+}

@@ -92,3 +92,55 @@ impl std::fmt::Display for Tarifpreisposition {
         }
     }
 }
+impl crate::Bo4eStrict for Tarifpreisposition {
+    fn collect_unknown_enums(&self, path: &str, out: &mut Vec<String>) {
+        if let Some(v) = &self.bezugseinheit {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "bezugseinheit"),
+                out,
+            );
+        }
+        if let Some(v) = &self.einheit {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "einheit"),
+                out,
+            );
+        }
+        if let Some(v) = &self.mengeneinheitstaffel {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "mengeneinheitstaffel"),
+                out,
+            );
+        }
+        if let Some(items) = &self.preisstaffeln {
+            let child = crate::strict::field_path(path, "preisstaffeln");
+            for (i, item) in items.iter().enumerate() {
+                crate::Bo4eStrict::collect_unknown_enums(
+                    item,
+                    &crate::strict::index_path(&child, i),
+                    out,
+                );
+            }
+        }
+        if let Some(v) = &self.preistyp {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "preistyp"),
+                out,
+            );
+        }
+        if let Some(items) = &self.zusatz_attribute {
+            let child = crate::strict::field_path(path, "zusatzAttribute");
+            for (i, item) in items.iter().enumerate() {
+                crate::Bo4eStrict::collect_unknown_enums(
+                    item,
+                    &crate::strict::index_path(&child, i),
+                    out,
+                );
+            }
+        }
+    }
+}

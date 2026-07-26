@@ -156,3 +156,104 @@ impl std::fmt::Display for Ausschreibungslos {
         }
     }
 }
+impl crate::Bo4eStrict for Ausschreibungslos {
+    fn collect_unknown_enums(&self, path: &str, out: &mut Vec<String>) {
+        if let Some(v) = &self.energieart {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "energieart"),
+                out,
+            );
+        }
+        if let Some(v) = &self.gesamt_menge {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "gesamtMenge"),
+                out,
+            );
+        }
+        if let Some(items) = &self.lieferstellen {
+            let child = crate::strict::field_path(path, "lieferstellen");
+            for (i, item) in items.iter().enumerate() {
+                crate::Bo4eStrict::collect_unknown_enums(
+                    item,
+                    &crate::strict::index_path(&child, i),
+                    out,
+                );
+            }
+        }
+        if let Some(v) = &self.lieferzeitraum {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "lieferzeitraum"),
+                out,
+            );
+        }
+        if let Some(v) = &self.preismodell {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "preismodell"),
+                out,
+            );
+        }
+        if let Some(v) = &self.wiederholungsintervall {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "wiederholungsintervall"),
+                out,
+            );
+        }
+        if let Some(v) = &self.wunsch_kuendingungsfrist {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "wunschKuendingungsfrist"),
+                out,
+            );
+        }
+        if let Some(v) = &self.wunsch_maximalmenge {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "wunschMaximalmenge"),
+                out,
+            );
+        }
+        if let Some(v) = &self.wunsch_mindestmenge {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "wunschMindestmenge"),
+                out,
+            );
+        }
+        if let Some(v) = &self.wunsch_rechnungslegung {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "wunschRechnungslegung"),
+                out,
+            );
+        }
+        if let Some(v) = &self.wunsch_vertragsform {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "wunschVertragsform"),
+                out,
+            );
+        }
+        if let Some(v) = &self.wunsch_zahlungsziel {
+            crate::Bo4eStrict::collect_unknown_enums(
+                v,
+                &crate::strict::field_path(path, "wunschZahlungsziel"),
+                out,
+            );
+        }
+        if let Some(items) = &self.zusatz_attribute {
+            let child = crate::strict::field_path(path, "zusatzAttribute");
+            for (i, item) in items.iter().enumerate() {
+                crate::Bo4eStrict::collect_unknown_enums(
+                    item,
+                    &crate::strict::index_path(&child, i),
+                    out,
+                );
+            }
+        }
+    }
+}
