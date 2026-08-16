@@ -18,11 +18,37 @@ fn workspace_root() -> std::path::PathBuf {
 
 /// Loads the snapshot file at `tests/snapshots/<name>` and returns its content.
 fn load_snapshot(name: &str) -> String {
-    let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+    std::fs::read_to_string(snapshot_path(name))
+        .unwrap_or_else(|e| panic!("cannot read snapshot {name}: {e}"))
+}
+
+fn snapshot_path(name: &str) -> std::path::PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("tests/snapshots")
-        .join(name);
-    std::fs::read_to_string(&path)
-        .unwrap_or_else(|e| panic!("cannot read snapshot {}: {e}", path.display()))
+        .join(name)
+}
+
+/// Compares emitter output against a committed snapshot.
+///
+/// Set `UPDATE_SNAPSHOTS=1` to rewrite the snapshot instead of failing, then
+/// review the diff — the point of these files is that emitter changes show up as
+/// a reviewable diff, so the rewrite is deliberately opt-in and still fails the
+/// run so it can never pass silently in CI.
+fn assert_snapshot(name: &str, generated: &str) {
+    let expected = load_snapshot(name);
+    if generated == expected {
+        return;
+    }
+    if std::env::var_os("UPDATE_SNAPSHOTS").is_some() {
+        std::fs::write(snapshot_path(name), generated)
+            .unwrap_or_else(|e| panic!("cannot write snapshot {name}: {e}"));
+        panic!("snapshot {name} rewritten (UPDATE_SNAPSHOTS set) — review the diff and re-run");
+    }
+    eprintln!("=== EXPECTED ===\n{expected}\n=== GENERATED ===\n{generated}");
+    panic!(
+        "Generator output for {name} changed!\n\
+         If this is intentional, re-run with UPDATE_SNAPSHOTS=1 and review the diff."
+    );
 }
 
 /// Parses `<schema_dir>/<category>/<file>.json` and emits Rust source.
@@ -66,17 +92,10 @@ fn generate_one(schema_version: &str, category: &str, file_stem: &str) -> String
 #[test]
 fn v202607_menge_snapshot() {
     let generated = generate_one("v202607.0.0", "com", "Menge");
-    let expected = load_snapshot("v202607_menge.rs");
-    if generated != expected {
-        eprintln!("=== EXPECTED ===\n{expected}\n=== GENERATED ===\n{generated}");
-        panic!(
-            "Generator output for Menge changed!\n\
-             If this is intentional, update generator/tests/snapshots/v202607_menge.rs."
-        );
-    }
+    assert_snapshot("v202607_menge.rs", &generated);
 }
 
-/// Smoke-test: every schema in v202501 must parse without error.
+/// Smoke-test: every schema in v202607 must parse without error.
 #[test]
 fn v202607_all_schemas_parse() {
     let root = workspace_root();
@@ -106,7 +125,7 @@ fn v202607_all_schemas_parse() {
 }
 
 /// Smoke-test: every parsed schema node must emit valid Rust source (no panics,
-/// no emitter errors) for v202501.
+/// no emitter errors) for v202607.
 #[test]
 fn v202607_all_schemas_emit() {
     let root = workspace_root();

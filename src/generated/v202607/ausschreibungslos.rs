@@ -2,7 +2,7 @@ use super::{
     Ausschreibungsdetail, ComTyp, Menge, Preismodell, Rechnungslegung, Sparte, Vertragsform,
     Zeitraum, ZusatzAttribut,
 };
-#[derive(Debug, Clone, PartialEq, Default)]
+#[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(not(feature = "json"), derive(Hash))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "builder", derive(typed_builder::TypedBuilder))]
@@ -78,7 +78,10 @@ pub struct Ausschreibungslos {
     /// Version der COM-Struktur aka "fachliche Versionierung"
     #[cfg_attr(feature = "serde", serde(rename = "_version"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(
+        feature = "builder",
+        builder(default = Some("v202607.0.0".to_owned()), setter(into))
+    )]
     pub version: Option<String>,
     /// In welchem Intervall die Angebotsabgabe wiederholt werden darf.
     /// Angabe nur gesetzt für die 2. Phase bei öffentlich-rechtlichen Ausschreibungen
@@ -131,6 +134,34 @@ pub struct Ausschreibungslos {
     #[cfg_attr(feature = "builder", builder(default, setter(skip)))]
     #[doc(hidden)]
     pub _additional: crate::LimitedExtensionMap,
+}
+impl Default for Ausschreibungslos {
+    fn default() -> Self {
+        Self {
+            anzahl_lieferstellen: Default::default(),
+            bemerkung: Default::default(),
+            betreut_durch: Default::default(),
+            bezeichnung: Default::default(),
+            energieart: Default::default(),
+            gesamt_menge: Default::default(),
+            id: Default::default(),
+            lieferstellen: Default::default(),
+            lieferzeitraum: Default::default(),
+            losnummer: Default::default(),
+            preismodell: Default::default(),
+            typ: Default::default(),
+            version: Some("v202607.0.0".to_owned()),
+            wiederholungsintervall: Default::default(),
+            wunsch_kuendingungsfrist: Default::default(),
+            wunsch_maximalmenge: Default::default(),
+            wunsch_mindestmenge: Default::default(),
+            wunsch_rechnungslegung: Default::default(),
+            wunsch_vertragsform: Default::default(),
+            wunsch_zahlungsziel: Default::default(),
+            zusatz_attribute: Default::default(),
+            _additional: Default::default(),
+        }
+    }
 }
 #[cfg(feature = "json")]
 impl crate::json::sealed::Sealed for Ausschreibungslos {}

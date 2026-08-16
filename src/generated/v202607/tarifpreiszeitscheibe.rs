@@ -2,7 +2,7 @@ use super::{
     ComTyp, EinheitsPreisposition, LastvariablePreisposition, RelativePreisposition, Zeitraum,
     ZeitvariablePreisposition, ZusatzAttribut,
 };
-#[derive(Debug, Clone, PartialEq, Default)]
+#[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(not(feature = "json"), derive(Hash))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "builder", derive(typed_builder::TypedBuilder))]
@@ -50,7 +50,10 @@ pub struct Tarifpreiszeitscheibe {
     /// Version der COM-Struktur aka "fachliche Versionierung"
     #[cfg_attr(feature = "serde", serde(rename = "_version"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(
+        feature = "builder",
+        builder(default = Some("v202607.0.0".to_owned()), setter(into))
+    )]
     pub version: Option<String>,
     /// Gibt an für welchen Zeitraum dieser zusammengesetzte Tarifpreis gültig ist.
     #[cfg_attr(feature = "serde", serde(rename = "zeitscheibengueltigkeit"))]
@@ -78,6 +81,22 @@ pub struct Tarifpreiszeitscheibe {
     #[cfg_attr(feature = "builder", builder(default, setter(skip)))]
     #[doc(hidden)]
     pub _additional: crate::LimitedExtensionMap,
+}
+impl Default for Tarifpreiszeitscheibe {
+    fn default() -> Self {
+        Self {
+            einheits_preispositionen: Default::default(),
+            id: Default::default(),
+            lastvariable_preispositionen: Default::default(),
+            relative_preispositionen: Default::default(),
+            typ: Default::default(),
+            version: Some("v202607.0.0".to_owned()),
+            zeitscheibengueltigkeit: Default::default(),
+            zeitvariable_preispositionen: Default::default(),
+            zusatz_attribute: Default::default(),
+            _additional: Default::default(),
+        }
+    }
 }
 #[cfg(feature = "json")]
 impl crate::json::sealed::Sealed for Tarifpreiszeitscheibe {}

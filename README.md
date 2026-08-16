@@ -1,32 +1,28 @@
 # rubo4e
 
-Rust implementation of the [BO4E](https://www.bo4e.de/) energy-market data standard —
-the canonical data model for the German energy industry.
+Rust implementation of [BO4E](https://www.bo4e.de/) — *Geschäftsobjekte für die
+Energiewirtschaft*, the object model the German energy industry uses to exchange
+contracts, metering points, invoices, and the parties involved.
 
-> **Not an official BO4E implementation.** The reference implementation is
-> [BO4E-python](https://github.com/bo4e/BO4E-python). This crate aims for idiomatic
-> Rust ergonomics, strong domain types, and ecosystem integration.
+`rubo4e` generates the full object model from the official JSON Schema, then adds
+what the schema cannot express: market identifiers that verify their own BDEW
+check digits, enums you can parse strictly at an ingest boundary, and JSON that
+stays byte-compatible with the Python, Go, and .NET implementations.
 
 [![Crates.io](https://img.shields.io/crates/v/rubo4e.svg)](https://crates.io/crates/rubo4e)
+[![Docs](https://img.shields.io/badge/docs-hupe1980.github.io%2Frubo4e-blue.svg)](https://hupe1980.github.io/rubo4e)
+[![API](https://img.shields.io/badge/api-docs.rs-blue.svg)](https://docs.rs/rubo4e)
 [![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](LICENSE-MIT)
 [![Rust 1.87+](https://img.shields.io/badge/rust-1.87%2B-orange.svg)](https://www.rust-lang.org/)
 
-## MSRV Policy
-
-The **minimum supported Rust version** is `1.87`, encoded in `Cargo.toml` as
-`rust-version = "1.87"`.
-
-We target **stable + 2 releases** — MSRV advances when the current floor has been
-superseded by two stable releases.  MSRV bumps are treated as **minor** version
-changes (not patch).  The `rust-version` field in `Cargo.toml` is the authoritative
-source; the README badge is kept in sync.
-
----
+> **Independent implementation.** Not affiliated with or endorsed by the BO4E
+> project or BDEW; the reference implementation is
+> [BO4E-python](https://github.com/bo4e/BO4E-python).
 
 ## Features
 
 - **Generated types** from the official BO4E JSON Schema (v202607)
-- **Strong domain identifiers** — `MaloId`, `MeloId`, `EicCode`, `ObisCode`, `MarktpartnerId`, … with embedded validation and domain helpers
+- **Strong domain identifiers** — the complete BDEW identifier family (`MaloId`, `MeloId`, `NeloId`, `NebeId`, `CrId`, `SgId`, `SrId`, `TrId`, `PaketId`, `EicCode`, `ObisCode`, `MarktpartnerId`, …) with spec-accurate check digits and domain helpers
 - **Three-layer validation** — constructor checks, `garde` struct rules, cross-field business logic
 - **Strict enum parsing & introspection** — `from_wire` (reject out-of-schema values), `VARIANTS` / `COUNT` / `iter_known`, `Display` / `AsRef<str>`, `is_unknown`, unified by the `Bo4eEnum` trait — all **without** the `strum` feature
 - **Recursive strict decoding** — `Bo4eStrict::ensure_known_enums()` rejects any `Unknown` enum value anywhere in a deserialized payload, with JSON-paths — one call replaces hand-written per-field checks
@@ -40,15 +36,14 @@ source; the README badge is kept in sync.
 
 ## Installation
 
-```toml
-[dependencies]
-rubo4e = "0.8"
+```sh
+cargo add rubo4e
 ```
 
-Enable optional features as needed:
+That gives you the identifier types only. Add the features you need:
 
-```toml
-rubo4e = { version = "0.8", features = ["versioned", "time", "decimal", "json", "validate"] }
+```sh
+cargo add rubo4e --features versioned,time,decimal,json,validate
 ```
 
 ---
@@ -68,8 +63,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .vertragsnummer("VN-2026-001".to_string())
         .build();
 
-    // Cross-field struct validation (requires `validate` feature)
-    use garde::Validate as _;
+    // Cross-field struct validation (requires `validate` feature).
+    // The prelude re-exports the `Validate` trait, so no direct garde dependency.
     vertrag.validate()?;
 
     // German camelCase JSON — BO4E wire format (requires `json` feature)
@@ -95,7 +90,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 | `builder`   |         | `typed-builder` derives on all BO/COM structs     |
 | `validate`  |         | `garde` validation — constructor + cross-field rules |
 | `schemars`  |         | JSON Schema generation with patterns and examples |
-| `sqlx`      |         | `Type`/`Encode`/`Decode` for all identifier types (PostgreSQL) |
+| `sqlx`      |         | `Type`/`Encode`/`Decode`/`PgHasArrayType` for every identifier **and** every enum (PostgreSQL) |
 | `utoipa`    |         | `ToSchema` with pattern/example/description for OpenAPI |
 | `strum`     |         | Enum iteration and string conversion              |
 | `versioned` |         | Versioned schema modules (`v202607`, `current`)   |
@@ -103,8 +98,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 | `metrics`   |         | Counter export hooks (metrics ecosystem)          |
 
 > **Typical full setup:**
-> ```toml
-> rubo4e = { version = "0.8", features = ["versioned", "time", "decimal", "json", "validate", "builder"] }
+> ```sh
+> cargo add rubo4e --features versioned,time,decimal,json,validate,builder
 > ```
 
 ---
@@ -128,7 +123,7 @@ shape you guard** (SQL `CHECK` lists, exhaustive mappings, variant-count
 assertions); use `current` for code that should always track the latest series.
 Every release that changes schema-derived membership records it in the
 [CHANGELOG](CHANGELOG.md) **Schema deltas** section. See
-[docs/versioning.md](docs/versioning.md) for the full contract.
+[Schema Versioning](https://hupe1980.github.io/rubo4e/docs/versioning/) for the full contract.
 
 ---
 
@@ -208,65 +203,127 @@ All domain identifiers validate their format at construction time. There are no 
 
 | Type                | Format / Rule                                              |
 |---------------------|------------------------------------------------------------|
-| `MaloId`            | 11 digits, BDEW alternating-weight check digit             |
-| `NeloId`            | 11 chars: Codetyp `'E'` + 9 `[A-Z0-9]` + ASCII-Verfahren check digit (BDEW §4.2) |
-| `SrId`              | 11 chars: Codetyp `'C'` + 9 `[A-Z0-9]` + ASCII-Verfahren check digit (BDEW §6.6) |
-| `TrId`              | 11 chars: Codetyp `'D'` + 9 `[A-Z0-9]` + ASCII-Verfahren check digit (BDEW §6.6) |
+| `MaloId`            | 11 digits, first `1`–`9`, BDEW §8.1 check digit — Marktlokation / Tranche |
+| `NeloId`            | Codetyp `'E'` + 9 `[A-Z0-9]` + §8.2 check digit — Netzlokation (BK6-22-128) |
+| `NebeId`            | Codetyp `'F'` + 9 `[A-Z0-9]` + §8.2 check digit — Netzbereich (BK6-22-300) |
+| `CrId`              | Codetyp `'A'` + 9 `[A-Z0-9]` + §8.2 check digit — Cluster Ressource |
+| `SgId`              | Codetyp `'B'` + 9 `[A-Z0-9]` + §8.2 check digit — Steuergruppe |
+| `SrId`              | Codetyp `'C'` + 9 `[A-Z0-9]` + §8.2 check digit — Steuerbare Ressource |
+| `TrId`              | Codetyp `'D'` + 9 `[A-Z0-9]` + §8.2 check digit — Technische Ressource |
+| `PaketId`           | Codetyp `'P9'` + 8 `[A-Z0-9]` + §8.2 check digit — Netzbetreiberwechsel |
 | `MeloId`            | 33 chars: 2-char ISO country code + 31 alphanumeric        |
-| `EicCode`           | 16-char EIC with ENTSO-E check character                   |
-| `BilanzkreisId`     | 16-char EIC restricted to type `'Z'` (Bilanzierungszone) — GaBi Gas / MABIS |
-| `ObisCode`          | `[A-B:]C.D[.E][*F]`; C=0 permitted (IEC 62056-61 general metering group) |
-| `MarktpartnerId`    | 13 decimal digits — BDEW (prefix 99), DVGW (prefix 98), or GS1 GLN |
-| `AkivId`            | 1–35 printable ASCII chars — Aktivierungsidentifikator Redispatch 2.0 (BK6-24-174) |
+| `EicCode`           | 16-char EIC with ENTSO-E check character and object type   |
+| `BilanzkreisId`     | 16-char EIC restricted to object type `'X'` (Party) — Bilanzkreis, MaBiS / GaBi Gas |
+| `BilanzierungsgebietId` | 16-char EIC restricted to object type `'Y'` (Area) — Bilanzierungsgebiet, MaBiS |
+| `ObisCode`          | `[A-B:]C.D[.E][*F]`, value groups are octets; C=0 permitted (IEC 62056-61 general metering group) |
+| `MarktpartnerId`    | 13 decimal digits — BDEW (99), DVGW (98), or GS1 GLN; check digit opt-in |
+| `AkivId`            | 1–36 printable ASCII chars — Aktivierungsidentifikator Redispatch 2.0 (BK6-24-174) |
 | `TranchennummerId`  | 1–6 decimal digits, no leading zeros — MABIS Bilanzkreisabrechnung (PID 13003) |
 
-```rust
-// Build from base (check digit computed automatically)
-let malo = MaloId::from_base("5123869678")?;   // → "51238696780"
-let c    = MaloId::check_digit("5123869678")?; // → 0u8
+Section numbers refer to the BDEW Anwendungshilfe *"Identifikatoren in der
+Marktkommunikation"* v1.2 (7 February 2025). Chapter 8 defines a single
+check-digit arithmetic — sum the mapped values at odd positions, add twice the sum
+at even positions, take the difference to the next multiple of 10 — in two flavours:
+§8.1 for numeric IDs and §8.2 (the "ASCII-Verfahren", where `A`–`Z` map to their
+ASCII codes) for alphanumeric ones. Both are implemented once and pinned to the
+worked examples printed in the specification.
 
-// NeloId / SrId / TrId — same from_base pattern
-let nelo = NeloId::from_base("E000000001")?;  // → "E0000000019" (ASCII-Verfahren check)
-let sr   = SrId::from_base("C000000000")?;   // → "C0000000003"
-let tr   = TrId::from_base("D000000000")?;   // → "D0000000002"
+```rust
+// Build from base — the check digit is computed, never typed by hand.
+let malo = MaloId::from_base("4137355924")?;   // → "41373559241"  (BDEW §8.1 example)
+let c    = MaloId::check_digit("4137355924")?; // → 1u8
+assert_eq!(malo.vergabestelle(), MaloVergabestelle::Bdew);
+
+// Every §8.2 identifier shares the same API and enforces its own Codetyp.
+let nelo  = NeloId::from_base("E000000001")?;  // → "E0000000019"
+let tr    = TrId::from_base("D000000001")?;    // → "D0000000010"
+let paket = PaketId::from_base("P900000001")?; // → "P9000000010"
+assert!(NeloId::new("D0000000010").is_err());  // Codetyp mismatch — that is a TrId
 
 // Country code extraction (MeloId)
-let melo = MeloId::new("DE00001234567890123456789012345")?;
+let melo = MeloId::new("DE0000000000000000000000000000001")?;
 assert_eq!(melo.country_code(), "DE");
 assert!(melo.is_german());
 
 // EDIFACT agency codes (MarktpartnerId) — eliminates duplicate mapping tables
-let mp = MarktpartnerId::new("9900357000004")?;
-assert!(mp.is_bdew());
+let mp = MarktpartnerId::new("9900357000003")?;
+assert_eq!(mp.authority(), MpIdAuthority::Bdew);
 assert_eq!(mp.nad_agency_code(), "293");  // EDIFACT NAD DE3055
 assert_eq!(mp.unb_agency_code(), "500");  // EDIFACT UNB DE0007
 
+// MP-IDs carry either a BDEW (§8.1) or a GS1/EAN-13 check digit; opt in explicitly.
+assert!(mp.has_valid_bdew_check_digit());
+assert!(MarktpartnerId::new_checked("9900357000000").is_err());
+
 // Integer round-trip for legacy systems
-assert_eq!(mp.to_i64(), 9_900_357_000_004_i64);
+assert_eq!(mp.to_i64(), 9_900_357_000_003_i64);
 
 // Serde as integer (opt-in, field-level)
 #[serde(with = "rubo4e::identifiers::marktpartner_id_as_i64")]
 pub partner_id: MarktpartnerId,
 ```
 
+### EIC codes and object types
+
+Position 3 of an EIC carries the ENTSO-E **object type**, and the German market
+leans on it: a Bilanzkreis is a market party (`11X…`), while a Bilanzierungsgebiet
+is an area (`11Y…`). `EicType` exposes all seven types, and the two restricted
+newtypes make the roles unswappable at a call site.
+
+```rust
+use rubo4e::identifiers::{BilanzierungsgebietId, BilanzkreisId, EicCode, EicType};
+
+let area = EicCode::new("10YDE-EON------1")?;   // TenneT control area
+assert_eq!(area.eic_type(), EicType::Area);     // 'Y'
+
+let party = EicCode::new("11XSUEDWESTSTRO8")?;  // a Bilanzkreis
+assert_eq!(party.eic_type(), EicType::Party);   // 'X'
+
+// The restricted types pin position 3, so the two cannot be confused.
+let bk = BilanzkreisId::new("11XSUEDWESTSTRO8")?;
+assert!(BilanzierungsgebietId::new("11XSUEDWESTSTRO8").is_err());
+
+let bg = BilanzierungsgebietId::new("11YN-0000-0001-Q")?;
+assert!(BilanzkreisId::new("11YN-0000-0001-Q").is_err());
+
+// The check character is derived, never typed by hand.
+assert_eq!(BilanzkreisId::from_prefix("11XSUEDWESTSTRO")?.as_ref(), "11XSUEDWESTSTRO8");
+
+// Widening is infallible; narrowing is checked.
+let eic: EicCode = bk.into();
+assert!(BilanzkreisId::try_from(eic).is_ok());
+```
+
 ### OBIS codes (EDIFACT support)
+
+`ObisCode` parses once at construction and stores a **canonical** form, so two
+spellings of the same code are equal and hash alike. Value groups are single
+octets, as IEC 62056-61 specifies.
 
 ```rust
 // Standard OBIS codes
 let obis = ObisCode::new("1-0:1.8.0")?;       // active energy total
 let obis = ObisCode::new("0-0:0.0.0")?;       // C=0 — general metering group (IEC 62056-61)
 
-// F separator normalisation — & is accepted and stored as *
-assert_eq!(ObisCode::new("1.8.1&255")?, ObisCode::new("1.8.1*255")?);
+// Canonicalisation: `&` becomes `*`, and leading zeros are dropped.
+assert_eq!(ObisCode::new("1.8.1&255")?,      ObisCode::new("1.8.1*255")?);
+assert_eq!(ObisCode::new("01-00:01.08.00")?, ObisCode::new("1-0:1.8.0")?);
+assert_eq!(ObisCode::new("01-00:01.08.00")?.as_str(), "1-0:1.8.0");
 
-// Structured accessors
-assert_eq!(ObisCode::new("1-0:1.8.0*255")?.to_pia_string(),  "1-0:1.8.0");    // F stripped
-assert_eq!(ObisCode::new("1-0:1.8.0*255")?.to_bo4e_string(), "1-0:1.8.0*255"); // F kept
+// Value groups are octets — 256 is not an OBIS value.
+assert!(ObisCode::new("1-0:1.8.256").is_err());
+
+// Components are stored, so this neither re-parses nor allocates.
+let parts = ObisCode::new("1-0:1.8.0*255")?.components();
+assert_eq!((parts.a, parts.c, parts.f), (Some(1), 1, Some(255)));
+
+// PIA item-number form drops the F component.
+assert_eq!(ObisCode::new("1-0:1.8.0*255")?.to_pia_string(), "1-0:1.8.0");
 ```
 
 ---
 
-## Multi-version Dispatch (F4)
+## Multi-version Dispatch
 
 When a storage layer (e.g. PostgreSQL `JSONB`) writes a `bo4e_version` column alongside
 BO4E JSON, the idiomatic dispatch pattern is a plain `match`:
@@ -297,7 +354,7 @@ This pattern:
 - Localises migration to the storage layer; business logic only handles the current version
 - Avoids over-engineering (`trait` objects, `Any*` enums) for a straightforward branch
 
-See [docs/versioning.md](docs/versioning.md) for the full upgrade workflow.
+See [Schema Versioning](https://hupe1980.github.io/rubo4e/docs/versioning/) for the full upgrade workflow.
 
 ---
 
@@ -390,6 +447,43 @@ Unknown JSON fields are **preserved through round-trips** via the `_additional`
 extension-data map (requires `json` feature). This allows forward-compatible
 handling of new BO4E fields without library updates.
 
+The snake_case mapping is an exact table emitted by the code generator, not a
+runtime heuristic, so `from_json_snake_case(to_json_snake_case(x)) == x` holds
+for every generated type. That is not achievable algorithmically: BO4E names like
+`hoechstpreisHT`, `kundengruppeKA`, and `Sigmoidparameter`'s `A`/`B`/`C`/`D`
+render to a snake form a heuristic maps back to a *different* camelCase name,
+which silently diverts the value into `_additional`. BO4E metadata keys (`_typ`,
+`_version`, `_id`) and unknown extension keys pass through byte-for-byte in both
+directions. See [Serialization](https://hupe1980.github.io/rubo4e/docs/serialization/#how-snake-case-keys-are-mapped).
+
+### Parsing untrusted input
+
+Preserving unknown fields is a memory-growth surface, so every deserialization
+path — hardened or not — caps extension fields at 128 per struct and extension
+keys at 256 bytes, and rejects documents nested deeper than 128 levels.
+
+For payloads from outside your trust boundary, the `_hardened` entry points add
+four opt-in budgets on top:
+
+```rust
+use rubo4e::json::{Bo4eJsonExt, JsonParseLimits};
+
+let malo = Marktlokation::from_json_german_hardened(
+    &body,
+    JsonParseLimits::untrusted_defaults(),   // 1 MB / depth 64 / 64 KB ext / 32 fields
+)?;
+```
+
+All four limits are enforced **during** parsing and at **every** nesting level —
+extension data buried in a nested COM is charged to the same budget as extension
+data on the root — so an oversized payload is rejected while it is being read,
+not after the object tree has been allocated. Every limit that fires bumps a
+process-wide counter readable via `json_limit_hit_counters()`, exported to the
+`metrics` ecosystem when the `metrics` feature is on.
+
+See [Serialization](https://hupe1980.github.io/rubo4e/docs/serialization/#hardened-deserialization-for-untrusted-inputs)
+for the exact scope of each limit.
+
 ---
 
 ## Validation
@@ -422,7 +516,7 @@ let schema = schemars::schema_for!(rubo4e::v202607::Marktlokation);
 
 // utoipa — OpenAPI 3.1 (requires `utoipa` feature)
 // All identifier types emit pattern, description, and example values:
-// MaloId → { type: string, pattern: "^[0-9]{11}$", example: "51238696780" }
+// MaloId → { type: string, pattern: "^[0-9]{11}$", example: "51238696781" }
 ```
 
 ---
@@ -430,9 +524,11 @@ let schema = schemars::schema_for!(rubo4e::v202607::Marktlokation);
 ## SQLx Integration
 
 ```rust
-// Requires `sqlx` feature — implements Type, Encode, Decode for all identifiers
+// Requires the `sqlx` feature — implements Type, Encode, Decode and
+// PgHasArrayType for every identifier and every generated enum.
+// No `json` feature needed: everything round-trips through &str.
 
-// Bind directly as typed identifier
+// Bind directly as a typed identifier
 sqlx::query("INSERT INTO malo (id) VALUES ($1)")
     .bind(&malo_id)
     .execute(&pool).await?;
@@ -440,24 +536,51 @@ sqlx::query("INSERT INTO malo (id) VALUES ($1)")
 // Decode directly — runs the same validation as new()
 let id: MaloId = row.try_get("malo_id")?;
 
-// Works in query_as! structs too
+// Vec<Id> binds to a TEXT[] column
+sqlx::query("SELECT * FROM malo WHERE id = ANY($1)")
+    .bind(&malo_ids)
+    .fetch_all(&pool).await?;
+
+// Works in FromRow structs too
 #[derive(sqlx::FromRow)]
 struct MpRow {
     mp_id: MarktpartnerId,
 }
 ```
 
+Identifiers reject invalid values on decode. Enums decode **leniently** —
+an out-of-schema string becomes `Unknown`, mirroring the serde path — so use
+`from_wire` on a `String` column where that must be an error instead.
+
 ---
 
 ## Documentation
 
-- [docs/architecture.md](docs/architecture.md) — Workspace layout, module tree, feature gate reference
-- [docs/generator.md](docs/generator.md) — Internal code generator — running it, pipeline, inference rules
-- [docs/identifiers.md](docs/identifiers.md) — All identifier types, validation rules, algorithms
-- [docs/validation.md](docs/validation.md) — Cross-field business rules and `Validated<T>`
-- [docs/versioning.md](docs/versioning.md) — Schema versioning scheme and upgrade workflow
-- [docs/serialization.md](docs/serialization.md) — JSON format variants, extension-data map, round-trip guarantees
-- [docs/testing.md](docs/testing.md) — Golden corpus, fuzz targets, proptest strategies
+**[hupe1980.github.io/rubo4e](https://hupe1980.github.io/rubo4e)** — guides and design notes.
+**[docs.rs/rubo4e](https://docs.rs/rubo4e)** — per-item API reference.
+**[CHANGELOG](CHANGELOG.md)** — release history and upgrade notes.
+
+| Guide | Covers |
+|---|---|
+| [Architecture](https://hupe1980.github.io/rubo4e/docs/architecture/) | Workspace layout, module tree, feature-gate reference |
+| [Identifiers](https://hupe1980.github.io/rubo4e/docs/identifiers/) | Every identifier type, its validation rules, and the BDEW check-digit procedures |
+| [Serialization](https://hupe1980.github.io/rubo4e/docs/serialization/) | JSON output modes, extension data, hardened parsing |
+| [Validation](https://hupe1980.github.io/rubo4e/docs/validation/) | The three validation layers and `Validated<T>` |
+| [Schema Versioning](https://hupe1980.github.io/rubo4e/docs/versioning/) | Version modules, `current`, and the upgrade workflow |
+| [Ecosystem](https://hupe1980.github.io/rubo4e/docs/ecosystem/) | sqlx, schemars, utoipa, strum integrations |
+| [Code Generator](https://hupe1980.github.io/rubo4e/docs/generator/) | How generation works and how to re-run it |
+| [Testing](https://hupe1980.github.io/rubo4e/docs/testing/) | The seven testing layers and how to run each |
+
+The site sources live in [`site/`](site/) and are built with [Zola](https://www.getzola.org).
+
+---
+
+## MSRV
+
+The minimum supported Rust version is **1.87**, declared as `rust-version` in
+`Cargo.toml` and verified in CI on every push. MSRV advances only when the
+current floor is two stable releases behind, and a bump is a **minor** version
+change, never a patch.
 
 ---
 

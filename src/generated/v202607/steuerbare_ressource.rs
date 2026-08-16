@@ -62,7 +62,10 @@ pub struct SteuerbareRessource {
     /// Version der BO-Struktur aka "fachliche Versionierung"
     #[cfg_attr(feature = "serde", serde(rename = "_version"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(
+        feature = "builder",
+        builder(default = Some("v202607.0.0".to_owned()), setter(into))
+    )]
     pub version: Option<String>,
     /// Angabe des Messstellenbetreibers, der der Steuerbaren Ressource zugeordnet ist.
     #[cfg_attr(feature = "serde", serde(rename = "zugeordneteMsbCodenummer"))]
@@ -97,7 +100,7 @@ impl Default for SteuerbareRessource {
             lokationszuordnungen: Default::default(),
             steuerbare_ressource_id: Default::default(),
             steuerkanal_leistungsbeschreibung: Default::default(),
-            version: Default::default(),
+            version: Some("v202607.0.0".to_owned()),
             zugeordnete_msb_codenummer: Default::default(),
             zusatz_attribute: Default::default(),
             _additional: Default::default(),

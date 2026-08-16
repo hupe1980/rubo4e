@@ -45,12 +45,27 @@ mod identifier_sizes {
         assert_eq!(size_of::<EicCode>(), BOX_STR, "EicCode should be 16 bytes");
     }
 
+    /// `ObisCode` is the one identifier that is not *just* a `Box<str>`: it also
+    /// caches its parsed value groups so `components()` is infallible and free
+    /// rather than re-parsing (and re-allocating) on every call.
+    ///
+    /// The six value groups are octets per IEC 62056-61, so they cost 10 bytes —
+    /// four `Option<u8>` at 2 bytes plus two bare `u8`. `Box<str>` fills all 16 of
+    /// its bytes and forces 8-byte alignment, so 16 + 10 rounds up to 32.
+    ///
+    /// Widening any value group back to `u32` would push this to 40; that is what
+    /// this guard is here to catch.
     #[test]
     fn obis_code_size() {
         assert_eq!(
+            size_of::<ObisComponents>(),
+            10,
+            "OBIS value groups are octets — this should not grow"
+        );
+        assert_eq!(
             size_of::<ObisCode>(),
-            BOX_STR,
-            "ObisCode should be 16 bytes"
+            32,
+            "ObisCode is a Box<str> plus its cached value groups"
         );
     }
 
@@ -113,5 +128,82 @@ mod generated_type_sizes {
             "Option<BoTyp> should fit in 2 bytes (niche opt), got {}",
             size_of::<Option<BoTyp>>()
         );
+    }
+}
+
+/// Every identifier must expose the *same* conversion surface.
+///
+/// These traits used to be hand-written per type, and the copies had drifted:
+/// `MaloId` implemented `Deref`/`Borrow`/`Into<String>` while `EicCode`,
+/// `BilanzkreisId`, `MeloId`, `ObisCode`, `AkivId`, and `TranchennummerId`
+/// implemented only a subset — so `String::from(malo)` compiled and
+/// `String::from(eic)` did not. All identifiers now share one macro-generated
+/// implementation; this asserts that, so a future hand-written type cannot
+/// quietly ship with a smaller API than its siblings.
+mod uniform_trait_surface {
+    use rubo4e::identifiers::*;
+    use std::borrow::Borrow;
+    use std::str::FromStr;
+
+    /// Fails to compile if `T` is missing any of the shared identifier traits.
+    fn assert_full_surface<T>(valid: &str)
+    where
+        T: FromStr
+            + for<'a> TryFrom<&'a str>
+            + TryFrom<String>
+            + AsRef<str>
+            + Borrow<str>
+            + std::ops::Deref<Target = str>
+            + std::fmt::Display
+            + std::fmt::Debug
+            + Clone
+            + PartialEq
+            + Eq
+            + std::hash::Hash,
+        String: From<T>,
+    {
+        let id = T::try_from(valid).ok().expect("fixture must be valid");
+
+        // All five string views agree.
+        assert_eq!(id.as_ref(), valid);
+        assert_eq!(Borrow::<str>::borrow(&id), valid);
+        assert_eq!(&*id, valid);
+        assert_eq!(id.to_string(), valid);
+        assert_eq!(String::from(id.clone()), valid);
+
+        // Display output re-parses to the same value. Routing through
+        // `to_string()` rather than `as_ref()` is the point of this assertion: it
+        // pins `Display` and `FromStr` against each other, which borrowing the
+        // stored string would not exercise.
+        #[allow(clippy::unnecessary_to_owned)]
+        let displayed = id.to_string();
+        assert_eq!(id, T::from_str(&displayed).ok().expect("FromStr"));
+        assert_eq!(
+            T::try_from(valid.to_string())
+                .ok()
+                .expect("TryFrom<String>"),
+            id
+        );
+    }
+
+    #[test]
+    fn every_identifier_has_the_same_surface() {
+        assert_full_surface::<MaloId>("41373559241");
+        assert_full_surface::<MeloId>("DE0000000000000000000000000000001");
+        assert_full_surface::<MarktpartnerId>("9900357000003");
+        assert_full_surface::<NeloId>("E0000000019");
+        assert_full_surface::<NebeId>("F0000000018");
+        assert_full_surface::<CrId>("A0000000013");
+        assert_full_surface::<SgId>("B0000000012");
+        assert_full_surface::<SrId>("C0000000011");
+        assert_full_surface::<TrId>("D0000000010");
+        assert_full_surface::<PaketId>("P9000000010");
+        assert_full_surface::<EicCode>("10YDE-EON------1");
+        assert_full_surface::<BilanzkreisId>("11XSUEDWESTSTRO8");
+        assert_full_surface::<BilanzierungsgebietId>("11YN-0000-0001-Q");
+        assert_full_surface::<AkivId>("550e8400-e29b-41d4-a716-446655440000");
+        assert_full_surface::<TranchennummerId>("13003");
+        // `ObisCode` canonicalises, so its fixture must already be canonical.
+        assert_full_surface::<ObisCode>("1-0:1.8.0*255");
     }
 }

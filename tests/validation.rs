@@ -12,8 +12,8 @@ mod identifier_tests {
 
     #[test]
     fn malo_id_valid_passes_garde() {
-        // 51238696780 is a valid BDEW 11-digit ID (passes checksum).
-        let id = MaloId::new("51238696780").unwrap();
+        // 51238696781 is a valid BDEW 11-digit ID (passes checksum).
+        let id = MaloId::new("51238696781").unwrap();
         assert!(id.validate().is_ok());
     }
 

@@ -1,9 +1,11 @@
-# Validation
++++
+title = "Validation"
+description = "The three independent validation layers — constructor invariants, garde-based cross-field rules, and JSON Schema — and when to reach for each."
+weight = 40
++++
 
 `rubo4e` validates domain data at three distinct levels. Each level is independent —
 you can use constructor validation without the full `garde`-based struct validation.
-
----
 
 ## Layer 1 — Constructor Validation (Identifier Types)
 
@@ -11,8 +13,8 @@ Identifier newtypes validate their invariants **at the point of construction**.
 A valid `MaloId` value can never exist without a valid checksum.
 
 ```rust
-let malo = MaloId::new("51238696780")?;  // validates: 11 digits + checksum
-let eic  = EicCode::new("10XDE-EON-NETZ---W")?; // validates: EIC format
+let malo = MaloId::new("51238696781")?;  // validates: 11 digits + checksum
+let eic  = EicCode::new("10YDE-EON------1")?;  // validates: EIC format + check char
 let obis = ObisCode::new("1-0:1.8.1")?;  // validates: OBIS pattern
 ```
 
@@ -20,15 +22,15 @@ These checks run without any feature flag. They use `thiserror`-derived errors:
 
 ```rust
 match MaloId::new("bad") {
+    Ok(id) => { /* guaranteed valid */ }
     Err(IdentifierError::InvalidLength { expected, actual }) => { /* ... */ }
     Err(IdentifierError::InvalidChecksum) => { /* ... */ }
-    Ok(id) => { /* guaranteed valid */ }
+    // `IdentifierError` is #[non_exhaustive], so a catch-all arm is required.
+    Err(other) => { /* ... */ }
 }
 ```
 
-See [identifiers.md](identifiers.md) for the complete error type and per-type rules.
-
----
+See [Identifiers](@/docs/identifiers.md) for the complete error type and per-type rules.
 
 ## Layer 2 — Struct-Level Validation (garde)
 
@@ -77,8 +79,6 @@ pub struct Vertrag {
 ```
 
 Error path for an invalid ID: `"marktlokations_id"` (not `"marktlokations_id[0]"`).
-
----
 
 ## Validation Rules Reference
 
@@ -155,8 +155,6 @@ All position amounts are summed using `Decimal`. The sum must exactly equal `zu_
 ✗  positions = [],                    zu_zahlen = 50.00   →  "sum 0.00 ≠ 50.00"
 ```
 
----
-
 ## Layer 3 — Schema Validation
 
 **Feature flag:** `schemars` (for schema generation); validation against schema uses
@@ -171,8 +169,6 @@ let schema = schemars::schema_for!(Vertrag);
 let schema_json = serde_json::to_string_pretty(&schema)?;
 // Pass schema_json to a JSON Schema validator (e.g. jsonschema crate)
 ```
-
----
 
 ## Collecting All Errors at Once
 
@@ -221,8 +217,6 @@ let valid: Validated<Vertrag> = Validated::new(vertrag)?;
 // fn persist(v: &Validated<Vertrag>) { ... }
 let inner: Vertrag = valid.into_inner();
 ```
-
----
 
 ## When `validate` Feature Is Inactive
 

@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+
+{% block seo %}
+<title>{{ section.title }} · {{ config.title }}</title>
+<meta name="description" content="{{ section.description | default(value=config.description) }}">
+<link rel="canonical" href="{{ section.permalink }}">
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="{{ config.title }}">
+<meta property="og:title" content="{{ section.title }}">
+<meta property="og:description" content="{{ section.description | default(value=config.description) }}">
+<meta property="og:url" content="{{ section.permalink }}">
+<meta property="og:locale" content="en">
+
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="{{ section.title }}">
+<meta name="twitter:description" content="{{ section.description | default(value=config.description) }}">
+{% endblock seo %}
+
+{% block content %}
+<div class="wrap docs">
+  <aside class="sidebar">
+    <h2>Documentation</h2>
+    <nav aria-label="Documentation">
+      <ul>
+        <li>
+          <a href="{{ section.permalink }}"{% if current_url == section.permalink %} class="active" aria-current="page"{% endif %}>Overview</a>
+        </li>
+        {% for p in section.pages %}
+        <li>
+          <a href="{{ p.permalink }}"{% if current_url == p.permalink %} class="active" aria-current="page"{% endif %}>{{ p.title }}</a>
+        </li>
+        {% endfor %}
+      </ul>
+    </nav>
+  </aside>
+
+  <article class="prose">
+    <h1>{{ section.title }}</h1>
+    {% if section.description %}<p class="page-lede">{{ section.description }}</p>{% endif %}
+    {{ section.content | safe }}
+
+    <div class="grid wide" style="margin-top:2rem">
+      {% for p in section.pages %}
+      <a class="card" href="{{ p.permalink }}">
+        <h3>{{ p.title }}</h3>
+        <p>{{ p.description }}</p>
+      </a>
+      {% endfor %}
+    </div>
+  </article>
+</div>
+{% endblock %}

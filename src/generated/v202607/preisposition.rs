@@ -2,7 +2,7 @@ use super::{
     BdewArtikelnummer, Bemessungsgroesse, ComTyp, Kalkulationsmethode, Leistungstyp, Mengeneinheit,
     Preisstaffel, Tarifzeit, Waehrungseinheit, ZusatzAttribut,
 };
-#[derive(Debug, Clone, PartialEq, Default)]
+#[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(not(feature = "json"), derive(Hash))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "builder", derive(typed_builder::TypedBuilder))]
@@ -101,7 +101,10 @@ pub struct Preisposition {
     /// Version der COM-Struktur aka "fachliche Versionierung"
     #[cfg_attr(feature = "serde", serde(rename = "_version"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(
+        feature = "builder",
+        builder(default = Some("v202607.0.0".to_owned()), setter(into))
+    )]
     pub version: Option<String>,
     /// Die Zeit(dauer) auf die sich der Preis bezieht.
     /// Z.B. ein Jahr für einen Leistungspreis der in €/kW/Jahr ausgegeben wird
@@ -129,6 +132,30 @@ pub struct Preisposition {
     #[cfg_attr(feature = "builder", builder(default, setter(skip)))]
     #[doc(hidden)]
     pub _additional: crate::LimitedExtensionMap,
+}
+impl Default for Preisposition {
+    fn default() -> Self {
+        Self {
+            bdew_artikelnummer: Default::default(),
+            berechnungsmethode: Default::default(),
+            bezugsgroesse: Default::default(),
+            freimenge_blindarbeit: Default::default(),
+            freimenge_leistungsfaktor: Default::default(),
+            gruppenartikel_id: Default::default(),
+            id: Default::default(),
+            leistungsbezeichnung: Default::default(),
+            leistungstyp: Default::default(),
+            preiseinheit: Default::default(),
+            preisstaffeln: Default::default(),
+            tarifzeit: Default::default(),
+            typ: Default::default(),
+            version: Some("v202607.0.0".to_owned()),
+            zeitbasis: Default::default(),
+            zonungsgroesse: Default::default(),
+            zusatz_attribute: Default::default(),
+            _additional: Default::default(),
+        }
+    }
 }
 #[cfg(feature = "json")]
 impl crate::json::sealed::Sealed for Preisposition {}

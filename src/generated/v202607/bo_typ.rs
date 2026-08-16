@@ -185,10 +185,11 @@ impl BoTyp {
     /// Available **without** the `strum` feature.
     ///
     /// # Example
-    /// ```rust,ignore
-    /// for v in BoTyp::iter_known() {
-    ///     println!("{}", v.as_wire());
-    /// }
+    /// ```
+    /// # use rubo4e::current::BoTyp;
+    /// // Never yields the `Unknown` catch-all, so the count matches `COUNT`.
+    /// assert_eq!(BoTyp::iter_known().count(), BoTyp::COUNT);
+    /// assert!(BoTyp::iter_known().all(|v| v.is_known()));
     /// ```
     pub fn iter_known() -> impl Iterator<Item = Self> + Clone {
         Self::VARIANTS.iter().copied()
@@ -249,8 +250,12 @@ impl BoTyp {
     /// reject bad values instead of silently degrading them.
     ///
     /// # Example
-    /// ```rust,ignore
+    /// ```
+    /// # use rubo4e::current::BoTyp;
+    /// /// assert_eq!(BoTyp::from_wire("ANGEBOT"), Ok(BoTyp::Angebot));
     /// assert!(BoTyp::from_wire("NOT_A_REAL_VALUE").is_err());
+    /// // …including the `Unknown` catch-all's own wire spelling:
+    /// assert!(BoTyp::from_wire("UNKNOWN").is_err());
     /// ```
     pub fn from_wire(s: &str) -> Result<Self, crate::error::UnknownVariant> {
         match s {
@@ -339,15 +344,15 @@ impl crate::Bo4eStrict for BoTyp {
         }
     }
 }
-#[cfg(all(feature = "sqlx", feature = "json"))]
+#[cfg(feature = "sqlx")]
 impl sqlx::Type<sqlx::Postgres> for BoTyp {
     fn type_info() -> sqlx::postgres::PgTypeInfo {
         <String as sqlx::Type<sqlx::Postgres>>::type_info()
     }
 }
-/// Encode via the canonical wire string (`as_wire`, always available) — no
-/// `serde_json::Value` intermediate, saving an allocation per encode (M-07).
-#[cfg(all(feature = "sqlx", feature = "json"))]
+/// Encodes as the canonical BO4E wire string, borrowed from `as_wire` — no
+/// intermediate `String` or `serde_json::Value` is allocated.
+#[cfg(feature = "sqlx")]
 impl<'q> sqlx::Encode<'q, sqlx::Postgres> for BoTyp {
     fn encode_by_ref(
         &self,
@@ -357,14 +362,19 @@ impl<'q> sqlx::Encode<'q, sqlx::Postgres> for BoTyp {
         <&str as sqlx::Encode<'q, sqlx::Postgres>>::encode_by_ref(&s, buf)
     }
 }
-#[cfg(all(feature = "sqlx", feature = "json"))]
+/// Decodes leniently, matching the `serde` path: a value the schema does not
+/// define becomes [`BoTyp::Unknown`] rather than a decode error, so a
+/// database row written by a newer schema version still reads back.
+///
+/// Use [`BoTyp::from_wire`] on a `String` column, or check
+/// [`BoTyp::is_known`], where out-of-schema values must be rejected.
+#[cfg(feature = "sqlx")]
 impl<'r> sqlx::Decode<'r, sqlx::Postgres> for BoTyp {
     fn decode(
         value: <sqlx::Postgres as sqlx::Database>::ValueRef<'r>,
     ) -> Result<Self, sqlx::error::BoxDynError> {
-        let s = <String as sqlx::Decode<sqlx::Postgres>>::decode(value)?;
-        serde_json::from_value(serde_json::Value::String(s))
-            .map_err(|e| Box::new(e) as sqlx::error::BoxDynError)
+        let s = <&str as sqlx::Decode<sqlx::Postgres>>::decode(value)?;
+        Ok(Self::from_wire(s).unwrap_or(Self::Unknown))
     }
 }
 #[cfg(test)]

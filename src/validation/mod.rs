@@ -2,21 +2,35 @@
 //!
 //! ## `Validated<T>`
 //!
-//! [`Validated<T>`](crate::validation::Validated) is a zero-cost newtype wrapper that can only be constructed by
-//! running the garde validation rules on `T`.  It implements `Deref<Target = T>` for
-//! transparent field access and `Into<T>` / `From<Validated<T>>` for ergonomic
-//! unwrapping.
+//! [`Validated<T>`](crate::validation::Validated) is a zero-cost newtype wrapper that can only be
+//! constructed by running the garde validation rules on `T`.  It implements
+//! `Deref<Target = T>` and `AsRef<T>` for transparent field access, and
+//! [`into_inner`](crate::validation::Validated::into_inner) to unwrap.
+//!
+//! A blanket `impl From<Validated<T>> for T` is deliberately absent: `T` is a type
+//! parameter, so such an impl is uncovered and rejected by the orphan rule.
+//! `into_inner()` is the unwrapping path.
 //!
 //! Requires only the `validate` feature (not `versioned`).
 //!
-//! ```rust,ignore
+//! ```
+//! # #[cfg(feature = "versioned")] {
 //! use rubo4e::validation::Validated;
-//! use rubo4e::v202607::Marktlokation;
+//! use rubo4e::current::{Marktlokation, Adresse};
 //!
-//! let melo: Marktlokation = /* ... */;
-//! let validated = Validated::new(melo)?;  // Err(garde::Report) if invariants violated
-//! println!("{:?}", validated.lokations_id); // Deref to &Marktlokation
+//! // A Marktlokation must carry exactly one of the three address fields.
+//! let malo = Marktlokation {
+//!     lokationsadresse: Some(Adresse { ort: Some("Bremen".into()), ..Default::default() }),
+//!     ..Default::default()
+//! };
+//!
+//! let validated = Validated::new(malo).expect("exactly one address field is set");
+//! assert!(validated.lokationsadresse.is_some());  // Deref to &Marktlokation
 //! let inner: Marktlokation = validated.into_inner();
+//!
+//! // A Marktlokation with no address at all is rejected.
+//! assert!(Validated::new(Marktlokation::default()).is_err());
+//! # }
 //! ```
 //!
 //! ## Cross-field validators
@@ -51,14 +65,17 @@
 ///
 /// # Examples
 ///
-/// ```rust,ignore
-/// # use rubo4e::validation::Validated;
-/// # use rubo4e::v202607::Marktlokation;
-/// let malo = Marktlokation::default();
-/// match Validated::new(malo) {
-///     Ok(v)  => println!("valid: {:?}", v.lokations_id),
-///     Err(r) => eprintln!("invalid: {r}"),
+/// ```
+/// # #[cfg(feature = "versioned")] {
+/// use rubo4e::validation::Validated;
+/// use rubo4e::current::Marktlokation;
+///
+/// // No address field set — violates the "exactly one" rule.
+/// match Validated::new(Marktlokation::default()) {
+///     Ok(v)  => panic!("unexpectedly valid: {:?}", v.marktlokations_id),
+///     Err(r) => assert!(r.iter().count() > 0),
 /// }
+/// # }
 /// ```
 #[derive(Debug, Clone)]
 pub struct Validated<T>(T);
@@ -161,6 +178,8 @@ macro_rules! impl_validators {
             /// The ordering check is only performed when the `time` feature is active
             /// (fields are `time::OffsetDateTime`).  Without `time`, fields are `String`
             /// and lexicographic comparison is unsafe for partial ISO-8601 forms.
+            // Without `time` the body compiles away and `v` goes unread.
+            #[cfg_attr(not(feature = "time"), allow(unused_variables))]
             pub fn validate_vertrag_dates(v: &Vertrag, _: &()) -> Result<(), garde::Error> {
                 #[cfg(feature = "time")]
                 if let (Some(start), Some(end)) = (v.vertragsbeginn, v.vertragsende) {
@@ -177,6 +196,8 @@ macro_rules! impl_validators {
             /// present.
             ///
             /// The ordering check is only performed when the `time` feature is active.
+            // Without `time` the body compiles away and `v` goes unread.
+            #[cfg_attr(not(feature = "time"), allow(unused_variables))]
             pub fn validate_bilanzierung_dates(
                 v: &Bilanzierung,
                 _: &(),
@@ -203,6 +224,8 @@ macro_rules! impl_validators {
             ///
             /// The arithmetic checks are gated on the `decimal` feature; without it
             /// `Betrag.wert` is `Option<String>` and numeric comparison is unsafe.
+            // Without `decimal` the body compiles away and `v` goes unread.
+            #[cfg_attr(not(feature = "decimal"), allow(unused_variables))]
             pub fn validate_rechnung_arithmetic(v: &Rechnung, _: &()) -> Result<(), garde::Error> {
                 #[cfg(feature = "decimal")]
                 {
@@ -287,14 +310,19 @@ macro_rules! impl_validators {
                 Ok(())
             }
 
-            /// `Zeitraum` must encode exactly one of the three valid modes:
+            /// `Zeitraum` must encode **at least one** of the three modes:
             ///
             /// 1. **Duration**: `dauer` is set (ISO 8601 duration string, e.g. `"P1DT"`)
-            /// 2. **Date range**: at least `startdatum` or `enddatum` is set
-            /// 3. **Time range**: at least `startuhrzeit` or `enduhrzeit` is set
+            /// 2. **Date range**: `startdatum` or `enddatum` is set
+            /// 3. **Time range**: `startuhrzeit` or `enduhrzeit` is set
+            ///
+            /// Combinations are *not* rejected — the BO4E schema permits them, and a
+            /// stricter "exactly one" rule would reject payloads that real senders
+            /// produce (e.g. a date range annotated with an explicit duration).
+            /// An entirely empty `Zeitraum` carries no information and is rejected.
             ///
             /// When both `startdatum` and `enddatum` are present, `startdatum` must
-            /// be strictly before `enddatum` (only checked when `time` feature is active).
+            /// be strictly before `enddatum` (only checked when `time` is active).
             pub fn validate_zeitraum(v: &Zeitraum, _: &()) -> Result<(), garde::Error> {
                 let has_duration = v.dauer.is_some();
                 let has_date = v.startdatum.is_some() || v.enddatum.is_some();
@@ -326,6 +354,8 @@ macro_rules! impl_validators {
             ///
             /// Gated on the `decimal` feature; without it the fields are `Option<String>`
             /// and numeric arithmetic is not available.
+            // Without `decimal` the body compiles away and `v` goes unread.
+            #[cfg_attr(not(feature = "decimal"), allow(unused_variables))]
             pub fn validate_kostenposition_arithmetic(
                 v: &Kostenposition,
                 _: &(),
@@ -382,16 +412,18 @@ pub struct ValidationFailure {
 /// - build test assertions per field
 ///
 /// # Example
-/// ```rust,ignore
-/// use rubo4e::validation::{Validated, report_errors};
-/// use rubo4e::v202607::Marktlokation;
+/// ```
+/// # #[cfg(feature = "versioned")] {
+/// use rubo4e::validation::{report_errors, Validated};
+/// use rubo4e::current::Marktlokation;
 ///
-/// let malo = Marktlokation::default();
-/// if let Err(report) = Validated::new(malo) {
-///     for failure in report_errors(&report) {
-///         eprintln!("  {}: {}", failure.path, failure.message);
-///     }
+/// let report = Validated::new(Marktlokation::default()).unwrap_err();
+/// let failures = report_errors(&report);
+/// assert!(!failures.is_empty());
+/// for failure in &failures {
+///     eprintln!("  {}: {}", failure.path, failure.message);
 /// }
+/// # }
 /// ```
 #[cfg(feature = "validate")]
 #[cfg_attr(docsrs, doc(cfg(feature = "validate")))]

@@ -1,9 +1,11 @@
-# Testing Strategy
++++
+title = "Testing Strategy"
+description = "The seven testing layers that back this crate: golden corpus, snapshots, property tests, fuzzing, cross-implementation compatibility, doctests, and the feature matrix."
+weight = 80
++++
 
-`rubo4e` uses five distinct testing layers. Each layer has its own purpose, test corpus,
+`rubo4e` uses seven distinct testing layers. Each layer has its own purpose, test corpus,
 and command to run.
-
----
 
 ## Test Layer Summary
 
@@ -14,8 +16,8 @@ and command to run.
 | 3. Property | Identifier invariants | (dev dep only) | `tests/proptest_roundtrips.rs` | 30–60 s |
 | 4. Fuzz | Panic safety | nightly + `json` | `fuzz/` | minutes (CI: 1M runs) |
 | 5. Compat | Cross-impl interop | `json`, `versioned` | `tests/compat/` | < 10 s |
-
----
+| 6. Doctest | Documentation is executable | all | `src/**` rustdoc comments | ~50 s |
+| 7. Feature matrix | Every feature builds warning-free | (per combination) | CI job / `just lint-features` | minutes |
 
 ## Layer 1 — Golden Schema Tests
 
@@ -51,8 +53,6 @@ Files are **not** nested in a version subdirectory — all live directly under
   to the original (field values identical; key ordering not required to match)
 - Unknown fields in the payload are preserved in `_additional` and survive the round-trip
 
----
-
 ## Layer 2 — Snapshot Serialization Tests
 
 Verify that canonical and German serialization output does not change unexpectedly.
@@ -70,8 +70,6 @@ cargo insta review
 
 Snapshots are committed to the repository. A changed snapshot in CI is a CI failure
 that requires explicit review and acceptance with `cargo insta accept`.
-
----
 
 ## Layer 3 — Property-Based Tests
 
@@ -114,8 +112,6 @@ proptest! {
 Also covered: `opt_date_serde` `None`/`Some` round-trips, JSON null → `None` deserialization,
 ISO 8601 wire-format assertion (`"YYYY-MM-DD"`).
 
----
-
 ## Layer 4 — Fuzz Testing
 
 Feed arbitrary bytes to the deserialization path and verify no panics occur.
@@ -155,8 +151,6 @@ to return an error, not panic.
 cargo +nightly fuzz run fuzz_deserialize_vertrag fuzz/artifacts/fuzz_deserialize_vertrag/<id>
 ```
 
----
-
 ## Layer 5 — Cross-Implementation Compatibility
 
 Verify that `rubo4e` correctly deserializes payloads produced by the Python and Go
@@ -172,15 +166,15 @@ cargo test --features json,versioned --test compat
 tests/compat/
 ├── README.md           — how to regenerate vectors
 ├── python/
-│   ├── Marktlokation.json
-│   ├── Messlokation.json
-│   ├── Vertrag.json
-│   └── Rechnung.json
+│   ├── marktlokation.json
+│   ├── messlokation.json
+│   ├── rechnung.json
+│   └── vertrag.json
 └── go/
-    ├── Marktlokation.json
-    ├── Messlokation.json
-    ├── Vertrag.json
-    └── Rechnung.json
+    ├── marktlokation.json
+    ├── messlokation.json
+    ├── rechnung.json
+    └── vertrag.json
 ```
 
 **What the test checks:**
@@ -191,7 +185,55 @@ tests/compat/
 See `tests/compat/README.md` for instructions on how to regenerate when either reference
 implementation releases a new version.
 
----
+## Layer 6 — Doctests
+
+Every code block in a rustdoc comment is compiled and run. There are no
+`rust,ignore` blocks anywhere in the crate: an example that cannot be executed
+is written as a ```` ```text ```` block so it is never mistaken for verified code.
+
+**Run:**
+```bash
+cargo test --all-features --doc
+```
+
+This matters more here than in most crates because the majority of the public
+API is generated. The per-enum `iter_known` and `from_wire` examples are emitted
+by the generator with real assertions — including a positive `wire → variant`
+mapping taken from the schema — so a generator change that breaks the documented
+behaviour fails the build instead of silently producing wrong documentation.
+
+Examples that need a feature the doctest harness may not have are wrapped rather
+than ignored, so they compile in every configuration:
+
+```rust
+/// ```
+/// # #[cfg(feature = "json")] {
+/// // …example needing `json`…
+/// # }
+/// ```
+```
+
+Examples needing external resources (a live database) use `no_run`: they are
+still type-checked, just not executed.
+
+## Layer 7 — Feature Matrix
+
+`--all-features` is not sufficient to prove the crate builds. It cannot catch:
+
+- code that is dead unless an optional dependency is enabled,
+- bindings left unread when a feature compiles a function body away,
+- a feature that does not build **at all** on its own.
+
+All three shipped undetected before this layer existed. Every feature is
+therefore checked in isolation and in realistic combinations, with warnings
+denied.
+
+**Run:**
+```bash
+just lint-features
+```
+
+In CI this is a matrix job, so a failing combination names itself in the job list.
 
 ## CI Safety Notes
 
@@ -204,8 +246,6 @@ cargo test --features json,versioned --test golden 2>&1 | tee test-output.log
 ```
 
 Without `pipefail`, a non-zero exit from `cargo test` is masked by `tee`'s success.
-
----
 
 ## Running the Full Suite
 
@@ -231,6 +271,15 @@ cargo test --features schemars --test schemars_snapshots
 # Validation integration tests
 cargo test --all-features --test validation
 
+# Doctests only
+cargo test --all-features --doc
+
+# Every feature combination, warnings denied
+just lint-features
+
 # Fuzz (nightly, 1M iterations)
 cargo +nightly fuzz run fuzz_deserialize_vertrag -- -runs=1000000
+
+# Everything CI runs
+just ci
 ```

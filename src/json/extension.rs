@@ -1,16 +1,24 @@
 //! Extension-data map with a hard deserialization count limit, and the
 //! [`Bo4eExtensionData`] accessor trait for generated BO/COM structs.
 //!
-//! Also houses limit-enforcement helpers that depend on [`Bo4eExtensionData`]:
-//! [`check_extension_budget`] and the private `estimated_json_value_bytes`.
+//! The per-call extension budget installed by the hardened entry points is
+//! charged from here, in `LimitedExtensionMap::deserialize`, because that is the
+//! one place every struct's extension fields pass through — at every nesting
+//! level, not just the root.
 
-use serde::de::Error as _;
 use serde_json::Value;
 
-use super::limits::{trace_limit_violation, JsonParseLimits};
+use super::limits::{
+    budget_max_fields_per_struct, charge_extension_bytes, trace_limit_violation, LimitKind,
+};
 use super::sealed;
 
-fn estimated_json_value_bytes(value: &Value) -> usize {
+/// Approximate encoded size of `value`, used to charge the extension byte budget.
+///
+/// Deliberately an estimate rather than a re-serialization: the goal is to bound
+/// retained memory, and re-serializing every captured value to measure it would
+/// cost more than the budget protects against.
+pub(super) fn estimated_json_value_bytes(value: &Value) -> usize {
     match value {
         Value::Null => 4, // "null"
         Value::Bool(b) => {
@@ -28,38 +36,6 @@ fn estimated_json_value_bytes(value: &Value) -> usize {
             .map(|(k, v)| k.len() + estimated_json_value_bytes(v))
             .sum(),
     }
-}
-
-pub(super) fn check_extension_budget<T>(
-    value: &T,
-    limits: JsonParseLimits,
-) -> Result<(), serde_json::Error>
-where
-    T: Bo4eExtensionData,
-{
-    let data = value.extension_data();
-    if let Some(max) = limits.max_extension_field_count {
-        let count = data.len();
-        if count > max {
-            trace_limit_violation("extension_field_count", count, max);
-            return Err(serde_json::Error::custom(format!(
-                "extension field count {count} exceeds per-call limit {max}"
-            )));
-        }
-    }
-    if let Some(max) = limits.max_extension_value_bytes {
-        let used: usize = data
-            .iter()
-            .map(|(k, v)| k.len() + estimated_json_value_bytes(v))
-            .sum();
-        if used > max {
-            trace_limit_violation("extension_value_bytes", used, max);
-            return Err(serde_json::Error::custom(format!(
-                "extension value budget exceeded: estimated {used} bytes exceeds limit {max}"
-            )));
-        }
-    }
-    Ok(())
 }
 
 // ─── Extension-data accessor trait ───────────────────────────────────────────
@@ -106,6 +82,10 @@ pub struct LimitedExtensionMap(
 #[cfg(feature = "json")]
 impl LimitedExtensionMap {
     /// Returns a reference to the inner map, or `None` if empty.
+    ///
+    /// Consumed by the generated `Bo4eExtensionData` impls, so it has no caller
+    /// unless `versioned` is on (or we are compiling this module's own tests).
+    #[cfg(any(feature = "versioned", test))]
     #[inline]
     pub(crate) fn as_map(&self) -> Option<&indexmap::IndexMap<String, serde_json::Value>> {
         self.0.as_deref()
@@ -170,12 +150,20 @@ impl<'de> serde::Deserialize<'de> for LimitedExtensionMap {
             ) -> Result<Self::Value, A::Error> {
                 let hint = access.size_hint().unwrap_or(0).min(MAX_EXTENSION_FIELDS);
                 let mut map = indexmap::IndexMap::with_capacity(hint);
+
+                // Per-struct field cap: the process-wide hard cap, tightened by the
+                // per-call budget when a hardened entry point installed one.  Applies
+                // at *every* nesting level, because this visitor runs for every
+                // struct's `_additional` field.
+                let field_cap = budget_max_fields_per_struct()
+                    .map_or(MAX_EXTENSION_FIELDS, |b| b.min(MAX_EXTENSION_FIELDS));
+
                 while let Some(key) = access.next_key::<String>()? {
                     // Reject oversized keys before they enter the IndexMap to prevent
                     // memory exhaustion from adversarial payloads with huge key strings.
                     if key.len() > MAX_EXTENSION_KEY_LEN {
                         trace_limit_violation(
-                            "extension_key_len",
+                            LimitKind::ExtensionKeyLen,
                             key.len(),
                             MAX_EXTENSION_KEY_LEN,
                         );
@@ -184,18 +172,30 @@ impl<'de> serde::Deserialize<'de> for LimitedExtensionMap {
                             key.len()
                         )));
                     }
-                    if map.len() >= MAX_EXTENSION_FIELDS {
+                    if map.len() >= field_cap {
                         trace_limit_violation(
-                            "extension_field_count",
+                            LimitKind::ExtensionFieldCount,
                             map.len() + 1,
-                            MAX_EXTENSION_FIELDS,
+                            field_cap,
                         );
                         return Err(serde::de::Error::custom(format!(
-                            "extension field count exceeds the limit of {MAX_EXTENSION_FIELDS} \
+                            "extension field count exceeds the limit of {field_cap} \
                              — rejecting payload to prevent unbounded memory growth"
                         )));
                     }
                     let value = access.next_value::<serde_json::Value>()?;
+
+                    // Charge the cumulative value-byte budget as we go, so an
+                    // oversized payload is rejected mid-parse rather than after the
+                    // whole tree has been built.
+                    let cost = key.len() + estimated_json_value_bytes(&value);
+                    if let Err(overrun) = charge_extension_bytes(cost) {
+                        trace_limit_violation(LimitKind::ExtensionValueBytes, overrun, 0);
+                        return Err(serde::de::Error::custom(format!(
+                            "extension value budget exceeded: field {key:?} needs {cost} bytes, \
+                             which exhausts the remaining per-call allowance"
+                        )));
+                    }
                     map.insert(key, value);
                 }
                 Ok(LimitedExtensionMap(if map.is_empty() {
@@ -241,10 +241,11 @@ pub trait Bo4eExtensionData: sealed::Sealed {
 /// A single shared empty-map sentinel used by all generated `Bo4eExtensionData` impls.
 ///
 /// Sharing one `LazyLock` across all ~200 generated struct types avoids allocating
-/// a separate `static` per struct (I-5 fix).  The contained `IndexMap` is never
+/// a separate `static` per struct.  The contained `IndexMap` is never
 /// mutated; `extension_data()` returns a reference to it only when the struct's
 /// `_additional` field is `None`.
-#[cfg(feature = "json")]
+// Referenced only from generated `Bo4eExtensionData` impls.
+#[cfg(all(feature = "json", feature = "versioned"))]
 pub(crate) static EMPTY_EXTENSION_MAP: std::sync::LazyLock<
     indexmap::IndexMap<String, serde_json::Value>,
 > = std::sync::LazyLock::new(indexmap::IndexMap::new);

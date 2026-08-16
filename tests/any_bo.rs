@@ -198,3 +198,82 @@ mod any_bo_tests {
         assert_eq!(any.bo_type(), BoTyp::Messlokation);
     }
 }
+
+// ─── Regression: AnyBo must honour the caller's deserializer ─────────────────
+//
+// `AnyBo::deserialize` has to buffer the payload before it can read `"_typ"` and
+// pick a concrete type. It previously did that by capturing a `Box<RawValue>` and
+// re-parsing it with `serde_json::from_str`, which threw away the deserializer the
+// caller passed in — and with it both wrappers this crate relies on.
+
+/// `to_json_snake_case` → `from_json_snake_case` must round-trip through `AnyBo`.
+///
+/// Re-parsing the raw capture skipped the snake_case → German key transform, so
+/// every typed field silently landed in `_additional` instead: the call returned
+/// `Ok` with an empty object rather than failing.
+#[cfg(all(feature = "versioned", feature = "json"))]
+#[test]
+fn any_bo_snake_case_round_trip_preserves_typed_fields() {
+    use rubo4e::current::{AnyBo, Marktlokation, Sparte};
+    use rubo4e::json::{Bo4eExtensionData, Bo4eJsonExt};
+
+    let malo = Marktlokation {
+        marktlokations_id: Some("51238696781".try_into().expect("valid MaLo-ID")),
+        sparte: Some(Sparte::Strom),
+        ..Default::default()
+    };
+    let any: AnyBo = malo.clone().into();
+
+    let snake = any.to_json_snake_case().expect("serialize");
+    assert!(
+        snake.contains("\"marktlokations_id\""),
+        "snake_case output should use Rust field names: {snake}"
+    );
+
+    let back = AnyBo::from_json_snake_case(&snake).expect("deserialize");
+    let AnyBo::Marktlokation(round_tripped) = back else {
+        panic!("_typ MARKTLOKATION must select the Marktlokation variant");
+    };
+
+    assert_eq!(round_tripped.marktlokations_id, malo.marktlokations_id);
+    assert_eq!(round_tripped.sparte, malo.sparte);
+    assert!(
+        !round_tripped.has_extension_data(),
+        "typed fields must not be diverted into extension data: {:?}",
+        round_tripped.extension_data()
+    );
+}
+
+/// A hardened `max_nesting_depth` must bind `AnyBo` exactly as it binds a
+/// concrete BO type.
+///
+/// A `RawValue` capture is only one level deep as far as the depth limiter can
+/// see, so re-parsing left the configured limit entirely unenforced — the guard
+/// silently did nothing on the polymorphic ingest path it matters most for.
+#[cfg(all(feature = "versioned", feature = "json"))]
+#[test]
+fn any_bo_enforces_hardened_nesting_depth() {
+    use rubo4e::current::{AnyBo, Marktlokation};
+    use rubo4e::json::{Bo4eJsonExt, JsonParseLimits};
+
+    fn payload(depth: usize) -> String {
+        let (open, close) = ("[".repeat(depth), "]".repeat(depth));
+        format!(r#"{{"_typ":"MARKTLOKATION","marktlokationsId":"51238696781","x":{open}1{close}}}"#)
+    }
+
+    let limits = JsonParseLimits {
+        max_nesting_depth: Some(8),
+        ..JsonParseLimits::unlimited()
+    };
+
+    // Within the limit: both accept.
+    assert!(Marktlokation::from_json_german_hardened(&payload(4), limits).is_ok());
+    assert!(AnyBo::from_json_german_hardened(&payload(4), limits).is_ok());
+
+    // Beyond the limit: both must reject, and for the same reason.
+    assert!(Marktlokation::from_json_german_hardened(&payload(40), limits).is_err());
+    assert!(
+        AnyBo::from_json_german_hardened(&payload(40), limits).is_err(),
+        "AnyBo must not escape the configured nesting-depth limit"
+    );
+}

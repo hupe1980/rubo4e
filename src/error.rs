@@ -2,17 +2,17 @@ use std::borrow::Cow;
 
 use thiserror::Error;
 
-/// Expected input-length contract for an identifier type.
+/// Expected input-length contract for an identifier type, in bytes.
 #[non_exhaustive]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum LengthExpectation {
-    /// Identifier must have exactly this number of characters.
+    /// Identifier must be exactly this many bytes long.
     Exact(usize),
-    /// Identifier must have a number of characters inside this inclusive range.
+    /// Identifier length must fall inside this inclusive byte range.
     RangeInclusive {
-        /// Minimum accepted number of characters (inclusive).
+        /// Minimum accepted length in bytes (inclusive).
         min: usize,
-        /// Maximum accepted number of characters (inclusive).
+        /// Maximum accepted length in bytes (inclusive).
         max: usize,
     },
 }
@@ -30,19 +30,27 @@ impl std::fmt::Display for LengthExpectation {
 #[non_exhaustive]
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 pub enum IdentifierError {
-    /// The input has a wrong number of characters.
+    /// The input has a wrong length.
+    ///
+    /// Lengths are measured in **bytes**. Every identifier this crate defines is
+    /// ASCII-only, so for any input that could have been valid this equals the
+    /// character count; a non-ASCII input is rejected either way.
     #[error("invalid length: expected {expected}, got {actual}")]
     InvalidLength {
         /// The accepted length contract for this identifier type.
         expected: LengthExpectation,
-        /// The actual number of characters in the input.
+        /// The actual length of the input, in bytes.
         actual: usize,
     },
 
-    /// A character at the given byte position is not permitted.
+    /// A character at the given position is not permitted.
     #[error("invalid character {character:?} at position {position}")]
     InvalidCharacter {
-        /// Zero-based character index of the offending character.
+        /// Zero-based **byte** offset of the offending character within the input.
+        ///
+        /// Byte offset rather than character index so the value can be used to
+        /// slice the original input directly. The two coincide for the ASCII
+        /// prefix that every identifier requires.
         position: usize,
         /// The offending character.
         character: char,
@@ -74,12 +82,14 @@ pub enum IdentifierError {
 /// having them silently degrade to `Unknown`.
 ///
 /// # Example
-/// ```rust,ignore
+/// ```
+/// # #[cfg(feature = "versioned")] {
 /// use rubo4e::current::Marktrolle;
 ///
 /// assert!(Marktrolle::from_wire("LF").is_ok());
 /// // Legacy / typo'd values are rejected rather than silently accepted:
 /// assert!(Marktrolle::from_wire("LFG").is_err());
+/// # }
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 #[error("unknown enum value {value:?}: not a variant defined in this BO4E schema version")]

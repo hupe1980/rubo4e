@@ -14,7 +14,9 @@ use crate::error::IdentifierError;
 //   E  – value group E (tariff), optional
 //   F  – value group F (billing period), optional (separator '*' or '&')
 //
-// All numeric components are non-negative integers (no leading zeros enforced).
+// Every value group is a single octet (0–255) per IEC 62056-61 §4; a group that
+// does not fit in a byte is not an OBIS value group. Leading zeros are accepted
+// on input and canonicalised away.
 //
 // Prefix forms:
 //   A-B:   both A and B are present (e.g. "1-0:1.8.0")
@@ -30,40 +32,56 @@ use crate::error::IdentifierError;
 ///
 /// This struct is `#[non_exhaustive]` — new fields may be added in future
 /// minor versions without a major-version bump.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub struct ObisComponents {
     /// Value group A (energy type). `None` means the full `A-B:` prefix was omitted.
-    pub a: Option<u32>,
+    ///
+    /// Common values: `1` electricity, `6` heat, `7` gas, `8` water.
+    pub a: Option<u8>,
     /// Value group B (channel).
     /// - `Some(b)` when both A and B appear in the `A-B:` prefix.
     /// - `None` when only the `A:` prefix was given (A present, B absent).
     /// - `None` when the entire `A-B:` / `A:` prefix was omitted.
-    pub b: Option<u32>,
+    pub b: Option<u8>,
     /// Value group C (physical quantity) – mandatory.
     ///
     /// `C = 0` identifies the general metering data group per IEC 62056-21 §5.4
     /// and IEC 62056-61 §4.2 (status, date/time, administrative objects).
-    pub c: u32,
+    pub c: u8,
     /// Value group D (measurement type) – mandatory.
-    pub d: u32,
+    pub d: u8,
     /// Value group E (tariff) – optional.
-    pub e: Option<u32>,
+    pub e: Option<u8>,
     /// Value group F (billing period) – optional.
-    pub f: Option<u32>,
+    ///
+    /// `255` conventionally marks "not used".
+    pub f: Option<u8>,
 }
 
 // ─── Parser helpers ───────────────────────────────────────────────────────────
 
-/// Parses a non-negative integer from the beginning of `s`, returning `(value, rest)`.
-/// Returns `None` if `s` is empty or does not start with a digit.
-fn parse_uint(s: &str) -> Option<(u32, &str)> {
+/// Parses one OBIS value group from the beginning of `s`, returning `(value, rest)`.
+///
+/// Returns `None` if `s` does not start with a digit, or if the digits do not
+/// denote a single octet — value groups are one byte wide (IEC 62056-61 §4), so
+/// `256` and up are not OBIS values regardless of how many digits are written.
+/// Leading zeros are accepted: `007` and `7` are the same value group.
+fn parse_group(s: &str) -> Option<(u8, &str)> {
     let end = s.find(|c: char| !c.is_ascii_digit()).unwrap_or(s.len());
     if end == 0 {
         return None;
     }
-    let n = s[..end].parse::<u32>().ok()?;
+    let n = s[..end].parse::<u8>().ok()?;
     Some((n, &s[end..]))
+}
+
+/// Parses a complete value group, i.e. `parse_group` that must consume all of `s`.
+fn parse_whole_group(s: &str) -> Option<u8> {
+    match parse_group(s) {
+        Some((n, "")) => Some(n),
+        _ => None,
+    }
 }
 
 fn validate_and_parse(s: &str) -> Result<ObisComponents, IdentifierError> {
@@ -73,14 +91,19 @@ fn validate_and_parse(s: &str) -> Result<ObisComponents, IdentifierError> {
         });
     }
 
+    /// Every value group failure reads the same way, so build the message once.
+    fn bad_group(group: char) -> IdentifierError {
+        IdentifierError::InvalidFormat {
+            description: format!(
+                "{group} component must be a single octet (0-255) per IEC 62056-61"
+            )
+            .into(),
+        }
+    }
+
     // ── Split off optional F component (*F or &F) ────────────────────────────
     let (s, f) = if let Some(idx) = s.rfind(['*', '&']) {
-        let f_str = &s[idx + 1..];
-        let f_val = f_str
-            .parse::<u32>()
-            .map_err(|_| IdentifierError::InvalidFormat {
-                description: "F component must be a non-negative integer".into(),
-            })?;
+        let f_val = parse_whole_group(&s[idx + 1..]).ok_or_else(|| bad_group('F'))?;
         (&s[..idx], Some(f_val))
     } else {
         (s, None)
@@ -92,24 +115,11 @@ fn validate_and_parse(s: &str) -> Result<ObisComponents, IdentifierError> {
         let rest = &s[colon_pos + 1..];
         // Prefix is either "A" or "A-B"
         if let Some(dash_pos) = prefix.find('-') {
-            let a =
-                prefix[..dash_pos]
-                    .parse::<u32>()
-                    .map_err(|_| IdentifierError::InvalidFormat {
-                        description: "A component must be a non-negative integer".into(),
-                    })?;
-            let b = prefix[dash_pos + 1..].parse::<u32>().map_err(|_| {
-                IdentifierError::InvalidFormat {
-                    description: "B component must be a non-negative integer".into(),
-                }
-            })?;
+            let a = parse_whole_group(&prefix[..dash_pos]).ok_or_else(|| bad_group('A'))?;
+            let b = parse_whole_group(&prefix[dash_pos + 1..]).ok_or_else(|| bad_group('B'))?;
             (rest, Some(a), Some(b))
         } else {
-            let a = prefix
-                .parse::<u32>()
-                .map_err(|_| IdentifierError::InvalidFormat {
-                    description: "A component must be a non-negative integer".into(),
-                })?;
+            let a = parse_whole_group(prefix).ok_or_else(|| bad_group('A'))?;
             (rest, Some(a), None)
         }
     } else {
@@ -117,9 +127,7 @@ fn validate_and_parse(s: &str) -> Result<ObisComponents, IdentifierError> {
     };
 
     // ── Parse mandatory C.D[.E] ──────────────────────────────────────────────
-    let (c, rest) = parse_uint(s).ok_or(IdentifierError::InvalidFormat {
-        description: "C component (mandatory) must be a non-negative integer".into(),
-    })?;
+    let (c, rest) = parse_group(s).ok_or_else(|| bad_group('C'))?;
 
     if !rest.starts_with('.') {
         return Err(IdentifierError::InvalidFormat {
@@ -128,14 +136,10 @@ fn validate_and_parse(s: &str) -> Result<ObisComponents, IdentifierError> {
     }
     let rest = &rest[1..];
 
-    let (d, rest) = parse_uint(rest).ok_or(IdentifierError::InvalidFormat {
-        description: "D component (mandatory) must be a non-negative integer".into(),
-    })?;
+    let (d, rest) = parse_group(rest).ok_or_else(|| bad_group('D'))?;
 
     let (e, rest_after_e) = if let Some(after_dot) = rest.strip_prefix('.') {
-        let (e_val, remainder) = parse_uint(after_dot).ok_or(IdentifierError::InvalidFormat {
-            description: "E component must be a non-negative integer after '.'".into(),
-        })?;
+        let (e_val, remainder) = parse_group(after_dot).ok_or_else(|| bad_group('E'))?;
         (Some(e_val), remainder)
     } else {
         (None, rest)
@@ -150,6 +154,39 @@ fn validate_and_parse(s: &str) -> Result<ObisComponents, IdentifierError> {
     Ok(ObisComponents { a, b, c, d, e, f })
 }
 
+impl ObisComponents {
+    /// Renders these components in the canonical BO4E form `[A-B:]C.D[.E][*F]`.
+    ///
+    /// This is the single renderer for the type: it defines the canonical string
+    /// stored by [`ObisCode`], so a stored value and its re-rendered components can
+    /// never disagree.
+    fn render(&self, include_f: bool) -> String {
+        use std::fmt::Write as _;
+
+        // Longest realistic form is well under 32 bytes; one allocation, no reallocs.
+        let mut out = String::with_capacity(32);
+        match (self.a, self.b) {
+            (Some(a), Some(b)) => {
+                let _ = write!(out, "{a}-{b}:");
+            }
+            (Some(a), None) => {
+                let _ = write!(out, "{a}:");
+            }
+            (None, _) => {}
+        }
+        let _ = write!(out, "{}.{}", self.c, self.d);
+        if let Some(e) = self.e {
+            let _ = write!(out, ".{e}");
+        }
+        if include_f {
+            if let Some(f) = self.f {
+                let _ = write!(out, "*{f}");
+            }
+        }
+        out
+    }
+}
+
 // ─── Type ────────────────────────────────────────────────────────────────────
 
 /// OBIS identifier (IEC 62056-61 / BDEW): compact reference for metering values.
@@ -160,13 +197,20 @@ fn validate_and_parse(s: &str) -> Result<ObisComponents, IdentifierError> {
 /// `A`, `B`, `E`, and `F` are optional.  `C = 0` is permitted and identifies the
 /// general metering data group (IEC 62056-21 / IEC 62056-61).
 ///
-/// The stored string is **normalised** at construction time: the alternative `&`
-/// separator for the F component is converted to `*`.  Two codes that differ
-/// only in separator are therefore equal.
+/// # Canonicalisation
 ///
-/// Use [`ObisCode::components`] to access the parsed values.
-/// Use [`ObisCode::to_pia_string`] to emit the A-B:C.D[.E] form (F stripped).
-/// Use [`ObisCode::to_bo4e_string`] to emit the canonical BO4E form.
+/// The input is parsed once at construction and stored in **canonical form**, so
+/// two codes that denote the same value are always equal and hash alike:
+///
+/// - the alternative `&` separator for the F component becomes `*`;
+/// - redundant leading zeros are dropped (`01.08` → `1.8`).
+///
+/// [`AsRef<str>`], [`Display`](std::fmt::Display), and the `serde` output all
+/// yield this canonical string, so a round-trip through JSON is stable.
+///
+/// Use [`ObisCode::components`] to access the parsed values — they are stored, so
+/// the accessor neither re-parses nor allocates.
+/// Use [`ObisCode::to_pia_string`] to emit the `A-B:C.D[.E]` form (F stripped).
 ///
 /// # Examples
 /// ```
@@ -177,17 +221,29 @@ fn validate_and_parse(s: &str) -> Result<ObisComponents, IdentifierError> {
 /// ObisCode::new("0-0:0.0.0").unwrap();          // C=0 (general metering group)
 /// ObisCode::new("1:1.8").unwrap();              // A-only prefix (B absent)
 /// ObisCode::new("1.8.1").unwrap();              // C.D.E only
-/// // & separator is accepted and normalised to *
+///
+/// // `&` is accepted on input and canonicalised to `*`.
 /// assert_eq!(ObisCode::new("1.8.1&255").unwrap(), ObisCode::new("1.8.1*255").unwrap());
+/// // Leading zeros are canonicalised away.
+/// assert_eq!(ObisCode::new("01-00:01.08.00").unwrap(), ObisCode::new("1-0:1.8.0").unwrap());
+/// assert_eq!(ObisCode::new("01-00:01.08.00").unwrap().as_ref(), "1-0:1.8.0");
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "validate", derive(garde::Validate))]
 #[cfg_attr(feature = "validate", garde(allow_unvalidated))]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
-#[cfg_attr(feature = "schemars", schemars(with = "String"))]
-#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
-#[cfg_attr(feature = "utoipa", schema(value_type = String))]
-pub struct ObisCode(#[cfg_attr(feature = "validate", garde(custom(check_obis_code)))] Box<str>);
+#[cfg_attr(
+    feature = "schemars",
+    schemars(schema_with = "crate::schema_helpers::obis_code_schema")
+)]
+pub struct ObisCode {
+    /// Canonical rendering — the only value ever exposed as a string.
+    #[cfg_attr(feature = "validate", garde(custom(check_obis_code)))]
+    canonical: Box<str>,
+    /// Parsed once at construction so `components()` is infallible and free.
+    #[cfg_attr(feature = "validate", garde(skip))]
+    components: ObisComponents,
+}
 
 #[cfg(feature = "validate")]
 fn check_obis_code(value: &str, _: &()) -> Result<(), garde::Error> {
@@ -197,37 +253,45 @@ fn check_obis_code(value: &str, _: &()) -> Result<(), garde::Error> {
 }
 
 impl ObisCode {
-    /// Creates a new `ObisCode` after full structural validation.
-    ///
-    /// - The `&` separator for the F component is normalised to `*` so that
-    ///   semantically identical codes compare equal.
+    /// Creates a new `ObisCode` after full structural validation, storing the
+    /// value in canonical form.
     ///
     /// # Errors
     /// Returns [`IdentifierError::InvalidFormat`] if the input does not conform
     /// to the OBIS grammar.
     #[must_use = "the validated identifier is returned; ignoring it discards the result"]
     pub fn new(s: &str) -> Result<Self, IdentifierError> {
-        validate_and_parse(s)?;
-        // Normalise the alternative F-component separator.
-        let normalised: Box<str> = if s.contains('&') {
-            s.replace('&', "*").into()
-        } else {
-            Box::from(s)
-        };
-        Ok(Self(normalised))
+        let components = validate_and_parse(s)?;
+        Ok(Self {
+            canonical: components.render(true).into_boxed_str(),
+            components,
+        })
     }
 
-    /// Parses and returns the individual OBIS value groups.
+    /// Returns the individual OBIS value groups.
+    ///
+    /// Parsed once at construction, so this neither re-parses nor allocates.
+    #[must_use]
     pub fn components(&self) -> ObisComponents {
-        // SAFETY: `ObisCode` values are only constructable via `new()` / `TryFrom`,
-        // both of which call `validate_and_parse` and return `Err` on invalid input.
-        // A stored `ObisCode` is therefore always a valid OBIS string, so
-        // `validate_and_parse` cannot return `Err` here.
-        validate_and_parse(&self.0)
-            .expect("ObisCode invariant violated: stored string is not a valid OBIS identifier")
+        self.components
     }
 
-    /// Returns the A-B:C.D[.E] form of this OBIS code, without the F component.
+    /// Returns the canonical `[A-B:]C.D[.E][*F]` form — the same string as
+    /// [`AsRef<str>`] and [`Display`](std::fmt::Display).
+    ///
+    /// # Examples
+    /// ```
+    /// use rubo4e::identifiers::ObisCode;
+    ///
+    /// assert_eq!(ObisCode::new("1-0:1.8.0*255").unwrap().as_str(), "1-0:1.8.0*255");
+    /// assert_eq!(ObisCode::new("01-00:01.08").unwrap().as_str(),   "1-0:1.8");
+    /// ```
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        &self.canonical
+    }
+
+    /// Returns the `A-B:C.D[.E]` form of this OBIS code, without the F component.
     ///
     /// Useful for emitting the item-number composite in a PIA segment, where F
     /// is not included.
@@ -236,113 +300,56 @@ impl ObisCode {
     /// ```
     /// use rubo4e::identifiers::ObisCode;
     ///
-    /// assert_eq!(ObisCode::new("1-0:1.8.0").unwrap().to_pia_string(),    "1-0:1.8.0");
+    /// assert_eq!(ObisCode::new("1-0:1.8.0").unwrap().to_pia_string(),     "1-0:1.8.0");
     /// assert_eq!(ObisCode::new("1-0:1.8.0*255").unwrap().to_pia_string(), "1-0:1.8.0");
     /// ```
     #[must_use]
     pub fn to_pia_string(&self) -> String {
-        let c = self.components();
-        let mut out = match (c.a, c.b) {
-            (Some(a), Some(b)) => format!("{a}-{b}:"),
-            (Some(a), None) => format!("{a}:"),
-            (None, _) => String::new(),
-        };
-        out += &format!("{}.{}", c.c, c.d);
-        if let Some(e) = c.e {
-            out += &format!(".{e}");
-        }
-        out
-    }
-
-    /// Returns the BO4E JSON canonical form: `[A-B:]C.D[.E][*F]`.
-    ///
-    /// The F (billing period) component is included with `*` as separator.
-    ///
-    /// # Examples
-    /// ```
-    /// use rubo4e::identifiers::ObisCode;
-    ///
-    /// assert_eq!(ObisCode::new("1-0:1.8.0*255").unwrap().to_bo4e_string(), "1-0:1.8.0*255");
-    /// assert_eq!(ObisCode::new("1-0:1.8.0").unwrap().to_bo4e_string(),     "1-0:1.8.0");
-    /// ```
-    #[must_use]
-    pub fn to_bo4e_string(&self) -> String {
-        let c = self.components();
-        let mut out = match (c.a, c.b) {
-            (Some(a), Some(b)) => format!("{a}-{b}:"),
-            (Some(a), None) => format!("{a}:"),
-            (None, _) => String::new(),
-        };
-        out += &format!("{}.{}", c.c, c.d);
-        if let Some(e) = c.e {
-            out += &format!(".{e}");
-        }
-        if let Some(f) = c.f {
-            out += &format!("*{f}");
-        }
-        out
+        self.components.render(false)
     }
 }
 
-impl TryFrom<String> for ObisCode {
-    type Error = IdentifierError;
-    fn try_from(s: String) -> Result<Self, Self::Error> {
-        Self::new(&s)
+impl_identifier_traits!(
+    ObisCode,
+    "an OBIS code string (e.g. \"1-0:1.8.0*255\")",
+    field = canonical
+);
+
+// `utoipa`'s `value_type = String` shortcut only applies to newtype structs, and
+// `ObisCode` carries its parsed components alongside the string.  Writing the
+// schema out by hand also lets it carry the grammar, which the derive could not.
+#[cfg(feature = "utoipa")]
+impl utoipa::PartialSchema for ObisCode {
+    fn schema() -> utoipa::openapi::RefOr<utoipa::openapi::schema::Schema> {
+        utoipa::openapi::ObjectBuilder::new()
+            .schema_type(utoipa::openapi::schema::Type::String)
+            .pattern(Some(OBIS_PATTERN))
+            .description(Some(
+                "OBIS-Kennzahl nach IEC 62056-61: [A-B:]C.D[.E][*F]. \
+                 Wird kanonisiert gespeichert (führende Nullen entfallen, '&' wird zu '*').",
+            ))
+            // Not `serde_json::json!` — the `utoipa` feature does not enable
+            // `serde_json` for this crate, and `&str` already converts.
+            .examples(["1-0:1.8.0*255"])
+            .into()
     }
 }
 
-impl TryFrom<&str> for ObisCode {
-    type Error = IdentifierError;
-    fn try_from(s: &str) -> Result<Self, Self::Error> {
-        Self::new(s)
+#[cfg(feature = "utoipa")]
+impl utoipa::ToSchema for ObisCode {
+    fn name() -> std::borrow::Cow<'static, str> {
+        std::borrow::Cow::Borrowed("ObisCode")
     }
 }
 
-impl AsRef<str> for ObisCode {
-    fn as_ref(&self) -> &str {
-        &self.0
-    }
-}
-
-impl std::fmt::Display for ObisCode {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(&self.0)
-    }
-}
-
-impl std::str::FromStr for ObisCode {
-    type Err = IdentifierError;
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Self::new(s)
-    }
-}
-
-#[cfg(feature = "serde")]
-impl serde::Serialize for ObisCode {
-    fn serialize<S: serde::Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
-        s.serialize_str(&self.0)
-    }
-}
-
-#[cfg(feature = "serde")]
-impl<'de> serde::Deserialize<'de> for ObisCode {
-    fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
-        struct Visitor;
-        impl<'de> serde::de::Visitor<'de> for Visitor {
-            type Value = ObisCode;
-            fn expecting(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                f.write_str("an OBIS code string (e.g. \"1-0:1.8.0*255\")")
-            }
-            fn visit_str<E: serde::de::Error>(self, v: &str) -> Result<ObisCode, E> {
-                ObisCode::new(v).map_err(|e| {
-                    crate::identifiers::trace_identifier_deser_error("ObisCode", v, &e);
-                    serde::de::Error::custom(e)
-                })
-            }
-        }
-        d.deserialize_str(Visitor)
-    }
-}
+/// Regex for the OBIS grammar, shared by the `schemars` and `utoipa` schemas so
+/// the two can never describe different grammars.
+///
+/// This describes what deserialization **accepts**, not only what serialization
+/// emits: both F-component separators are allowed, and leading zeros are
+/// permitted on input even though they are canonicalised away on the way in.
+#[cfg(any(feature = "schemars", feature = "utoipa"))]
+pub(crate) const OBIS_PATTERN: &str = r"^(?:\d+(?:-\d+)?:)?\d+\.\d+(?:\.\d+)?(?:[*&]\d+)?$";
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
@@ -432,7 +439,7 @@ mod tests {
         assert_eq!(ObisCode::new(input).unwrap().to_string(), input);
     }
 
-    // ── to_pia_string and to_bo4e_string (F6) ────────────────────────────────
+    // ── Rendering ─────────────────────────────────────────────────────────────
 
     #[test]
     fn to_pia_drops_f() {
@@ -441,17 +448,28 @@ mod tests {
     }
 
     #[test]
-    fn to_bo4e_preserves_f() {
+    fn canonical_form_preserves_f() {
         let c = ObisCode::new("1-0:1.8.0*255").unwrap();
-        assert_eq!(c.to_bo4e_string(), "1-0:1.8.0*255");
+        assert_eq!(c.as_str(), "1-0:1.8.0*255");
     }
 
     #[test]
-    fn to_pia_and_bo4e_agree_on_plain_obis() {
+    fn pia_and_canonical_agree_when_there_is_no_f() {
         let s = "1-0:1.8.1";
         let c = ObisCode::new(s).unwrap();
         assert_eq!(c.to_pia_string(), s);
-        assert_eq!(c.to_bo4e_string(), s);
+        assert_eq!(c.as_str(), s);
+    }
+
+    /// `as_str`, `as_ref`, `Display`, and `Deref` must all agree — they are the
+    /// same canonical string, not independently rendered views.
+    #[test]
+    fn every_string_view_agrees() {
+        let c = ObisCode::new("01-00:01.08.00&255").unwrap();
+        assert_eq!(c.as_str(), "1-0:1.8.0*255");
+        assert_eq!(c.as_ref(), c.as_str());
+        assert_eq!(c.to_string(), c.as_str());
+        assert_eq!(&*c, c.as_str());
     }
 
     #[test]
@@ -459,6 +477,65 @@ mod tests {
         let s = "1-0:1.8.0*255";
         let c = s.parse::<ObisCode>().unwrap();
         assert_eq!(c.to_string(), s);
+    }
+
+    // ── Canonicalisation ─────────────────────────────────────────────────────
+
+    /// Codes that denote the same value must be equal and hash alike, whatever
+    /// spelling they arrived in.
+    #[test]
+    fn equal_values_are_equal_regardless_of_spelling() {
+        use std::collections::HashSet;
+
+        for (a, b) in [
+            ("1.8.1&255", "1.8.1*255"),          // separator
+            ("01-00:01.08.00", "1-0:1.8.0"),     // leading zeros
+            ("0001.0008", "1.8"),                // leading zeros, no prefix
+            ("01:01.08.01*0255", "1:1.8.1*255"), // both, A-only prefix
+        ] {
+            let (x, y) = (ObisCode::new(a).unwrap(), ObisCode::new(b).unwrap());
+            assert_eq!(x, y, "{a} vs {b}");
+            assert_eq!(x.as_str(), y.as_str(), "{a} vs {b}");
+            let set: HashSet<_> = [x, y].into_iter().collect();
+            assert_eq!(set.len(), 1, "{a} and {b} must hash alike");
+        }
+    }
+
+    /// Canonicalisation must be idempotent: re-parsing a canonical string is a
+    /// no-op, so serialize → deserialize can never drift.
+    #[test]
+    fn canonicalisation_is_idempotent() {
+        for input in [
+            "1-0:1.8.0*255",
+            "01-00:01.08.00&0255",
+            "1:1.8",
+            "0.0",
+            "1.8.1",
+        ] {
+            let once = ObisCode::new(input).unwrap();
+            let twice = ObisCode::new(once.as_str()).unwrap();
+            assert_eq!(once, twice, "{input}");
+            assert_eq!(once.as_str(), twice.as_str(), "{input}");
+        }
+    }
+
+    /// `components()` must describe exactly the canonical string, so the two can
+    /// never disagree about what the value is.
+    #[test]
+    fn components_and_canonical_string_agree() {
+        for input in ["1-0:1.8.0*255", "01:01.08", "0000.0000", "1.8.1"] {
+            let code = ObisCode::new(input).unwrap();
+            let reparsed = ObisCode::new(code.as_str()).unwrap();
+            assert_eq!(code.components(), reparsed.components(), "{input}");
+        }
+    }
+
+    /// The accessor is a copy of stored data — repeated calls are stable and
+    /// cannot panic on any constructable value.
+    #[test]
+    fn components_is_a_stable_accessor() {
+        let c = ObisCode::new("1-0:1.8.0*255").unwrap();
+        assert_eq!(c.components(), c.components());
     }
 
     // ── Invalid inputs ────────────────────────────────────────────────────────
@@ -509,5 +586,70 @@ mod tests {
             ObisCode::new("1.8*abc").unwrap_err(),
             IdentifierError::InvalidFormat { .. }
         ));
+    }
+
+    // ── Octet range (IEC 62056-61 §4) ────────────────────────────────────────
+
+    /// Every value group is one byte, so 255 is the largest legal value and 256
+    /// is not an OBIS value group at all.
+    #[test]
+    fn value_groups_are_octets() {
+        // 255 is the documented maximum and must be accepted in every position.
+        let max = ObisCode::new("255-255:255.255.255*255").unwrap();
+        let p = max.components();
+        assert_eq!(
+            (p.a, p.b, p.c, p.d, p.e, p.f),
+            (Some(255), Some(255), 255, 255, Some(255), Some(255))
+        );
+
+        // 256 overflows the octet in each position.
+        for over in [
+            "256-0:1.8.0",
+            "1-256:1.8.0",
+            "1-0:256.8.0",
+            "1-0:1.256.0",
+            "1-0:1.8.256",
+            "1-0:1.8.0*256",
+        ] {
+            assert!(
+                matches!(
+                    ObisCode::new(over),
+                    Err(IdentifierError::InvalidFormat { .. })
+                ),
+                "{over} must be rejected: OBIS value groups are single octets"
+            );
+        }
+    }
+
+    /// The out-of-range message must name the offending group, not just say
+    /// "invalid" — otherwise a bad F reads the same as a bad A.
+    #[test]
+    fn octet_overflow_names_the_group() {
+        for (input, group) in [
+            ("256-0:1.8", 'A'),
+            ("1-256:1.8", 'B'),
+            ("300.8", 'C'),
+            ("1.300", 'D'),
+            ("1.8.300", 'E'),
+            ("1.8*300", 'F'),
+        ] {
+            let msg = ObisCode::new(input).unwrap_err().to_string();
+            assert!(
+                msg.contains(group),
+                "error for {input:?} should name group {group}: {msg}"
+            );
+        }
+    }
+
+    /// Leading zeros are an accepted spelling of an in-range group, not an
+    /// overflow — `0255` is 255, and `00001` is 1.
+    #[test]
+    fn leading_zeros_do_not_overflow_the_octet() {
+        assert_eq!(
+            ObisCode::new("0001-0000:0001.0008.0000*0255")
+                .unwrap()
+                .as_str(),
+            "1-0:1.8.0*255"
+        );
     }
 }

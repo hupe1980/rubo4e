@@ -120,65 +120,7 @@ impl MeloId {
     }
 }
 
-impl TryFrom<String> for MeloId {
-    type Error = IdentifierError;
-    fn try_from(s: String) -> Result<Self, Self::Error> {
-        Self::new(&s)
-    }
-}
-
-impl TryFrom<&str> for MeloId {
-    type Error = IdentifierError;
-    fn try_from(s: &str) -> Result<Self, Self::Error> {
-        Self::new(s)
-    }
-}
-
-impl AsRef<str> for MeloId {
-    fn as_ref(&self) -> &str {
-        &self.0
-    }
-}
-
-impl std::fmt::Display for MeloId {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(&self.0)
-    }
-}
-
-impl std::str::FromStr for MeloId {
-    type Err = IdentifierError;
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Self::new(s)
-    }
-}
-
-#[cfg(feature = "serde")]
-impl serde::Serialize for MeloId {
-    fn serialize<S: serde::Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
-        s.serialize_str(&self.0)
-    }
-}
-
-#[cfg(feature = "serde")]
-impl<'de> serde::Deserialize<'de> for MeloId {
-    fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
-        struct Visitor;
-        impl<'de> serde::de::Visitor<'de> for Visitor {
-            type Value = MeloId;
-            fn expecting(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                f.write_str("a 33-character Messlokations-ID")
-            }
-            fn visit_str<E: serde::de::Error>(self, v: &str) -> Result<MeloId, E> {
-                MeloId::new(v).map_err(|e| {
-                    crate::identifiers::trace_identifier_deser_error("MeloId", v, &e);
-                    serde::de::Error::custom(e)
-                })
-            }
-        }
-        d.deserialize_str(Visitor)
-    }
-}
+impl_identifier_traits!(MeloId, "a 33-character Messlokations-ID");
 
 #[cfg(test)]
 mod tests {

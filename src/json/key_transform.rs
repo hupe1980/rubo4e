@@ -6,14 +6,23 @@
 // the `where T: Serialize` clause is also required. Both are intentional.
 #![allow(clippy::multiple_bound_locations)]
 
-use std::borrow::Cow;
-
 use serde::de::DeserializeOwned;
 use serde::de::Error as _;
 use serde::de::IntoDeserializer;
 use serde::Serialize;
 
-pub(super) type KeyTransformFn = for<'a> fn(&'a str) -> Cow<'a, str>;
+/// Maps a JSON key to its counterpart in the other naming mode.
+///
+/// `None` means "no mapping — pass this key through byte-for-byte", which is the
+/// case for extension-data keys and the `_`-prefixed BO4E metadata keys. A
+/// `Some` result is always a `&'static str` borrowed from the generated key map,
+/// so renaming a key never allocates on either the serialize or deserialize path.
+///
+/// The `Option` carries the "unchanged" case explicitly on purpose. An earlier
+/// version returned `Cow` and treated `Cow::Borrowed` as "unchanged"; once the
+/// transform started borrowing its *result* from a static table, that inference
+/// silently dropped every rewrite.
+pub(super) type KeyTransformFn = fn(&str) -> Option<&'static str>;
 
 pub(super) fn serialize_with_key_transform<T>(
     value: &T,
@@ -67,7 +76,7 @@ where
 /// M-C fix: replaces `serde_json::to_value(key)` (which allocates a
 /// `Value::String`) with a minimal serializer that captures the string directly.
 ///
-/// D-05 fix: non-string key branches are removed — BO4E JSON objects always
+/// non-string key branches are removed — BO4E JSON objects always
 /// use string keys.  A `debug_assert` fires in debug builds if a non-string
 /// key is ever encountered, making unexpected usage visible immediately.
 fn json_key_to_string<K: ?Sized + Serialize>(key: &K) -> Result<String, serde_json::Error> {
@@ -252,8 +261,8 @@ where
         T: Serialize,
     {
         let key = json_key_to_string(key).map_err(<S::Error as serde::ser::Error>::custom)?;
-        let key = (self.transform)(&key);
-        self.inner.serialize_key(key.as_ref())
+        self.inner
+            .serialize_key((self.transform)(&key).unwrap_or(&key))
     }
 
     fn serialize_value<T: ?Sized>(&mut self, value: &T) -> Result<(), Self::Error>
@@ -276,9 +285,8 @@ where
         V: Serialize,
     {
         let key = json_key_to_string(key).map_err(<S::Error as serde::ser::Error>::custom)?;
-        let key = (self.transform)(&key);
         self.inner.serialize_entry(
-            key.as_ref(),
+            (self.transform)(&key).unwrap_or(&key),
             &KeyTransformValue {
                 value,
                 transform: self.transform,
@@ -311,9 +319,8 @@ where
     where
         T: Serialize,
     {
-        let key = (self.transform)(key);
         self.inner.serialize_entry(
-            key.as_ref(),
+            (self.transform)(key).unwrap_or(key),
             &KeyTransformValue {
                 value,
                 transform: self.transform,
@@ -346,8 +353,13 @@ where
     where
         T: Serialize,
     {
+        // Rename the field exactly as `SerializeStruct` does. No BO4E type is a
+        // struct variant today, so this branch is unreachable from generated
+        // code — but leaving the key untransformed here while transforming it
+        // for plain structs would make the wrapper's behaviour depend on which
+        // serde shape a type happens to use.
         self.inner.serialize_field(
-            key,
+            (self.transform)(key).unwrap_or(key),
             &KeyTransformValue {
                 value,
                 transform: self.transform,
@@ -552,7 +564,7 @@ pub(super) fn deserialize_with_key_transform_from_str<T, F>(
 ) -> Result<T, serde_json::Error>
 where
     T: DeserializeOwned,
-    F: Fn(&str) -> Cow<'_, str>,
+    F: Fn(&str) -> Option<&'static str>,
 {
     let mut de = serde_json::Deserializer::from_str(input);
     T::deserialize(KeyTransformDeserializer::new(&mut de, transform))
@@ -564,7 +576,7 @@ pub(super) fn deserialize_with_key_transform_from_slice<T, F>(
 ) -> Result<T, serde_json::Error>
 where
     T: DeserializeOwned,
-    F: Fn(&str) -> Cow<'_, str>,
+    F: Fn(&str) -> Option<&'static str>,
 {
     let mut de = serde_json::Deserializer::from_slice(input);
     T::deserialize(KeyTransformDeserializer::new(&mut de, transform))
@@ -594,7 +606,7 @@ struct KeyTransformSeed<S, F> {
 impl<'de, S, F> serde::de::DeserializeSeed<'de> for KeyTransformSeed<S, F>
 where
     S: serde::de::DeserializeSeed<'de>,
-    F: Copy + Fn(&str) -> Cow<'_, str>,
+    F: Copy + Fn(&str) -> Option<&'static str>,
 {
     type Value = S::Value;
 
@@ -615,7 +627,7 @@ struct KeyTransformMapAccess<A, F> {
 impl<'de, A, F> serde::de::MapAccess<'de> for KeyTransformMapAccess<A, F>
 where
     A: serde::de::MapAccess<'de>,
-    F: Copy + Fn(&str) -> Cow<'_, str>,
+    F: Copy + Fn(&str) -> Option<&'static str>,
 {
     type Error = A::Error;
 
@@ -624,13 +636,12 @@ where
         K: serde::de::DeserializeSeed<'de>,
     {
         match self.inner.next_key::<String>()? {
-            Some(key) => {
-                let transformed = match (self.transform)(&key) {
-                    Cow::Borrowed(_) => key,
-                    Cow::Owned(s) => s,
-                };
-                seed.deserialize(transformed.into_deserializer()).map(Some)
-            }
+            // A mapped key is `&'static`, so the rename costs no allocation; an
+            // unmapped key reuses the `String` the parser already produced.
+            Some(key) => match (self.transform)(&key) {
+                Some(mapped) => seed.deserialize(mapped.into_deserializer()).map(Some),
+                None => seed.deserialize(key.into_deserializer()).map(Some),
+            },
             None => Ok(None),
         }
     }
@@ -658,7 +669,7 @@ struct KeyTransformSeqAccess<A, F> {
 impl<'de, A, F> serde::de::SeqAccess<'de> for KeyTransformSeqAccess<A, F>
 where
     A: serde::de::SeqAccess<'de>,
-    F: Copy + Fn(&str) -> Cow<'_, str>,
+    F: Copy + Fn(&str) -> Option<&'static str>,
 {
     type Error = A::Error;
 
@@ -688,7 +699,7 @@ macro_rules! delegate_visit {
 impl<'de, V, F> serde::de::Visitor<'de> for KeyTransformVisitor<V, F>
 where
     V: serde::de::Visitor<'de>,
-    F: Copy + Fn(&str) -> Cow<'_, str>,
+    F: Copy + Fn(&str) -> Option<&'static str>,
 {
     type Value = V::Value;
 
@@ -775,7 +786,7 @@ macro_rules! delegate_deser {
 impl<'de, D, F> serde::de::Deserializer<'de> for KeyTransformDeserializer<D, F>
 where
     D: serde::de::Deserializer<'de>,
-    F: Copy + Fn(&str) -> Cow<'_, str>,
+    F: Copy + Fn(&str) -> Option<&'static str>,
 {
     type Error = D::Error;
 
@@ -902,243 +913,232 @@ where
 }
 
 // ─── Key renaming (German camelCase ↔ snake_case) ─────────────────────────────
+//
+// Both directions are exact table lookups into the generated key map, never
+// heuristics.  A heuristic cannot be correct here: `hoechstpreis_ht` is an
+// equally valid snake_case rendering of `hoechstpreisHt` and `hoechstpreisHT`,
+// and `a` of both `a` and `A`.  BO4E contains all of those shapes
+// (`Tarifberechnungsparameter.hoechstpreisHT`, `Sigmoidparameter.A`,
+// `PreisblattKonzessionsabgabe.kundengruppeKA`), so a heuristic inverse maps
+// them back to a name no field answers to and the value lands in the
+// extension-data bag instead of its typed field — silent data loss on a
+// `to_json_snake_case` → `from_json_snake_case` round-trip.
+//
+// The generator knows both names for every field, so it emits the mapping
+// (`src/generated/key_map.rs`) and the round-trip is lossless by construction.
+// Keys outside the table — extension data, and BO4E metadata keys like `_typ` —
+// pass through untouched, which is also what keeps *those* lossless.
 
-/// Converts a German camelCase JSON key to its snake_case equivalent.
+use crate::generated::key_map::{SNAKE_TO_WIRE, WIRE_TO_SNAKE};
+
+/// Converts a BO4E wire key (German camelCase) to its Rust snake_case field name.
 ///
-/// Returns a borrowed `Cow` (zero allocation) when the key starts with `_`
-/// or contains no uppercase letters.  Only allocates when a conversion is
-/// actually needed — no intermediate `Vec<char>` is created.
+/// Returns `None` for keys with no mapping — extension data, and the
+/// `_`-prefixed BO4E metadata keys (`_typ`, `_version`, `_id`) — which must pass
+/// through unchanged to survive a round-trip.
 ///
-/// Keys starting with `_` (such as `_typ`, `_version`, `_additional`) are
-/// returned unchanged to preserve the BO4E convention for meta-fields.
-///
-/// Uses an acronym-aware sliding-window algorithm: an underscore is inserted
-/// only at an uppercase→lowercase transition or at the end of an uppercase run
-/// preceding a lowercase letter, not between consecutive uppercase letters.
-/// Examples:
-/// - `"marktlokationsId"` → `"marktlokations_id"`
-/// - `"EICCode"` → `"eic_code"` (not `"e_i_c_code"`)
-pub(super) fn camel_to_snake(key: &str) -> Cow<'_, str> {
-    // Fast path: preserve _typ, _version, _additional etc.
-    if key.starts_with('_') {
-        return Cow::Borrowed(key);
-    }
-    // Fast path: already snake_case or a single-word name with no uppercase.
-    if !key.chars().any(|c| c.is_uppercase()) {
-        return Cow::Borrowed(key);
-    }
-    let mut result = String::with_capacity(key.len() + 4);
-    let mut chars = key.chars().peekable();
-    let mut prev: Option<char> = None;
-    while let Some(c) = chars.next() {
-        if c.is_uppercase() && prev.is_some() {
-            // Insert underscore when:
-            //   - previous char was lowercase/digit (e.g. marktlokations|I|d → …_i…)
-            //   - or next char is lowercase and prev was uppercase (end of acronym:
-            //     EIC|C|ode → …_c…)
-            let prev_lower = prev.is_some_and(|p| p.is_lowercase() || p.is_ascii_digit());
-            let next_lower = chars.peek().is_some_and(|n| n.is_lowercase());
-            if prev_lower || (next_lower && prev.is_some_and(|p| p.is_uppercase())) {
-                result.push('_');
-            }
-        }
-        result.extend(c.to_lowercase());
-        prev = Some(c);
-    }
-    Cow::Owned(result)
+/// - `"marktlokationsId"` → `Some("marktlokations_id")`
+/// - `"hoechstpreisHT"` → `Some("hoechstpreis_ht")`
+/// - `"A"` → `Some("a")`
+/// - `"_typ"` → `None` (metadata key, passes through)
+pub(super) fn camel_to_snake(key: &str) -> Option<&'static str> {
+    WIRE_TO_SNAKE
+        .binary_search_by_key(&key, |&(wire, _)| wire)
+        .ok()
+        .map(|i| WIRE_TO_SNAKE[i].1)
 }
 
-/// Converts a snake_case key back to the BO4E German camelCase form.
+/// Converts a Rust snake_case field name back to its BO4E wire key.
 ///
-/// Returns a borrowed `Cow` (zero allocation) when the key starts with `_`
-/// or contains no underscores (already camelCase or a single word).  Only
-/// allocates when a conversion is actually needed.
+/// The exact inverse of [`camel_to_snake`] for every generated field; keys with
+/// no mapping return `None` and pass through unchanged.
 ///
-/// This is the inverse of [`camel_to_snake`].  Keys starting with `_` are
-/// passed through unchanged.
-pub(super) fn snake_to_camel(key: &str) -> Cow<'_, str> {
-    if key.starts_with('_') {
-        return Cow::Borrowed(key);
-    }
-    // Fast path: no underscore means nothing to convert.
-    if !key.contains('_') {
-        return Cow::Borrowed(key);
-    }
-    let mut result = String::with_capacity(key.len());
-    let mut capitalize_next = false;
-    for c in key.chars() {
-        if c == '_' {
-            capitalize_next = true;
-        } else if capitalize_next {
-            for uc in c.to_uppercase() {
-                result.push(uc);
-            }
-            capitalize_next = false;
-        } else {
-            result.push(c);
-        }
-    }
-    Cow::Owned(result)
+/// - `"marktlokations_id"` → `Some("marktlokationsId")`
+/// - `"hoechstpreis_ht"` → `Some("hoechstpreisHT")`
+/// - `"a"` → `Some("A")`
+pub(super) fn snake_to_camel(key: &str) -> Option<&'static str> {
+    SNAKE_TO_WIRE
+        .binary_search_by_key(&key, |&(snake, _)| snake)
+        .ok()
+        .map(|i| SNAKE_TO_WIRE[i].1)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    /// Exhaustive round-trip matrix for every transformation path.
-    /// Each entry is `(camelCase, snake_case)`.
+    use crate::generated::key_map::{SNAKE_TO_WIRE, WIRE_TO_SNAKE};
+
+    /// Both generated tables must be sorted — `binary_search_by_key` silently
+    /// returns wrong answers on unsorted input, which would corrupt keys rather
+    /// than fail loudly.
+    #[test]
+    fn generated_tables_are_sorted() {
+        assert!(
+            WIRE_TO_SNAKE.windows(2).all(|w| w[0].0 < w[1].0),
+            "WIRE_TO_SNAKE must be strictly sorted by wire name"
+        );
+        assert!(
+            SNAKE_TO_WIRE.windows(2).all(|w| w[0].0 < w[1].0),
+            "SNAKE_TO_WIRE must be strictly sorted by snake name"
+        );
+    }
+
+    /// The two tables must describe the same bijection, read in either direction.
+    #[test]
+    fn generated_tables_are_exact_inverses() {
+        assert_eq!(WIRE_TO_SNAKE.len(), SNAKE_TO_WIRE.len());
+        for &(wire, snake) in WIRE_TO_SNAKE {
+            assert_eq!(
+                camel_to_snake(wire),
+                Some(snake),
+                "camel_to_snake({wire:?})"
+            );
+            assert_eq!(
+                snake_to_camel(snake),
+                Some(wire),
+                "snake_to_camel({snake:?})"
+            );
+        }
+    }
+
+    /// The property that actually matters: every BO4E wire key survives a
+    /// camel→snake→camel round-trip, so `to_json_snake_case` followed by
+    /// `from_json_snake_case` can never move a typed field into extension data.
     ///
-    /// **Round-trip invariant (camel→snake→camel)** only holds for entries where the
-    /// camelCase form is unambiguously reconstructable from snake_case, i.e. no
-    /// leading-uppercase acronym sequences.  Entries in `ACRONYM_ONE_WAY` are
-    /// intentionally one-way: `camel_to_snake` is correct and lossy for acronyms,
-    /// so `snake_to_camel(camel_to_snake(s)) != s` for those entries.
-    const FIELD_TABLE: &[(&str, &str)] = &[
-        // ── underscore-prefixed system keys (pass-through both ways) ───────────
-        ("_typ", "_typ"),
-        ("_version", "_version"),
-        ("_additional", "_additional"),
-        // ── single all-lowercase words (no change) ────────────────────────────
-        ("lokationsid", "lokationsid"),
-        ("marktteilnehmercode", "marktteilnehmercode"),
-        ("vertragsbeginn", "vertragsbeginn"),
-        ("vertragsnummer", "vertragsnummer"),
-        ("zeitraum", "zeitraum"),
-        ("messzeitpunkt", "messzeitpunkt"),
-        // ── standard camelCase (one transition each) ─────────────────────────
-        ("boTyp", "bo_typ"),
-        ("lokationsId", "lokations_id"),
-        ("marktlokationsId", "marktlokations_id"),
-        ("messlokationsId", "messlokations_id"),
-        ("netzlokationsId", "netzlokations_id"),
-        ("istBilanzierungsgebiet", "ist_bilanzierungsgebiet"),
-        ("gesamtNetto", "gesamt_netto"),
-        ("gesamtBrutto", "gesamt_brutto"),
-        ("rechnungsDatum", "rechnungs_datum"),
-        ("lieferantCode", "lieferant_code"),
-        ("lieferbeginn", "lieferbeginn"),
-        ("lieferende", "lieferende"),
-        ("zeitreihenTyp", "zeitreihen_typ"),
-        ("statusZusatzInfo", "status_zusatz_info"),
-        ("einheitlichesBilanzgebiet", "einheitliches_bilanzgebiet"),
-        ("grundlageZurVerrechnung", "grundlage_zur_verrechnung"),
-        // ── digit-containing field names ──────────────────────────────────────
-        ("marktplatz2030", "marktplatz2030"),
-        ("version202401", "version202401"),
-        // ── BO4E field names that start with a lowercase acronym prefix ───────
-        ("obisKennzahl", "obis_kennzahl"),
-        ("ediCode", "edi_code"),
-    ];
-
-    /// These entries are one-way only: `camel_to_snake` is correct, but
-    /// `snake_to_camel` cannot reconstruct the original because leading-uppercase
-    /// acronym sequences lose their casing when lowercased.
-    const ACRONYM_ONE_WAY: &[(&str, &str)] = &[
-        ("EICCode", "eic_code"),
-        ("XMLParser", "xml_parser"),
-        ("HTMLToText", "html_to_text"),
-        ("ISO8601datum", "iso8601datum"),
-    ];
-
+    /// The heuristic this table replaced failed exactly here, for
+    /// `Sigmoidparameter.A`, `Tarifberechnungsparameter.hoechstpreisHT`, and
+    /// `PreisblattKonzessionsabgabe.kundengruppeKA`.
     #[test]
-    fn camel_to_snake_table() {
-        for &(camel, snake) in FIELD_TABLE {
+    fn every_wire_key_round_trips() {
+        for &(wire, _) in WIRE_TO_SNAKE {
+            let snake = camel_to_snake(wire).unwrap_or(wire);
             assert_eq!(
-                camel_to_snake(camel).as_ref(),
+                snake_to_camel(snake).unwrap_or(snake),
+                wire,
+                "round-trip broke {wire:?}"
+            );
+        }
+        for &(snake, _) in SNAKE_TO_WIRE {
+            let wire = snake_to_camel(snake).unwrap_or(snake);
+            assert_eq!(
+                camel_to_snake(wire).unwrap_or(wire),
                 snake,
-                "camel_to_snake({camel:?}) should be {snake:?}"
-            );
-        }
-        for &(camel, snake) in ACRONYM_ONE_WAY {
-            assert_eq!(
-                camel_to_snake(camel).as_ref(),
-                snake,
-                "camel_to_snake({camel:?}) should be {snake:?}"
+                "round-trip broke {snake:?}"
             );
         }
     }
 
+    /// The three shapes a heuristic inverse cannot recover.
     #[test]
-    fn snake_to_camel_table() {
-        for &(camel, snake) in FIELD_TABLE {
-            assert_eq!(
-                snake_to_camel(snake).as_ref(),
-                camel,
-                "snake_to_camel({snake:?}) should be {camel:?}"
-            );
-        }
-        // Acronym entries: snake_to_camel produces lowercase initial segment, which is
-        // correct for the snake→camel direction (e.g. "eic_code" → "eicCode").
-        for &(_camel, snake) in ACRONYM_ONE_WAY {
-            // Just ensure it doesn't panic and produces something non-empty.
-            let result = snake_to_camel(snake);
-            assert!(
-                !result.is_empty(),
-                "snake_to_camel({snake:?}) returned empty string"
-            );
+    fn ambiguous_shapes_map_exactly() {
+        for (wire, snake) in [
+            ("A", "a"),
+            ("B", "b"),
+            ("hoechstpreisHT", "hoechstpreis_ht"),
+            ("hoechstpreisNT", "hoechstpreis_nt"),
+            ("kundengruppeKA", "kundengruppe_ka"),
+            ("marktlokationsId", "marktlokations_id"),
+        ] {
+            assert_eq!(camel_to_snake(wire), Some(snake));
+            assert_eq!(snake_to_camel(snake), Some(wire));
         }
     }
 
+    /// BO4E metadata keys are not Rust field names and must survive verbatim in
+    /// both directions, in every output mode.
     #[test]
-    fn round_trip_camel_snake_camel() {
-        for &(camel, _) in FIELD_TABLE {
-            let snake = camel_to_snake(camel);
-            let back = snake_to_camel(snake.as_ref());
-            assert_eq!(
-                back.as_ref(),
-                camel,
-                "camel→snake→camel round-trip failed for {camel:?}"
-            );
+    fn metadata_keys_pass_through() {
+        for key in ["_typ", "_version", "_id", "_additional"] {
+            assert_eq!(camel_to_snake(key), None, "camel_to_snake({key:?})");
+            assert_eq!(snake_to_camel(key), None, "snake_to_camel({key:?})");
         }
     }
 
+    /// Keys the schema does not define — extension data — must not be rewritten.
+    /// Rewriting them with a heuristic is what made unknown fields lossy before.
     #[test]
-    fn round_trip_snake_camel_snake() {
-        for &(_, snake) in FIELD_TABLE {
-            let camel = snake_to_camel(snake);
-            let back = camel_to_snake(camel.as_ref());
-            assert_eq!(
-                back.as_ref(),
-                snake,
-                "snake→camel→snake round-trip failed for {snake:?}"
-            );
+    fn unknown_keys_pass_through_unchanged() {
+        for key in [
+            "someVendorField",
+            "some_vendor_field",
+            "fooBAR",
+            "XMLPayload",
+            "already_snake",
+            "",
+        ] {
+            assert_eq!(camel_to_snake(key), None, "camel_to_snake({key:?})");
+            assert_eq!(snake_to_camel(key), None, "snake_to_camel({key:?})");
         }
     }
 
-    /// All underscore-prefixed keys must be borrowed (zero allocation).
+    /// Drift guard, read straight from the schema snapshots rather than from the
+    /// generator's own output: **every** BO4E property name must survive
+    /// camel→snake→camel.
+    ///
+    /// This is the invariant that failed before the key map existed. Checking it
+    /// against the schemas — not against `WIRE_TO_SNAKE` — is what makes it a
+    /// guard: a property the generator forgot to put in the table shows up here,
+    /// whereas a table-only test would happily pass on an incomplete table.
     #[test]
-    fn system_keys_are_borrowed() {
-        for key in ["_typ", "_version", "_additional"] {
-            assert!(
-                matches!(camel_to_snake(key), Cow::Borrowed(_)),
-                "camel_to_snake({key:?}) should borrow"
-            );
-            assert!(
-                matches!(snake_to_camel(key), Cow::Borrowed(_)),
-                "snake_to_camel({key:?}) should borrow"
-            );
+    fn every_schema_property_round_trips() {
+        let schemas = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("generator/schemas");
+
+        let mut checked = 0usize;
+        let mut stack = vec![schemas.clone()];
+        while let Some(dir) = stack.pop() {
+            let Ok(entries) = std::fs::read_dir(&dir) else {
+                continue;
+            };
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_dir() {
+                    stack.push(path);
+                    continue;
+                }
+                if path.extension().is_none_or(|e| e != "json") {
+                    continue;
+                }
+                let raw = std::fs::read_to_string(&path).expect("readable schema");
+                let doc: serde_json::Value = serde_json::from_str(&raw).expect("valid schema JSON");
+                let Some(props) = doc.get("properties").and_then(|p| p.as_object()) else {
+                    continue;
+                };
+                for wire in props.keys() {
+                    let snake = camel_to_snake(wire).unwrap_or(wire);
+                    let back = snake_to_camel(snake).unwrap_or(snake);
+                    assert_eq!(
+                        back,
+                        wire.as_str(),
+                        "{}: property {wire:?} does not survive a snake_case round-trip \
+                         (became {back:?} via {snake:?}); `just generate` may be stale",
+                        path.display(),
+                    );
+                    checked += 1;
+                }
+            }
         }
+
+        assert!(
+            checked > 400,
+            "expected to check the whole BO4E property set, only saw {checked} \
+             — is {} populated?",
+            schemas.display(),
+        );
     }
 
-    /// All-lowercase / already-snake keys must be borrowed (zero allocation).
+    /// A mapped key must never be reported as "unchanged", and an unmapped key
+    /// must never be reported as mapped-to-itself: the deserializer distinguishes
+    /// the two cases by `Option`, so a blurred boundary would drop renames.
     #[test]
-    fn already_snake_keys_are_borrowed() {
-        for key in ["lokationsid", "marktteilnehmercode", "vertragsbeginn"] {
-            assert!(
-                matches!(camel_to_snake(key), Cow::Borrowed(_)),
-                "camel_to_snake({key:?}) should borrow"
-            );
+    fn mapping_and_passthrough_never_overlap() {
+        for &(wire, snake) in WIRE_TO_SNAKE {
+            assert_ne!(wire, snake, "identity pairs do not belong in the table");
+            assert_eq!(camel_to_snake(wire), Some(snake));
         }
-    }
-
-    /// Keys without underscores must be borrowed by snake_to_camel (zero allocation).
-    #[test]
-    fn no_underscore_keys_are_borrowed() {
-        for key in ["lokationsid", "marktteilnehmercode", "vertragsbeginn"] {
-            assert!(
-                matches!(snake_to_camel(key), Cow::Borrowed(_)),
-                "snake_to_camel({key:?}) should borrow"
-            );
+        for key in ["_typ", "unknownKey", "vertragsbeginn"] {
+            assert_eq!(camel_to_snake(key), None);
+            assert_eq!(snake_to_camel(key), None);
         }
     }
 }

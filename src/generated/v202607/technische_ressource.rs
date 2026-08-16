@@ -97,7 +97,10 @@ pub struct TechnischeRessource {
     /// Version der BO-Struktur aka "fachliche Versionierung"
     #[cfg_attr(feature = "serde", serde(rename = "_version"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(
+        feature = "builder",
+        builder(default = Some("v202607.0.0".to_owned()), setter(into))
+    )]
     pub version: Option<String>,
     /// Vorgelagerte Messlokation ID
     #[cfg_attr(feature = "serde", serde(rename = "vorgelagerteMesslokationId"))]
@@ -153,7 +156,7 @@ impl Default for TechnischeRessource {
             technische_ressource_id: Default::default(),
             technische_ressource_nutzung: Default::default(),
             technische_ressource_verbrauchsart: Default::default(),
-            version: Default::default(),
+            version: Some("v202607.0.0".to_owned()),
             vorgelagerte_messlokation_id: Default::default(),
             waermenutzung: Default::default(),
             zugeordnete_marktlokation_id: Default::default(),

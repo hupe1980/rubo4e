@@ -1,23 +1,73 @@
-#[cfg(test)]
-use super::checksum::bdew_check_digit;
-use super::checksum::{compute_11digit_from_base, validate_11digit_bdew};
+use super::checksum::{compute_numeric_id_from_base, validate_numeric_id};
 use crate::error::IdentifierError;
-#[cfg(test)]
-use crate::error::LengthExpectation;
 
-// ─── Type ────────────────────────────────────────────────────────────────────
+/// Length of a Marktlokations-ID, including the check digit.
+const LEN: usize = 11;
 
-/// Marktlokations-ID (MaLo-ID): 11-digit string validated by BDEW checksum.
+/// Minimum value of the first digit (Vergabestelle) — `0` is not assigned (§3.2).
+const MIN_FIRST_DIGIT: u8 = 1;
+
+/// Marktlokations-ID (MaLo-ID) — identifies a *Marktlokation* or *Tranche*.
 ///
-/// The 11th digit is a check digit computed from the first ten digits using the
-/// BDEW alternating-weight algorithm.
+/// Defined by BDEW "Identifikatoren in der Marktkommunikation" v1.2
+/// (7 February 2025), §3, and by BNetzA-Festlegung BK6-16-200 / BK7-16-142.
+/// In use across electricity and gas since 1 February 2018.
+///
+/// ## Format (§3.2)
+///
+/// | Position | Content | Character set |
+/// |----------|---------|---------------|
+/// | 1 | Vergabestelle — `1`–`3` = DVGW, `4`–`9` = BDEW | `[1-9]` |
+/// | 2–10 | Automatically assigned body | `[0-9]` |
+/// | 11 | Check digit (§8.1) | `[0-9]` |
+///
+/// The Vergabestelle digit says **nothing** about the commodity: a MaLo-ID issued
+/// by either office can be assigned to an electricity Marktlokation, a gas
+/// Marktlokation, or a Tranche.
+///
+/// ## Check digit (§8.1 — Lok- und Waggon-Kennzeichnungsverfahren)
+///
+/// Sum the digits at odd positions, add twice the sum of the digits at even
+/// positions, and take the difference to the next multiple of 10. The BDEW
+/// document's own worked example:
+///
+/// ```text
+/// MaLo-ID base:  4 1 3 7 3 5 5 9 2 4
+/// a) odd:        4 + 3 + 3 + 5 + 2       = 17
+/// b) even:      (1 + 7 + 5 + 9 + 4) * 2  = 52
+/// c) sum:        17 + 52                 = 69
+/// d) check:      70 - 69                 = 1
+/// → 41373559241
+/// ```
+///
+/// This is the same procedure that validates BDEW- and DVGW-Codenummern; see
+/// [`MarktpartnerId`](super::MarktpartnerId).
+///
+/// ## What the check digit does and does not catch
+///
+/// It catches every adjacent transposition of two distinct digits, and every
+/// single-digit typo **except** one class: changing a digit by exactly 5 at an
+/// even position, because that position carries weight 2 and `2 · 5 ≡ 0 (mod 10)`.
+/// For example `41373559241` and `46373559241` share a check digit.
+///
+/// That blind spot is inherent to the BDEW specification, not to this
+/// implementation. Treat the check digit as a typo guard, not as authentication —
+/// only the issuing office can confirm that an ID was actually assigned.
 ///
 /// # Examples
 /// ```
 /// use rubo4e::identifiers::MaloId;
 ///
-/// let id = MaloId::new("51238696780").unwrap();
-/// assert_eq!(id.as_ref(), "51238696780");
+/// // The worked example from the BDEW specification.
+/// let id = MaloId::new("41373559241").unwrap();
+/// assert_eq!(id.as_ref(), "41373559241");
+///
+/// // The check digit is derived, so it never has to be typed by hand.
+/// assert_eq!(MaloId::from_base("4137355924").unwrap(), id);
+/// assert_eq!(MaloId::check_digit("4137355924").unwrap(), 1);
+///
+/// // A wrong check digit is rejected.
+/// assert!(MaloId::new("41373559242").is_err());
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "validate", derive(garde::Validate))]
@@ -30,299 +80,306 @@ use crate::error::LengthExpectation;
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "utoipa", schema(
     value_type = String,
-    pattern = r"^[0-9]{11}$",
-    example = "51238696780",
-    description = "11-stellige BDEW Marktlokations-ID mit BDEW-Prüfziffer (11. Stelle)"
+    pattern = r"^[1-9][0-9]{10}$",
+    example = "41373559241",
+    description = "11-stellige BDEW Marktlokations-ID mit Prüfziffer nach dem Lok- und Waggon-Kennzeichnungsverfahren (11. Stelle)"
 ))]
 pub struct MaloId(#[cfg_attr(feature = "validate", garde(custom(check_malo_id)))] Box<str>);
 
 #[cfg(feature = "validate")]
 fn check_malo_id(value: &str, _: &()) -> Result<(), garde::Error> {
-    validate_11digit_bdew(value).map_err(garde::Error::from)
+    validate_numeric_id(value, LEN, MIN_FIRST_DIGIT).map_err(garde::Error::from)
+}
+
+/// Issuing office (Vergabestelle) encoded in the first digit of a MaLo-ID.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum MaloVergabestelle {
+    /// Digits `1`–`3` — DVGW Services und Consult GmbH.
+    Dvgw,
+    /// Digits `4`–`9` — Energie Codes und Services GmbH (BDEW).
+    Bdew,
+}
+
+impl std::fmt::Display for MaloVergabestelle {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            Self::Dvgw => "DVGW",
+            Self::Bdew => "BDEW",
+        })
+    }
 }
 
 impl MaloId {
-    /// Creates a new `MaloId` after validating the BDEW checksum.
+    /// Creates a new `MaloId`, validating the format and the §8.1 check digit.
     ///
     /// # Errors
     /// - [`IdentifierError::InvalidLength`] if `s` is not exactly 11 characters.
     /// - [`IdentifierError::InvalidCharacter`] if any character is not a decimal digit.
+    /// - [`IdentifierError::InvalidFormat`] if the first digit is `0`.
     /// - [`IdentifierError::InvalidChecksum`] if the 11th digit does not match.
     #[must_use = "the validated identifier is returned; ignoring it discards the result"]
     pub fn new(s: &str) -> Result<Self, IdentifierError> {
-        validate_11digit_bdew(s)?;
+        validate_numeric_id(s, LEN, MIN_FIRST_DIGIT)?;
         Ok(Self(Box::from(s)))
     }
 
-    /// Constructs a valid `MaloId` from a 10-digit numeric base string by computing
-    /// the BDEW alternating-weight check digit and appending it.
-    ///
-    /// This is the canonical way to generate a valid `MaloId` when only the 10-digit
-    /// base is known (e.g. during test data generation or synthetic MaLo assignment).
+    /// Builds a `MaloId` from its 10-digit base by computing and appending the
+    /// §8.1 check digit.
     ///
     /// # Errors
     /// - [`IdentifierError::InvalidLength`] if `base` is not exactly 10 characters.
     /// - [`IdentifierError::InvalidCharacter`] if any character is not a decimal digit.
+    /// - [`IdentifierError::InvalidFormat`] if the first digit is `0`.
     ///
     /// # Examples
     /// ```
     /// use rubo4e::identifiers::MaloId;
     ///
-    /// let id = MaloId::from_base("5123869678").unwrap();
-    /// assert_eq!(id.as_ref(), "51238696780");
+    /// assert_eq!(MaloId::from_base("4137355924").unwrap().as_ref(), "41373559241");
     /// ```
     pub fn from_base(base: &str) -> Result<Self, IdentifierError> {
-        let full = compute_11digit_from_base(base)?;
-        Ok(Self(Box::from(full.as_str())))
+        let full = compute_numeric_id_from_base(base, LEN, MIN_FIRST_DIGIT)?;
+        Ok(Self(full.into_boxed_str()))
     }
 
-    /// Computes the BDEW check digit for a 10-digit numeric base string without
-    /// constructing a full `MaloId`.
-    ///
-    /// Returns the single check digit (`0..=9`) on success.
+    /// Computes the §8.1 check digit (`0`–`9`) for a 10-digit base without
+    /// constructing a `MaloId`.
     ///
     /// # Errors
-    /// - [`IdentifierError::InvalidLength`] if `base` is not exactly 10 characters.
-    /// - [`IdentifierError::InvalidCharacter`] if any character is not a decimal digit.
+    /// Same as [`from_base`](Self::from_base).
     ///
     /// # Examples
     /// ```
     /// use rubo4e::identifiers::MaloId;
     ///
-    /// assert_eq!(MaloId::check_digit("5123869678").unwrap(), 0);
+    /// assert_eq!(MaloId::check_digit("4137355924").unwrap(), 1);
     /// ```
     pub fn check_digit(base: &str) -> Result<u8, IdentifierError> {
-        let full = compute_11digit_from_base(base)?;
-        let check = full.as_bytes().last().copied().expect("11 chars") - b'0';
-        Ok(check)
+        let full = compute_numeric_id_from_base(base, LEN, MIN_FIRST_DIGIT)?;
+        Ok(full.as_bytes()[LEN - 1] - b'0')
     }
-}
 
-// ─── Standard trait impls ────────────────────────────────────────────────────
-
-impl TryFrom<String> for MaloId {
-    type Error = IdentifierError;
-    fn try_from(s: String) -> Result<Self, Self::Error> {
-        Self::new(&s)
+    /// Returns the 10-digit base (everything except the check digit).
+    #[must_use]
+    pub fn base(&self) -> &str {
+        &self.0[..LEN - 1]
     }
-}
 
-impl TryFrom<&str> for MaloId {
-    type Error = IdentifierError;
-    fn try_from(s: &str) -> Result<Self, Self::Error> {
-        Self::new(s)
-    }
-}
-
-impl AsRef<str> for MaloId {
-    fn as_ref(&self) -> &str {
-        &self.0
-    }
-}
-
-impl std::fmt::Display for MaloId {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(&self.0)
-    }
-}
-
-impl std::str::FromStr for MaloId {
-    type Err = IdentifierError;
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Self::new(s)
-    }
-}
-
-// ─── Serde ───────────────────────────────────────────────────────────────────
-
-#[cfg(feature = "serde")]
-impl serde::Serialize for MaloId {
-    fn serialize<S: serde::Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
-        s.serialize_str(&self.0)
-    }
-}
-
-/// Efficient deserialization using `visit_str` — avoids allocating an
-/// intermediate `String` before constructing the validated `Box<str>`.
-#[cfg(feature = "serde")]
-impl<'de> serde::Deserialize<'de> for MaloId {
-    fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
-        struct Visitor;
-        impl<'de> serde::de::Visitor<'de> for Visitor {
-            type Value = MaloId;
-            fn expecting(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                f.write_str("an 11-digit Marktlokations-ID (BDEW checksum)")
-            }
-            fn visit_str<E: serde::de::Error>(self, v: &str) -> Result<MaloId, E> {
-                MaloId::new(v).map_err(|e| {
-                    crate::identifiers::trace_identifier_deser_error("MaloId", v, &e);
-                    serde::de::Error::custom(e)
-                })
-            }
+    /// Returns the issuing office encoded in the first digit (§3.2).
+    ///
+    /// # Examples
+    /// ```
+    /// use rubo4e::identifiers::{MaloId, MaloVergabestelle};
+    ///
+    /// let id = MaloId::new("41373559241").unwrap();
+    /// assert_eq!(id.vergabestelle(), MaloVergabestelle::Bdew);
+    /// ```
+    #[must_use]
+    pub fn vergabestelle(&self) -> MaloVergabestelle {
+        // Validated at construction: the first byte is a digit in 1..=9.
+        match self.0.as_bytes()[0] {
+            b'1'..=b'3' => MaloVergabestelle::Dvgw,
+            _ => MaloVergabestelle::Bdew,
         }
-        d.deserialize_str(Visitor)
     }
 }
+
+impl_identifier_traits!(MaloId, "an 11-digit Marktlokations-ID (BDEW check digit)");
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::error::LengthExpectation;
 
-    /// Builds a valid 11-digit MaloId string from 10 digit values using the
-    /// reference checksum algorithm.
-    fn make_valid(prefix: &[u8; 10]) -> String {
-        super::super::checksum::make_valid_11digit(prefix)
-    }
-
-    // ── Valid IDs ─────────────────────────────────────────────────────────
+    /// Reference vectors that do **not** come from this implementation.
+    ///
+    /// - `41373559241` is the worked example printed in BDEW "Identifikatoren in
+    ///   der Marktkommunikation" v1.2 §8.1 and on the German Wikipedia article
+    ///   for the Marktlokations-Identifikationsnummer.
+    /// - `51238696781` is the fixture used by the reference implementation
+    ///   [BO4E-python](https://github.com/bo4e/BO4E-python) in its
+    ///   `validate_marktlokations_id` tests.
+    ///
+    /// These pin the algorithm to an external source, so a regression cannot be
+    /// masked by generating expectations from the code under test.
+    const EXTERNAL_VECTORS: &[(&str, &str)] =
+        &[("4137355924", "41373559241"), ("5123869678", "51238696781")];
 
     #[test]
-    fn valid_constructed_ids_pass() {
-        let prefixes: &[[u8; 10]] = &[
-            [5, 1, 2, 3, 8, 6, 9, 6, 7, 8], // check = 0 → "51238696780"
-            [1, 2, 3, 4, 5, 6, 7, 8, 9, 0], // check = 7 → "12345678907"
-            [0, 9, 8, 7, 6, 5, 4, 3, 2, 1], // check = 3 → "09876543213"
-            [1, 1, 1, 1, 1, 1, 1, 1, 1, 1], // check = 5 → "11111111115"
-            [2, 2, 2, 2, 2, 2, 2, 2, 2, 2], // check = 0 → "22222222220"
-            [9, 9, 9, 9, 9, 9, 9, 9, 9, 9], // check = 0 → "99999999990"
-            [1, 2, 3, 4, 5, 1, 2, 3, 4, 5], // check = 4 → "12345123454"
-            [5, 6, 7, 8, 9, 5, 6, 7, 8, 9], // check = 0 → "56789567890"
-            [1, 3, 5, 7, 9, 2, 4, 6, 8, 0], // check = 5 → "13579246805"
-            [1, 0, 0, 0, 0, 0, 0, 0, 0, 0], // check = 8 → "10000000008"
-        ];
-        for prefix in prefixes {
-            let id_str = make_valid(prefix);
-            let id = MaloId::new(&id_str)
-                .unwrap_or_else(|e| panic!("{id_str} should be valid but got: {e}"));
-            // round-trip
-            assert_eq!(id.to_string().parse::<MaloId>().unwrap(), id);
+    fn external_reference_vectors_validate() {
+        for &(base, full) in EXTERNAL_VECTORS {
+            let id = MaloId::new(full)
+                .unwrap_or_else(|e| panic!("{full} must be a valid MaLo-ID, got: {e}"));
+            assert_eq!(id.as_ref(), full);
+            assert_eq!(MaloId::from_base(base).unwrap(), id);
+            assert_eq!(id.base(), base);
         }
     }
 
-    // ── Invalid IDs ───────────────────────────────────────────────────────
+    /// Every single-digit perturbation of the check digit must be rejected — this
+    /// is what the check digit exists for.
+    #[test]
+    fn every_wrong_check_digit_is_rejected() {
+        for &(base, full) in EXTERNAL_VECTORS {
+            let correct = full.as_bytes()[10];
+            for d in b'0'..=b'9' {
+                if d == correct {
+                    continue;
+                }
+                let candidate = format!("{base}{}", d as char);
+                assert!(
+                    matches!(
+                        MaloId::new(&candidate),
+                        Err(IdentifierError::InvalidChecksum)
+                    ),
+                    "{candidate} must be rejected as an invalid checksum"
+                );
+            }
+        }
+    }
+
+    /// Pins the exact error-detection power of the §8.1 procedure.
+    ///
+    /// A single-digit typo in the body shifts the weighted sum by `δ` at an odd
+    /// position and by `2δ` at an even position. The check digit therefore misses
+    /// exactly one class of typo: `δ = ±5` at an even position, because
+    /// `2 · 5 ≡ 0 (mod 10)`. Everything else is caught.
+    ///
+    /// This is a property of the BDEW specification, not of this implementation —
+    /// see the note on [`MaloId`]. The test asserts it precisely so that a future
+    /// change to the algorithm cannot quietly alter the guarantee.
+    #[test]
+    fn single_digit_typo_detection_matches_specification() {
+        let full = "41373559241";
+        for pos in 0..10 {
+            let original = i32::from(full.as_bytes()[pos] - b'0');
+            for d in b'0'..=b'9' {
+                if full.as_bytes()[pos] == d || (pos == 0 && d == b'0') {
+                    continue;
+                }
+                let mut bytes = full.as_bytes().to_vec();
+                bytes[pos] = d;
+                let candidate = String::from_utf8(bytes).unwrap();
+
+                let delta = (i32::from(d - b'0') - original).rem_euclid(10);
+                // 1-indexed even position → weight 2 → δ = ±5 is invisible mod 10.
+                let undetectable = pos % 2 == 1 && delta == 5;
+
+                assert_eq!(
+                    MaloId::new(&candidate).is_err(),
+                    !undetectable,
+                    "{candidate} vs {full}: single-digit change at position {pos} \
+                     (δ={delta}) — expected detected={}",
+                    !undetectable
+                );
+            }
+        }
+    }
+
+    /// Transposing two adjacent, distinct digits is always caught: the swap moves
+    /// `a` from weight 1 to weight 2 and `b` the other way, shifting the sum by
+    /// `a − b`, which is non-zero mod 10 whenever `a ≠ b`.
+    #[test]
+    fn adjacent_transpositions_are_caught() {
+        let full = "41373559241";
+        for pos in 0..9 {
+            let bytes = full.as_bytes();
+            if bytes[pos] == bytes[pos + 1] {
+                continue;
+            }
+            let mut swapped = bytes.to_vec();
+            swapped.swap(pos, pos + 1);
+            if swapped[0] == b'0' {
+                continue;
+            }
+            let candidate = String::from_utf8(swapped).unwrap();
+            assert!(
+                MaloId::new(&candidate).is_err(),
+                "{candidate} transposes positions {pos}/{} of {full} and must be rejected",
+                pos + 1
+            );
+        }
+    }
 
     #[test]
-    fn too_short_returns_invalid_length() {
-        let err = MaloId::new("1234567890").unwrap_err();
+    fn first_digit_zero_is_rejected() {
+        // Structurally 11 digits with a correct check digit, but Vergabestelle 0
+        // is not assigned (§3.2).
+        let base = "0137355924";
         assert!(matches!(
-            err,
-            IdentifierError::InvalidLength {
-                expected: LengthExpectation::Exact(11),
-                actual: 10
-            }
+            MaloId::from_base(base),
+            Err(IdentifierError::InvalidFormat { .. })
         ));
     }
 
     #[test]
-    fn too_long_returns_invalid_length() {
-        let err = MaloId::new("123456789012").unwrap_err();
-        assert!(matches!(
-            err,
-            IdentifierError::InvalidLength {
-                expected: LengthExpectation::Exact(11),
-                actual: 12
-            }
-        ));
+    fn vergabestelle_classification() {
+        for (base, expected) in [
+            ("1137355924", MaloVergabestelle::Dvgw),
+            ("3137355924", MaloVergabestelle::Dvgw),
+            ("4137355924", MaloVergabestelle::Bdew),
+            ("9137355924", MaloVergabestelle::Bdew),
+        ] {
+            let id = MaloId::from_base(base).unwrap();
+            assert_eq!(id.vergabestelle(), expected, "for {base}");
+        }
     }
 
     #[test]
-    fn empty_returns_invalid_length() {
-        let err = MaloId::new("").unwrap_err();
-        assert!(matches!(
-            err,
-            IdentifierError::InvalidLength {
-                expected: LengthExpectation::Exact(11),
-                actual: 0
-            }
-        ));
+    fn wrong_length_is_rejected() {
+        for (input, actual) in [("", 0usize), ("1234567890", 10), ("123456789012", 12)] {
+            assert!(matches!(
+                MaloId::new(input).unwrap_err(),
+                IdentifierError::InvalidLength {
+                    expected: LengthExpectation::Exact(11),
+                    actual: a,
+                } if a == actual
+            ));
+        }
     }
 
     #[test]
-    fn non_digit_returns_invalid_character() {
-        let err = MaloId::new("1234X678901").unwrap_err();
+    fn non_digit_is_rejected_with_position() {
         assert!(matches!(
-            err,
+            MaloId::new("4137X559241").unwrap_err(),
             IdentifierError::InvalidCharacter {
                 position: 4,
                 character: 'X'
             }
         ));
-    }
-
-    #[test]
-    fn wrong_check_digit_returns_invalid_checksum() {
-        // "51238696780" is valid; flip the check digit
-        let err = MaloId::new("51238696781").unwrap_err();
-        assert!(matches!(err, IdentifierError::InvalidChecksum));
-    }
-
-    #[test]
-    fn multiple_wrong_check_digits() {
-        for wrong in ["51238696782", "51238696783", "51238696789"] {
-            let err = MaloId::new(wrong).unwrap_err();
-            assert!(matches!(err, IdentifierError::InvalidChecksum));
-        }
-    }
-
-    #[test]
-    fn space_character_returns_invalid_character() {
-        let err = MaloId::new("5123 696780").unwrap_err();
         assert!(matches!(
-            err,
+            MaloId::new("4137 559241").unwrap_err(),
             IdentifierError::InvalidCharacter {
                 position: 4,
                 character: ' '
             }
         ));
-    }
-
-    #[test]
-    fn leading_hyphen_returns_invalid_character() {
-        let err = MaloId::new("-1238696780").unwrap_err();
         assert!(matches!(
-            err,
-            IdentifierError::InvalidCharacter {
-                position: 0,
-                character: '-'
-            }
+            MaloId::new("-137355924").unwrap_err(),
+            IdentifierError::InvalidLength { .. }
         ));
     }
 
-    // ── Display / AsRef / TryFrom ────────────────────────────────────────
-
     #[test]
-    fn display_equals_inner_string() {
-        let id_str = make_valid(&[5, 1, 2, 3, 8, 6, 9, 6, 7, 8]);
-        let id = MaloId::new(&id_str).unwrap();
-        assert_eq!(id.to_string(), id_str);
-        assert_eq!(id.as_ref(), id_str);
+    fn conversions_round_trip() {
+        let id = MaloId::new("41373559241").unwrap();
+        assert_eq!(id.to_string().parse::<MaloId>().unwrap(), id);
+        assert_eq!(MaloId::try_from("41373559241").unwrap(), id);
+        assert_eq!(MaloId::try_from(String::from("41373559241")).unwrap(), id);
+        assert_eq!(String::from(id.clone()), "41373559241");
+        assert_eq!(&*id, "41373559241");
     }
 
+    #[cfg(feature = "serde")]
     #[test]
-    fn try_from_str_delegates_to_new() {
-        let valid = make_valid(&[1, 2, 3, 4, 5, 1, 2, 3, 4, 5]);
-        assert!(MaloId::try_from(valid.as_str()).is_ok());
-        assert!(MaloId::try_from("bad").is_err());
-    }
-
-    #[test]
-    fn try_from_string_delegates_to_new() {
-        let valid = make_valid(&[9, 9, 9, 9, 9, 9, 9, 9, 9, 9]);
-        assert!(MaloId::try_from(valid).is_ok());
-    }
-
-    // ── Checksum helper self-consistency ─────────────────────────────────
-
-    #[test]
-    fn compute_check_digit_is_deterministic() {
-        let prefix = [1u8, 2, 3, 4, 5, 6, 7, 8, 9, 0];
-        assert_eq!(bdew_check_digit(&prefix), bdew_check_digit(&prefix));
-    }
-
-    #[test]
-    fn all_zeros_check_is_zero() {
-        assert_eq!(bdew_check_digit(&[0u8; 10]), 0);
+    fn serde_round_trip_and_rejection() {
+        let id = MaloId::new("41373559241").unwrap();
+        let json = serde_json::to_string(&id).unwrap();
+        assert_eq!(json, r#""41373559241""#);
+        assert_eq!(serde_json::from_str::<MaloId>(&json).unwrap(), id);
+        // Deserialization must not bypass validation.
+        assert!(serde_json::from_str::<MaloId>(r#""41373559242""#).is_err());
     }
 }

@@ -2,7 +2,14 @@
 
 This directory holds JSON payloads that represent the wire format produced by
 different BO4E implementations. The Rust test suite deserializes all of them to
-verify byte-for-byte compatibility with the BO4E standard.
+verify rubo4e can read what other implementations emit.
+
+Reading them only covers the **inbound** direction. `tests/compat.rs` therefore
+also has an `outbound_tests` module asserting that JSON rubo4e *produces* carries
+the metadata every other implementation emits — `_typ` on BOs, `_version` on both
+BOs and COMs. That gap is not hypothetical: `_version` was missing from every
+constructed value until it was closed, and no fixture here caught it, because
+round-tripping a vector carries `_version` in from the input.
 
 ## Directory layout
 
@@ -22,7 +29,7 @@ compat/
 
 ## How to regenerate vectors
 
-### Python (BO4E-python ≥ v202501.0.0)
+### Python (BO4E-python ≥ v202607.0.0)
 
 ```bash
 pip install bo4e
@@ -31,7 +38,7 @@ import json
 from bo4e import Marktlokation, Sparte, Energierichtung, Bilanzierungsmethode, Netzebene, Adresse
 
 malo = Marktlokation(
-    marktlokations_id="51238696780",
+    marktlokations_id="51238696781",
     sparte=Sparte.GAS,
     energierichtung=Energierichtung.EINSP,
     bilanzierungsmethode=Bilanzierungsmethode.PAUSCHAL,

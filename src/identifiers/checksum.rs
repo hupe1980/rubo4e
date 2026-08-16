@@ -1,122 +1,50 @@
-//! Shared BDEW checksum algorithm for MaloId, SrId, and TrId.
+//! BDEW check-digit procedures shared by the German energy-market identifiers.
+//!
+//! Source: BDEW Anwendungshilfe **"Identifikatoren in der Marktkommunikation"**,
+//! version 1.2 (7 February 2025), chapter 8.
+//!
+//! The document defines two procedures — and they are the *same* arithmetic:
+//!
+//! | § | Name | Applies to |
+//! |---|------|------------|
+//! | 8.1 | Lok- und Waggon-Kennzeichnungsverfahren | BDEW-Codenummer, DVGW-Codenummer, MaLo-ID |
+//! | 8.2 | ASCII-Verfahren | Ressourcen-ID (TR/SR/SG/CR), NeLo-ID, NeBe-ID, Paket-ID |
+//!
+//! Both compute:
+//!
+//! 1. Map every character of the base to a numeric value.
+//!    §8.1 bases are purely numeric, so a digit maps to its own value.
+//!    §8.2 bases may contain uppercase letters, which map to their ASCII code
+//!    (`A` = 65 … `Z` = 90).
+//! 2. Sum the values at **odd** positions (1-indexed 1, 3, 5, … → 0-indexed 0, 2, 4, …).
+//! 3. Sum the values at **even** positions and multiply that sum by 2.
+//! 4. The check digit is the difference from the sum of (2) and (3) to the next
+//!    multiple of 10 — i.e. `(10 - (total % 10)) % 10`, so a total that is already
+//!    a multiple of 10 yields check digit `0`.
+//!
+//! Because a decimal digit maps to itself under both mappings, §8.1 is exactly
+//! §8.2 restricted to numeric bases. This module therefore implements the
+//! arithmetic **once**, in [`bdew_check_digit`], and exposes two validators that
+//! differ only in the character set they accept.
+//!
+//! ## Reference vectors (from the BDEW document)
+//!
+//! - §8.1, MaLo-ID base `4137355924` → check digit `1` (full ID `41373559241`)
+//! - §8.2, base `A113735592` → check digit `5` (full ID `A1137355925`)
 
-/// Computes the BDEW alternating-weight check digit used by Marktlokations-ID,
-/// Steuerbare-Ressource-ID, and Technische-Ressource-ID.
+use crate::error::{IdentifierError, LengthExpectation};
+
+// ─── Core algorithm ──────────────────────────────────────────────────────────
+
+/// Maps a base character to its numeric value for the BDEW check-digit procedures.
 ///
-/// Algorithm:
-/// 1. Apply weights `[2, 1, 2, 1, …]` to the 10 input digit values.
-/// 2. Products ≥ 10 are reduced by subtracting 9.
-/// 3. `check = (10 − (Σ % 10)) % 10`.
+/// - Decimal digits (`0`–`9`) → their numeric value `0`–`9`.
+/// - Uppercase letters (`A`–`Z`) → their ASCII code value (`A` = 65 … `Z` = 90).
 ///
-/// Exposed `pub(super)` so that `MaloId`, `SrId`, and `TrId` can call it from
-/// their `from_base` constructors.
-pub(super) fn bdew_check_digit(digits: &[u8; 10]) -> u8 {
-    const WEIGHTS: [u8; 10] = [2, 1, 2, 1, 2, 1, 2, 1, 2, 1];
-    let sum: u32 = digits
-        .iter()
-        .zip(WEIGHTS.iter())
-        .map(|(&d, &w)| {
-            let p = u32::from(d) * u32::from(w);
-            if p >= 10 {
-                p - 9
-            } else {
-                p
-            }
-        })
-        .sum();
-    ((10 - (sum % 10)) % 10) as u8
-}
-
-/// Validates an 11-digit string against the BDEW check-digit algorithm.
-pub(super) fn validate_11digit_bdew(s: &str) -> Result<(), crate::error::IdentifierError> {
-    use crate::error::{IdentifierError, LengthExpectation};
-
-    if s.len() != 11 {
-        return Err(IdentifierError::InvalidLength {
-            expected: LengthExpectation::Exact(11),
-            actual: s.len(),
-        });
-    }
-    let mut digits = [0u8; 11];
-    for (i, c) in s.chars().enumerate() {
-        match c.to_digit(10) {
-            Some(d) => digits[i] = d as u8,
-            None => {
-                return Err(IdentifierError::InvalidCharacter {
-                    position: i,
-                    character: c,
-                })
-            }
-        }
-    }
-    let expected = bdew_check_digit(
-        digits[..10]
-            .try_into()
-            .expect("slice has exactly 10 elements; checked above"),
-    );
-    if digits[10] != expected {
-        return Err(IdentifierError::InvalidChecksum);
-    }
-    Ok(())
-}
-
-// ─── Test helpers (available to sibling modules in #[cfg(test)]) ─────────────
-
-#[cfg(test)]
-pub(super) fn make_valid_11digit(prefix: &[u8; 10]) -> String {
-    let check = bdew_check_digit(prefix);
-    prefix
-        .iter()
-        .chain(std::iter::once(&check))
-        .map(|&d| char::from_digit(u32::from(d), 10).unwrap())
-        .collect()
-}
-
-// ─── Public construction helpers ─────────────────────────────────────────────
-
-/// Parses a 10-ASCII-digit base string, computes the BDEW check digit, and
-/// returns the full 11-character ID string.
-///
-/// # Errors
-/// - [`IdentifierError::InvalidLength`] if `base` is not exactly 10 characters.
-/// - [`IdentifierError::InvalidCharacter`] if any character is not a decimal digit.
-pub(super) fn compute_11digit_from_base(
-    base: &str,
-) -> Result<String, crate::error::IdentifierError> {
-    use crate::error::{IdentifierError, LengthExpectation};
-
-    if base.len() != 10 {
-        return Err(IdentifierError::InvalidLength {
-            expected: LengthExpectation::Exact(10),
-            actual: base.len(),
-        });
-    }
-    let mut digits = [0u8; 10];
-    for (i, c) in base.chars().enumerate() {
-        match c.to_digit(10) {
-            Some(d) => digits[i] = d as u8,
-            None => {
-                return Err(IdentifierError::InvalidCharacter {
-                    position: i,
-                    character: c,
-                })
-            }
-        }
-    }
-    let check = bdew_check_digit(&digits);
-    let mut result = base.to_owned();
-    result.push(char::from_digit(u32::from(check), 10).expect("check digit is 0..=9"));
-    Ok(result)
-}
-
-// ─── ASCII-Verfahren (NeLo-ID, SR-ID, TR-ID, NeBe-ID, Paket-ID) ─────────────
-
-/// Maps a byte to its numeric value for the BDEW ASCII-Verfahren (§8.2).
-///
-/// - Uppercase letters (`A`–`Z`): raw ASCII code value (A = 65 … Z = 90).
-/// - Decimal digits (`0`–`9`): numeric value (0–9).
+/// Any other byte maps to its raw ASCII value; callers validate the character set
+/// before calling, so such bytes never reach here in practice.
 #[inline]
-fn ascii_val(b: u8) -> u32 {
+fn char_value(b: u8) -> u32 {
     if b.is_ascii_digit() {
         u32::from(b - b'0')
     } else {
@@ -124,131 +52,264 @@ fn ascii_val(b: u8) -> u32 {
     }
 }
 
-/// Computes the BDEW ASCII-Verfahren check digit for a 10-byte base.
+/// Computes the BDEW check digit for `base` (chapter 8 — both §8.1 and §8.2).
 ///
-/// Used by NeLo-ID, NeBe-ID, Ressourcen-ID (TR-ID, SR-ID, SG-ID, CR-ID),
-/// and Paket-ID.
+/// Sums the mapped values at odd 1-indexed positions, adds twice the sum at even
+/// 1-indexed positions, and returns the difference to the next multiple of 10.
 ///
-/// Algorithm (BDEW "Identifikatoren in der Marktkommunikation" v1.2, §8.2):
-/// 1. Map each character: digit → numeric value (0–9); letter → ASCII code value.
-/// 2. Sum mapped values at **odd** positions (1-indexed: 1, 3, 5, 7, 9
-///    → 0-indexed: 0, 2, 4, 6, 8).
-/// 3. Sum mapped values at **even** positions (1-indexed: 2, 4, 6, 8, 10
-///    → 0-indexed: 1, 3, 5, 7, 9), multiply by 2.
-/// 4. check digit = (10 − ((step 2 + step 3) % 10)) % 10.
+/// # Examples (BDEW reference vectors)
 ///
-/// **Reference example** (§8.2): base `A113735592` → check digit `5`.
-pub(super) fn ascii_check_digit(base: &[u8; 10]) -> u8 {
-    let odd_sum: u32 = base.iter().step_by(2).map(|&b| ascii_val(b)).sum();
-    let even_sum: u32 = base.iter().skip(1).step_by(2).map(|&b| ascii_val(b)).sum();
-    ((10 - ((odd_sum + even_sum * 2) % 10)) % 10) as u8
+/// This function is crate-private, so the vectors below are pinned by
+/// `tests::bdew_reference_vector_lok_waggon` and
+/// `tests::bdew_reference_vector_ascii` rather than by a doctest:
+///
+/// ```text
+/// bdew_check_digit(b"4137355924") == 1   // §8.1 MaLo-ID
+/// bdew_check_digit(b"A113735592") == 5   // §8.2 ASCII-Verfahren
+/// ```
+pub(super) fn bdew_check_digit(base: &[u8]) -> u8 {
+    let odd: u32 = base.iter().step_by(2).map(|&b| char_value(b)).sum();
+    let even: u32 = base.iter().skip(1).step_by(2).map(|&b| char_value(b)).sum();
+    ((10 - ((odd + even * 2) % 10)) % 10) as u8
 }
 
-/// Validates an 11-character alphanumeric BDEW ID using the ASCII-Verfahren.
+// ─── §8.1 — numeric identifiers (MaLo-ID, BDEW/DVGW-Codenummer) ──────────────
+
+/// Validates a purely numeric identifier of `len` characters whose final digit is
+/// the §8.1 check digit.
+///
+/// `min_first` constrains the first digit (the Vergabestelle): MaLo-IDs require
+/// `1`–`9` per §3.2, whereas 13-digit Marktpartner-IDs permit a leading `0`.
+pub(super) fn validate_numeric_id(
+    s: &str,
+    len: usize,
+    min_first: u8,
+) -> Result<(), IdentifierError> {
+    if s.len() != len {
+        return Err(IdentifierError::InvalidLength {
+            expected: LengthExpectation::Exact(len),
+            actual: s.len(),
+        });
+    }
+    let bytes = s.as_bytes();
+    for (i, &b) in bytes.iter().enumerate() {
+        if !b.is_ascii_digit() {
+            return Err(IdentifierError::InvalidCharacter {
+                position: i,
+                character: char_at(s, i),
+            });
+        }
+    }
+    if bytes[0] - b'0' < min_first {
+        return Err(IdentifierError::InvalidFormat {
+            description: format!(
+                "first digit (Vergabestelle) must be {}-9, got '{}'",
+                min_first, bytes[0] as char,
+            )
+            .into(),
+        });
+    }
+    let (base, check) = bytes.split_at(len - 1);
+    if check[0] - b'0' != bdew_check_digit(base) {
+        return Err(IdentifierError::InvalidChecksum);
+    }
+    Ok(())
+}
+
+/// Appends the §8.1 check digit to a numeric base of `len - 1` digits, returning
+/// the complete `len`-character identifier.
+pub(super) fn compute_numeric_id_from_base(
+    base: &str,
+    len: usize,
+    min_first: u8,
+) -> Result<String, IdentifierError> {
+    let base_len = len - 1;
+    if base.len() != base_len {
+        return Err(IdentifierError::InvalidLength {
+            expected: LengthExpectation::Exact(base_len),
+            actual: base.len(),
+        });
+    }
+    let bytes = base.as_bytes();
+    for (i, &b) in bytes.iter().enumerate() {
+        if !b.is_ascii_digit() {
+            return Err(IdentifierError::InvalidCharacter {
+                position: i,
+                character: char_at(base, i),
+            });
+        }
+    }
+    if bytes[0] - b'0' < min_first {
+        return Err(IdentifierError::InvalidFormat {
+            description: format!(
+                "first digit (Vergabestelle) must be {}-9, got '{}'",
+                min_first, bytes[0] as char,
+            )
+            .into(),
+        });
+    }
+    let mut out = String::with_capacity(len);
+    out.push_str(base);
+    out.push(char::from(b'0' + bdew_check_digit(bytes)));
+    Ok(out)
+}
+
+// ─── §8.2 — alphanumeric identifiers (NeLo, NeBe, Ressourcen, Paket) ─────────
+
+/// Checks the fixed Codetyp `prefix` and the `[A-Z0-9]` body of a 10-character
+/// §8.2 base. Shared by the validating and constructing entry points.
+fn check_ascii_base(base: &str, prefix: &[u8]) -> Result<(), IdentifierError> {
+    let bytes = base.as_bytes();
+    if !bytes.starts_with(prefix) {
+        return Err(IdentifierError::InvalidFormat {
+            description: format!(
+                "identifier must start with Codetyp \"{}\", got \"{}\"",
+                std::str::from_utf8(prefix).unwrap_or("?"),
+                base.chars().take(prefix.len()).collect::<String>(),
+            )
+            .into(),
+        });
+    }
+    for (i, &b) in bytes.iter().enumerate().skip(prefix.len()) {
+        if !b.is_ascii_uppercase() && !b.is_ascii_digit() {
+            return Err(IdentifierError::InvalidCharacter {
+                position: i,
+                character: char_at(base, i),
+            });
+        }
+    }
+    Ok(())
+}
+
+/// Validates an 11-character alphanumeric BDEW identifier using the §8.2
+/// ASCII-Verfahren.
 ///
 /// Constraints:
-/// - Length must be exactly 11.
-/// - `s[0]` must equal `type_char` (Codetyp).
-/// - `s[1..=9]` must be `[A-Z0-9]` (uppercase alphanumeric).
-/// - `s[10]` must be a decimal digit `[0-9]` (the check digit).
-/// - The check digit must match the ASCII-Verfahren result for the 10-byte base.
-pub(super) fn validate_ascii_id(
-    s: &str,
-    type_char: u8,
-) -> Result<(), crate::error::IdentifierError> {
-    use crate::error::{IdentifierError, LengthExpectation};
-
+/// - Length exactly 11.
+/// - `s` starts with the fixed Codetyp `prefix` (one byte for NeLo/NeBe/Ressourcen,
+///   two bytes `b"P9"` for the Paket-ID).
+/// - The remaining base characters up to position 10 are `[A-Z0-9]`.
+/// - `s[10]` is a decimal digit matching the check digit for `s[..10]`.
+pub(super) fn validate_ascii_id(s: &str, prefix: &[u8]) -> Result<(), IdentifierError> {
     if s.len() != 11 {
         return Err(IdentifierError::InvalidLength {
             expected: LengthExpectation::Exact(11),
             actual: s.len(),
         });
     }
-    let bytes = s.as_bytes();
-    if bytes[0] != type_char {
-        return Err(IdentifierError::InvalidFormat {
-            description: format!(
-                "first character (Codetyp) must be '{}', got '{}'",
-                type_char as char, bytes[0] as char,
-            )
-            .into(),
+    // Guarantees every byte index below is a character boundary, so the `&s[..10]`
+    // slice and the per-position error reporting can never split a code point.
+    if let Some((i, c)) = s.char_indices().find(|(_, c)| !c.is_ascii()) {
+        return Err(IdentifierError::InvalidCharacter {
+            position: i,
+            character: c,
         });
     }
-    for (i, &b) in bytes.iter().enumerate().skip(1).take(9) {
-        if !b.is_ascii_uppercase() && !b.is_ascii_digit() {
-            return Err(IdentifierError::InvalidCharacter {
-                position: i,
-                character: b as char,
-            });
-        }
-    }
-    let last = bytes[10];
-    if !last.is_ascii_digit() {
+    let bytes = s.as_bytes();
+    check_ascii_base(&s[..10], prefix)?;
+    if !bytes[10].is_ascii_digit() {
         return Err(IdentifierError::InvalidCharacter {
             position: 10,
-            character: last as char,
+            character: char_at(s, 10),
         });
     }
-    let base_arr: [u8; 10] = bytes[..10].try_into().expect("verified 10 bytes above");
-    if last - b'0' != ascii_check_digit(&base_arr) {
+    if bytes[10] - b'0' != bdew_check_digit(&bytes[..10]) {
         return Err(IdentifierError::InvalidChecksum);
     }
     Ok(())
 }
 
-/// Constructs a valid 11-character ASCII-Verfahren ID from a 10-character base.
-///
-/// - `base[0]` must equal `type_char` (Codetyp).
-/// - `base[1..=9]` must be `[A-Z0-9]` (uppercase alphanumeric).
-///
-/// Returns the full 11-character string (base + computed check digit).
+/// Appends the §8.2 check digit to a 10-character base, returning the complete
+/// 11-character identifier.
 pub(super) fn compute_ascii_id_from_base(
     base: &str,
-    type_char: u8,
-) -> Result<String, crate::error::IdentifierError> {
-    use crate::error::{IdentifierError, LengthExpectation};
-
+    prefix: &[u8],
+) -> Result<String, IdentifierError> {
     if base.len() != 10 {
         return Err(IdentifierError::InvalidLength {
             expected: LengthExpectation::Exact(10),
             actual: base.len(),
         });
     }
-    let bytes = base.as_bytes();
-    if bytes[0] != type_char {
-        return Err(IdentifierError::InvalidFormat {
-            description: format!(
-                "base must start with '{}' (Codetyp), got '{}'",
-                type_char as char, bytes[0] as char,
-            )
-            .into(),
-        });
-    }
-    for (i, &b) in bytes.iter().enumerate().skip(1).take(9) {
-        if !b.is_ascii_uppercase() && !b.is_ascii_digit() {
-            return Err(IdentifierError::InvalidCharacter {
-                position: i,
-                character: b as char,
-            });
-        }
-    }
-    let arr: [u8; 10] = bytes.try_into().expect("verified 10 bytes above");
-    let check = ascii_check_digit(&arr);
-    let mut result = base.to_owned();
-    result.push(char::from_digit(u32::from(check), 10).expect("check digit is 0..=9"));
-    Ok(result)
+    check_ascii_base(base, prefix)?;
+    let mut out = String::with_capacity(11);
+    out.push_str(base);
+    out.push(char::from(b'0' + bdew_check_digit(base.as_bytes())));
+    Ok(out)
 }
 
-#[cfg(test)]
-pub(super) fn make_valid_ascii_id(type_char: u8, body: &[u8; 9]) -> String {
-    let mut base = [0u8; 10];
-    base[0] = type_char;
-    base[1..].copy_from_slice(body);
-    let check = ascii_check_digit(&base);
-    let mut s = String::with_capacity(11);
-    for &b in &base {
-        s.push(b as char);
+/// Returns the character starting at byte index `i`, or U+FFFD when `i` is out of
+/// range or falls inside a multi-byte sequence.
+///
+/// Used only on error paths. Slicing is guarded by [`str::is_char_boundary`] so
+/// this can never panic on non-ASCII input.
+#[inline]
+fn char_at(s: &str, i: usize) -> char {
+    if s.is_char_boundary(i) {
+        s[i..].chars().next().unwrap_or('\u{FFFD}')
+    } else {
+        '\u{FFFD}'
     }
-    s.push(char::from_digit(u32::from(check), 10).unwrap());
-    s
+}
+
+// ─── Tests ───────────────────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// BDEW "Identifikatoren in der Marktkommunikation" v1.2, §8.1 worked example.
+    #[test]
+    fn bdew_reference_vector_lok_waggon() {
+        // a) 4 + 3 + 3 + 5 + 2 = 17
+        // b) (1 + 7 + 5 + 9 + 4) * 2 = 52
+        // c) 17 + 52 = 69
+        // d) 70 - 69 = 1
+        assert_eq!(bdew_check_digit(b"4137355924"), 1);
+    }
+
+    /// BDEW "Identifikatoren in der Marktkommunikation" v1.2, §8.2 worked example.
+    #[test]
+    fn bdew_reference_vector_ascii() {
+        // a) A = 65
+        // b) 65 + 1 + 7 + 5 + 9 = 87
+        // c) (1 + 3 + 3 + 5 + 2) * 2 = 28
+        // d) 87 + 28 = 115
+        // e) 120 - 115 = 5
+        assert_eq!(bdew_check_digit(b"A113735592"), 5);
+    }
+
+    /// A total that is already a multiple of 10 must yield check digit 0, not 10.
+    #[test]
+    fn multiple_of_ten_yields_zero() {
+        assert_eq!(bdew_check_digit(b"0000000000"), 0);
+    }
+
+    /// §8.1 and §8.2 are the same arithmetic — a numeric base must produce the
+    /// same digit through either entry point.
+    #[test]
+    fn numeric_and_ascii_paths_agree() {
+        let full = compute_numeric_id_from_base("4137355924", 11, 1).unwrap();
+        assert_eq!(full, "41373559241");
+        assert_eq!(bdew_check_digit(b"4137355924"), 1);
+    }
+
+    #[test]
+    fn numeric_id_rejects_leading_zero_when_required() {
+        // MaLo-ID: first digit must be 1-9 (§3.2).
+        let err = validate_numeric_id("01234567890", 11, 1).unwrap_err();
+        assert!(matches!(err, IdentifierError::InvalidFormat { .. }));
+        // Marktpartner-ID permits a leading zero.
+        assert!(matches!(
+            validate_numeric_id("0123456789012", 13, 0),
+            Err(IdentifierError::InvalidChecksum) | Ok(())
+        ));
+    }
+
+    #[test]
+    fn non_ascii_error_reports_full_char() {
+        // 'ä' is multi-byte; the error must not panic on a non-boundary slice.
+        let err = validate_numeric_id("4137355924ä", 11, 1);
+        assert!(err.is_err());
+    }
 }

@@ -1,5 +1,5 @@
 use super::{ComTyp, Energieherkunft, Oekolabel, Oekozertifikat, Sparte, ZusatzAttribut};
-#[derive(Debug, Clone, PartialEq, Default)]
+#[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(not(feature = "json"), derive(Hash))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "builder", derive(typed_builder::TypedBuilder))]
@@ -96,7 +96,10 @@ pub struct Energiemix {
     /// Version der COM-Struktur aka "fachliche Versionierung"
     #[cfg_attr(feature = "serde", serde(rename = "_version"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(
+        feature = "builder",
+        builder(default = Some("v202607.0.0".to_owned()), setter(into))
+    )]
     pub version: Option<String>,
     /// Internetseite, auf der die Strommixdaten veröffentlicht sind
     #[cfg_attr(feature = "serde", serde(rename = "website"))]
@@ -118,6 +121,29 @@ pub struct Energiemix {
     #[cfg_attr(feature = "builder", builder(default, setter(skip)))]
     #[doc(hidden)]
     pub _additional: crate::LimitedExtensionMap,
+}
+impl Default for Energiemix {
+    fn default() -> Self {
+        Self {
+            anteil: Default::default(),
+            atommuell: Default::default(),
+            bemerkung: Default::default(),
+            bezeichnung: Default::default(),
+            co2_emission: Default::default(),
+            energieart: Default::default(),
+            energiemixnummer: Default::default(),
+            gueltigkeitsjahr: Default::default(),
+            id: Default::default(),
+            ist_in_oeko_top_ten: Default::default(),
+            oekolabel: Default::default(),
+            oekozertifikate: Default::default(),
+            typ: Default::default(),
+            version: Some("v202607.0.0".to_owned()),
+            website: Default::default(),
+            zusatz_attribute: Default::default(),
+            _additional: Default::default(),
+        }
+    }
 }
 #[cfg(feature = "json")]
 impl crate::json::sealed::Sealed for Energiemix {}

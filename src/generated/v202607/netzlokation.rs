@@ -83,7 +83,10 @@ pub struct Netzlokation {
     /// Version der BO-Struktur aka "fachliche Versionierung"
     #[cfg_attr(feature = "serde", serde(rename = "_version"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(
+        feature = "builder",
+        builder(default = Some("v202607.0.0".to_owned()), setter(into))
+    )]
     pub version: Option<String>,
     /// Verwendungungszweck der Werte Netzlokation
     #[cfg_attr(feature = "serde", serde(rename = "verwendungszweck"))]
@@ -121,7 +124,7 @@ impl Default for Netzlokation {
             obiskennzahl: Default::default(),
             sparte: Default::default(),
             steuerkanal: Default::default(),
-            version: Default::default(),
+            version: Some("v202607.0.0".to_owned()),
             verwendungszweck: Default::default(),
             zusatz_attribute: Default::default(),
             _additional: Default::default(),

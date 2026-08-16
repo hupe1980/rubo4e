@@ -1,5 +1,5 @@
 use super::{ComTyp, Geraet, Menge, Voraussetzungen, ZusatzAttribut};
-#[derive(Debug, Clone, PartialEq, Default)]
+#[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(not(feature = "json"), derive(Hash))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "builder", derive(typed_builder::TypedBuilder))]
@@ -37,7 +37,10 @@ pub struct Tarifeinschraenkung {
     /// Version der COM-Struktur aka "fachliche Versionierung"
     #[cfg_attr(feature = "serde", serde(rename = "_version"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(
+        feature = "builder",
+        builder(default = Some("v202607.0.0".to_owned()), setter(into))
+    )]
     pub version: Option<String>,
     /// Voraussetzungen, die erfüllt sein müssen, damit dieser Tarif zur Anwendung kommen kann
     #[cfg_attr(feature = "serde", serde(rename = "voraussetzungen"))]
@@ -64,6 +67,21 @@ pub struct Tarifeinschraenkung {
     #[cfg_attr(feature = "builder", builder(default, setter(skip)))]
     #[doc(hidden)]
     pub _additional: crate::LimitedExtensionMap,
+}
+impl Default for Tarifeinschraenkung {
+    fn default() -> Self {
+        Self {
+            einschraenkungleistung: Default::default(),
+            einschraenkungzaehler: Default::default(),
+            id: Default::default(),
+            typ: Default::default(),
+            version: Some("v202607.0.0".to_owned()),
+            voraussetzungen: Default::default(),
+            zusatz_attribute: Default::default(),
+            zusatzprodukte: Default::default(),
+            _additional: Default::default(),
+        }
+    }
 }
 #[cfg(feature = "json")]
 impl crate::json::sealed::Sealed for Tarifeinschraenkung {}

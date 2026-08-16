@@ -9,7 +9,7 @@ use std::sync::LazyLock;
 /// The lookup order is:
 /// 1. Exact match on `(parent_struct_name, json_property_name)` — highest priority.
 /// 2. Exact match on the JSON property name alone.
-/// 3. Suffix match (field name ends with the key), longest-suffix first.
+/// 3. Suffix match (field name ends with the key); the longest match wins.
 ///
 /// All keys are *camelCase* JSON property names as they appear in the BO4E schemas.
 use crate::ast::{FieldType, PrimitiveType};
@@ -88,9 +88,24 @@ static EXACT_MAP: LazyLock<HashMap<&'static str, FieldType>> = LazyLock::new(|| 
             "technischeRessourceId",
             FieldType::Identifier("TrId".into()),
         ),
+        // Left as the general `EicCode` on purpose. A German electricity
+        // Bilanzkreis is a party code (`11X…`), so `BilanzkreisId` would be the
+        // tighter type — but this field also carries gas Bilanzkreise (GaBi Gas
+        // BK7-14-020), whose object type is not established here. Narrowing it
+        // would turn an unverified assumption into a hard deserialization failure
+        // on real payloads, so the object type stays unconstrained and callers
+        // opt in via `BilanzkreisId::try_from(eic)`.
         ("bilanzkreis", FieldType::Identifier("EicCode".into())),
+        // A Bilanzierungsgebiet is an area code. The schema documents this field
+        // as "Die EIC-Nummer des Bilanzierungsgebietes" but declares it a plain
+        // string; all 645 codes in the TSOs' published VNB-Bilanzierungsgebiete
+        // list carry object type 'Y', so the restricted type is safe here.
+        (
+            "bilanzierungsgebietEic",
+            FieldType::Identifier("BilanzierungsgebietId".into()),
+        ),
         ("eicCode", FieldType::Identifier("EicCode".into())),
-        // H-05: control area and balance area codes are EIC codes.
+        // control area and balance area codes are EIC codes.
         ("marktgebiet", FieldType::Identifier("EicCode".into())),
         ("regelzone", FieldType::Identifier("EicCode".into())),
         ("obisKennzahl", FieldType::Identifier("ObisCode".into())),
@@ -134,7 +149,10 @@ static EXACT_MAP: LazyLock<HashMap<&'static str, FieldType>> = LazyLock::new(|| 
 ///
 /// All entries use the exact lowercase suffix as it appears in BO4E JSON
 /// property names (e.g. `"vertragsbeginn"` ends with `"beginn"`).
-/// Entries are sorted longest-suffix first so that more specific patterns win.
+///
+/// Declaration order is irrelevant: [`infer_with_parent`] picks the **longest**
+/// matching suffix, so a more specific pattern always wins over a shorter one it
+/// contains.
 ///
 /// **Note:** since the parser now reads `"format"` from JSON Schema directly,
 /// these suffix rules only fire for string-typed fields with **no** format
@@ -201,13 +219,19 @@ pub fn infer_with_parent(parent: Option<&str>, json_name: &str) -> Option<FieldT
     if let Some(ft) = EXACT_MAP.get(json_name) {
         return Some(ft.clone());
     }
-    // 3. Suffix match (longest first).
-    for (suffix, ft) in SUFFIX_MAP.iter() {
-        if json_name.ends_with(suffix) {
-            return Some(ft.clone());
-        }
-    }
-    None
+    // 3. Suffix match — the *longest* matching suffix wins.
+    //
+    // Selecting the longest match rather than the first makes the result
+    // independent of SUFFIX_MAP's declaration order. Relying on order was a trap:
+    // the table documented itself as "longest first" but was not actually sorted
+    // that way, so it happened to be correct only because no entry was a suffix of
+    // another. Adding one that was (e.g. `"id"` alongside `"marktlokationsid"`)
+    // would have silently mistyped fields.
+    SUFFIX_MAP
+        .iter()
+        .filter(|(suffix, _)| json_name.ends_with(suffix))
+        .max_by_key(|(suffix, _)| suffix.len())
+        .map(|(_, ft)| ft.clone())
 }
 
 #[cfg(test)]
@@ -380,6 +404,55 @@ mod tests {
     }
 
     // ── Suffix uniqueness invariant ───────────────────────────────────────
+
+    /// The EIC-typed fields, including the one the schema leaves as a bare string.
+    #[test]
+    fn eic_field_types() {
+        // Generic EIC — object type deliberately unconstrained.
+        assert_eq!(infer("bilanzkreis"), Some(ident("EicCode")));
+        assert_eq!(infer("eicCode"), Some(ident("EicCode")));
+        assert_eq!(infer("marktgebiet"), Some(ident("EicCode")));
+        assert_eq!(infer("regelzone"), Some(ident("EicCode")));
+        // Restricted to object type 'Y' (Area).
+        assert_eq!(
+            infer("bilanzierungsgebietEic"),
+            Some(ident("BilanzierungsgebietId"))
+        );
+        // `Marktlokation.bilanzierungsgebiet` is a different, free-form field and
+        // must stay untyped.
+        assert_eq!(infer("bilanzierungsgebiet"), None);
+    }
+
+    /// Suffix selection must not depend on declaration order.
+    ///
+    /// The table used to document itself as "longest first" while not being
+    /// sorted that way; this pins the property the lookup actually guarantees.
+    #[test]
+    fn longest_matching_suffix_wins_regardless_of_order() {
+        // "marktlokationsid" and "menge" would both need considering for a name
+        // ending in the former; the longer, more specific one must win.
+        assert_eq!(infer("xmarktlokationsid"), Some(ident("MaloId")));
+
+        // Directly: for every field name built from a suffix, no *shorter*
+        // matching suffix may win.
+        for (suffix, expected) in SUFFIX_MAP.iter() {
+            let name = format!("zzz{suffix}");
+            let got = infer(&name).unwrap_or_else(|| panic!("{name} should match {suffix}"));
+            let longest = SUFFIX_MAP
+                .iter()
+                .filter(|(s, _)| name.ends_with(s))
+                .max_by_key(|(s, _)| s.len())
+                .expect("at least one match");
+            assert_eq!(
+                got,
+                longest.1.clone(),
+                "{name}: expected the longest suffix match"
+            );
+            if longest.0 == *suffix {
+                assert_eq!(&got, expected, "{name}");
+            }
+        }
+    }
 
     #[test]
     fn no_duplicate_suffixes() {

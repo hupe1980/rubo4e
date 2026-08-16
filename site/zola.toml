@@ -1,0 +1,33 @@
+base_url = "https://hupe1980.github.io/rubo4e"
+title = "rubo4e"
+description = "Rust implementation of BO4E, the data standard for the German energy market. Type-safe business objects, market identifiers that verify their own BDEW check digits, and wire-compatible JSON."
+default_language = "en"
+
+compile_sass = true
+build_search_index = false
+generate_feeds = false
+minify_html = true
+
+[markdown]
+smart_punctuation = false
+render_emoji = false
+bottom_footnotes = true
+
+[markdown.highlighting]
+# Every token is emitted with both a light (`z-l-*`) and a dark (`z-d-*`) class;
+# the stylesheet that is active decides which one applies. See base.html, which
+# switches them on `prefers-color-scheme` and on the explicit theme toggle.
+style = "class"
+light_theme = "catppuccin-latte"
+dark_theme = "catppuccin-mocha"
+
+[link_checker]
+skip_prefixes = ["https://crates.io", "https://docs.rs"]
+
+[extra]
+repo = "https://github.com/hupe1980/rubo4e"
+crate = "https://crates.io/crates/rubo4e"
+api_docs = "https://docs.rs/rubo4e"
+# Schema release the generated types are pinned to.
+schema_version = "v202607.0.0"
+msrv = "1.87"

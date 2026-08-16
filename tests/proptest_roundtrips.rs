@@ -8,263 +8,246 @@
 //! cargo test --test proptest_roundtrips --all-features
 //! ```
 
-// ─── Inline strategies (no dependency on library-private Arbitrary impls) ────
+// ─── Shared strategies ───────────────────────────────────────────────────────
+//
+// These deliberately build identifiers through the crate's **public** `from_base`
+// constructors instead of mirroring the check-digit arithmetic. An earlier version
+// of this file reimplemented the algorithm, which meant the tests agreed with the
+// implementation even while both disagreed with the BDEW specification. The
+// reference vectors that pin the arithmetic live in `src/identifiers/checksum.rs`.
 
-/// BDEW ASCII-Verfahren check digit (mirrors `src/identifiers/checksum.rs`).
-/// Letters use ASCII code value; digits use numeric value.
-fn ascii_check_digit(base: &[u8; 10]) -> u8 {
-    fn ascii_val(b: u8) -> u32 {
-        if b.is_ascii_digit() {
-            u32::from(b - b'0')
-        } else {
-            u32::from(b)
-        }
-    }
-    let odd: u32 = base.iter().step_by(2).map(|&b| ascii_val(b)).sum();
-    let even: u32 = base.iter().skip(1).step_by(2).map(|&b| ascii_val(b)).sum();
-    ((10 - ((odd + even * 2) % 10)) % 10) as u8
+use proptest::prelude::*;
+
+/// Uppercase alphanumeric body characters permitted by BDEW §8.2.
+const ALNUM: &str = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+
+/// A valid MaLo-ID: Vergabestelle digit `1`-`9`, nine free digits, check digit.
+fn valid_malo_id() -> impl Strategy<Value = String> {
+    prop::string::string_regex("[1-9][0-9]{9}")
+        .expect("MaLo base regex")
+        .prop_map(|base| {
+            rubo4e::identifiers::MaloId::from_base(&base)
+                .expect("generated base is valid")
+                .to_string()
+        })
 }
 
-/// BDEW Lok-Waggon check digit used by MaLo-ID (mirrors `src/identifiers/checksum.rs`).
-fn bdew_check_digit(digits: &[u8; 10]) -> u8 {
-    const WEIGHTS: [u8; 10] = [2, 1, 2, 1, 2, 1, 2, 1, 2, 1];
-    let sum: u32 = digits
-        .iter()
-        .zip(WEIGHTS)
-        .map(|(&d, w)| {
-            let p = u32::from(d) * u32::from(w);
-            if p >= 10 {
-                p - 9
-            } else {
-                p
-            }
+/// A valid 13-digit Marktpartner-ID carrying the BDEW §8.1 check digit.
+fn valid_marktpartner_id() -> impl Strategy<Value = String> {
+    prop::string::string_regex("[0-9]{12}")
+        .expect("MP-ID base regex")
+        .prop_map(|base| {
+            rubo4e::identifiers::MarktpartnerId::from_base(&base)
+                .expect("generated base is valid")
+                .to_string()
         })
-        .sum();
-    ((10 - (sum % 10)) % 10) as u8
 }
 
-mod identifier_roundtrips {
-    use proptest::prelude::*;
-
-    fn valid_11digit() -> impl Strategy<Value = String> {
-        prop::array::uniform10(0u8..=9u8).prop_map(|prefix| {
-            let check = super::bdew_check_digit(&prefix);
-            prefix
-                .iter()
-                .chain(std::iter::once(&check))
-                .map(|&d| char::from_digit(u32::from(d), 10).unwrap())
-                .collect::<String>()
-        })
-    }
-
-    fn valid_melo_id() -> impl Strategy<Value = String> {
-        prop::string::string_regex("[A-Z]{2}[A-Z0-9]{31}").expect("valid MeloId regex")
-    }
-
-    fn valid_nelo_id() -> impl Strategy<Value = String> {
-        const ALNUM: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-        prop::collection::vec(prop::sample::select(ALNUM), 9).prop_map(|body| {
-            let mut base = [0u8; 10];
-            base[0] = b'E';
-            for (i, &b) in body.iter().enumerate() {
-                base[i + 1] = b;
-            }
-            let check = super::ascii_check_digit(&base);
-            let mut s = String::with_capacity(11);
-            for &b in &base {
-                s.push(b as char);
-            }
-            s.push(char::from_digit(u32::from(check), 10).unwrap());
-            s
-        })
-    }
-
-    fn valid_sr_id() -> impl Strategy<Value = String> {
-        const ALNUM: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-        prop::collection::vec(prop::sample::select(ALNUM), 9).prop_map(|body| {
-            let mut base = [0u8; 10];
-            base[0] = b'C';
-            for (i, &b) in body.iter().enumerate() {
-                base[i + 1] = b;
-            }
-            let check = super::ascii_check_digit(&base);
-            let mut s = String::with_capacity(11);
-            for &b in &base {
-                s.push(b as char);
-            }
-            s.push(char::from_digit(u32::from(check), 10).unwrap());
-            s
-        })
-    }
-
-    fn valid_tr_id() -> impl Strategy<Value = String> {
-        const ALNUM: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-        prop::collection::vec(prop::sample::select(ALNUM), 9).prop_map(|body| {
-            let mut base = [0u8; 10];
-            base[0] = b'D';
-            for (i, &b) in body.iter().enumerate() {
-                base[i + 1] = b;
-            }
-            let check = super::ascii_check_digit(&base);
-            let mut s = String::with_capacity(11);
-            for &b in &base {
-                s.push(b as char);
-            }
-            s.push(char::from_digit(u32::from(check), 10).unwrap());
-            s
-        })
-    }
-
-    fn valid_obis_code() -> impl Strategy<Value = String> {
-        (
-            0u8..=255u8,
-            0u8..=255u8,
-            1u8..=255u8,
-            0u8..=255u8,
-            0u8..=255u8,
-            0u8..=255u8,
-        )
-            .prop_map(|(a, b, c, d, e, f)| format!("{a}-{b}:{c}.{d}.{e}*{f}"))
-    }
-
-    fn valid_eic_code() -> impl Strategy<Value = String> {
-        use rubo4e::identifiers::EicCode;
-        let type_chars = prop_oneof![
-            Just('A'),
-            Just('T'),
-            Just('V'),
-            Just('W'),
-            Just('X'),
-            Just('Y'),
-            Just('Z'),
-        ];
-        let lio = prop::string::string_regex("[A-Z0-9]{2}").expect("LIO regex");
-        let body = prop::string::string_regex("[A-Z0-9\\-]{12}").expect("body regex");
-        (lio, type_chars, body).prop_filter_map("EIC check char not '-'", |(lio, tc, body)| {
-            let prefix = format!("{lio}{tc}{body}");
-            let check = EicCode::compute_check_char(&prefix)?;
-            Some(format!("{prefix}{check}"))
-        })
-    }
-
-    proptest! {
-        #[test]
-        fn malo_id_display_from_str_roundtrip(s in valid_11digit()) {
-            let id = rubo4e::identifiers::MaloId::new(&s).expect("valid MaloId");
-            let displayed = id.to_string();
-            let parsed: rubo4e::identifiers::MaloId = displayed.parse()
-                .expect("MaloId::from_str must succeed for valid ID");
-            prop_assert_eq!(id.as_ref(), parsed.as_ref());
+/// Builds a strategy for one member of the §8.2 ASCII-Verfahren family.
+macro_rules! valid_ascii_id {
+    ($name:ident, $ty:ty, $body_len:expr) => {
+        fn $name() -> impl Strategy<Value = String> {
+            prop::collection::vec(prop::sample::select(ALNUM.as_bytes()), $body_len).prop_map(
+                |body| {
+                    let mut base = String::from(<$ty>::CODETYP);
+                    base.extend(body.iter().map(|&b| b as char));
+                    <$ty>::from_base(&base)
+                        .expect("generated base is valid")
+                        .to_string()
+                },
+            )
         }
-
-        #[test]
-        fn melo_id_display_from_str_roundtrip(s in valid_melo_id()) {
-            let id = rubo4e::identifiers::MeloId::new(&s).expect("valid MeloId");
-            let displayed = id.to_string();
-            let parsed: rubo4e::identifiers::MeloId = displayed.parse()
-                .expect("MeloId::from_str must succeed for valid ID");
-            prop_assert_eq!(id.as_ref(), parsed.as_ref());
-        }
-
-        #[test]
-        fn nelo_id_display_from_str_roundtrip(s in valid_nelo_id()) {
-            let id = rubo4e::identifiers::NeloId::new(&s).expect("valid NeloId");
-            let displayed = id.to_string();
-            let parsed: rubo4e::identifiers::NeloId = displayed.parse()
-                .expect("NeloId::from_str must succeed for valid ID");
-            prop_assert_eq!(id.as_ref(), parsed.as_ref());
-        }
-
-        #[test]
-        fn sr_id_display_from_str_roundtrip(s in valid_sr_id()) {
-            let id = rubo4e::identifiers::SrId::new(&s).expect("valid SrId");
-            let displayed = id.to_string();
-            let parsed: rubo4e::identifiers::SrId = displayed.parse()
-                .expect("SrId::from_str must succeed for valid ID");
-            prop_assert_eq!(id.as_ref(), parsed.as_ref());
-        }
-
-        #[test]
-        fn tr_id_display_from_str_roundtrip(s in valid_tr_id()) {
-            let id = rubo4e::identifiers::TrId::new(&s).expect("valid TrId");
-            let displayed = id.to_string();
-            let parsed: rubo4e::identifiers::TrId = displayed.parse()
-                .expect("TrId::from_str must succeed for valid ID");
-            prop_assert_eq!(id.as_ref(), parsed.as_ref());
-        }
-
-        #[test]
-        fn obis_code_display_from_str_roundtrip(s in valid_obis_code()) {
-            let code = rubo4e::identifiers::ObisCode::new(&s).expect("valid ObisCode");
-            let displayed = code.to_string();
-            let parsed: rubo4e::identifiers::ObisCode = displayed.parse()
-                .expect("ObisCode::from_str must succeed for valid code");
-            prop_assert_eq!(code.as_ref(), parsed.as_ref());
-        }
-
-        #[test]
-        fn eic_code_display_from_str_roundtrip(s in valid_eic_code()) {
-            let code = rubo4e::identifiers::EicCode::new(&s).expect("valid EicCode");
-            let displayed = code.to_string();
-            let parsed: rubo4e::identifiers::EicCode = displayed.parse()
-                .expect("EicCode::from_str must succeed for valid code");
-            prop_assert_eq!(code.as_ref(), parsed.as_ref());
-        }
-    }
+    };
 }
 
+valid_ascii_id!(valid_nelo_id, rubo4e::identifiers::NeloId, 9);
+valid_ascii_id!(valid_nebe_id, rubo4e::identifiers::NebeId, 9);
+valid_ascii_id!(valid_cr_id, rubo4e::identifiers::CrId, 9);
+valid_ascii_id!(valid_sg_id, rubo4e::identifiers::SgId, 9);
+valid_ascii_id!(valid_sr_id, rubo4e::identifiers::SrId, 9);
+valid_ascii_id!(valid_tr_id, rubo4e::identifiers::TrId, 9);
+valid_ascii_id!(valid_paket_id, rubo4e::identifiers::PaketId, 8);
+
+fn valid_obis_code() -> impl Strategy<Value = String> {
+    (
+        0u8..=255u8,
+        0u8..=255u8,
+        1u8..=255u8,
+        0u8..=255u8,
+        0u8..=255u8,
+        0u8..=255u8,
+    )
+        .prop_map(|(a, b, c, d, e, f)| format!("{a}-{b}:{c}.{d}.{e}*{f}"))
+}
+
+fn valid_melo_id() -> impl Strategy<Value = String> {
+    prop::string::string_regex("[A-Z]{2}[A-Z0-9]{31}").expect("valid MeloId regex")
+}
+
+fn valid_eic_code() -> impl Strategy<Value = String> {
+    use rubo4e::identifiers::EicCode;
+    let type_chars = prop_oneof![
+        Just('A'),
+        Just('T'),
+        Just('V'),
+        Just('W'),
+        Just('X'),
+        Just('Y'),
+        Just('Z'),
+    ];
+    let lio = prop::string::string_regex("[A-Z0-9]{2}").expect("LIO regex");
+    let body = prop::string::string_regex("[A-Z0-9\\-]{12}").expect("body regex");
+    (lio, type_chars, body).prop_filter_map("EIC check char not '-'", |(lio, tc, body)| {
+        let prefix = format!("{lio}{tc}{body}");
+        let check = EicCode::compute_check_char(&prefix)?;
+        Some(format!("{prefix}{check}"))
+    })
+}
+
+/// Builds a strategy for an EIC code pinned to one object-type character.
+///
+/// Used for the EIC-restricted identifiers, whose whole point is that position 3
+/// is fixed — generating the character randomly would not exercise them.
+fn valid_eic_of_type(type_char: char) -> impl Strategy<Value = String> {
+    use rubo4e::identifiers::EicCode;
+    let lio = prop::string::string_regex("[A-Z0-9]{2}").expect("LIO regex");
+    let body = prop::string::string_regex("[A-Z0-9\\-]{12}").expect("body regex");
+    (lio, body).prop_filter_map("EIC check char not '-'", move |(lio, body)| {
+        let prefix = format!("{lio}{type_char}{body}");
+        let check = EicCode::compute_check_char(&prefix)?;
+        Some(format!("{prefix}{check}"))
+    })
+}
+
+fn valid_bilanzkreis_id() -> impl Strategy<Value = String> {
+    valid_eic_of_type('X')
+}
+
+fn valid_bilanzierungsgebiet_id() -> impl Strategy<Value = String> {
+    valid_eic_of_type('Y')
+}
+
+/// The identifier types under test, paired with a strategy that produces valid
+/// values. Both the wire-format and the serde laws are asserted over this one
+/// table, so adding an identifier here covers it everywhere.
+macro_rules! for_each_identifier {
+    ($mac:ident) => {
+        $mac!(malo_id, rubo4e::identifiers::MaloId, valid_malo_id);
+        $mac!(
+            marktpartner_id,
+            rubo4e::identifiers::MarktpartnerId,
+            valid_marktpartner_id
+        );
+        $mac!(melo_id, rubo4e::identifiers::MeloId, valid_melo_id);
+        $mac!(nelo_id, rubo4e::identifiers::NeloId, valid_nelo_id);
+        $mac!(nebe_id, rubo4e::identifiers::NebeId, valid_nebe_id);
+        $mac!(cr_id, rubo4e::identifiers::CrId, valid_cr_id);
+        $mac!(sg_id, rubo4e::identifiers::SgId, valid_sg_id);
+        $mac!(sr_id, rubo4e::identifiers::SrId, valid_sr_id);
+        $mac!(tr_id, rubo4e::identifiers::TrId, valid_tr_id);
+        $mac!(paket_id, rubo4e::identifiers::PaketId, valid_paket_id);
+        $mac!(eic_code, rubo4e::identifiers::EicCode, valid_eic_code);
+        $mac!(obis_code, rubo4e::identifiers::ObisCode, valid_obis_code);
+        $mac!(
+            bilanzkreis_id,
+            rubo4e::identifiers::BilanzkreisId,
+            valid_bilanzkreis_id
+        );
+        $mac!(
+            bilanzierungsgebiet_id,
+            rubo4e::identifiers::BilanzierungsgebietId,
+            valid_bilanzierungsgebiet_id
+        );
+    };
+}
+
+/// `Display` → `FromStr` must be the identity for every identifier.
+///
+/// These traits are unconditional (no feature gate), so this module is too.
+mod display_from_str_roundtrips {
+    use super::*;
+
+    macro_rules! law {
+        ($name:ident, $ty:ty, $strategy:ident) => {
+            proptest! {
+                #[test]
+                fn $name(s in $strategy()) {
+                    let id = <$ty>::new(&s).expect("strategy must produce a valid identifier");
+                    let parsed: $ty = id.to_string().parse()
+                        .expect("FromStr must accept this type's own Display output");
+                    prop_assert_eq!(&id, &parsed);
+                    prop_assert_eq!(id.as_ref(), s.as_str());
+                }
+            }
+        };
+    }
+
+    for_each_identifier!(law);
+}
+
+/// `Serialize` → `Deserialize` must be the identity, and identifiers must be
+/// transparent on the wire (a bare JSON string, not a wrapper object).
+///
+/// Previously only `MaloId` and `EicCode` were covered here.
 #[cfg(feature = "serde")]
-mod identifier_serde_roundtrips {
-    use proptest::prelude::*;
+mod serde_roundtrips {
+    use super::*;
 
-    fn valid_11digit() -> impl Strategy<Value = String> {
-        prop::array::uniform10(0u8..=9u8).prop_map(|prefix| {
-            let check = super::bdew_check_digit(&prefix);
-            prefix
-                .iter()
-                .chain(std::iter::once(&check))
-                .map(|&d| char::from_digit(u32::from(d), 10).unwrap())
-                .collect::<String>()
-        })
+    macro_rules! law {
+        ($name:ident, $ty:ty, $strategy:ident) => {
+            proptest! {
+                #[test]
+                fn $name(s in $strategy()) {
+                    let id = <$ty>::new(&s).expect("strategy must produce a valid identifier");
+                    let json = serde_json::to_string(&id).expect("serialize");
+                    prop_assert_eq!(&json, &format!("\"{}\"", s));
+                    let back: $ty = serde_json::from_str(&json).expect("deserialize");
+                    prop_assert_eq!(&id, &back);
+                }
+            }
+        };
     }
 
-    fn valid_eic_code() -> impl Strategy<Value = String> {
-        use rubo4e::identifiers::EicCode;
-        let type_chars = prop_oneof![
-            Just('A'),
-            Just('T'),
-            Just('V'),
-            Just('W'),
-            Just('X'),
-            Just('Y'),
-            Just('Z'),
-        ];
-        let lio = prop::string::string_regex("[A-Z0-9]{2}").expect("LIO regex");
-        let body = prop::string::string_regex("[A-Z0-9\\-]{12}").expect("body regex");
-        (lio, type_chars, body).prop_filter_map("EIC check char not '-'", |(lio, tc, body)| {
-            let prefix = format!("{lio}{tc}{body}");
-            let check = EicCode::compute_check_char(&prefix)?;
-            Some(format!("{prefix}{check}"))
-        })
+    for_each_identifier!(law);
+}
+
+/// A mutated check digit must be rejected. This is the property that actually
+/// guards against typos, so it is asserted for every generated value rather than
+/// for a handful of fixtures.
+mod check_digit_rejects_mutation {
+    use super::*;
+
+    macro_rules! law {
+        ($name:ident, $ty:ty, $strategy:ident) => {
+            proptest! {
+                #[test]
+                fn $name(s in $strategy()) {
+                    let bytes = s.as_bytes();
+                    let last = bytes[bytes.len() - 1] - b'0';
+                    for delta in 1..10u8 {
+                        let mut mutated = bytes.to_vec();
+                        let n = mutated.len();
+                        mutated[n - 1] = b'0' + (last + delta) % 10;
+                        let candidate = String::from_utf8(mutated).unwrap();
+                        prop_assert!(
+                            <$ty>::new(&candidate).is_err(),
+                            "{} has a mutated check digit and must be rejected",
+                            candidate
+                        );
+                    }
+                }
+            }
+        };
     }
 
-    proptest! {
-        #[test]
-        fn malo_id_serde_roundtrip(s in valid_11digit()) {
-            let id = rubo4e::identifiers::MaloId::new(&s).expect("valid MaloId");
-            let json = serde_json::to_string(&id).expect("serialize");
-            let back: rubo4e::identifiers::MaloId = serde_json::from_str(&json).expect("deserialize");
-            prop_assert_eq!(id.as_ref(), back.as_ref());
-        }
-
-        #[test]
-        fn eic_code_serde_roundtrip(s in valid_eic_code()) {
-            let code = rubo4e::identifiers::EicCode::new(&s).expect("valid EicCode");
-            let json = serde_json::to_string(&code).expect("serialize");
-            let back: rubo4e::identifiers::EicCode = serde_json::from_str(&json).expect("deserialize");
-            prop_assert_eq!(code.as_ref(), back.as_ref());
-        }
-    }
+    law!(malo_id, rubo4e::identifiers::MaloId, valid_malo_id);
+    law!(nelo_id, rubo4e::identifiers::NeloId, valid_nelo_id);
+    law!(nebe_id, rubo4e::identifiers::NebeId, valid_nebe_id);
+    law!(cr_id, rubo4e::identifiers::CrId, valid_cr_id);
+    law!(sg_id, rubo4e::identifiers::SgId, valid_sg_id);
+    law!(sr_id, rubo4e::identifiers::SrId, valid_sr_id);
+    law!(tr_id, rubo4e::identifiers::TrId, valid_tr_id);
+    law!(paket_id, rubo4e::identifiers::PaketId, valid_paket_id);
 }
 
 #[cfg(all(feature = "strum", feature = "versioned"))]
@@ -396,5 +379,103 @@ mod date_roundtrips {
         };
         let json = serde_json::to_string(&w).expect("serialize");
         assert_eq!(json, r#"{"date":"2025-06-15"}"#);
+    }
+}
+
+/// Laws specific to the EIC object-type character (position 3).
+mod eic_object_type {
+    use super::*;
+    use rubo4e::identifiers::{BilanzierungsgebietId, BilanzkreisId, EicCode, EicType};
+
+    proptest! {
+        /// Position 3 of a valid EIC must always round-trip through `EicType`.
+        ///
+        /// `eic_type()` uses an `expect` justified by construction validating the
+        /// character, so this is the property that keeps the `expect` honest.
+        #[test]
+        fn eic_type_matches_position_three(s in valid_eic_code()) {
+            let eic = EicCode::new(&s).expect("strategy produces valid EIC");
+            let ty = eic.eic_type();
+            prop_assert_eq!(ty.as_char(), eic.type_char());
+            prop_assert_eq!(EicType::from_char(eic.type_char()), Some(ty));
+            prop_assert_eq!(s.as_bytes()[2] as char, ty.as_char());
+        }
+    }
+
+    proptest! {
+        /// A Bilanzkreis is a party (`X`) and a Bilanzierungsgebiet is an area
+        /// (`Y`); neither may accept the other's codes.
+        #[test]
+        fn restricted_types_accept_only_their_own_object_type(
+            bk in valid_bilanzkreis_id(),
+            bg in valid_bilanzierungsgebiet_id(),
+        ) {
+            let bk_id = BilanzkreisId::new(&bk).expect("X-type code is a Bilanzkreis-ID");
+            let bg_id = BilanzierungsgebietId::new(&bg).expect("Y-type code is a Bilanzierungsgebiet-ID");
+
+            prop_assert_eq!(bk_id.to_eic_code().eic_type(), EicType::Party);
+            prop_assert_eq!(bg_id.to_eic_code().eic_type(), EicType::Area);
+
+            prop_assert!(BilanzierungsgebietId::new(&bk).is_err(), "{} is a party code", bk);
+            prop_assert!(BilanzkreisId::new(&bg).is_err(), "{} is an area code", bg);
+        }
+    }
+}
+
+/// `ObisCode` stores a canonical form, so equality is semantic rather than textual.
+mod obis_canonicalisation {
+    use super::*;
+    use rubo4e::identifiers::ObisCode;
+
+    /// Re-spells an OBIS code with random leading zeros and the alternative `&`
+    /// separator — a different string denoting the same value.
+    fn respelled(code: &str, pad: usize) -> String {
+        let zeros = "0".repeat(pad);
+        let mut out = String::with_capacity(code.len() + pad * 6);
+        let mut at_group_start = true;
+        for ch in code.chars() {
+            if ch.is_ascii_digit() {
+                if at_group_start {
+                    out.push_str(&zeros);
+                    at_group_start = false;
+                }
+                out.push(ch);
+            } else {
+                at_group_start = true;
+                out.push(if ch == '*' { '&' } else { ch });
+            }
+        }
+        out
+    }
+
+    proptest! {
+        /// Any spelling of a value parses to the same `ObisCode`: equal, equally
+        /// hashed, and rendered identically.
+        #[test]
+        fn spelling_does_not_affect_identity(s in valid_obis_code(), pad in 1usize..4) {
+            use std::collections::HashSet;
+
+            let canonical = ObisCode::new(&s).expect("strategy produces valid OBIS");
+            let variant = ObisCode::new(&respelled(&s, pad))
+                .expect("a re-spelling of a valid OBIS code is still valid");
+
+            prop_assert_eq!(&canonical, &variant);
+            prop_assert_eq!(canonical.as_str(), variant.as_str());
+            prop_assert_eq!(canonical.components(), variant.components());
+
+            let set: HashSet<_> = [canonical, variant].into_iter().collect();
+            prop_assert_eq!(set.len(), 1);
+        }
+    }
+
+    proptest! {
+        /// Canonicalisation is idempotent, so serialize → deserialize is stable.
+        #[test]
+        fn canonical_form_is_a_fixed_point(s in valid_obis_code()) {
+            let once = ObisCode::new(&s).expect("valid OBIS");
+            let twice = ObisCode::new(once.as_str()).expect("canonical form re-parses");
+            prop_assert_eq!(once.as_str(), twice.as_str());
+            prop_assert_eq!(&once, &twice);
+        }
     }
 }

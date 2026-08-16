@@ -13,11 +13,11 @@ use clap::Parser;
 /// and writes Rust source files to `src/generated/<series>/`.
 ///
 /// The *series* is the first 7 characters of the schema version tag,
-/// e.g. `v202501.0.0` → `v202501`.
+/// e.g. `v202607.0.0` → `v202607`.
 #[derive(Parser, Debug)]
 #[command(author, version, about)]
 struct Args {
-    /// BO4E schema version tag, e.g. `v202501.0.0`
+    /// BO4E schema version tag, e.g. `v202607.0.0`
     #[arg(long, short = 'v')]
     schema_version: String,
 
@@ -31,7 +31,7 @@ struct Args {
 fn main() -> Result<()> {
     let args = Args::parse();
 
-    // Derive the series ("v202501") and paths.
+    // Derive the series ("v202607") and paths.
     let series = series_from_version(&args.schema_version)?;
     let schema_dir = schema_dir_for(&args.repo_root, &args.schema_version);
     let out_root = args.repo_root.join("src").join("generated").join(&series);
@@ -72,6 +72,14 @@ fn main() -> Result<()> {
     let generated_root = args.repo_root.join("src").join("generated");
     write_generated_root_mod(&generated_root)?;
 
+    // The wire-key ↔ snake_case map is shared by every schema series, because
+    // `key_transform` has no version context when it rewrites a JSON key.  Build
+    // it from every schema snapshot on disk — not just the version being
+    // generated — so regenerating one series can never drop another series'
+    // keys from the table.
+    let key_map = emitter::emit_key_map(&parse_all_schema_versions(&args.repo_root)?)?;
+    write_if_changed(&generated_root.join("key_map.rs"), &key_map)?;
+
     eprintln!(
         "Done. {} files written to {}",
         all_nodes.len() + 1,
@@ -100,9 +108,15 @@ fn write_generated_root_mod(generated_root: &Path) -> Result<()> {
 
     let mut content = String::from(
         "// @generated \u{2014} do not edit by hand.\n\
-         // This file is maintained by the code generator (`just generate`).\n\n",
+         // This file is maintained by the code generator (`just generate`).\n\n\
+         // `key_map` is gated on `json` rather than `versioned`: the JSON key\n\
+         // transforms need it whenever the `json` entry points are compiled, and\n\
+         // `json` does not imply `versioned`.\n\
+         #[cfg(feature = \"json\")]\n\
+         pub(crate) mod key_map;\n\n",
     );
     for s in &series {
+        content.push_str("#[cfg(feature = \"versioned\")]\n");
         content.push_str(&format!("pub mod {s};\n"));
     }
 
@@ -111,12 +125,39 @@ fn write_generated_root_mod(generated_root: &Path) -> Result<()> {
     Ok(())
 }
 
+/// Parses every schema snapshot under `generator/schemas/` and returns all nodes.
+///
+/// The wire-key map must cover every series the crate can deserialize, so it is
+/// built from all snapshots rather than only the one being generated.  Versions
+/// are visited in sorted order so the emitted table is deterministic.
+fn parse_all_schema_versions(repo_root: &Path) -> Result<Vec<bo4e_generator::ast::SchemaNode>> {
+    let schemas_root = repo_root.join("generator").join("schemas");
+    let mut versions: Vec<PathBuf> = std::fs::read_dir(&schemas_root)
+        .with_context(|| format!("reading {}", schemas_root.display()))?
+        .filter_map(|e| e.ok())
+        .map(|e| e.path())
+        .filter(|p| p.is_dir())
+        .collect();
+    versions.sort();
+
+    let mut nodes = Vec::new();
+    for dir in &versions {
+        let version = dir
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or_default()
+            .to_owned();
+        nodes.extend(parse_schema_nodes(dir, &version)?);
+    }
+    Ok(nodes)
+}
+
 /// Extracts the 7-character series prefix from a full version tag.
 ///
-/// `"v202501.0.0"` → `"v202501"`
+/// `"v202607.0.0"` → `"v202607"`
 fn series_from_version(version: &str) -> Result<String> {
     if version.len() < 7 {
-        bail!("schema_version must be at least 7 characters (e.g. v202501.0.0), got: {version}");
+        bail!("schema_version must be at least 7 characters (e.g. v202607.0.0), got: {version}");
     }
     Ok(version[..7].to_owned())
 }

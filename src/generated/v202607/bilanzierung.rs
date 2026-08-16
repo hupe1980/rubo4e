@@ -169,7 +169,10 @@ pub struct Bilanzierung {
     /// Version der BO-Struktur aka "fachliche Versionierung"
     #[cfg_attr(feature = "serde", serde(rename = "_version"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(
+        feature = "builder",
+        builder(default = Some("v202607.0.0".to_owned()), setter(into))
+    )]
     pub version: Option<String>,
     /// Wahlrecht der Prognosegrundlage.
     #[cfg_attr(feature = "serde", serde(rename = "wahlrechtPrognosegrundlage"))]
@@ -217,7 +220,7 @@ impl Default for Bilanzierung {
             prognosegrundlage: Default::default(),
             temperatur_arbeit: Default::default(),
             verbrauchsaufteilung: Default::default(),
-            version: Default::default(),
+            version: Some("v202607.0.0".to_owned()),
             wahlrecht_prognosegrundlage: Default::default(),
             zeitreihentyp: Default::default(),
             zusatz_attribute: Default::default(),

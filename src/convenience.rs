@@ -13,26 +13,37 @@
 //!
 //! ## Extension traits
 //!
-//! [`BetragExt`], [`MengeExt`], and [`PreisExt`] are the primary ergonomic
+//! [`BetragExt`][be], [`MengeExt`][me], and [`PreisExt`][pe] are the primary ergonomic
 //! entry points for the common `Option<Com> → Option<Decimal>` pattern.  They
 //! eliminate the repetitive `.as_ref().and_then(|x| x.wert)` chain:
 //!
-//! ```rust,ignore
+//! ```
+//! # #[cfg(feature = "decimal")] {
 //! use rubo4e::prelude::*;  // re-exports BetragExt, MengeExt, PreisExt
+//! use rubo4e::current::{Betrag, Waehrungscode};
 //!
-//! // Before (requires two-level unwrap):
-//! let net = pos.gesamtpreis.as_ref().and_then(|b| b.wert);
-//! // After:
-//! let net = pos.gesamtpreis.wert_decimal();
+//! let gesamtpreis = Some(Betrag {
+//!     wert: Some(rust_decimal::Decimal::new(1250, 2)),
+//!     waehrung: Some(Waehrungscode::Eur),
+//!     ..Default::default()
+//! });
+//!
+//! // Before: `gesamtpreis.as_ref().and_then(|b| b.wert)`
+//! assert_eq!(gesamtpreis.wert_decimal(), Some(rust_decimal::Decimal::new(1250, 2)));
+//! # }
 //! ```
 //!
 //! Import via `use rubo4e::prelude::*` or individually via
 //! `use rubo4e::convenience::{BetragExt, MengeExt, PreisExt}`.
+//!
+//! [be]: crate::convenience::BetragExt
+//! [me]: crate::convenience::MengeExt
+//! [pe]: crate::convenience::PreisExt
 
 // ── Extension traits: Option<Com> → Option<Decimal> ─────────────────────────
 //
-// These resolve B-01: `Option<Betrag/Menge/Preis>` → `Option<Decimal>` in one
-// method call. Gated on both `versioned` (the struct) and `decimal` (the type).
+// Flatten `Option<Betrag/Menge/Preis>` to `Option<Decimal>` in one method call.
+// Gated on both `versioned` (the struct) and `decimal` (the type).
 
 /// Ergonomic access to the `wert` field of an [`Option<Betrag>`][crate::v202607::Betrag].
 ///
@@ -488,7 +499,8 @@ mod preisblatt_netznutzung_impl {
 
         /// Returns `true` if this price sheet's validity period contains `date`.
         ///
-        /// Uses [`Zeitraum::contains`] — a missing `gueltigkeit` is treated as
+        /// Uses [`Zeitraum::contains`][crate::v202607::Zeitraum::contains] — a
+        /// missing `gueltigkeit` is treated as
         /// "always invalid" (returns `false`).
         ///
         /// ```no_run

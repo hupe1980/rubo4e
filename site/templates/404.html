@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+
+{% block seo %}
+<title>Page not found · {{ config.title }}</title>
+<meta name="description" content="That page does not exist. Browse the rubo4e documentation instead.">
+<meta name="robots" content="noindex">
+{% endblock seo %}
+
+{% block content %}
+<section class="section">
+  <div class="wrap">
+    <h1>Page not found</h1>
+    <p class="section-lede">
+      That URL does not exist — it may have moved when the documentation was
+      reorganised.
+    </p>
+    <div class="cta">
+      <a class="btn btn-primary" href="{{ get_url(path='@/docs/_index.md') }}">Browse the docs</a>
+      <a class="btn" href="{{ get_url(path='@/_index.md') }}">Home</a>
+    </div>
+  </div>
+</section>
+{% endblock %}

@@ -91,7 +91,7 @@ mod golden_tests {
         let m: Marktlokation = serde_json::from_str(json).unwrap();
         assert_eq!(
             m.marktlokations_id.as_ref().map(|id| id.as_ref()),
-            Some("51238696780"),
+            Some("51238696781"),
             "marktlokationsId field"
         );
         assert!(

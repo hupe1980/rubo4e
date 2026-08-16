@@ -8,14 +8,21 @@
 //!
 //! The [`Bo4eStrict`](crate::Bo4eStrict) trait — implemented by every generated BO,
 //! COM, enum, and by `AnyBo` — walks a value **recursively** and reports the
-//! JSON-path of every enum field that decoded to `Unknown`. This turns the mako
+//! JSON-path of every enum field that decoded to `Unknown`. This turns the MaKo
 //! "round-trip as validation" pattern into an actually-strict one:
 //!
-//! ```rust,ignore
-//! use rubo4e::{Bo4eStrict, current::Netzlokation};
+//! ```
+//! # #[cfg(feature = "json")] {
+//! use rubo4e::{Bo4eStrict, current::Messlokation};
 //!
-//! let nelo: Netzlokation = serde_json::from_value(body)?;   // lenient decode
-//! nelo.ensure_known_enums()?;                               // reject Unknown anywhere
+//! // `sparte` carries a value this schema version does not define.
+//! let body = r#"{"messlokationsId":"DE0123456789012345678901234567890","sparte":"PLASMA"}"#;
+//! let melo: Messlokation = serde_json::from_str(body).unwrap();  // lenient decode
+//!
+//! // One call finds it, wherever it sits in the tree:
+//! let err = melo.ensure_known_enums().unwrap_err();
+//! assert_eq!(err.paths, ["sparte"]);
+//! # }
 //! ```
 //!
 //! One call replaces the hand-written `field == T::Unknown` checks scattered across

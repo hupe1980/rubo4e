@@ -9,7 +9,7 @@ use crate::error::IdentifierError;
 ///
 /// ## Format
 ///
-/// 1–35 printable ASCII characters (graphic characters, `0x21`–`0x7E`).  The
+/// 1–36 printable ASCII characters (graphic characters, `0x21`–`0x7E`).  The
 /// content is free-form within this envelope — in practice it is assigned by the
 /// MSB and often takes the form of a UUID or a composite of SR-ID + sequence number.
 ///
@@ -80,7 +80,7 @@ fn validate(s: &str) -> Result<(), IdentifierError> {
 }
 
 impl AkivId {
-    /// Creates a new `AkivId` after validation (1–35 printable ASCII characters).
+    /// Creates a new `AkivId` after validation (1–36 printable ASCII characters).
     ///
     /// # Errors
     /// - [`IdentifierError::InvalidLength`] if `s` is empty or longer than 35 characters.
@@ -95,72 +95,12 @@ impl AkivId {
 
 // ─── Standard trait implementations ─────────────────────────────────────────
 
-impl TryFrom<String> for AkivId {
-    type Error = IdentifierError;
-    fn try_from(s: String) -> Result<Self, Self::Error> {
-        Self::new(&s)
-    }
-}
-
-impl TryFrom<&str> for AkivId {
-    type Error = IdentifierError;
-    fn try_from(s: &str) -> Result<Self, Self::Error> {
-        Self::new(s)
-    }
-}
-
-impl AsRef<str> for AkivId {
-    fn as_ref(&self) -> &str {
-        &self.0
-    }
-}
-
-impl std::fmt::Display for AkivId {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(&self.0)
-    }
-}
-
-impl std::str::FromStr for AkivId {
-    type Err = IdentifierError;
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Self::new(s)
-    }
-}
-
-impl From<AkivId> for String {
-    fn from(a: AkivId) -> Self {
-        a.0.into()
-    }
-}
-
-#[cfg(feature = "serde")]
-impl serde::Serialize for AkivId {
-    fn serialize<S: serde::Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
-        s.serialize_str(&self.0)
-    }
-}
-
-#[cfg(feature = "serde")]
-impl<'de> serde::Deserialize<'de> for AkivId {
-    fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
-        struct Visitor;
-        impl<'de> serde::de::Visitor<'de> for Visitor {
-            type Value = AkivId;
-            fn expecting(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                f.write_str(
-                    "a non-empty Aktivierungs-ID string of up to 35 printable ASCII characters",
-                )
-            }
-            fn visit_str<E: serde::de::Error>(self, v: &str) -> Result<AkivId, E> {
-                AkivId::new(v).map_err(E::custom)
-            }
-        }
-        d.deserialize_str(Visitor)
-    }
-}
-
 // ─── Tests ───────────────────────────────────────────────────────────────────
+
+impl_identifier_traits!(
+    AkivId,
+    "an Aktivierungsidentifikator of 1-36 printable ASCII characters"
+);
 
 #[cfg(test)]
 mod tests {

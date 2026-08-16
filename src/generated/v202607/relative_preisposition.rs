@@ -1,5 +1,5 @@
 use super::{ComTyp, ZusatzAttribut};
-#[derive(Debug, Clone, PartialEq, Default)]
+#[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(not(feature = "json"), derive(Hash))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "builder", derive(typed_builder::TypedBuilder))]
@@ -39,7 +39,10 @@ pub struct RelativePreisposition {
     /// Version der COM-Struktur aka "fachliche Versionierung"
     #[cfg_attr(feature = "serde", serde(rename = "_version"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(
+        feature = "builder",
+        builder(default = Some("v202607.0.0".to_owned()), setter(into))
+    )]
     pub version: Option<String>,
     /// Der Modifikator in Prozent, der auf den Preis der referenzierten Preisposition angewendet wird.
     /// Der Wert wird multiplikativ angewendet. D.h. wenn bspw. ein Rabatt von 20% angewendet werden soll, muss der Wert
@@ -71,6 +74,20 @@ pub struct RelativePreisposition {
     #[cfg_attr(feature = "builder", builder(default, setter(skip)))]
     #[doc(hidden)]
     pub _additional: crate::LimitedExtensionMap,
+}
+impl Default for RelativePreisposition {
+    fn default() -> Self {
+        Self {
+            bezeichnung: Default::default(),
+            id: Default::default(),
+            id_referenz: Default::default(),
+            typ: Default::default(),
+            version: Some("v202607.0.0".to_owned()),
+            wert: Default::default(),
+            zusatz_attribute: Default::default(),
+            _additional: Default::default(),
+        }
+    }
 }
 #[cfg(feature = "json")]
 impl crate::json::sealed::Sealed for RelativePreisposition {}

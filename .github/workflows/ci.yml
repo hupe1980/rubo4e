@@ -38,11 +38,19 @@ jobs:
           RUSTFLAGS: "-D warnings"
         run: cargo check --workspace --all-targets --all-features
 
+      - name: Rustdoc (deny broken intra-doc links)
+        env:
+          RUSTDOCFLAGS: "-D warnings"
+        run: cargo doc --no-deps --all-features
+
       - name: Tests (all features)
         run: cargo test --workspace --all-features
 
       - name: Tests (no default features)
         run: cargo test --workspace --no-default-features
+
+      - name: Tests (no default features + versioned)
+        run: cargo test --workspace --no-default-features --features versioned
 
       - name: Docs-backed examples
         run: |
@@ -51,3 +59,107 @@ jobs:
 
       - name: Package check (publish dry-run)
         run: cargo publish --dry-run --locked
+
+  feature-matrix:
+    name: Feature combination (${{ matrix.features }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # `--all-features` cannot catch code that is dead unless an optional
+        # dependency is on, bindings left unread when a feature compiles a body
+        # away, or a feature that simply does not build alone. All three classes
+        # of defect shipped before this matrix existed, so every feature is
+        # checked in isolation as well as in realistic combinations.
+        features:
+          # Each feature on its own.
+          - serde
+          - json
+          - time
+          - decimal
+          - builder
+          - validate
+          - schemars
+          - sqlx
+          - utoipa
+          - strum
+          - tracing
+          - metrics
+          - identifiers
+          - versioned
+          # Realistic combinations.
+          - versioned,json
+          - versioned,json,time,decimal
+          - versioned,validate
+          - versioned,builder,validate
+          - versioned,json,schemars,utoipa
+          - versioned,json,simd-json
+          - versioned,sqlx
+          - versioned,json,sqlx
+          - versioned,strum,tracing,metrics
+          - json,time,decimal,builder,validate,schemars,utoipa,strum
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Check (deny warnings)
+        env:
+          RUSTFLAGS: "-D warnings"
+        run: >
+          cargo check --workspace --all-targets
+          --no-default-features --features ${{ matrix.features }}
+
+  msrv:
+    name: Minimum supported Rust version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read rust-version from Cargo.toml
+        id: msrv
+        run: echo "version=$(sed -n 's/^rust-version *= *"\(.*\)"/\1/p' Cargo.toml | head -1)" >> "$GITHUB_OUTPUT"
+
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ steps.msrv.outputs.version }}
+
+      - uses: Swatinem/rust-cache@v2
+
+      # Verifies the declared MSRV is real. Without this the `rust-version` key
+      # is an unchecked promise that any new std API silently breaks.
+      - name: Check on MSRV
+        run: cargo check --workspace --all-features
+
+  codegen:
+    name: Generated code is in sync
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Codegen size guard
+        run: bash scripts/check_codegen_size.sh
+
+      # Catches hand-edits to src/generated/ and generator changes that were
+      # never re-run, either of which makes the committed code a lie.
+      - name: Regenerate and diff
+        run: |
+          cargo run -p bo4e-generator -- --schema-version v202607.0.0
+          cargo fmt --all
+          if ! git diff --quiet -- src/generated; then
+            echo "::error::src/generated/ is out of sync with the generator. Run 'just generate'."
+            git diff --stat -- src/generated
+            git diff -- src/generated | head -200
+            exit 1
+          fi
+          echo "src/generated/ is in sync with the generator."
+
+  deny:
+    name: Licenses and advisories
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: EmbarkStudios/cargo-deny-action@v2

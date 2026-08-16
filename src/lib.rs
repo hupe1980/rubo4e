@@ -41,8 +41,9 @@
 //!
 //! ## `serde` is enabled by default
 //!
-//! The `serde` feature is included in `default = ["serde"]`.  Targets that only
-//! need the type definitions for in-memory processing can opt out:
+//! The default feature set is `default = ["identifiers"]`, and `identifiers`
+//! enables `serde`.  Targets that only need the type definitions for in-memory
+//! processing can opt out:
 //! ```toml
 //! rubo4e = { version = "...", default-features = false, features = ["versioned"] }
 //! ```
@@ -129,8 +130,12 @@ pub mod schema_helpers;
 ///
 /// These are referenced from generated code via
 /// `#[serde(with = "crate::time_serde::opt_date_serde")]`.
-#[cfg(feature = "time")]
-#[cfg_attr(docsrs, doc(cfg(feature = "time")))]
+///
+/// The module is pure serde glue, so it needs `serde` as well as `time`; the
+/// generated `serde(with = …)` attributes that reference it are themselves
+/// gated on `serde`.
+#[cfg(all(feature = "time", feature = "serde"))]
+#[cfg_attr(docsrs, doc(cfg(all(feature = "time", feature = "serde"))))]
 pub mod time_serde;
 
 /// Strict-decoding support: reject out-of-schema (`Unknown`) enum values anywhere
@@ -139,18 +144,28 @@ pub mod time_serde;
 #[cfg_attr(docsrs, doc(cfg(feature = "versioned")))]
 pub mod strict;
 
-// Versioned schema modules — emitted by the generator; gated behind `versioned`.
-// Run `just generate` to populate or refresh these modules.
-#[cfg(feature = "versioned")]
+// Generator output.  Run `just generate` to populate or refresh it.
+//
+// This holds two independently gated things: the versioned schema modules
+// (`versioned`) and the wire-key ↔ snake_case map the JSON key transforms need
+// (`json`).  Neither feature implies the other, so the module is compiled when
+// either is on and its contents are gated individually in the generated
+// `mod.rs`.
+#[cfg(any(feature = "versioned", feature = "json"))]
 #[allow(missing_docs)]
 mod generated;
 
 /// Hand-written convenience methods on generated BO4E types.
 ///
-/// Provides ergonomic accessors such as [`Zeitraum::as_closed_range`],
-/// [`Rechnung::billing_period`], and [`PreisblattNetznutzung::validity`].
+/// Provides ergonomic accessors such as [`Zeitraum::as_closed_range`][az],
+/// [`Rechnung::billing_period`][bp], and [`PreisblattNetznutzung::validity`][va].
+///
 /// All methods are gated on the feature flags that make their return types
 /// available (`versioned`, `time`, `decimal`).
+///
+/// [az]: crate::current::Zeitraum::as_closed_range
+/// [bp]: crate::current::Rechnung::billing_period
+/// [va]: crate::current::PreisblattNetznutzung::validity
 #[cfg(feature = "versioned")]
 #[cfg_attr(docsrs, doc(cfg(feature = "versioned")))]
 pub mod convenience;
@@ -197,20 +212,23 @@ pub mod current {
 /// definition in `src/lib.rs` can serve all schema versions while keeping each
 /// version's `BoTyp` enum strongly typed.  For `dyn` usage, bind the associated type:
 ///
-/// ```rust,ignore
-/// use rubo4e::v202607::BoTyp;
-/// let objects: Vec<Box<dyn rubo4e::Bo4eObject<BoTyp = BoTyp>>> = vec![
+/// ```
+/// use rubo4e::current::{BoTyp, Marktlokation, Vertrag};
+/// use rubo4e::Bo4eObject;
+///
+/// let objects: Vec<Box<dyn Bo4eObject<BoTyp = BoTyp>>> = vec![
 ///     Box::new(Vertrag::default()),
 ///     Box::new(Marktlokation::default()),
 /// ];
-/// for obj in &objects {
-///     println!("{:?} schema={}", obj.bo_type(), obj.schema_version());
-/// }
+/// let types: Vec<BoTyp> = objects.iter().map(|o| o.bo_type()).collect();
+/// assert_eq!(types, [BoTyp::Vertrag, BoTyp::Marktlokation]);
 /// ```
 ///
 /// # Example
-/// ```rust,ignore
-/// use rubo4e::prelude::*;
+/// ```
+/// use rubo4e::current::{BoTyp, Vertrag};
+/// use rubo4e::Bo4eObject as _;
+///
 /// let v = Vertrag::default();
 /// assert_eq!(v.bo_type(), BoTyp::Vertrag);
 /// assert_eq!(v.schema_version(), "v202607.0.0");
@@ -260,8 +278,8 @@ pub mod bo4e_object_sealed {
 /// database `CHECK` list covers `T::VARIANTS`).
 ///
 /// # Example
-/// ```rust,ignore
-/// use rubo4e::{Bo4eEnum, current::Zaehlertyp};
+/// ```
+/// use rubo4e::{current::Zaehlertyp, Bo4eEnum};
 ///
 /// // Introspection without `strum`:
 /// assert_eq!(Zaehlertyp::COUNT, Zaehlertyp::VARIANTS.len());
@@ -271,8 +289,10 @@ pub mod bo4e_object_sealed {
 /// assert!(Zaehlertyp::from_wire("NOT_A_REAL_VALUE").is_err());
 ///
 /// // Detect lenient-decode fall-through:
-/// let z: Zaehlertyp = serde_json::from_value(serde_json::json!("BOGUS")).unwrap();
+/// # #[cfg(feature = "json")] {
+/// let z: Zaehlertyp = serde_json::from_str("\"BOGUS\"").unwrap();
 /// assert!(z.is_unknown());
+/// # }
 /// ```
 ///
 /// # Sealed trait
@@ -332,11 +352,17 @@ pub mod bo4e_enum_sealed {
 /// "round-trip as validation" pattern *actually* strict at an ingest boundary,
 /// with a single call instead of hand-checking every enum field:
 ///
-/// ```rust,ignore
-/// use rubo4e::{Bo4eStrict, current::Netzlokation};
+/// ```
+/// # #[cfg(feature = "json")] {
+/// use rubo4e::{current::Messlokation, Bo4eStrict};
 ///
-/// let nelo: Netzlokation = serde_json::from_value(body)?;   // lenient decode
-/// nelo.ensure_known_enums()?;                               // 422 if any Unknown, anywhere
+/// let body = r#"{"messlokationsId":"DE0123456789012345678901234567890","sparte":"PLASMA"}"#;
+/// let melo: Messlokation = serde_json::from_str(body).unwrap();  // lenient decode
+///
+/// // 422 if any Unknown, anywhere:
+/// assert_eq!(melo.unknown_enum_paths(), ["sparte"]);
+/// assert!(melo.ensure_known_enums().is_err());
+/// # }
 /// ```
 ///
 /// Paths are reported relative to the checked value, using dotted field names and
@@ -397,8 +423,8 @@ pub trait Bo4eStrict {
 pub mod prelude {
     pub use crate::error::{IdentifierError, UnknownVariant};
     pub use crate::identifiers::{
-        AkivId, BilanzkreisId, EicCode, EicDomain, MaloId, MarktpartnerId, MeloId, NeloId,
-        ObisCode, ObisComponents, SrId, TrId, TranchennummerId,
+        AkivId, BilanzierungsgebietId, BilanzkreisId, EicCode, EicType, MaloId, MarktpartnerId,
+        MeloId, NeloId, ObisCode, ObisComponents, SrId, TrId, TranchennummerId,
     };
 
     /// Uniform enum introspection + strict parsing (`VARIANTS`, `from_wire`, …).
@@ -408,6 +434,11 @@ pub mod prelude {
     /// Recursive strict-decode check (`ensure_known_enums`, `unknown_enum_paths`).
     #[cfg(feature = "versioned")]
     pub use crate::Bo4eStrict;
+
+    /// The trait providing `.validate()`, re-exported so callers do not need a
+    /// direct `garde` dependency just to run the derived rules.
+    #[cfg(feature = "validate")]
+    pub use garde::Validate;
 
     #[cfg(feature = "validate")]
     pub use crate::validation::Validated;

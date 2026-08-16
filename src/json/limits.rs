@@ -61,37 +61,57 @@ pub(super) fn trace_json_outcome(
     );
 }
 
-/// Increments the process-wide atomic counter for the given limit kind.
-fn increment_limit_counter(kind: &'static str) {
-    match kind {
-        "payload_bytes" => {
-            JSON_LIMIT_HIT_PAYLOAD_BYTES.fetch_add(1, Ordering::Relaxed);
-        }
-        "nesting_depth" => {
-            JSON_LIMIT_HIT_NESTING_DEPTH.fetch_add(1, Ordering::Relaxed);
-        }
-        "extension_value_bytes" => {
-            JSON_LIMIT_HIT_EXTENSION_VALUE_BYTES.fetch_add(1, Ordering::Relaxed);
-        }
-        "extension_field_count" => {
-            JSON_LIMIT_HIT_EXTENSION_FIELD_COUNT.fetch_add(1, Ordering::Relaxed);
-        }
-        "extension_key_len" => {
-            JSON_LIMIT_HIT_EXTENSION_KEY_LEN.fetch_add(1, Ordering::Relaxed);
-        }
-        _ => {
-            debug_assert!(false, "unknown limit kind: {kind}");
-        }
-    }
-    #[cfg(feature = "metrics")]
-    metrics::counter!("bo4e_json_limit_hit_total", "kind" => kind).increment(1);
+/// The resource limits this crate enforces while parsing JSON.
+///
+/// A closed enum rather than a string tag: it makes the counter dispatch below
+/// exhaustive, so adding a limit cannot silently miss its counter.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum LimitKind {
+    PayloadBytes,
+    NestingDepth,
+    ExtensionValueBytes,
+    ExtensionFieldCount,
+    ExtensionKeyLen,
 }
 
-pub(super) fn trace_limit_violation(kind: &'static str, actual: usize, limit: usize) {
-    increment_limit_counter(kind);
+impl LimitKind {
+    /// Stable label used for `tracing` fields and the `metrics` counter tag.
+    #[cfg(any(feature = "tracing", feature = "metrics"))]
+    const fn as_str(self) -> &'static str {
+        match self {
+            Self::PayloadBytes => "payload_bytes",
+            Self::NestingDepth => "nesting_depth",
+            Self::ExtensionValueBytes => "extension_value_bytes",
+            Self::ExtensionFieldCount => "extension_field_count",
+            Self::ExtensionKeyLen => "extension_key_len",
+        }
+    }
+
+    fn counter(self) -> &'static AtomicU64 {
+        match self {
+            Self::PayloadBytes => &JSON_LIMIT_HIT_PAYLOAD_BYTES,
+            Self::NestingDepth => &JSON_LIMIT_HIT_NESTING_DEPTH,
+            Self::ExtensionValueBytes => &JSON_LIMIT_HIT_EXTENSION_VALUE_BYTES,
+            Self::ExtensionFieldCount => &JSON_LIMIT_HIT_EXTENSION_FIELD_COUNT,
+            Self::ExtensionKeyLen => &JSON_LIMIT_HIT_EXTENSION_KEY_LEN,
+        }
+    }
+}
+
+pub(super) fn trace_limit_violation(kind: LimitKind, actual: usize, limit: usize) {
+    kind.counter().fetch_add(1, Ordering::Relaxed);
+
+    #[cfg(feature = "metrics")]
+    metrics::counter!("bo4e_json_limit_hit_total", "kind" => kind.as_str()).increment(1);
+
     #[cfg(feature = "tracing")]
-    tracing::warn!(kind, actual, limit, "bo4e json parse limit exceeded");
-    #[cfg(not(feature = "tracing"))]
+    tracing::warn!(
+        kind = kind.as_str(),
+        actual,
+        limit,
+        "bo4e json parse limit exceeded"
+    );
+    #[cfg(not(any(feature = "tracing", feature = "metrics")))]
     let _ = (actual, limit);
 }
 
@@ -172,6 +192,92 @@ impl JsonParseLimits {
     }
 }
 
+// ─── Parse-time extension budget ─────────────────────────────────────────────
+//
+// The extension caps must apply to *every* struct in the payload, not just the
+// root.  A post-hoc check on the deserialized root can only ever see the root's
+// own `_additional` map, so extension data hidden inside a nested COM (e.g.
+// `marktlokation.lokationsadresse`) escapes it entirely.
+//
+// The budget is therefore installed for the duration of one hardened call and
+// consulted by `LimitedExtensionMap::deserialize` at every nesting level.  That
+// also makes enforcement fail-fast: an oversized payload is rejected while it is
+// being parsed, instead of after the whole tree has been materialized.
+//
+// A thread-local is sound here because a single `from_json_*` call is entirely
+// synchronous — it never yields, so no other task can observe or share the
+// scope.  `BudgetGuard` saves and restores the previous value, so nested
+// hardened calls compose correctly.
+
+thread_local! {
+    static EXTENSION_BUDGET: std::cell::Cell<Option<ExtensionBudget>> =
+        const { std::cell::Cell::new(None) };
+}
+
+/// Remaining extension allowance for the hardened call currently in progress.
+#[derive(Debug, Clone, Copy)]
+pub(super) struct ExtensionBudget {
+    /// Cumulative value-byte allowance left for the whole payload.
+    remaining_bytes: Option<usize>,
+    /// Per-struct field-count cap (not consumed; re-checked at each struct).
+    max_fields_per_struct: Option<usize>,
+}
+
+/// RAII guard that installs an [`ExtensionBudget`] and restores the previous one.
+pub(super) struct BudgetGuard(Option<ExtensionBudget>);
+
+impl Drop for BudgetGuard {
+    fn drop(&mut self) {
+        EXTENSION_BUDGET.with(|b| b.set(self.0));
+    }
+}
+
+/// Installs the extension budget described by `limits` for the current scope.
+///
+/// Returns `None` when `limits` constrains nothing, so the common path costs no
+/// thread-local access during parsing.
+pub(super) fn install_extension_budget(limits: JsonParseLimits) -> Option<BudgetGuard> {
+    if limits.max_extension_value_bytes.is_none() && limits.max_extension_field_count.is_none() {
+        return None;
+    }
+    let budget = ExtensionBudget {
+        remaining_bytes: limits.max_extension_value_bytes,
+        max_fields_per_struct: limits.max_extension_field_count,
+    };
+    let previous = EXTENSION_BUDGET.with(|b| b.replace(Some(budget)));
+    Some(BudgetGuard(previous))
+}
+
+/// Returns the per-struct extension field-count cap, if a budget is installed.
+#[inline]
+pub(super) fn budget_max_fields_per_struct() -> Option<usize> {
+    EXTENSION_BUDGET
+        .with(|b| b.get())
+        .and_then(|b| b.max_fields_per_struct)
+}
+
+/// Charges `bytes` against the cumulative value-byte allowance.
+///
+/// Returns `Err` with the exceeded limit once the allowance is exhausted. A
+/// no-op when no budget is installed or no byte cap was configured.
+#[inline]
+pub(super) fn charge_extension_bytes(bytes: usize) -> Result<(), usize> {
+    EXTENSION_BUDGET.with(|cell| {
+        let Some(mut budget) = cell.get() else {
+            return Ok(());
+        };
+        let Some(remaining) = budget.remaining_bytes else {
+            return Ok(());
+        };
+        let Some(left) = remaining.checked_sub(bytes) else {
+            return Err(bytes);
+        };
+        budget.remaining_bytes = Some(left);
+        cell.set(Some(budget));
+        Ok(())
+    })
+}
+
 /// Default maximum JSON nesting depth for all non-hardened deserialization paths.
 ///
 /// Valid BO4E structures are at most 6–8 levels deep in practice.  128 is a
@@ -184,6 +290,9 @@ pub(super) const DEFAULT_MAX_NESTING_DEPTH: usize = 128;
 
 /// Scans `bytes` for the maximum JSON nesting depth without parsing.
 ///
+/// Only reachable on the `simd-json` code path; the `serde_json` path enforces
+/// depth inline via `DepthLimitedDeserializer` and never needs a pre-scan.
+///
 /// This is a single-pass linear scan that correctly skips `{` / `[` / `}` / `]`
 /// characters inside JSON string values (honouring `\"` escape sequences).  It
 /// does **not** do full JSON validation — it is only used to guard against
@@ -193,6 +302,7 @@ pub(super) const DEFAULT_MAX_NESTING_DEPTH: usize = 128;
 /// on code paths where `simd-json` is active, because the SIMD parser does not
 /// support visitor wrapping and therefore cannot use `DepthLimitedDeserializer`.
 /// The `_hardened` variants use the true single-pass visitor approach instead.
+#[cfg(feature = "simd-json")]
 pub(super) fn scan_max_nesting_depth(bytes: &[u8]) -> usize {
     let mut depth: usize = 0;
     let mut max: usize = 0;
@@ -232,7 +342,7 @@ pub(super) fn check_payload_limit(
 ) -> Result<(), serde_json::Error> {
     if let Some(max) = limits.max_payload_bytes {
         if payload_len > max {
-            trace_limit_violation("payload_bytes", payload_len, max);
+            trace_limit_violation(LimitKind::PayloadBytes, payload_len, max);
             return Err(serde_json::Error::custom(format!(
                 "payload too large: {payload_len} bytes exceeds limit {max}"
             )));
@@ -245,10 +355,11 @@ pub(super) fn check_payload_limit(
 ///
 /// Returns a serde error if the depth is exceeded.  Called on paths where
 /// `DepthLimitedDeserializer` cannot be used (simd-json).
+#[cfg(feature = "simd-json")]
 pub(super) fn check_default_depth(bytes: &[u8]) -> Result<(), serde_json::Error> {
     let actual = scan_max_nesting_depth(bytes);
     if actual > DEFAULT_MAX_NESTING_DEPTH {
-        trace_limit_violation("nesting_depth", actual, DEFAULT_MAX_NESTING_DEPTH);
+        trace_limit_violation(LimitKind::NestingDepth, actual, DEFAULT_MAX_NESTING_DEPTH);
         Err(serde_json::Error::custom(format!(
             "JSON nesting depth {actual} exceeds default limit {DEFAULT_MAX_NESTING_DEPTH}; \
              use from_json_german_hardened with a JsonParseLimits to adjust"

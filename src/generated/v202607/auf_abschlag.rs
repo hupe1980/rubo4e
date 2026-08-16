@@ -2,7 +2,7 @@ use super::{
     AufAbschlagstyp, AufAbschlagsziel, ComTyp, Preisstaffel, Waehrungseinheit, Zeitraum,
     ZusatzAttribut,
 };
-#[derive(Debug, Clone, PartialEq, Default)]
+#[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(not(feature = "json"), derive(Hash))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "builder", derive(typed_builder::TypedBuilder))]
@@ -65,7 +65,10 @@ pub struct AufAbschlag {
     /// Version der COM-Struktur aka "fachliche Versionierung"
     #[cfg_attr(feature = "serde", serde(rename = "_version"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(
+        feature = "builder",
+        builder(default = Some("v202607.0.0".to_owned()), setter(into))
+    )]
     pub version: Option<String>,
     /// Internetseite, auf der die Informationen zum Auf-/Abschlag veröffentlicht sind.
     #[cfg_attr(feature = "serde", serde(rename = "website"))]
@@ -87,6 +90,25 @@ pub struct AufAbschlag {
     #[cfg_attr(feature = "builder", builder(default, setter(skip)))]
     #[doc(hidden)]
     pub _additional: crate::LimitedExtensionMap,
+}
+impl Default for AufAbschlag {
+    fn default() -> Self {
+        Self {
+            auf_abschlagstyp: Default::default(),
+            auf_abschlagsziel: Default::default(),
+            beschreibung: Default::default(),
+            bezeichnung: Default::default(),
+            einheit: Default::default(),
+            gueltigkeitszeitraum: Default::default(),
+            id: Default::default(),
+            staffeln: Default::default(),
+            typ: Default::default(),
+            version: Some("v202607.0.0".to_owned()),
+            website: Default::default(),
+            zusatz_attribute: Default::default(),
+            _additional: Default::default(),
+        }
+    }
 }
 #[cfg(feature = "json")]
 impl crate::json::sealed::Sealed for AufAbschlag {}

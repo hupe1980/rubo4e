@@ -44,7 +44,10 @@ pub struct Energiemenge {
     /// Version der BO-Struktur aka "fachliche Versionierung"
     #[cfg_attr(feature = "serde", serde(rename = "_version"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(
+        feature = "builder",
+        builder(default = Some("v202607.0.0".to_owned()), setter(into))
+    )]
     pub version: Option<String>,
     /// Zeitraum, in dem die Energiemenge angefallen ist/gemessen wurde
     #[cfg_attr(feature = "serde", serde(rename = "zeitraum"))]
@@ -75,7 +78,7 @@ impl Default for Energiemenge {
             id: Default::default(),
             menge: Default::default(),
             obis_kennzahl: Default::default(),
-            version: Default::default(),
+            version: Some("v202607.0.0".to_owned()),
             zeitraum: Default::default(),
             zusatz_attribute: Default::default(),
             _additional: Default::default(),

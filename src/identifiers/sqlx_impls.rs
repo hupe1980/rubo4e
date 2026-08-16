@@ -3,38 +3,44 @@
 //! ## What is implemented
 //!
 //! When the `sqlx` feature is enabled the following traits are implemented for
-//! **all** identifier types (`MaloId`, `MeloId`, `NeloId`, `SrId`, `TrId`,
-//! `EicCode`, `MarktpartnerId`, `ObisCode`):
+//! **every** identifier type in [`crate::identifiers`]:
 //!
 //! | Trait | Effect |
 //! |-------|--------|
 //! | `sqlx::Type<Postgres>` | maps to PostgreSQL `TEXT` |
 //! | `sqlx::Encode<'_, Postgres>` | binds as `&str` (zero-copy) |
 //! | `sqlx::Decode<'_, Postgres>` | reads `TEXT`, validates, returns typed ID |
+//! | `sqlx::postgres::PgHasArrayType` | maps `Vec<Id>` to a `TEXT[]` column |
 //!
 //! ## Usage
 //!
 //! Use the identifier type directly as a bind parameter or result column:
 //!
-//! ```rust,ignore
+//! ```no_run
 //! use rubo4e::identifiers::{MaloId, MarktpartnerId};
+//! use sqlx::Row as _;
 //!
+//! # async fn demo(pool: sqlx::PgPool, malo_id: MaloId) -> Result<(), sqlx::Error> {
 //! // As a query bind parameter:
 //! sqlx::query("INSERT INTO malo (id) VALUES ($1)")
 //!     .bind(&malo_id)          // MaloId implements Encode
 //!     .execute(&pool).await?;
 //!
 //! // As a result column via try_get:
+//! let row = sqlx::query("SELECT malo_id, mp_id FROM parties LIMIT 1")
+//!     .fetch_one(&pool).await?;
 //! let id: MaloId = row.try_get("malo_id")?;
 //! let mp: MarktpartnerId = row.try_get("mp_id")?;
 //!
-//! // As a struct field in query_as!:
+//! // As a struct field with FromRow:
 //! #[derive(sqlx::FromRow)]
 //! struct MpRow {
 //!     mp_id: MarktpartnerId,   // decoded + validated automatically
 //! }
 //! let rows: Vec<MpRow> = sqlx::query_as("SELECT mp_id FROM parties")
 //!     .fetch_all(&pool).await?;
+//! # Ok(())
+//! # }
 //! ```
 //!
 //! ## Error behaviour
@@ -44,19 +50,25 @@
 //! digit) causes `row.try_get(...)` to return `Err(...)` wrapping an
 //! [`IdentifierError`](crate::error::IdentifierError).
 //!
-//! ## `PgHasArrayType`
+//! ## Array columns
 //!
-//! `PgHasArrayType` is **not** implemented — PostgreSQL array columns (`TEXT[]`)
-//! are not needed for energy-market identifiers and the blanket impl would pull
-//! in additional SQLx internals.  If you need array support, implement it locally:
+//! `PgHasArrayType` is implemented for every identifier, so `Vec<MaloId>` binds
+//! to a `TEXT[]` column directly:
 //!
-//! ```rust,ignore
-//! impl sqlx::postgres::PgHasArrayType for MaloId {
-//!     fn array_type_info() -> sqlx::postgres::PgTypeInfo {
-//!         <String as sqlx::postgres::PgHasArrayType>::array_type_info()
-//!     }
-//! }
+//! ```no_run
+//! use rubo4e::identifiers::MaloId;
+//!
+//! # async fn demo(pool: sqlx::PgPool, ids: Vec<MaloId>) -> Result<(), sqlx::Error> {
+//! sqlx::query("SELECT * FROM malo WHERE id = ANY($1)")
+//!     .bind(&ids)
+//!     .fetch_all(&pool).await?;
+//! # Ok(())
+//! # }
 //! ```
+//!
+//! This has to live here rather than in downstream code: both `PgHasArrayType`
+//! and the identifier types are foreign to any consuming crate, so the orphan
+//! rule makes a local impl impossible.
 
 /// Stamps out `sqlx::Type + Encode + Decode` for a newtype that wraps a
 /// validated string and implements `TryFrom<String>` + `AsRef<str>`.
@@ -86,24 +98,38 @@ macro_rules! impl_sqlx_text {
                 Self::try_from(s).map_err(|e| Box::new(e) as sqlx::error::BoxDynError)
             }
         }
+
+        // Lets `Vec<$T>` bind to a `TEXT[]` column.  Only this crate can provide
+        // it: the trait and the type are both foreign to any consumer, so the
+        // orphan rule rules out a downstream impl.
+        impl sqlx::postgres::PgHasArrayType for $T {
+            fn array_type_info() -> sqlx::postgres::PgTypeInfo {
+                <String as sqlx::postgres::PgHasArrayType>::array_type_info()
+            }
+        }
     )+};
 }
 
 use crate::identifiers::{
-    AkivId, BilanzkreisId, EicCode, MaloId, MarktpartnerId, MeloId, NeloId, ObisCode, SrId, TrId,
-    TranchennummerId,
+    AkivId, BilanzierungsgebietId, BilanzkreisId, CrId, EicCode, MaloId, MarktpartnerId, MeloId,
+    NebeId, NeloId, ObisCode, PaketId, SgId, SrId, TrId, TranchennummerId,
 };
 
 impl_sqlx_text!(
+    AkivId,
+    BilanzierungsgebietId,
+    BilanzkreisId,
+    CrId,
+    EicCode,
     MaloId,
+    MarktpartnerId,
     MeloId,
+    NebeId,
     NeloId,
+    ObisCode,
+    PaketId,
+    SgId,
     SrId,
     TrId,
-    EicCode,
-    MarktpartnerId,
-    ObisCode,
-    BilanzkreisId,
-    AkivId,
-    TranchennummerId
+    TranchennummerId,
 );

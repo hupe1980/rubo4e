@@ -2,7 +2,7 @@ use super::{
     ComTyp, Energierichtung, Konzessionsabgabe, Mengeneinheit, Messwert, Verbrauchsart,
     VerwendungszweckProMarktrolle, Waermenutzung, Zaehlzeitregister, ZusatzAttribut,
 };
-#[derive(Debug, Clone, PartialEq, Default)]
+#[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(not(feature = "json"), derive(Hash))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "builder", derive(typed_builder::TypedBuilder))]
@@ -90,7 +90,10 @@ pub struct Zaehlwerk {
     /// Version der COM-Struktur aka "fachliche Versionierung"
     #[cfg_attr(feature = "serde", serde(rename = "_version"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(
+        feature = "builder",
+        builder(default = Some("v202607.0.0".to_owned()), setter(into))
+    )]
     pub version: Option<String>,
     /// Verwendungungszweck der Werte Marktlokation
     #[cfg_attr(feature = "serde", serde(rename = "verwendungszwecke"))]
@@ -147,6 +150,35 @@ pub struct Zaehlwerk {
     #[cfg_attr(feature = "builder", builder(default, setter(skip)))]
     #[doc(hidden)]
     pub _additional: crate::LimitedExtensionMap,
+}
+impl Default for Zaehlwerk {
+    fn default() -> Self {
+        Self {
+            anzahl_ablesungen: Default::default(),
+            bezeichnung: Default::default(),
+            einheit: Default::default(),
+            id: Default::default(),
+            ist_abrechnungsrelevant: Default::default(),
+            ist_schwachlastfaehig: Default::default(),
+            ist_steuerbefreit: Default::default(),
+            konzessionsabgabe: Default::default(),
+            messwerte: Default::default(),
+            nachkommastelle: Default::default(),
+            obis_kennzahl: Default::default(),
+            richtung: Default::default(),
+            typ: Default::default(),
+            verbrauchsart: Default::default(),
+            version: Some("v202607.0.0".to_owned()),
+            verwendungszwecke: Default::default(),
+            vorkommastelle: Default::default(),
+            waermenutzung: Default::default(),
+            wandlerfaktor: Default::default(),
+            zaehlwerk_id: Default::default(),
+            zaehlzeitregister: Default::default(),
+            zusatz_attribute: Default::default(),
+            _additional: Default::default(),
+        }
+    }
 }
 #[cfg(feature = "json")]
 impl crate::json::sealed::Sealed for Zaehlwerk {}

@@ -151,3 +151,71 @@ mod extension_data_tests {
         );
     }
 }
+
+/// snake_case mode must be lossless for the BO4E field names whose snake form
+/// has no algorithmic inverse.
+///
+/// These four types are the whole population of that problem in v202607:
+/// `hoechstpreisHT`/`hoechstpreisNT` (trailing acronym), `kundengruppeKA`
+/// (trailing acronym), and `Sigmoidparameter`'s single-letter `A`–`D`. Each one
+/// previously deserialized into `_additional` instead of its typed field, so a
+/// `to_json_snake_case` → `from_json_snake_case` round-trip returned a value that
+/// compared unequal while reporting no error.
+#[cfg(all(feature = "versioned", feature = "json", feature = "decimal"))]
+mod snake_case_round_trip {
+    use rubo4e::current::{
+        KundengruppeKa, Preis, PreisblattKonzessionsabgabe, Sigmoidparameter,
+        Tarifberechnungsparameter,
+    };
+    use rubo4e::json::Bo4eJsonExt;
+    use rubo4e::prelude::*;
+    use rust_decimal::Decimal;
+
+    /// Asserts a value survives snake_case serialization + deserialization with
+    /// nothing diverted into the extension-data bag.
+    fn assert_lossless<T>(value: &T)
+    where
+        T: Bo4eJsonExt + Bo4eExtensionData + PartialEq + std::fmt::Debug,
+    {
+        let json = value.to_json_snake_case().expect("serialize");
+        let back = T::from_json_snake_case(&json).expect("deserialize");
+        assert!(
+            !back.has_extension_data(),
+            "snake_case round-trip diverted fields into extension data: {:?} (from {json})",
+            back.extension_data(),
+        );
+        assert_eq!(&back, value, "snake_case round-trip changed the value");
+    }
+
+    #[test]
+    fn sigmoidparameter_single_letter_fields() {
+        assert_lossless(&Sigmoidparameter {
+            a: Some(Decimal::new(15, 1)),
+            b: Some(Decimal::new(25, 1)),
+            c: Some(Decimal::new(35, 1)),
+            d: Some(Decimal::new(45, 1)),
+            ..Default::default()
+        });
+    }
+
+    #[test]
+    fn tarifberechnungsparameter_trailing_acronyms() {
+        let preis = |v: i64| Preis {
+            wert: Some(Decimal::new(v, 2)),
+            ..Default::default()
+        };
+        assert_lossless(&Tarifberechnungsparameter {
+            hoechstpreis_ht: Some(preis(9900)),
+            hoechstpreis_nt: Some(preis(4200)),
+            ..Default::default()
+        });
+    }
+
+    #[test]
+    fn preisblatt_konzessionsabgabe_trailing_acronym() {
+        assert_lossless(&PreisblattKonzessionsabgabe {
+            kundengruppe_ka: Some(KundengruppeKa::SSchwachlast),
+            ..Default::default()
+        });
+    }
+}

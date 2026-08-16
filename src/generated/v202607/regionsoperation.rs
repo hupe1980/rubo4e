@@ -1,5 +1,5 @@
 use super::{ComTyp, Operator, Regionskriterium, ZusatzAttribut};
-#[derive(Debug, Clone, PartialEq, Default)]
+#[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(not(feature = "json"), derive(Hash))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "builder", derive(typed_builder::TypedBuilder))]
@@ -67,7 +67,10 @@ pub struct Regionsoperation {
     /// Version der COM-Struktur aka "fachliche Versionierung"
     #[cfg_attr(feature = "serde", serde(rename = "_version"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(
+        feature = "builder",
+        builder(default = Some("v202607.0.0".to_owned()), setter(into))
+    )]
     pub version: Option<String>,
     /// (inklusiv)
     #[cfg_attr(feature = "serde", serde(rename = "wertBis"))]
@@ -94,6 +97,25 @@ pub struct Regionsoperation {
     #[cfg_attr(feature = "builder", builder(default, setter(skip)))]
     #[doc(hidden)]
     pub _additional: crate::LimitedExtensionMap,
+}
+impl Default for Regionsoperation {
+    fn default() -> Self {
+        Self {
+            bezeichnung: Default::default(),
+            bezeichnung2: Default::default(),
+            id: Default::default(),
+            prioritaet: Default::default(),
+            radius_in_km: Default::default(),
+            regionskriterium: Default::default(),
+            regionsoperator: Default::default(),
+            typ: Default::default(),
+            version: Some("v202607.0.0".to_owned()),
+            wert_bis: Default::default(),
+            wert_von: Default::default(),
+            zusatz_attribute: Default::default(),
+            _additional: Default::default(),
+        }
+    }
 }
 #[cfg(feature = "json")]
 impl crate::json::sealed::Sealed for Regionsoperation {}

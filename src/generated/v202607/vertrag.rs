@@ -56,7 +56,10 @@ pub struct Vertrag {
     /// Version der BO-Struktur aka "fachliche Versionierung"
     #[cfg_attr(feature = "serde", serde(rename = "_version"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(
+        feature = "builder",
+        builder(default = Some("v202607.0.0".to_owned()), setter(into))
+    )]
     pub version: Option<String>,
     /// Hier ist festgelegt, um welche Art von Vertrag es sich handelt.
     #[cfg_attr(feature = "serde", serde(rename = "vertragsart"))]
@@ -177,7 +180,7 @@ impl Default for Vertrag {
             sparte: Default::default(),
             unterzeichnervp1: Default::default(),
             unterzeichnervp2: Default::default(),
-            version: Default::default(),
+            version: Some("v202607.0.0".to_owned()),
             vertragsart: Default::default(),
             vertragsbeginn: Default::default(),
             vertragsende: Default::default(),

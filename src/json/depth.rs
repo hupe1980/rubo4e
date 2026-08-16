@@ -7,7 +7,7 @@
 //! All wrapper types borrow `&'state DepthState` which is stack-allocated,
 //! so no heap allocation is needed for tracking state.
 
-use super::limits::trace_limit_violation;
+use super::limits::{trace_limit_violation, LimitKind};
 
 use std::cell::Cell;
 
@@ -31,7 +31,7 @@ impl DepthState {
     fn try_enter<E: serde::de::Error>(&self) -> Result<(), E> {
         let next = self.current.get() + 1;
         if next > self.max {
-            trace_limit_violation("nesting_depth", next, self.max);
+            trace_limit_violation(LimitKind::NestingDepth, next, self.max);
             return Err(E::custom(format!(
                 "JSON nesting depth {next} exceeds limit {}",
                 self.max

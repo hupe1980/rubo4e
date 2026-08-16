@@ -1,0 +1,451 @@
+// rubo4e site styles.
+//
+// Light palette is defined on bare :root so it is always the fallback; dark is
+// layered on twice — once for the system preference, once for an explicit
+// [data-theme="dark"] — so the toggle wins in both directions.
+
+:root {
+  --bg: #ffffff;
+  --bg-soft: #f6f8fa;
+  --bg-inset: #f0f3f6;
+  --fg: #1c2128;
+  --fg-muted: #59636e;
+  --border: #d6dde4;
+  --accent: #1f6feb;
+  --accent-fg: #ffffff;
+  --accent-soft: #ddeaff;
+  --warn-border: #e5a50a;
+  --warn-bg: #fff8e6;
+
+  --radius: 10px;
+  --wrap: 74rem;
+  --measure: 46rem;
+  --mono: ui-monospace, "SF Mono", SFMono-Regular, "Cascadia Mono", Menlo, Consolas, monospace;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+@mixin dark-tokens {
+  --bg: #0b1220;
+  --bg-soft: #121a2a;
+  --bg-inset: #182236;
+  --fg: #e6edf6;
+  --fg-muted: #9babc2;
+  --border: #263349;
+  --accent: #6ea8fe;
+  --accent-fg: #0b1220;
+  --accent-soft: #16233b;
+  --warn-border: #d6a12a;
+  --warn-bg: #241d09;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { @include dark-tokens; }
+}
+:root[data-theme="dark"] { @include dark-tokens; }
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--sans);
+  font-size: 17px;
+  line-height: 1.65;
+  -webkit-text-size-adjust: 100%;
+}
+
+.wrap {
+  max-width: var(--wrap);
+  margin-inline: auto;
+  padding-inline: 1.25rem;
+}
+
+.skip {
+  position: absolute;
+  left: -9999px;
+  &:focus {
+    left: 1rem;
+    top: 1rem;
+    z-index: 100;
+    background: var(--accent);
+    color: var(--accent-fg);
+    padding: 0.6rem 1rem;
+    border-radius: var(--radius);
+  }
+}
+
+a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+a:hover { text-decoration-thickness: 2px; }
+
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+
+// ─── Header ────────────────────────────────────────────────────────────────
+
+.site-header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--border);
+}
+
+.header-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  min-height: 3.75rem;
+  flex-wrap: wrap;
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-weight: 700;
+  color: var(--fg);
+  text-decoration: none;
+  letter-spacing: -0.01em;
+}
+
+.brand-mark {
+  display: grid;
+  place-items: center;
+  width: 1.85rem;
+  height: 1.85rem;
+  border-radius: 7px;
+  background: var(--accent);
+  color: var(--accent-fg);
+  font-size: 0.78rem;
+  font-weight: 700;
+  font-family: var(--mono);
+}
+
+.site-nav {
+  display: flex;
+  align-items: center;
+  gap: 1.15rem;
+  font-size: 0.94rem;
+
+  a { color: var(--fg-muted); text-decoration: none; }
+  a:hover { color: var(--fg); text-decoration: underline; }
+}
+
+.theme-toggle {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--fg-muted);
+  border-radius: 7px;
+  width: 2rem;
+  height: 2rem;
+  cursor: pointer;
+  font-size: 0.95rem;
+  line-height: 1;
+  &:hover { color: var(--fg); border-color: var(--fg-muted); }
+}
+
+// ─── Hero ──────────────────────────────────────────────────────────────────
+
+.hero {
+  padding: clamp(3rem, 8vw, 5.5rem) 0 clamp(2rem, 5vw, 3.5rem);
+  border-bottom: 1px solid var(--border);
+  background:
+    radial-gradient(60rem 26rem at 12% -12%, var(--accent-soft), transparent 68%),
+    var(--bg);
+}
+
+.hero h1 {
+  font-size: clamp(2.1rem, 5.5vw, 3.4rem);
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+  margin: 0 0 1rem;
+  max-width: 20ch;
+}
+
+.hero .lede {
+  font-size: clamp(1.05rem, 2.2vw, 1.25rem);
+  color: var(--fg-muted);
+  max-width: 58ch;
+  margin: 0 0 1.75rem;
+}
+
+.eyebrow {
+  display: inline-block;
+  font-family: var(--mono);
+  font-size: 0.76rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.28rem 0.8rem;
+  margin-bottom: 1.25rem;
+}
+
+.cta { display: flex; flex-wrap: wrap; gap: 0.75rem; }
+
+.btn {
+  display: inline-block;
+  padding: 0.62rem 1.15rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  font-weight: 600;
+  font-size: 0.96rem;
+  text-decoration: none;
+  color: var(--fg);
+  background: var(--bg-soft);
+  &:hover { border-color: var(--fg-muted); text-decoration: none; }
+}
+
+.btn-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-fg);
+  &:hover { filter: brightness(1.08); }
+}
+
+// ─── Landing sections ──────────────────────────────────────────────────────
+
+.section { padding: clamp(2.5rem, 6vw, 4rem) 0; }
+.section + .section { border-top: 1px solid var(--border); }
+
+.section > .wrap > h2 {
+  font-size: clamp(1.4rem, 3vw, 1.85rem);
+  letter-spacing: -0.02em;
+  margin: 0 0 0.5rem;
+}
+
+.section-lede {
+  color: var(--fg-muted);
+  max-width: var(--measure);
+  margin: 0 0 2rem;
+}
+
+.grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(16.5rem, 1fr));
+}
+
+.card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.25rem 1.35rem;
+  background: var(--bg-soft);
+
+  h3 { margin: 0 0 0.45rem; font-size: 1.02rem; letter-spacing: -0.01em; }
+  p { margin: 0; color: var(--fg-muted); font-size: 0.94rem; }
+  a { text-decoration: none; }
+  a:hover { text-decoration: underline; }
+}
+
+a.card {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+  &:hover { border-color: var(--accent); }
+}
+
+// ─── Documentation layout ──────────────────────────────────────────────────
+
+.docs {
+  display: grid;
+  grid-template-columns: 15.5rem minmax(0, 1fr);
+  gap: 3rem;
+  align-items: start;
+  padding-block: 2.5rem 4rem;
+}
+
+@media (max-width: 62rem) {
+  .docs { grid-template-columns: 1fr; gap: 1.75rem; }
+}
+
+.sidebar {
+  position: sticky;
+  top: 4.75rem;
+  font-size: 0.93rem;
+
+  h2 {
+    font-size: 0.74rem;
+    text-transform: uppercase;
+    letter-spacing: 0.09em;
+    color: var(--fg-muted);
+    margin: 0 0 0.6rem;
+  }
+
+  ul { list-style: none; margin: 0; padding: 0; }
+  li { margin: 0.12rem 0; }
+
+  a {
+    display: block;
+    padding: 0.32rem 0.6rem;
+    border-radius: 6px;
+    color: var(--fg-muted);
+    text-decoration: none;
+    &:hover { background: var(--bg-soft); color: var(--fg); }
+  }
+
+  a.active {
+    background: var(--accent-soft);
+    color: var(--fg);
+    font-weight: 600;
+  }
+}
+
+@media (max-width: 62rem) {
+  .sidebar { position: static; border-bottom: 1px solid var(--border); padding-bottom: 1rem; }
+}
+
+// ─── Prose ─────────────────────────────────────────────────────────────────
+
+.prose {
+  min-width: 0;
+
+  > * { max-width: var(--measure); }
+  > .wide, > table, > pre, > .table-scroll { max-width: 100%; }
+
+  h1 {
+    font-size: clamp(1.85rem, 4vw, 2.4rem);
+    letter-spacing: -0.025em;
+    line-height: 1.15;
+    margin: 0 0 0.6rem;
+  }
+
+  h2 {
+    font-size: 1.42rem;
+    letter-spacing: -0.015em;
+    margin: 2.6rem 0 0.7rem;
+    padding-top: 0.4rem;
+    border-top: 1px solid var(--border);
+  }
+
+  h3 { font-size: 1.12rem; margin: 1.9rem 0 0.5rem; }
+  h4 { font-size: 1rem; margin: 1.5rem 0 0.4rem; }
+
+  p, ul, ol { margin: 0 0 1.05rem; }
+  li { margin: 0.3rem 0; }
+  li > ul, li > ol { margin: 0.3rem 0; }
+
+  hr { display: none; }
+
+  blockquote {
+    margin: 1.3rem 0;
+    padding: 0.85rem 1.1rem;
+    border-left: 3px solid var(--accent);
+    background: var(--bg-soft);
+    border-radius: 0 var(--radius) var(--radius) 0;
+    color: var(--fg-muted);
+    max-width: var(--measure);
+
+    > :last-child { margin-bottom: 0; }
+    strong { color: var(--fg); }
+  }
+}
+
+.page-lede {
+  font-size: 1.08rem;
+  color: var(--fg-muted);
+  margin-bottom: 1.8rem !important;
+}
+
+// Anchor links generated by Zola's `insert_anchor_links`.
+.anchor {
+  float: left;
+  margin-left: -0.85em;
+  padding-right: 0.25em;
+  color: var(--fg-muted);
+  opacity: 0;
+  text-decoration: none;
+  font-weight: 400;
+}
+h2:hover .anchor, h3:hover .anchor, h4:hover .anchor, .anchor:focus { opacity: 1; }
+
+// ─── Code ──────────────────────────────────────────────────────────────────
+
+code {
+  font-family: var(--mono);
+  font-size: 0.875em;
+  background: var(--bg-inset);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 0.1em 0.36em;
+}
+
+pre {
+  background: var(--bg-soft);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1rem 1.15rem;
+  overflow-x: auto;
+  line-height: 1.55;
+  font-size: 0.875rem;
+
+  code {
+    background: none;
+    border: 0;
+    padding: 0;
+    font-size: inherit;
+  }
+}
+
+// ─── Tables ────────────────────────────────────────────────────────────────
+
+// Reference tables here are wide (feature matrices, identifier rules). `display:
+// block` makes the table its own scroll container, so a table that cannot shrink
+// far enough scrolls itself instead of forcing the page sideways on a phone.
+// Cell text still wraps, because these tables carry prose, not just short codes.
+.prose table {
+  display: block;
+  overflow-x: auto;
+  max-width: 100%;
+}
+
+table {
+  border-collapse: collapse;
+  font-size: 0.9rem;
+  margin: 0 0 1.2rem;
+}
+
+th, td {
+  border: 1px solid var(--border);
+  padding: 0.5rem 0.7rem;
+  text-align: left;
+  vertical-align: top;
+}
+
+th { background: var(--bg-soft); font-weight: 600; }
+
+// ─── Figures / diagrams ────────────────────────────────────────────────────
+
+figure {
+  margin: 1.6rem 0;
+  max-width: 100%;
+
+  svg { display: block; width: 100%; height: auto; }
+
+  figcaption {
+    color: var(--fg-muted);
+    font-size: 0.86rem;
+    margin-top: 0.6rem;
+  }
+}
+
+// ─── Footer ────────────────────────────────────────────────────────────────
+
+.site-footer {
+  border-top: 1px solid var(--border);
+  padding: 2rem 0 2.75rem;
+  font-size: 0.9rem;
+  color: var(--fg-muted);
+
+  p { margin: 0 0 0.4rem; }
+}
+
+.muted { color: var(--fg-muted); font-size: 0.86rem; }

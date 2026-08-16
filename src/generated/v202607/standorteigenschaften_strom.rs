@@ -1,5 +1,5 @@
 use super::{ComTyp, ZusatzAttribut};
-#[derive(Debug, Clone, PartialEq, Default)]
+#[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(not(feature = "json"), derive(Hash))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "builder", derive(typed_builder::TypedBuilder))]
@@ -15,7 +15,8 @@ pub struct StandorteigenschaftenStrom {
     #[cfg_attr(feature = "serde", serde(rename = "bilanzierungsgebietEic"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
-    pub bilanzierungsgebiet_eic: Option<String>,
+    #[cfg_attr(feature = "validate", garde(dive))]
+    pub bilanzierungsgebiet_eic: Option<crate::identifiers::BilanzierungsgebietId>,
     /// Eine generische ID, die für eigene Zwecke genutzt werden kann.
     /// Z.B. könnten hier UUIDs aus einer Datenbank stehen oder URLs zu einem Backend-System.
     #[cfg_attr(feature = "serde", serde(rename = "_id"))]
@@ -41,7 +42,10 @@ pub struct StandorteigenschaftenStrom {
     /// Version der COM-Struktur aka "fachliche Versionierung"
     #[cfg_attr(feature = "serde", serde(rename = "_version"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(
+        feature = "builder",
+        builder(default = Some("v202607.0.0".to_owned()), setter(into))
+    )]
     pub version: Option<String>,
     #[cfg_attr(feature = "serde", serde(rename = "zusatzAttribute"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
@@ -58,6 +62,20 @@ pub struct StandorteigenschaftenStrom {
     #[cfg_attr(feature = "builder", builder(default, setter(skip)))]
     #[doc(hidden)]
     pub _additional: crate::LimitedExtensionMap,
+}
+impl Default for StandorteigenschaftenStrom {
+    fn default() -> Self {
+        Self {
+            bilanzierungsgebiet_eic: Default::default(),
+            id: Default::default(),
+            regelzone: Default::default(),
+            regelzone_eic: Default::default(),
+            typ: Default::default(),
+            version: Some("v202607.0.0".to_owned()),
+            zusatz_attribute: Default::default(),
+            _additional: Default::default(),
+        }
+    }
 }
 #[cfg(feature = "json")]
 impl crate::json::sealed::Sealed for StandorteigenschaftenStrom {}

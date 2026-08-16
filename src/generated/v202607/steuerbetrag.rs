@@ -1,5 +1,5 @@
 use super::{ComTyp, Steuerart, Waehrungscode, ZusatzAttribut};
-#[derive(Debug, Clone, PartialEq, Default)]
+#[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(not(feature = "json"), derive(Hash))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "builder", derive(typed_builder::TypedBuilder))]
@@ -69,7 +69,10 @@ pub struct Steuerbetrag {
     /// Version der COM-Struktur aka "fachliche Versionierung"
     #[cfg_attr(feature = "serde", serde(rename = "_version"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(
+        feature = "builder",
+        builder(default = Some("v202607.0.0".to_owned()), setter(into))
+    )]
     pub version: Option<String>,
     /// Währung. Z.B. Euro.
     #[cfg_attr(feature = "serde", serde(rename = "waehrungscode"))]
@@ -91,6 +94,22 @@ pub struct Steuerbetrag {
     #[cfg_attr(feature = "builder", builder(default, setter(skip)))]
     #[doc(hidden)]
     pub _additional: crate::LimitedExtensionMap,
+}
+impl Default for Steuerbetrag {
+    fn default() -> Self {
+        Self {
+            basiswert: Default::default(),
+            id: Default::default(),
+            steuerart: Default::default(),
+            steuersatz: Default::default(),
+            steuerwert: Default::default(),
+            typ: Default::default(),
+            version: Some("v202607.0.0".to_owned()),
+            waehrungscode: Default::default(),
+            zusatz_attribute: Default::default(),
+            _additional: Default::default(),
+        }
+    }
 }
 #[cfg(feature = "json")]
 impl crate::json::sealed::Sealed for Steuerbetrag {}

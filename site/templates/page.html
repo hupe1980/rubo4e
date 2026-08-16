@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+
+{% block seo %}
+<title>{{ page.title }} · {{ config.title }}</title>
+<meta name="description" content="{{ page.description | default(value=config.description) }}">
+<link rel="canonical" href="{{ page.permalink }}">
+
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="{{ config.title }}">
+<meta property="og:title" content="{{ page.title }}">
+<meta property="og:description" content="{{ page.description | default(value=config.description) }}">
+<meta property="og:url" content="{{ page.permalink }}">
+<meta property="og:locale" content="en">
+
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="{{ page.title }}">
+<meta name="twitter:description" content="{{ page.description | default(value=config.description) }}">
+{% endblock seo %}
+
+{% block structured_data %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "TechArticle",
+  "headline": {{ page.title | json_encode | safe }},
+  "description": {{ page.description | default(value=config.description) | json_encode | safe }},
+  "url": {{ page.permalink | json_encode | safe }},
+  "inLanguage": "en",
+  "isPartOf": {
+    "@type": "WebSite",
+    "name": {{ config.title | json_encode | safe }},
+    "url": {{ config.base_url | json_encode | safe }}
+  }
+}
+</script>
+{% endblock %}
+
+{% block content %}
+{% set docs = get_section(path="docs/_index.md") %}
+<div class="wrap docs">
+  <aside class="sidebar">
+    <h2>Documentation</h2>
+    <nav aria-label="Documentation">
+      <ul>
+        <li>
+          <a href="{{ docs.permalink }}"{% if current_url == docs.permalink %} class="active" aria-current="page"{% endif %}>Overview</a>
+        </li>
+        {% for p in docs.pages %}
+        <li>
+          <a href="{{ p.permalink }}"{% if current_url == p.permalink %} class="active" aria-current="page"{% endif %}>{{ p.title }}</a>
+        </li>
+        {% endfor %}
+      </ul>
+    </nav>
+  </aside>
+
+  <article class="prose">
+    <h1>{{ page.title }}</h1>
+    {% if page.description %}<p class="page-lede">{{ page.description }}</p>{% endif %}
+    {{ page.content | safe }}
+  </article>
+</div>
+{% endblock %}

@@ -20,19 +20,53 @@
 //!
 //! ### Per-type validation rules
 //!
-//! | Type | Always validated | Notes |
-//! |------|-----------------|-------|
-//! | [`MaloId`] | 11 digits, BDEW alternating-weight check digit (11th digit) | Check digit is the primary guard against typos |
-//! | [`MeloId`] | 33 chars, first 2 uppercase ASCII (country code), rest alphanumeric | No checksum — format-only |
-//! | [`MarktpartnerId`] | 13 digits, numeric only | **No EAN-13 check digit** for BDEW/DVGW codes. GS1 GLNs carry an EAN-13 check digit, but `MarktpartnerId` does not validate it (the check algorithm is the same as EAN-13, but BDEW codes use the same 13-digit format without being GLNs). |
-//! | [`NeloId`] | 11 chars: Codetyp `'E'` + 9 `[A-Z0-9]` + ASCII-Verfahren check digit (§8.2) | BDEW "Identifikatoren in der Marktkommunikation" v1.2 §4 |
-//! | [`SrId`] | 11 chars: Codetyp `'C'` + 9 `[A-Z0-9]` + ASCII-Verfahren check digit | BDEW §6.3/§6.6 — Redispatch 2.0 Steuerbare Ressource |
-//! | [`TrId`] | 11 chars: Codetyp `'D'` + 9 `[A-Z0-9]` + ASCII-Verfahren check digit | BDEW §6.2/§6.6 — Redispatch 2.0 Technische Ressource |
-//! | [`EicCode`] | 16 chars, uppercase alphanumeric + `-`, last char is EIC check char | |
-//! | [`BilanzkreisId`] | 16-char EIC restricted to type `'Z'` (Bilanzierungszone) | GaBi Gas BK7-14-020, MABIS BK6-06-009 |
-//! | [`ObisCode`] | `[A-B:]C.D[.E][*F]` format | C=0 permitted (general metering data group, IEC 62056-61) |
-//! | [`AkivId`] | 1–36 printable ASCII chars | Aktivierungsidentifikator Redispatch 2.0, BDEW WiM AHB BK6-24-174 |
-//! | [`TranchennummerId`] | 1–6 decimal digits, no leading zeros (0–999 999) | MABIS Bilanzkreisabrechnung PID 13003 (BK6-06-009) |
+//! Section numbers refer to the BDEW Anwendungshilfe **"Identifikatoren in der
+//! Marktkommunikation"** v1.2 (7 February 2025).
+//!
+//! | Type | Always validated | Reference |
+//! |------|-----------------|-----------|
+//! | [`MaloId`] | 11 digits, first digit `1`–`9`, §8.1 check digit | BDEW §3 |
+//! | [`MeloId`] | 33 chars, first 2 uppercase ASCII (country code), rest alphanumeric | No checksum defined |
+//! | [`MarktpartnerId`] | 13 digits — check digit **not** enforced, see below | BDEW §2 |
+//! | [`NeloId`] | Codetyp `'E'` + 9 `[A-Z0-9]` + §8.2 check digit | BDEW §4 (BK6-22-128) |
+//! | [`NebeId`] | Codetyp `'F'` + 9 `[A-Z0-9]` + §8.2 check digit | BDEW §5 (BK6-22-300, BK8-22/010-A) |
+//! | [`CrId`] | Codetyp `'A'` + 9 `[A-Z0-9]` + §8.2 check digit | BDEW §6.5/§6.6 — Cluster Ressource |
+//! | [`SgId`] | Codetyp `'B'` + 9 `[A-Z0-9]` + §8.2 check digit | BDEW §6.4/§6.6 — Steuergruppe |
+//! | [`SrId`] | Codetyp `'C'` + 9 `[A-Z0-9]` + §8.2 check digit | BDEW §6.3/§6.6 — Steuerbare Ressource |
+//! | [`TrId`] | Codetyp `'D'` + 9 `[A-Z0-9]` + §8.2 check digit | BDEW §6.2/§6.6 — Technische Ressource |
+//! | [`PaketId`] | Codetyp `'P9'` + 8 `[A-Z0-9]` + §8.2 check digit | BDEW §7 — Netzbetreiberwechsel |
+//! | [`EicCode`] | 16 chars, uppercase alphanumeric + `-`, ENTSO-E check char | ENTSO-E EIC Reference Manual |
+//! | [`BilanzkreisId`] | 16-char EIC restricted to object type `'X'` (Party) | GaBi Gas BK7-14-020, MABIS BK6-06-009 |
+//! | [`BilanzierungsgebietId`] | 16-char EIC restricted to object type `'Y'` (Area) | MABIS BK6-06-009 |
+//! | [`ObisCode`] | `[A-B:]C.D[.E][*F]` format | IEC 62056-61 (C=0 permitted) |
+//! | [`AkivId`] | 1–36 printable ASCII chars | BDEW WiM AHB BK6-24-174 |
+//! | [`TranchennummerId`] | 1–6 decimal digits, no leading zeros (0–999 999) | MABIS PID 13003 (BK6-06-009) |
+//!
+//! ### The two BDEW check-digit procedures
+//!
+//! BDEW chapter 8 defines two procedures, and they are the *same* arithmetic:
+//! sum the mapped character values at odd positions, add twice the sum at even
+//! positions, and take the difference to the next multiple of 10.
+//!
+//! - **§8.1 Lok- und Waggon-Kennzeichnungsverfahren** — numeric identifiers
+//!   ([`MaloId`], BDEW-/DVGW-Codenummern). Each digit maps to its own value.
+//! - **§8.2 ASCII-Verfahren** — alphanumeric identifiers ([`NeloId`], [`NebeId`],
+//!   [`CrId`], [`SgId`], [`SrId`], [`TrId`], [`PaketId`]). Digits map to their
+//!   value, uppercase letters to their ASCII code (`A` = 65 … `Z` = 90).
+//!
+//! Because a digit maps identically under both, §8.1 is exactly §8.2 restricted
+//! to numeric input, and this crate implements the arithmetic once.
+//!
+//! ### Why [`MarktpartnerId`] does not enforce a check digit
+//!
+//! An MP-ID may be a BDEW-/DVGW-Codenummer (which uses §8.1) *or* a GS1 Global
+//! Location Number (which uses the GS1/EAN-13 procedure). The two disagree, and
+//! the leading digits do not reliably separate them — codes predating the
+//! `98`/`99` convention are still in circulation. Enforcing either one by default
+//! would reject valid production identifiers, so construction checks only the
+//! unambiguous part and the check digit is available on demand via
+//! [`MarktpartnerId::new_checked`], [`MarktpartnerId::has_valid_bdew_check_digit`],
+//! and [`MarktpartnerId::has_valid_gln_check_digit`].
 //!
 //! ### Wire-format traits without feature flags
 //!
@@ -52,33 +86,32 @@
 #[cfg(feature = "serde")]
 use std::sync::atomic::{AtomicU64, Ordering};
 
+// Declared first and with `#[macro_use]` so the identifier macros are in textual
+// scope for every module below.
+#[macro_use]
+mod macros;
+
 mod akiv_id;
+mod ascii_ids;
 mod bilanzkreis_id;
 mod checksum;
 mod eic_code;
 mod malo_id;
 mod marktpartner_id;
 mod melo_id;
-mod nelo_id;
-mod obis_code;
-#[cfg(test)]
-mod proptest_impls;
+pub(crate) mod obis_code;
 #[cfg(feature = "sqlx")]
 mod sqlx_impls;
-mod sr_id;
-mod tr_id;
 mod tranchennummer_id;
 
 pub use akiv_id::{AkivId, AKIV_ID_MAX_LEN};
-pub use bilanzkreis_id::BilanzkreisId;
-pub use eic_code::{EicCode, EicDomain};
-pub use malo_id::MaloId;
-pub use marktpartner_id::MarktpartnerId;
+pub use ascii_ids::{CrId, NebeId, NeloId, PaketId, SgId, SrId, TrId};
+pub use bilanzkreis_id::{BilanzierungsgebietId, BilanzkreisId};
+pub use eic_code::{EicCode, EicType};
+pub use malo_id::{MaloId, MaloVergabestelle};
+pub use marktpartner_id::{MarktpartnerId, MpIdAuthority};
 pub use melo_id::MeloId;
-pub use nelo_id::NeloId;
 pub use obis_code::{ObisCode, ObisComponents};
-pub use sr_id::SrId;
-pub use tr_id::TrId;
 pub use tranchennummer_id::{TranchennummerId, TRANCHENNUMMER_MAX};
 
 /// Serde adapter module for encoding [`MarktpartnerId`] as a JSON integer (`i64`).

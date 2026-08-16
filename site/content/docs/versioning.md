@@ -1,9 +1,11 @@
-# Schema Versioning
++++
+title = "Schema Versioning"
+description = "How BO4E schema releases map onto Rust modules, what rubo4e::current guarantees, and which imports to pin when enum membership must not move underneath you."
+weight = 50
++++
 
 `rubo4e` exposes a single stable BO4E schema series (`v202607`), compiled
 conditionally behind the `versioned` feature flag.
-
----
 
 ## Multi-version Dispatch
 
@@ -34,8 +36,6 @@ Key points:
 - Older versions can be migrated before the branch (`FROM v202607 TO v202801`) or handled by a thin shim inside the arm
 - No trait objects, no `Any*` enums required for this straightforward branching
 
----
-
 ## Version Module Layout
 
 With the `versioned` feature enabled:
@@ -48,19 +48,15 @@ rubo4e::v202607::Sparte
 rubo4e::current::Vertrag       // moving alias — always the latest stable series
 ```
 
-Without the `versioned` feature, none of these module paths exist.  The default
-feature set (`serde` only) does not include versioned types.
-
----
+Without the `versioned` feature, none of these module paths exist. The default
+feature set (`identifiers`, which pulls in `serde`) does not include versioned types.
 
 ## Feature Gate
 
-```toml
-# Enable version modules (pure conditional-compilation; no external deps)
-rubo4e = { version = "0.8", features = ["versioned"] }
+```sh
+# Enable version modules (pure conditional compilation; no external deps)
+cargo add rubo4e --features versioned
 ```
-
----
 
 ## Known Schema Series
 
@@ -80,8 +76,6 @@ v202701.0.0  →  module: v202701   (hypothetical next series)
 Within a series, minor/patch bumps (e.g. `v202607.0.0` → `v202607.1.0`) are
 additive.  The generator pins the full semver tag for reproducibility but exposes
 only the series prefix in the public API.
-
----
 
 ## `rubo4e::current` — Moving Alias
 
@@ -133,7 +127,7 @@ fn sql_check_list_covers_every_variant() {
 ### Schema-delta changelog
 
 Every release that changes schema-derived enum membership or codelist coverage
-records it in the [`CHANGELOG.md`](../CHANGELOG.md) **Schema deltas** section, in
+records it in the [`CHANGELOG.md`](https://github.com/hupe1980/rubo4e/blob/main/CHANGELOG.md) **Schema deltas** section, in
 the form:
 
 ```
@@ -146,8 +140,6 @@ the form:
 This is the signal to update pinned guards deliberately, rather than discovering
 drift at runtime. `T::COUNT` and `T::VARIANTS` make the drift a compile-/test-time
 failure the moment you bump to a series with new members.
-
----
 
 ## Adding a New Schema Version
 
@@ -184,20 +176,16 @@ When a new BO4E schema release arrives with new or changed types:
    require updating field references (e.g. renamed fields in `Rechnung`,
    `Rechnungsposition`).
 7. Update the Known Schema Series table in this document.
-8. Record a **Schema deltas** section in [`CHANGELOG.md`](../CHANGELOG.md) listing
+8. Record a **Schema deltas** section in [`CHANGELOG.md`](https://github.com/hupe1980/rubo4e/blob/main/CHANGELOG.md) listing
    every enum whose membership changed and every codelist code added/removed
    (e.g. `Zaehlertyp +2 (…)`). Downstream projects rely on this to update pinned
    guards deliberately. Diffing `T::VARIANTS` between the old and new series makes
    this mechanical.
 
----
-
 ## COM and Enum Versioning
 
 COM and enum types live inside the versioned module alongside BO types.  They
 follow exactly the same conditional-compilation rules.
-
----
 
 ## Schema Breaking Changes
 

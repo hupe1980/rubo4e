@@ -1,10 +1,12 @@
-# Code Generator
++++
+title = "Code Generator"
+description = "How the internal generator turns pinned BO4E JSON Schema releases into Rust source, including type inference and the drift checks that keep output honest."
+weight = 70
++++
 
 The generator (`generator/`) is a standalone Rust binary that reads pinned BO4E JSON Schema
 files and emits Rust source code into `src/generated/`. It is a workspace member but is
 never published to crates.io.
-
----
 
 ## Running the Generator
 
@@ -15,9 +17,7 @@ cargo run -p bo4e-generator -- --schema-version v202607.0.0
 
 The generator reads schema files from `generator/schemas/<TAG>/` relative to the workspace
 root and writes output to `src/generated/<series>/` where `<series>` is the `vYYYYMM`
-prefix (e.g. `v202501`).
-
----
+prefix (e.g. `v202607`).
 
 ## Updating to a New Schema Version
 
@@ -30,21 +30,19 @@ When BO4E releases a new schema:
    ```
 2. **Run the generator:**
    ```bash
-   cargo run -p bo4e-generator -- --schema-version v202501.1.0
+   cargo run -p bo4e-generator -- --schema-version v202607.1.0
    ```
-3. **Inspect the diff** in `src/generated/v202501/`:
+3. **Inspect the diff** in `src/generated/v202607/`:
    - Added fields → inspect; update curated wrappers if needed
    - Removed fields → check migration impls are still correct
    - Type changes → update semantic inference map if applicable
-4. **Update the `_version` constant** in `src/generated/v202501/mod.rs`:
+4. **Update the `_version` constant** in `src/generated/v202607/mod.rs`:
    ```rust
-   pub const SCHEMA_VERSION: &str = "v202501.1.0";
+   pub const SCHEMA_VERSION: &str = "v202607.1.0";
    ```
 5. **Commit both** the new schema directory and the regenerated source.
 
-> **v202402 does not exist.** See [versioning.md](versioning.md) for the full warning.
-
----
+> **v202402 does not exist.** See [Schema Versioning](@/docs/versioning.md) for the full warning.
 
 ## Schema Directory Layout
 
@@ -64,8 +62,6 @@ generator/schemas/v202607.0.0/
 │   └── ...
 └── ZusatzAttribut.json   ← root-level COM (no category subdirectory)
 ```
-
----
 
 ## Internal Architecture
 
@@ -119,8 +115,6 @@ All `$ref` references are resolved **within the same schema snapshot**. The gene
 never makes network requests. If a `$ref` cannot be resolved (e.g. missing file), the
 generator emits a warning and replaces the field type with `serde_json::Value`.
 
----
-
 ## Semantic Type Inference
 
 The generator maps BO4E field names to strong Rust types using a hard-coded table.
@@ -158,9 +152,7 @@ fn infer_type(field_name: &str) -> RustType {
 ```
 
 Then implement the corresponding newtype in `src/identifiers/` and add it
-to the `identifiers/mod.rs` re-exports. See [identifiers.md](identifiers.md).
-
----
+to the `identifiers/mod.rs` re-exports. See [Identifiers](@/docs/identifiers.md).
 
 ## Determinism Guarantee
 
@@ -177,8 +169,6 @@ CI verifies this with:
 cargo run -p bo4e-generator -- --schema-version v202607.0.0
 git diff --exit-code src/generated/
 ```
-
----
 
 ## What the Generator Does NOT Do
 

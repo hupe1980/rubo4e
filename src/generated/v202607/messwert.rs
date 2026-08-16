@@ -1,5 +1,5 @@
 use super::{ComTyp, Menge, Messwertstatus, Messwertstatuszusatz, ZusatzAttribut};
-#[derive(Debug, Clone, PartialEq, Default)]
+#[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(not(feature = "json"), derive(Hash))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "builder", derive(typed_builder::TypedBuilder))]
@@ -35,7 +35,10 @@ pub struct Messwert {
     /// Version der COM-Struktur aka "fachliche Versionierung"
     #[cfg_attr(feature = "serde", serde(rename = "_version"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(
+        feature = "builder",
+        builder(default = Some("v202607.0.0".to_owned()), setter(into))
+    )]
     pub version: Option<String>,
     /// Gibt die gemessene Menge an.
     #[cfg_attr(feature = "serde", serde(rename = "wert"))]
@@ -84,6 +87,21 @@ pub struct Messwert {
     #[cfg_attr(feature = "builder", builder(default, setter(skip)))]
     #[doc(hidden)]
     pub _additional: crate::LimitedExtensionMap,
+}
+impl Default for Messwert {
+    fn default() -> Self {
+        Self {
+            id: Default::default(),
+            messwertstatus: Default::default(),
+            messwertstatuszusatz: Default::default(),
+            typ: Default::default(),
+            version: Some("v202607.0.0".to_owned()),
+            wert: Default::default(),
+            zeitpunkt: Default::default(),
+            zusatz_attribute: Default::default(),
+            _additional: Default::default(),
+        }
+    }
 }
 #[cfg(feature = "json")]
 impl crate::json::sealed::Sealed for Messwert {}

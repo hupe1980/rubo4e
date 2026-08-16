@@ -111,7 +111,10 @@ pub struct Zaehler {
     /// Version der BO-Struktur aka "fachliche Versionierung"
     #[cfg_attr(feature = "serde", serde(rename = "_version"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(
+        feature = "builder",
+        builder(default = Some("v202607.0.0".to_owned()), setter(into))
+    )]
     pub version: Option<String>,
     /// Spezifikation die Richtung des Zählers betreffend
     #[cfg_attr(feature = "serde", serde(rename = "zaehlerauspraegung"))]
@@ -188,7 +191,7 @@ impl Default for Zaehler {
             letzte_eichung: Default::default(),
             registeranzahl: Default::default(),
             sparte: Default::default(),
-            version: Default::default(),
+            version: Some("v202607.0.0".to_owned()),
             zaehlerauspraegung: Default::default(),
             zaehlergroesse: Default::default(),
             zaehlerhersteller: Default::default(),

@@ -41,10 +41,11 @@ impl Vertragsform {
     /// Available **without** the `strum` feature.
     ///
     /// # Example
-    /// ```rust,ignore
-    /// for v in Vertragsform::iter_known() {
-    ///     println!("{}", v.as_wire());
-    /// }
+    /// ```
+    /// # use rubo4e::current::Vertragsform;
+    /// // Never yields the `Unknown` catch-all, so the count matches `COUNT`.
+    /// assert_eq!(Vertragsform::iter_known().count(), Vertragsform::COUNT);
+    /// assert!(Vertragsform::iter_known().all(|v| v.is_known()));
     /// ```
     pub fn iter_known() -> impl Iterator<Item = Self> + Clone {
         Self::VARIANTS.iter().copied()
@@ -70,8 +71,12 @@ impl Vertragsform {
     /// reject bad values instead of silently degrading them.
     ///
     /// # Example
-    /// ```rust,ignore
+    /// ```
+    /// # use rubo4e::current::Vertragsform;
+    /// /// assert_eq!(Vertragsform::from_wire("ONLINE"), Ok(Vertragsform::Online));
     /// assert!(Vertragsform::from_wire("NOT_A_REAL_VALUE").is_err());
+    /// // …including the `Unknown` catch-all's own wire spelling:
+    /// assert!(Vertragsform::from_wire("UNKNOWN").is_err());
     /// ```
     pub fn from_wire(s: &str) -> Result<Self, crate::error::UnknownVariant> {
         match s {
@@ -125,15 +130,15 @@ impl crate::Bo4eStrict for Vertragsform {
         }
     }
 }
-#[cfg(all(feature = "sqlx", feature = "json"))]
+#[cfg(feature = "sqlx")]
 impl sqlx::Type<sqlx::Postgres> for Vertragsform {
     fn type_info() -> sqlx::postgres::PgTypeInfo {
         <String as sqlx::Type<sqlx::Postgres>>::type_info()
     }
 }
-/// Encode via the canonical wire string (`as_wire`, always available) — no
-/// `serde_json::Value` intermediate, saving an allocation per encode (M-07).
-#[cfg(all(feature = "sqlx", feature = "json"))]
+/// Encodes as the canonical BO4E wire string, borrowed from `as_wire` — no
+/// intermediate `String` or `serde_json::Value` is allocated.
+#[cfg(feature = "sqlx")]
 impl<'q> sqlx::Encode<'q, sqlx::Postgres> for Vertragsform {
     fn encode_by_ref(
         &self,
@@ -143,14 +148,19 @@ impl<'q> sqlx::Encode<'q, sqlx::Postgres> for Vertragsform {
         <&str as sqlx::Encode<'q, sqlx::Postgres>>::encode_by_ref(&s, buf)
     }
 }
-#[cfg(all(feature = "sqlx", feature = "json"))]
+/// Decodes leniently, matching the `serde` path: a value the schema does not
+/// define becomes [`Vertragsform::Unknown`] rather than a decode error, so a
+/// database row written by a newer schema version still reads back.
+///
+/// Use [`Vertragsform::from_wire`] on a `String` column, or check
+/// [`Vertragsform::is_known`], where out-of-schema values must be rejected.
+#[cfg(feature = "sqlx")]
 impl<'r> sqlx::Decode<'r, sqlx::Postgres> for Vertragsform {
     fn decode(
         value: <sqlx::Postgres as sqlx::Database>::ValueRef<'r>,
     ) -> Result<Self, sqlx::error::BoxDynError> {
-        let s = <String as sqlx::Decode<sqlx::Postgres>>::decode(value)?;
-        serde_json::from_value(serde_json::Value::String(s))
-            .map_err(|e| Box::new(e) as sqlx::error::BoxDynError)
+        let s = <&str as sqlx::Decode<sqlx::Postgres>>::decode(value)?;
+        Ok(Self::from_wire(s).unwrap_or(Self::Unknown))
     }
 }
 #[cfg(test)]

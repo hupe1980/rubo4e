@@ -13,11 +13,28 @@
 //! | [`to_json_snake_case`]    | insertion order  | Rust snake_case field names      |
 //! | [`to_json_canonical`]     | alphabetical     | BO4E German camelCase            |
 //!
-//! The "snake_case" format uses the Rust struct field names as JSON keys.
-//! These are the snake_case equivalents of the German camelCase BO4E names
+//! The "snake_case" format uses the Rust struct field names as JSON keys
 //! (e.g. `marktlokationsId` → `marktlokations_id`).  A true German→English
 //! translation is intentionally out of scope; use [`to_json_german`] for
 //! wire-compatible BO4E exchange.
+//!
+//! # Key mapping is exact, not heuristic
+//!
+//! Both directions are table lookups into a mapping the generator emits from the
+//! same field data it uses to emit the structs, so
+//! `from_json_snake_case(to_json_snake_case(x))` returns `x` for every generated
+//! type.  This matters because several BO4E names have no heuristic inverse —
+//! `hoechstpreisHT`, `kundengruppeKA`, and `Sigmoidparameter`'s `A`/`B`/`C`/`D`
+//! all render to a snake form that an algorithm would map back to a different
+//! camelCase name, silently diverting the value into `_additional`.
+//!
+//! Two kinds of key are deliberately left alone in both directions:
+//!
+//! - **BO4E metadata keys** (`_typ`, `_version`, `_id`) keep their leading
+//!   underscore in every mode; they are wire metadata, not Rust field names.
+//! - **Extension keys** — anything the schema does not define — pass through
+//!   byte-for-byte, so unknown fields round-trip exactly as they arrived instead
+//!   of being rewritten into a name their producer would not recognize.
 //!
 //! [`to_json_german`]: crate::json::Bo4eJsonExt::to_json_german
 //! [`to_json_snake_case`]: crate::json::Bo4eJsonExt::to_json_snake_case
@@ -37,7 +54,6 @@ pub use limits::{json_limit_hit_counters, JsonLimitHitCounters, JsonParseLimits}
 
 // ── Internal imports from submodules ───────────────────────────────────
 use depth::{DepthLimitedDeserializer, DepthState};
-use extension::check_extension_budget;
 use key_transform::{
     camel_to_snake, deserialize_with_key_transform_from_slice,
     deserialize_with_key_transform_from_str, serialize_with_key_transform, snake_to_camel,
@@ -47,7 +63,7 @@ use key_transform::{
 use limits::trace_json_outcome;
 use limits::{
     check_payload_limit, deserialize_german_from_slice, deserialize_german_from_str,
-    trace_deser_error,
+    install_extension_budget, trace_deser_error,
 };
 #[cfg(feature = "tracing")]
 use std::time::Instant;
@@ -55,33 +71,67 @@ use std::time::Instant;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
-// ─── _typ peek helper ─────────────────────────────────────────────────────────
+// ─── Shared instrumentation ──────────────────────────────────────────────────
+//
+// Every entry point below emits the same tracing event around the same shape of
+// work.  Threading that through two helpers keeps each method's body down to the
+// part that actually differs, and compiles away entirely without `tracing`.
 
-/// Peeks at the `_typ` discriminant field from a raw JSON object string without
-/// materializing a full [`serde_json::Value`] tree.
-///
-/// Returns a `&str` borrowed from `json` that holds the string value of `"_typ"`,
-/// or `None` if the key is absent, `null`, or the input is invalid JSON.
-///
-/// This is used by the generated [`AnyBo`] deserializer to dispatch to the correct
-/// concrete type after a single `Box<RawValue>` capture, avoiding the two-pass
-/// `Value`-based strategy that allocated an entire JSON object tree just to read
-/// one short string.
-///
-/// BO4E `_typ` values are ASCII SCREAMING_CASE (e.g. `"MARKTLOKATION"`) and
-/// contain no escape sequences, so the returned `&str` is a zero-copy slice into
-/// the input buffer.
-///
-/// [`AnyBo`]: crate::v202501::AnyBo
-pub(crate) fn peek_typ_field(json: &str) -> Option<&str> {
-    #[derive(serde::Deserialize)]
-    struct TypOnly<'a> {
-        #[serde(rename = "_typ", borrow)]
-        typ: Option<&'a str>,
+/// Runs a serializing entry point, recording its outcome when `tracing` is on.
+#[inline]
+fn traced_serialize<T: ?Sized>(
+    mode: &'static str,
+    op: impl FnOnce() -> Result<String, serde_json::Error>,
+) -> Result<String, serde_json::Error> {
+    #[cfg(not(feature = "tracing"))]
+    {
+        let _ = mode;
+        op()
     }
-    serde_json::from_str::<TypOnly<'_>>(json)
-        .ok()
-        .and_then(|t| t.typ)
+    #[cfg(feature = "tracing")]
+    {
+        let started = Instant::now();
+        let result = op();
+        trace_json_outcome(
+            "serialize",
+            mode,
+            std::any::type_name::<T>(),
+            None,
+            result.as_ref().ok().map(String::len),
+            started,
+            result.is_ok(),
+        );
+        result
+    }
+}
+
+/// Runs a deserializing entry point, recording the error (always) and the
+/// outcome event (when `tracing` is on).
+#[inline]
+fn traced_deserialize<S: ?Sized, T>(
+    operation: &'static str,
+    mode: &'static str,
+    input_len: usize,
+    context: &'static str,
+    op: impl FnOnce() -> Result<T, serde_json::Error>,
+) -> Result<T, serde_json::Error> {
+    #[cfg(feature = "tracing")]
+    let started = Instant::now();
+    let result = op();
+    trace_deser_error(&result, context);
+    #[cfg(feature = "tracing")]
+    trace_json_outcome(
+        operation,
+        mode,
+        std::any::type_name::<S>(),
+        Some(input_len),
+        None,
+        started,
+        result.is_ok(),
+    );
+    #[cfg(not(feature = "tracing"))]
+    let _ = (operation, mode, input_len);
+    result
 }
 
 // ─── Sealed trait machinery ───────────────────────────────────────────────────
@@ -110,24 +160,8 @@ pub trait Bo4eJsonExt: sealed::Sealed + Serialize + DeserializeOwned + Sized {
     ///
     /// # Errors
     /// Returns [`serde_json::Error`] if the value cannot be serialized.
-    #[must_use = "the JSON string is returned, not printed"]
     fn to_json_german(&self) -> Result<String, serde_json::Error> {
-        #[cfg(feature = "tracing")]
-        let started = Instant::now();
-        #[cfg(feature = "tracing")]
-        let bo_type = std::any::type_name::<Self>();
-        let result = serde_json::to_string(self);
-        #[cfg(feature = "tracing")]
-        trace_json_outcome(
-            "serialize",
-            "german",
-            bo_type,
-            None,
-            result.as_ref().ok().map(String::len),
-            started,
-            result.is_ok(),
-        );
-        result
+        traced_serialize::<Self>("german", || serde_json::to_string(self))
     }
 
     /// Serializes `self` to a JSON string with **alphabetically sorted** keys.
@@ -139,14 +173,16 @@ pub trait Bo4eJsonExt: sealed::Sealed + Serialize + DeserializeOwned + Sized {
     ///
     /// # Performance
     ///
-    /// This method uses a **single-pass sorted serializer** (M-B fix).  Each map
-    /// level buffers `(key, serialized_value_bytes)` pairs, sorts them by key,
-    /// then flushes directly into the output `String`.  No intermediate
-    /// [`serde_json::Value`] tree is ever allocated, which makes this roughly
-    /// 2–3× faster than the previous two-pass approach for deeply-nested types.
+    /// Each map level buffers `(key, serialized_value_bytes)` pairs, sorts them
+    /// by key, then flushes them into the output.  No intermediate
+    /// [`serde_json::Value`] tree is ever allocated.
     ///
-    /// For hot serialization paths where key ordering is not required, prefer
-    /// [`to_json_german`] which completes in a single pass with one allocation.
+    /// It is still meaningfully more expensive than [`to_json_german`]: each
+    /// nested value is buffered and re-checked as a raw JSON fragment once per
+    /// enclosing level, so cost grows with nesting depth as well as size.  BO4E
+    /// documents are shallow (6–8 levels), which keeps that factor small — but
+    /// on a hot path where key ordering is not required, prefer
+    /// [`to_json_german`], which completes in one pass with one allocation.
     ///
     /// # Deviations from RFC 8785 / JCS
     ///
@@ -172,30 +208,16 @@ pub trait Bo4eJsonExt: sealed::Sealed + Serialize + DeserializeOwned + Sized {
     /// Returns [`serde_json::Error`] if the value cannot be serialized.
     ///
     /// [`to_json_german`]: Bo4eJsonExt::to_json_german
-    #[must_use = "the canonical JSON string is returned, not printed"]
     fn to_json_canonical(&self) -> Result<String, serde_json::Error> {
-        #[cfg(feature = "tracing")]
-        let started = Instant::now();
-        #[cfg(feature = "tracing")]
-        let bo_type = std::any::type_name::<Self>();
-        let mut out = Vec::new();
-        {
-            let mut ser = serde_json::Serializer::new(&mut out);
-            self.serialize(SortedSerializer { inner: &mut ser })?;
-        }
-        // serde_json::Serializer always produces valid UTF-8.
-        let result = Ok(String::from_utf8(out).expect("serde_json always produces valid UTF-8"));
-        #[cfg(feature = "tracing")]
-        trace_json_outcome(
-            "serialize",
-            "canonical",
-            bo_type,
-            None,
-            result.as_ref().ok().map(String::len),
-            started,
-            result.is_ok(),
-        );
-        result
+        traced_serialize::<Self>("canonical", || {
+            let mut out = Vec::new();
+            {
+                let mut ser = serde_json::Serializer::new(&mut out);
+                self.serialize(SortedSerializer { inner: &mut ser })?;
+            }
+            // serde_json::Serializer always produces valid UTF-8.
+            Ok(String::from_utf8(out).expect("serde_json always produces valid UTF-8"))
+        })
     }
 
     /// Serializes `self` to a JSON string using Rust **snake_case** field names as keys.
@@ -214,24 +236,10 @@ pub trait Bo4eJsonExt: sealed::Sealed + Serialize + DeserializeOwned + Sized {
     /// Returns [`serde_json::Error`] if the value cannot be serialized.
     ///
     /// [`from_json_snake_case`]: Bo4eJsonExt::from_json_snake_case
-    #[must_use = "the JSON string is returned, not printed"]
     fn to_json_snake_case(&self) -> Result<String, serde_json::Error> {
-        #[cfg(feature = "tracing")]
-        let started = Instant::now();
-        #[cfg(feature = "tracing")]
-        let bo_type = std::any::type_name::<Self>();
-        let result = serialize_with_key_transform(self, camel_to_snake);
-        #[cfg(feature = "tracing")]
-        trace_json_outcome(
-            "serialize",
-            "snake_case",
-            bo_type,
-            None,
-            result.as_ref().ok().map(String::len),
-            started,
-            result.is_ok(),
-        );
-        result
+        traced_serialize::<Self>("snake_case", || {
+            serialize_with_key_transform(self, camel_to_snake)
+        })
     }
 
     /// Deserializes from a JSON string produced by [`to_json_snake_case`].
@@ -253,26 +261,13 @@ pub trait Bo4eJsonExt: sealed::Sealed + Serialize + DeserializeOwned + Sized {
     /// [`to_json_snake_case`]: Bo4eJsonExt::to_json_snake_case
     /// [`from_json_snake_case_bytes`]: Bo4eJsonExt::from_json_snake_case_bytes
     fn from_json_snake_case(s: &str) -> Result<Self, serde_json::Error> {
-        #[cfg(feature = "tracing")]
-        let started = Instant::now();
-        #[cfg(feature = "tracing")]
-        let bo_type = std::any::type_name::<Self>();
-        let result = deserialize_with_key_transform_from_str::<Self, _>(s, &snake_to_camel);
-        trace_deser_error(
-            &result,
-            "BO4E deserialization failed in from_json_snake_case",
-        );
-        #[cfg(feature = "tracing")]
-        trace_json_outcome(
+        traced_deserialize::<Self, _>(
             "deserialize",
             "snake_case_str",
-            bo_type,
-            Some(s.len()),
-            None,
-            started,
-            result.is_ok(),
-        );
-        result
+            s.len(),
+            "BO4E deserialization failed in from_json_snake_case",
+            || deserialize_with_key_transform_from_str::<Self, _>(s, &snake_to_camel),
+        )
     }
 
     /// Byte-slice variant of [`from_json_snake_case`] for callers that already hold
@@ -287,27 +282,14 @@ pub trait Bo4eJsonExt: sealed::Sealed + Serialize + DeserializeOwned + Sized {
     ///
     /// [`from_json_snake_case`]: Bo4eJsonExt::from_json_snake_case
     fn from_json_snake_case_bytes(bytes: &[u8]) -> Result<Self, serde_json::Error> {
-        #[cfg(feature = "tracing")]
-        let started = Instant::now();
-        #[cfg(feature = "tracing")]
-        let bo_type = std::any::type_name::<Self>();
-        // Streamed key transformation avoids building an intermediate Value tree.
-        let result = deserialize_with_key_transform_from_slice::<Self, _>(bytes, &snake_to_camel);
-        trace_deser_error(
-            &result,
-            "BO4E deserialization failed in from_json_snake_case_bytes",
-        );
-        #[cfg(feature = "tracing")]
-        trace_json_outcome(
+        traced_deserialize::<Self, _>(
             "deserialize",
             "snake_case_bytes",
-            bo_type,
-            Some(bytes.len()),
-            None,
-            started,
-            result.is_ok(),
-        );
-        result
+            bytes.len(),
+            "BO4E deserialization failed in from_json_snake_case_bytes",
+            // Streamed key transformation avoids building an intermediate Value tree.
+            || deserialize_with_key_transform_from_slice::<Self, _>(bytes, &snake_to_camel),
+        )
     }
 
     /// Deserializes from a JSON string produced by [`to_json_german`] or any other
@@ -335,23 +317,13 @@ pub trait Bo4eJsonExt: sealed::Sealed + Serialize + DeserializeOwned + Sized {
     /// [`to_json_german`]: Bo4eJsonExt::to_json_german
     /// [`from_json_german_bytes`]: Bo4eJsonExt::from_json_german_bytes
     fn from_json_german(s: &str) -> Result<Self, serde_json::Error> {
-        #[cfg(feature = "tracing")]
-        let started = Instant::now();
-        #[cfg(feature = "tracing")]
-        let bo_type = std::any::type_name::<Self>();
-        let result = deserialize_german_from_str::<Self>(s);
-        trace_deser_error(&result, "BO4E deserialization failed in from_json_german");
-        #[cfg(feature = "tracing")]
-        trace_json_outcome(
+        traced_deserialize::<Self, _>(
             "deserialize",
             "german_str",
-            bo_type,
-            Some(s.len()),
-            None,
-            started,
-            result.is_ok(),
-        );
-        result
+            s.len(),
+            "BO4E deserialization failed in from_json_german",
+            || deserialize_german_from_str::<Self>(s),
+        )
     }
 
     /// Byte-slice variant of [`from_json_german`] for callers that already hold
@@ -368,9 +340,14 @@ pub trait Bo4eJsonExt: sealed::Sealed + Serialize + DeserializeOwned + Sized {
     /// - You read JSON bytes from I/O into a `Vec<u8>` or `Bytes` buffer.
     /// - You want to avoid the UTF-8 validation that converting to `&str` requires.
     ///
-    /// ```rust,ignore
-    /// let buf = std::fs::read("marktlokation.json")?;
-    /// let malo = Marktlokation::from_json_german_bytes(&buf)?;
+    /// ```
+    /// # #[cfg(feature = "versioned")] {
+    /// use rubo4e::{current::Marktlokation, json::Bo4eJsonExt};
+    ///
+    /// let buf: Vec<u8> = br#"{"marktlokationsId":"51238696781"}"#.to_vec();
+    /// let malo = Marktlokation::from_json_german_bytes(&buf).unwrap();
+    /// assert!(malo.marktlokations_id.is_some());
+    /// # }
     /// ```
     ///
     /// # Errors
@@ -378,26 +355,13 @@ pub trait Bo4eJsonExt: sealed::Sealed + Serialize + DeserializeOwned + Sized {
     ///
     /// [`from_json_german`]: Bo4eJsonExt::from_json_german
     fn from_json_german_bytes(bytes: &[u8]) -> Result<Self, serde_json::Error> {
-        #[cfg(feature = "tracing")]
-        let started = Instant::now();
-        #[cfg(feature = "tracing")]
-        let bo_type = std::any::type_name::<Self>();
-        let result = deserialize_german_from_slice(bytes);
-        trace_deser_error(
-            &result,
-            "BO4E deserialization failed in from_json_german_bytes",
-        );
-        #[cfg(feature = "tracing")]
-        trace_json_outcome(
+        traced_deserialize::<Self, _>(
             "deserialize",
             "german_bytes",
-            bo_type,
-            Some(bytes.len()),
-            None,
-            started,
-            result.is_ok(),
-        );
-        result
+            bytes.len(),
+            "BO4E deserialization failed in from_json_german_bytes",
+            || deserialize_german_from_slice(bytes),
+        )
     }
 
     /// Hardened deserialization from BO4E German camelCase JSON with optional
@@ -414,56 +378,37 @@ pub trait Bo4eJsonExt: sealed::Sealed + Serialize + DeserializeOwned + Sized {
     fn from_json_german_hardened(
         s: &str,
         limits: JsonParseLimits,
-    ) -> Result<Self, serde_json::Error>
-    where
-        Self: Bo4eExtensionData,
-    {
-        #[cfg(feature = "tracing")]
-        let started = Instant::now();
-        #[cfg(feature = "tracing")]
-        let bo_type = std::any::type_name::<Self>();
+    ) -> Result<Self, serde_json::Error> {
         check_payload_limit(s.len(), limits)?;
-        let result = if let Some(max_depth) = limits.max_nesting_depth {
-            // Single-pass: depth is tracked inline by DepthLimitedDeserializer.
-            // When simd-json is enabled, this path falls back to serde_json because
-            // simd-json does not support visitor wrapping; correctness takes priority.
-            let state = DepthState::new(max_depth);
-            let mut de = serde_json::Deserializer::from_str(s);
-            Self::deserialize(DepthLimitedDeserializer::new(&mut de, &state)).and_then(
-                |parsed: Self| {
-                    check_extension_budget(&parsed, limits)?;
-                    Ok(parsed)
-                },
-            )
-        } else {
-            deserialize_german_from_str::<Self>(s).and_then(|parsed: Self| {
-                check_extension_budget(&parsed, limits)?;
-                Ok(parsed)
-            })
-        };
-        trace_deser_error(
-            &result,
-            "BO4E hardened deserialization failed in from_json_german_hardened",
-        );
-        #[cfg(feature = "tracing")]
-        trace_json_outcome(
+        traced_deserialize::<Self, _>(
             "deserialize_hardened",
             "german_str",
-            bo_type,
-            Some(s.len()),
-            None,
-            started,
-            result.is_ok(),
-        );
-        result
+            s.len(),
+            "BO4E hardened deserialization failed in from_json_german_hardened",
+            || {
+                let _budget = install_extension_budget(limits);
+                match limits.max_nesting_depth {
+                    // Depth is tracked inline by DepthLimitedDeserializer.  When
+                    // simd-json is enabled this path still uses serde_json, because
+                    // simd-json cannot wrap visitors; correctness takes priority.
+                    Some(max_depth) => {
+                        let state = DepthState::new(max_depth);
+                        let mut de = serde_json::Deserializer::from_str(s);
+                        Self::deserialize(DepthLimitedDeserializer::new(&mut de, &state))
+                    }
+                    None => deserialize_german_from_str::<Self>(s),
+                }
+            },
+        )
     }
 
     /// Hardened deserialization from snake_case JSON with optional resource
     /// limits for untrusted inputs.
     ///
-    /// The input is first parsed, keys are transformed from snake_case to BO4E
-    /// camelCase, then the same limits as [`Bo4eJsonExt::from_json_german_hardened`] are
-    /// enforced before and after typed deserialization.
+    /// Keys are rewritten from snake_case to BO4E camelCase in the same pass that
+    /// deserializes them — there is no intermediate parse — and the same limits
+    /// as [`Bo4eJsonExt::from_json_german_hardened`] apply, with
+    /// `max_payload_bytes` checked up front and the rest enforced during parsing.
     ///
     /// # Errors
     /// Returns [`serde_json::Error`] on malformed JSON, type mismatch, or
@@ -471,49 +416,28 @@ pub trait Bo4eJsonExt: sealed::Sealed + Serialize + DeserializeOwned + Sized {
     fn from_json_snake_case_hardened(
         s: &str,
         limits: JsonParseLimits,
-    ) -> Result<Self, serde_json::Error>
-    where
-        Self: Bo4eExtensionData,
-    {
-        #[cfg(feature = "tracing")]
-        let started = Instant::now();
-        #[cfg(feature = "tracing")]
-        let bo_type = std::any::type_name::<Self>();
+    ) -> Result<Self, serde_json::Error> {
         check_payload_limit(s.len(), limits)?;
-        let result = if let Some(max_depth) = limits.max_nesting_depth {
-            let state = DepthState::new(max_depth);
-            let mut de = serde_json::Deserializer::from_str(s);
-            Self::deserialize(KeyTransformDeserializer::new(
-                DepthLimitedDeserializer::new(&mut de, &state),
-                &snake_to_camel,
-            ))
-            .and_then(|parsed: Self| {
-                check_extension_budget(&parsed, limits)?;
-                Ok(parsed)
-            })
-        } else {
-            deserialize_with_key_transform_from_str::<Self, _>(s, &snake_to_camel).and_then(
-                |parsed: Self| {
-                    check_extension_budget(&parsed, limits)?;
-                    Ok(parsed)
-                },
-            )
-        };
-        trace_deser_error(
-            &result,
-            "BO4E hardened deserialization failed in from_json_snake_case_hardened",
-        );
-        #[cfg(feature = "tracing")]
-        trace_json_outcome(
+        traced_deserialize::<Self, _>(
             "deserialize_hardened",
             "snake_case_str",
-            bo_type,
-            Some(s.len()),
-            None,
-            started,
-            result.is_ok(),
-        );
-        result
+            s.len(),
+            "BO4E hardened deserialization failed in from_json_snake_case_hardened",
+            || {
+                let _budget = install_extension_budget(limits);
+                match limits.max_nesting_depth {
+                    Some(max_depth) => {
+                        let state = DepthState::new(max_depth);
+                        let mut de = serde_json::Deserializer::from_str(s);
+                        Self::deserialize(KeyTransformDeserializer::new(
+                            DepthLimitedDeserializer::new(&mut de, &state),
+                            &snake_to_camel,
+                        ))
+                    }
+                    None => deserialize_with_key_transform_from_str::<Self, _>(s, &snake_to_camel),
+                }
+            },
+        )
     }
 
     /// Hardened byte-slice variant of [`from_json_german_bytes`].
@@ -522,9 +446,16 @@ pub trait Bo4eJsonExt: sealed::Sealed + Serialize + DeserializeOwned + Sized {
     /// budget.  See [`JsonParseLimits::untrusted_defaults`] for the recommended settings
     /// when processing input from untrusted callers.
     ///
-    /// Accepts an immutable `&[u8]` reference.  When `simd-json` is enabled and the
-    /// payload exceeds the SIMD threshold, a temporary clone is made internally (same
-    /// behaviour as [`from_json_german_bytes`]).
+    /// Accepts an immutable `&[u8]` reference.
+    ///
+    /// Setting `max_nesting_depth` pins this call to the `serde_json` backend even
+    /// when `simd-json` is enabled, because depth is enforced by wrapping the
+    /// visitor and `simd-json` does not support that. Since
+    /// [`JsonParseLimits::untrusted_defaults`] sets a depth cap, the recommended
+    /// hardened configuration never takes the SIMD path — correctness over
+    /// throughput on untrusted input. Leave `max_nesting_depth` at `None` to keep
+    /// the adaptive `simd-json` behaviour of [`from_json_german_bytes`], which
+    /// still enforces the default depth cap via a pre-scan.
     ///
     /// # Errors
     /// Returns [`serde_json::Error`] on malformed JSON, type mismatch, or when
@@ -534,45 +465,25 @@ pub trait Bo4eJsonExt: sealed::Sealed + Serialize + DeserializeOwned + Sized {
     fn from_json_german_bytes_hardened(
         bytes: &[u8],
         limits: JsonParseLimits,
-    ) -> Result<Self, serde_json::Error>
-    where
-        Self: Bo4eExtensionData,
-    {
-        #[cfg(feature = "tracing")]
-        let started = Instant::now();
-        #[cfg(feature = "tracing")]
-        let bo_type = std::any::type_name::<Self>();
+    ) -> Result<Self, serde_json::Error> {
         check_payload_limit(bytes.len(), limits)?;
-        let result = if let Some(max_depth) = limits.max_nesting_depth {
-            let state = DepthState::new(max_depth);
-            let mut de = serde_json::Deserializer::from_slice(bytes);
-            Self::deserialize(DepthLimitedDeserializer::new(&mut de, &state)).and_then(
-                |parsed: Self| {
-                    check_extension_budget(&parsed, limits)?;
-                    Ok(parsed)
-                },
-            )
-        } else {
-            deserialize_german_from_slice::<Self>(bytes).and_then(|parsed: Self| {
-                check_extension_budget(&parsed, limits)?;
-                Ok(parsed)
-            })
-        };
-        trace_deser_error(
-            &result,
-            "BO4E hardened deserialization failed in from_json_german_bytes_hardened",
-        );
-        #[cfg(feature = "tracing")]
-        trace_json_outcome(
+        traced_deserialize::<Self, _>(
             "deserialize_hardened",
             "german_bytes",
-            bo_type,
-            Some(bytes.len()),
-            None,
-            started,
-            result.is_ok(),
-        );
-        result
+            bytes.len(),
+            "BO4E hardened deserialization failed in from_json_german_bytes_hardened",
+            || {
+                let _budget = install_extension_budget(limits);
+                match limits.max_nesting_depth {
+                    Some(max_depth) => {
+                        let state = DepthState::new(max_depth);
+                        let mut de = serde_json::Deserializer::from_slice(bytes);
+                        Self::deserialize(DepthLimitedDeserializer::new(&mut de, &state))
+                    }
+                    None => deserialize_german_from_slice::<Self>(bytes),
+                }
+            },
+        )
     }
 
     /// Hardened byte-slice variant of [`Bo4eJsonExt::from_json_snake_case_bytes`].
@@ -583,57 +494,36 @@ pub trait Bo4eJsonExt: sealed::Sealed + Serialize + DeserializeOwned + Sized {
     fn from_json_snake_case_bytes_hardened(
         bytes: &[u8],
         limits: JsonParseLimits,
-    ) -> Result<Self, serde_json::Error>
-    where
-        Self: Bo4eExtensionData,
-    {
-        #[cfg(feature = "tracing")]
-        let started = Instant::now();
-        #[cfg(feature = "tracing")]
-        let bo_type = std::any::type_name::<Self>();
+    ) -> Result<Self, serde_json::Error> {
         check_payload_limit(bytes.len(), limits)?;
-        let result = if let Some(max_depth) = limits.max_nesting_depth {
-            let state = DepthState::new(max_depth);
-            let mut de = serde_json::Deserializer::from_slice(bytes);
-            Self::deserialize(KeyTransformDeserializer::new(
-                DepthLimitedDeserializer::new(&mut de, &state),
-                &snake_to_camel,
-            ))
-            .and_then(|parsed: Self| {
-                check_extension_budget(&parsed, limits)?;
-                Ok(parsed)
-            })
-        } else {
-            deserialize_with_key_transform_from_slice::<Self, _>(bytes, &snake_to_camel).and_then(
-                |parsed: Self| {
-                    check_extension_budget(&parsed, limits)?;
-                    Ok(parsed)
-                },
-            )
-        };
-        trace_deser_error(
-            &result,
-            "BO4E hardened deserialization failed in from_json_snake_case_bytes_hardened",
-        );
-        #[cfg(feature = "tracing")]
-        trace_json_outcome(
+        traced_deserialize::<Self, _>(
             "deserialize_hardened",
             "snake_case_bytes",
-            bo_type,
-            Some(bytes.len()),
-            None,
-            started,
-            result.is_ok(),
-        );
-        result
+            bytes.len(),
+            "BO4E hardened deserialization failed in from_json_snake_case_bytes_hardened",
+            || {
+                let _budget = install_extension_budget(limits);
+                match limits.max_nesting_depth {
+                    Some(max_depth) => {
+                        let state = DepthState::new(max_depth);
+                        let mut de = serde_json::Deserializer::from_slice(bytes);
+                        Self::deserialize(KeyTransformDeserializer::new(
+                            DepthLimitedDeserializer::new(&mut de, &state),
+                            &snake_to_camel,
+                        ))
+                    }
+                    None => {
+                        deserialize_with_key_transform_from_slice::<Self, _>(bytes, &snake_to_camel)
+                    }
+                }
+            },
+        )
     }
 }
 
 // ─── Single-pass sorted serializer ───────────────────────────────────────────
 //
-// M-B fix: replaces the original two-pass approach (serde_json::to_value → Value
-// tree, then SortedSerialize over that tree) with a single-pass approach that never
-// builds the intermediate Value tree.
+// Sorts object keys without ever building an intermediate serde_json::Value tree.
 //
 // Strategy per map level:
 //   1. Serialize each entry's value into a temporary Vec<u8> buffer.
@@ -720,7 +610,7 @@ impl<S: serde::ser::Serializer> serde::ser::SerializeMap for SortedMap<S> {
     fn end(mut self) -> Result<Self::Ok, Self::Error> {
         self.entries.sort_unstable_by(|(a, _), (b, _)| a.cmp(b));
         let mut map = self.inner.serialize_map(Some(self.entries.len()))?;
-        // Drain entries so we move value_bytes out instead of cloning (M-01 fix).
+        // Drain entries so value_bytes is moved out rather than cloned.
         for (key, value_bytes) in self.entries.drain(..) {
             // Write the pre-serialised value as a raw JSON fragment.
             // serde_json::Serializer always produces valid UTF-8 and valid JSON.
@@ -757,7 +647,7 @@ impl<S: serde::ser::Serializer> serde::ser::SerializeSeq for SortedSeq<S> {
 
     fn end(mut self) -> Result<Self::Ok, Self::Error> {
         let mut seq = self.inner.serialize_seq(Some(self.buf.len()))?;
-        // Drain buffers: move vbuf out instead of cloning (M-01 fix).
+        // Drain buffers so vbuf is moved out rather than cloned.
         for vbuf in self.buf.drain(..) {
             // serde_json::Serializer always produces valid UTF-8 and valid JSON.
             let raw_value = serde_json::value::RawValue::from_string(
@@ -1064,37 +954,74 @@ mod tests {
         );
     }
 
+    /// Fixture for the snake_case mode, which only rewrites keys the generator
+    /// put in the key map — so it has to be built from real BO4E wire names.
+    ///
+    /// `hoechstpreisHT` is deliberate: it is one of the keys whose snake form is
+    /// not recoverable by a heuristic, so it pins the regression.
+    #[derive(Debug, PartialEq, Serialize, Deserialize)]
+    struct SnakeSample {
+        #[serde(rename = "marktlokationsId")]
+        marktlokations_id: String,
+        #[serde(rename = "anteilProzent")]
+        anteil_prozent: u32,
+        #[serde(rename = "hoechstpreisHT", skip_serializing_if = "Option::is_none")]
+        hoechstpreis_ht: Option<String>,
+    }
+
+    impl sealed::Sealed for SnakeSample {}
+    impl Bo4eJsonExt for SnakeSample {}
+
     #[test]
     fn to_json_snake_case_uses_snake_case_keys() {
-        let v = Sample {
-            z_field: "hello".into(),
-            a_field: 42,
-            m_field: None,
+        let v = SnakeSample {
+            marktlokations_id: "51238696781".into(),
+            anteil_prozent: 42,
+            hoechstpreis_ht: None,
         };
         let json = v.to_json_snake_case().unwrap();
         assert!(
-            json.contains("\"z_field\""),
+            json.contains("\"marktlokations_id\""),
             "expected snake_case key: {json}"
         );
         assert!(
-            json.contains("\"a_field\""),
+            json.contains("\"anteil_prozent\""),
             "expected snake_case key: {json}"
         );
         assert!(
-            !json.contains("\"zField\""),
+            !json.contains("\"marktlokationsId\""),
             "must not contain camelCase: {json}"
         );
     }
 
     #[test]
     fn to_json_snake_case_round_trips() {
-        let v = Sample {
-            z_field: "x".into(),
-            a_field: 7,
-            m_field: Some("y".into()),
+        let v = SnakeSample {
+            marktlokations_id: "51238696781".into(),
+            anteil_prozent: 7,
+            hoechstpreis_ht: Some("12.50".into()),
         };
         let json = v.to_json_snake_case().unwrap();
-        let back = Sample::from_json_snake_case(&json).unwrap();
+        let back = SnakeSample::from_json_snake_case(&json).unwrap();
+        assert_eq!(v, back);
+    }
+
+    /// A wire key whose snake form a heuristic cannot invert must still land in
+    /// its typed field, not in the extension-data bag.
+    #[test]
+    fn acronym_keys_survive_snake_case_round_trip() {
+        let v = SnakeSample {
+            marktlokations_id: "51238696781".into(),
+            anteil_prozent: 1,
+            hoechstpreis_ht: Some("99.00".into()),
+        };
+        let json = v.to_json_snake_case().unwrap();
+        assert!(
+            json.contains("\"hoechstpreis_ht\""),
+            "expected snake_case key: {json}"
+        );
+        let back = SnakeSample::from_json_snake_case(&json).unwrap();
+        assert_eq!(back.hoechstpreis_ht.as_deref(), Some("99.00"));
         assert_eq!(v, back);
     }
 
@@ -1104,21 +1031,21 @@ mod tests {
         struct WithMeta {
             #[serde(rename = "_typ")]
             typ: String,
-            #[serde(rename = "normalField")]
-            normal_field: u32,
+            #[serde(rename = "anteilProzent")]
+            anteil_prozent: u32,
         }
         impl sealed::Sealed for WithMeta {}
         impl Bo4eJsonExt for WithMeta {}
         let v = WithMeta {
             typ: "Vertrag".into(),
-            normal_field: 1,
+            anteil_prozent: 1,
         };
         let json = v.to_json_snake_case().unwrap();
-        // _typ must NOT be renamed
+        // _typ is BO4E metadata, not a Rust field name — it must NOT be renamed.
         assert!(json.contains("\"_typ\""), "_typ must survive: {json}");
         assert!(
-            json.contains("\"normal_field\""),
-            "normal_field must appear: {json}"
+            json.contains("\"anteil_prozent\""),
+            "anteil_prozent must appear: {json}"
         );
         let back = WithMeta::from_json_snake_case(&json).unwrap();
         assert_eq!(v, back);
@@ -1301,7 +1228,9 @@ mod tests {
     #[test]
     fn identifier_deser_failure_counter_increments() {
         let before = crate::identifiers::identifier_deser_failure_count();
-        let _ = serde_json::from_str::<crate::identifiers::MaloId>("\"51238696781\"");
+        // Correct length and character set, but the check digit is wrong
+        // (`41373559241` is the valid form).
+        let _ = serde_json::from_str::<crate::identifiers::MaloId>("\"41373559242\"");
         let after = crate::identifiers::identifier_deser_failure_count();
         assert!(
             after > before,

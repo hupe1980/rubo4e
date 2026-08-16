@@ -1,6 +1,6 @@
 use anyhow::Result;
 use heck::ToUpperCamelCase;
-use std::collections::HashSet;
+use std::collections::{BTreeMap, HashSet};
 
 use crate::ast::{EnumNode, Field, FieldType, PrimitiveType, SchemaNode};
 
@@ -23,19 +23,32 @@ fn emit_any_bo(bo_names: &[String]) -> String {
     s.push_str("/// Use this when you receive a JSON message where the concrete BO type is\n");
     s.push_str("/// determined at runtime by the `\"_typ\"` discriminant field.\n");
     s.push_str("///\n");
-    s.push_str("/// Deserialization requires the `json` feature (uses `serde_json::Value` for\n");
-    s.push_str(
-        "/// the two-pass `_typ` peeking strategy).  Serialization requires only `serde`.\n",
-    );
+    s.push_str("/// Deserialization requires the `json` feature: the payload is buffered once,\n");
+    s.push_str("/// the `\"_typ\"` discriminant is read from it, and the buffer is then\n");
+    s.push_str("/// dispatched to the concrete type.  Serialization requires only `serde`.\n");
+    s.push_str("///\n");
+    s.push_str("/// # Performance\n");
+    s.push_str("///\n");
+    s.push_str("/// Because the concrete type is not known until `\"_typ\"` has been read, this\n");
+    s.push_str("/// buffers an intermediate `serde_json::Value`.  Deserializing a concrete BO\n");
+    s.push_str("/// type directly skips that step, so prefer it on hot paths where the type is\n");
+    s.push_str("/// known ahead of time.\n");
     s.push_str("///\n");
     s.push_str("/// # Example\n");
-    s.push_str("/// ```rust,ignore\n");
-    s.push_str("/// use rubo4e::v202501::AnyBo;\n");
-    s.push_str("/// let json = r#\"{\"_typ\":\"MARKTLOKATION\",\"marktlokationsId\":\"51238696780\"}\"#;\n");
-    s.push_str("/// let bo: AnyBo = serde_json::from_str(json)?;\n");
-    s.push_str("/// if let AnyBo::Marktlokation(malo) = bo {\n");
-    s.push_str("///     println!(\"ID: {:?}\", malo.marktlokations_id);\n");
-    s.push_str("/// }\n");
+    s.push_str("/// ```\n");
+    s.push_str("/// # #[cfg(feature = \"json\")] {\n");
+    s.push_str("/// use rubo4e::current::AnyBo;\n");
+    s.push_str("///\n");
+    s.push_str("/// let json = r#\"{\"_typ\":\"MARKTLOKATION\",\"marktlokationsId\":\"51238696781\"}\"#;\n");
+    s.push_str("/// let bo: AnyBo = serde_json::from_str(json).unwrap();\n");
+    s.push_str("///\n");
+    s.push_str(
+        "/// let AnyBo::Marktlokation(malo) = bo else { panic!(\"expected a Marktlokation\") };\n",
+    );
+    s.push_str(
+        "/// assert_eq!(malo.marktlokations_id.as_ref().map(|id| id.as_ref()), Some(\"51238696781\"));\n",
+    );
+    s.push_str("/// # }\n");
     s.push_str("/// ```\n");
     s.push_str("#[derive(Debug, Clone, PartialEq)]\n");
     s.push_str("#[cfg_attr(not(feature = \"json\"), derive(Hash))]\n");
@@ -110,36 +123,50 @@ fn emit_any_bo(bo_names: &[String]) -> String {
     s.push_str("    }\n");
     s.push_str("}\n\n");
 
-    // ── Deserialize — single-pass via Box<RawValue> + peek_typ_field
-    // Avoids the two-pass Value-based strategy that allocated the full JSON tree
-    // just to read the `_typ` discriminant.  peek_typ_field scans only that key.
+    // ── Deserialize — buffer through the *incoming* deserializer, then dispatch.
+    //
+    // This must not re-parse the input with `serde_json::from_str`.  Doing so
+    // discards whatever deserializer the caller handed us, and the crate wraps
+    // that deserializer with the two things `AnyBo` most needs:
+    //
+    //   * the snake_case ↔ German key transform — bypassing it made
+    //     `from_json_snake_case` return `Ok` with every typed field empty and the
+    //     values diverted into `_additional` (silent data loss);
+    //   * the nesting-depth limiter — bypassing it made
+    //     `from_json_german_hardened`'s `max_nesting_depth` silently unenforced,
+    //     since a `RawValue` capture is only one level deep to the wrapper.
+    //
+    // Buffering into a `serde_json::Value` costs an intermediate tree, which the
+    // old `Box<RawValue>` capture avoided.  That is the price of routing through
+    // the caller's deserializer, and callers on a hot path should deserialize the
+    // concrete BO type rather than `AnyBo`.
     s.push_str("#[cfg(all(feature = \"serde\", feature = \"json\"))]\n");
     s.push_str("impl<'de> serde::Deserialize<'de> for AnyBo {\n");
     s.push_str(
         "    fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {\n",
     );
-    s.push_str("        // Capture the raw JSON without materialising a full serde_json::Value\n");
-    s.push_str("        // tree.  peek_typ_field borrows from the raw string — zero heap\n");
-    s.push_str("        // allocation beyond the Box<RawValue> wrapper itself.\n");
-    s.push_str("        let raw: Box<serde_json::value::RawValue> =\n");
-    s.push_str("            serde::Deserialize::deserialize(d)?;\n");
-    s.push_str("        let typ_str = crate::json::peek_typ_field(raw.get()).unwrap_or(\"\");\n");
+    s.push_str("        // Buffer via `d` so any wrapping deserializer (key transform,\n");
+    s.push_str("        // depth limit) is applied exactly once, here.\n");
+    s.push_str("        let value = serde_json::Value::deserialize(d)?;\n");
+    s.push_str("        let typ_str = value\n");
+    s.push_str("            .get(\"_typ\")\n");
+    s.push_str("            .and_then(serde_json::Value::as_str)\n");
+    s.push_str("            .unwrap_or(\"\");\n");
     s.push_str("        match typ_str {\n");
     for name in bo_names {
         let typ_key = name.to_ascii_uppercase();
         s.push_str(&format!(
-            "            \"{typ_key}\" => serde_json::from_str::<{name}>(raw.get())\n"
+            "            \"{typ_key}\" => serde_json::from_value::<{name}>(value)\n"
         ));
         s.push_str(&format!(
             "                .map(|v| AnyBo::{name}(Box::new(v)))\n"
         ));
         s.push_str("                .map_err(serde::de::Error::custom),\n");
     }
-    s.push_str("            _ => {\n");
-    s.push_str("                let data: serde_json::Value = serde_json::from_str(raw.get())\n");
-    s.push_str("                    .map_err(serde::de::Error::custom)?;\n");
-    s.push_str("                Ok(AnyBo::Unknown { typ: typ_str.to_owned(), data })\n");
-    s.push_str("            }\n");
+    s.push_str("            _ => Ok(AnyBo::Unknown {\n");
+    s.push_str("                typ: typ_str.to_owned(),\n");
+    s.push_str("                data: value,\n");
+    s.push_str("            }),\n");
     s.push_str("        }\n");
     s.push_str("    }\n");
     s.push_str("}\n\n");
@@ -177,7 +204,7 @@ fn emit_any_bo(bo_names: &[String]) -> String {
 /// Emits the Rust source file for a single schema node.
 /// Returns `(filename, source_code)`.
 ///
-/// `schema_version` is the full schema version tag, e.g. `"v202501.0.0"`, used to
+/// `schema_version` is the full schema version tag, e.g. `"v202607.0.0"`, used to
 /// populate [`Bo4eObject::schema_version`] on generated BO types.
 pub fn emit_node(node: &SchemaNode, schema_version: &str) -> Result<(String, String)> {
     // Normalize the type name to UpperCamelCase so it matches the type references
@@ -269,6 +296,96 @@ pub fn emit_mod_rs(nodes: &[SchemaNode], _schema_version: &str) -> Result<String
     format_source(s)
 }
 
+// ─── Wire-key ↔ snake_case map emission ──────────────────────────────────────
+
+/// Emits `src/generated/key_map.rs` — the exact, bidirectional mapping between
+/// BO4E wire property names (German camelCase) and the Rust snake_case field
+/// names the generator derives from them.
+///
+/// # Why a table instead of a heuristic
+///
+/// `to_json_snake_case` / `from_json_snake_case` need to convert keys in both
+/// directions. Deriving the reverse direction with a heuristic is impossible to
+/// get right: `hoechstpreis_ht` could come from `hoechstpreisHt` or
+/// `hoechstpreisHT`, and `a` could come from `a` or `A`. BO4E uses all three
+/// forms (`Sigmoidparameter.A`, `Tarifberechnungsparameter.hoechstpreisHT`,
+/// `PreisblattKonzessionsabgabe.kundengruppeKA`), so a heuristic silently drops
+/// those fields into the extension-data bag on a snake_case round-trip.
+///
+/// The generator already knows both names for every field, so it emits the
+/// mapping directly. Lookups are exact, allocation-free, and cannot drift from
+/// the generated structs.
+///
+/// # What is excluded
+///
+/// - Pairs whose two sides are identical — the lookup falls through to the
+///   identity, so storing them would only bloat the table.
+/// - Underscore-prefixed wire keys (`_typ`, `_version`, `_id`). These are BO4E
+///   metadata keys that stay verbatim in every output mode, so they must not be
+///   rewritten to their Rust field names (`typ`, `version`, `id`).
+pub fn emit_key_map(nodes: &[SchemaNode]) -> Result<String> {
+    // BTreeMap keeps the emitted arrays sorted, which the runtime binary search
+    // relies on and which keeps codegen output stable across platforms.
+    let mut wire_to_snake: BTreeMap<&str, &str> = BTreeMap::new();
+    for node in nodes {
+        let fields = match node {
+            SchemaNode::Bo(n) => &n.fields,
+            SchemaNode::Com(n) => &n.fields,
+            SchemaNode::Enum(_) => continue,
+        };
+        for f in fields {
+            if f.name == f.rust_name || f.name.starts_with('_') {
+                continue;
+            }
+            wire_to_snake.insert(&f.name, &f.rust_name);
+        }
+    }
+
+    // The reverse direction must be a function too: two distinct wire keys that
+    // collapse onto the same snake name would make `from_json_snake_case`
+    // ambiguous. Fail generation rather than emit a table that silently picks one.
+    let mut snake_to_wire: BTreeMap<&str, &str> = BTreeMap::new();
+    for (wire, snake) in &wire_to_snake {
+        if let Some(previous) = snake_to_wire.insert(snake, wire) {
+            anyhow::bail!(
+                "ambiguous snake_case key map: wire names {previous:?} and {wire:?} both map to \
+                 {snake:?}; from_json_snake_case could not decide which field to fill"
+            );
+        }
+    }
+
+    let mut s = String::from(
+        "// @generated — do not edit by hand.\n\
+         // This file is maintained by the code generator (`just generate`).\n\n\
+         //! Exact BO4E wire-key ↔ Rust snake_case field-name mapping.\n\
+         //!\n\
+         //! Used by `crate::json::key_transform` to convert JSON keys for\n\
+         //! `to_json_snake_case` / `from_json_snake_case`. Both tables are sorted by\n\
+         //! their first element so lookups can binary-search, and every entry is\n\
+         //! `&'static str`, so a hit never allocates.\n\
+         //!\n\
+         //! Only pairs whose two sides differ are listed; any key that is absent maps\n\
+         //! to itself. Underscore-prefixed BO4E metadata keys (`_typ`, `_version`,\n\
+         //! `_id`) are deliberately absent so they survive verbatim in every mode.\n\n",
+    );
+
+    s.push_str("/// BO4E wire (camelCase) → Rust snake_case, sorted by wire name.\n");
+    s.push_str("pub(crate) static WIRE_TO_SNAKE: &[(&str, &str)] = &[\n");
+    for (wire, snake) in &wire_to_snake {
+        s.push_str(&format!("    ({wire:?}, {snake:?}),\n"));
+    }
+    s.push_str("];\n\n");
+
+    s.push_str("/// Rust snake_case → BO4E wire (camelCase), sorted by snake name.\n");
+    s.push_str("pub(crate) static SNAKE_TO_WIRE: &[(&str, &str)] = &[\n");
+    for (snake, wire) in &snake_to_wire {
+        s.push_str(&format!("    ({snake:?}, {wire:?}),\n"));
+    }
+    s.push_str("];\n");
+
+    format_source(s)
+}
+
 // ─── Struct emission ──────────────────────────────────────────────────────────
 
 /// Collects the set of sibling type names (exported by the version `mod.rs`)
@@ -334,7 +451,7 @@ fn emit_struct(
         s.push_str(&format!("use super::{{{}}};\n\n", imports.join(", ")));
     }
 
-    // BO types with a `_typ` field get a custom Default impl (H-05) so that
+    // BO types with a `_typ` field get a custom Default impl  so that
     // `Default::default()` pre-fills `typ` with the correct `BoTyp` discriminant,
     // producing structurally valid BO4E JSON without any manual field setting.
     let has_typ_field = is_bo && fields.iter().any(|f| f.name == "_typ");
@@ -346,7 +463,13 @@ fn emit_struct(
     // This guarantees struct references always agree with the generated enum variants.
     let bo_typ_variant = name.to_ascii_uppercase().to_upper_camel_case();
 
-    emit_struct_derives(&mut s, has_typ_field, name, schema_version);
+    emit_struct_derives(
+        &mut s,
+        emits_custom_default(is_bo, fields),
+        has_typ_field,
+        name,
+        schema_version,
+    );
 
     // Doc comment: strip RST directives (from BO4E Python docs) and convert to Markdown.
     if let Some(doc) = description {
@@ -381,15 +504,15 @@ fn emit_struct(
             s.push_str("    #[cfg_attr(feature = \"builder\", builder(default, setter(into)))]\n");
             s.push_str("    pub typ: Option<ComTyp>,\n");
         } else {
-            emit_field(&mut s, field);
+            emit_field(&mut s, field, schema_version);
         }
     }
 
     emit_extension_field(&mut s);
     s.push_str("}\n");
 
-    if has_typ_field {
-        emit_default_impl(&mut s, name, &bo_typ_variant, fields);
+    if emits_custom_default(is_bo, fields) {
+        emit_default_impl(&mut s, name, &bo_typ_variant, fields, is_bo, schema_version);
     }
 
     emit_struct_impls(&mut s, name, is_bo, &bo_typ_variant, schema_version, fields);
@@ -398,9 +521,37 @@ fn emit_struct(
 }
 
 /// Emits the `#[derive(...)]` and `#[cfg_attr(...)]` attribute block for a struct.
-fn emit_struct_derives(s: &mut String, has_typ_field: bool, name: &str, schema_version: &str) {
-    // BO types with `_typ` omit `Default` here; a handwritten impl is emitted below.
-    if has_typ_field {
+/// Whether this struct gets a hand-written `Default` instead of the derive.
+///
+/// A generated `Default` exists to pre-fill the two BO4E metadata fields the
+/// generator knows statically: `_typ` (BO types only) and `_version` (every BO
+/// and COM). Both reference implementations stamp them, so a value built in Rust
+/// must serialize the same way.
+///
+/// BO types carrying a required non-metadata field are the one exception: they
+/// have no valid empty state, so they get no `Default` at all — the derive would
+/// not compile either, since a required field's enum type need not implement
+/// `Default`. Their builder still stamps `_version`.
+fn emits_custom_default(is_bo: bool, fields: &[Field]) -> bool {
+    let has_typ_field = is_bo && fields.iter().any(|f| f.name == "_typ");
+    let has_version_field = fields.iter().any(|f| f.name == "_version");
+    if has_typ_field && fields.iter().any(|f| f.name != "_typ" && !f.is_optional) {
+        return false;
+    }
+    has_typ_field || has_version_field
+}
+
+fn emit_struct_derives(
+    s: &mut String,
+    custom_default: bool,
+    has_typ_field: bool,
+    name: &str,
+    schema_version: &str,
+) {
+    // Types with generator-populated metadata omit `Default` here; a handwritten
+    // impl is emitted below.  BO types with a required field get neither: see
+    // `emits_custom_default`.
+    if custom_default || has_typ_field {
         s.push_str("#[derive(Debug, Clone, PartialEq)]\n");
     } else {
         s.push_str("#[derive(Debug, Clone, PartialEq, Default)]\n");
@@ -419,7 +570,7 @@ fn emit_struct_derives(s: &mut String, has_typ_field: bool, name: &str, schema_v
     s.push_str("#[cfg_attr(feature = \"schemars\", derive(schemars::JsonSchema))]\n");
     s.push_str("#[cfg_attr(feature = \"utoipa\", derive(utoipa::ToSchema))]\n");
     // Cross-field validators for types with non-trivial business rules.
-    // The path is versioned so both v202401 and v202501 get correct impls.
+    // The path is versioned so every emitted schema series gets correct impls.
     let ver = schema_version.split('.').next().unwrap_or(schema_version);
     if let Some(validator) = cross_field_validator(name, ver) {
         s.push_str(&format!(
@@ -433,7 +584,7 @@ fn emit_extension_field(s: &mut String) {
     // Extension data: captures unknown JSON fields for transparent round-trip
     // preservation.  Gated on `json` because it requires `serde_json::Value`.
     //
-    // H-03: single `_additional` field using a cfg-adaptive type rather than
+    // Single `_additional` field using a cfg-adaptive type rather than
     // two cfg-gated duplicate declarations.  When `json` is on this is the real
     // `LimitedExtensionMap`; when off it is the ZST stub — same field name, same
     // serde skip/flatten semantics, no cfg branch in struct body.
@@ -451,29 +602,43 @@ fn emit_extension_field(s: &mut String) {
 }
 
 /// Emits a custom `Default` impl for a BO struct that pre-fills `typ` with the correct variant.
-fn emit_default_impl(s: &mut String, name: &str, bo_typ_variant: &str, fields: &[Field]) {
-    // H-05: BO types with a `_typ` field get a custom Default impl that pre-fills `typ`
-    // so that `Default::default()` produces structurally valid BO4E JSON with `"_typ"`
-    // present, matching the BO4E specification requirement for the type discriminant.
-    //
-    // Guard: only emit Default when every non-`_typ` field is optional.  Required
-    // fields (is_optional == false) may have enum types that don't implement Default,
-    // so generating `field: Default::default()` would fail to compile.  Structs with
-    // required fields have no valid "empty" state and should not implement Default.
-    let has_required_non_typ = fields.iter().any(|f| f.name != "_typ" && !f.is_optional);
-    if has_required_non_typ {
-        return;
-    }
+/// Emits a `Default` impl that pre-fills the BO4E metadata fields.
+///
+/// `Default::default()` must produce a value that serializes to the same JSON the
+/// Python and Go implementations emit for an equivalently empty object. Both
+/// stamp `_version` on every BO and COM, and `_typ` on BOs; leaving either unset
+/// makes a Rust-built payload distinguishable from every other implementation's.
+///
+/// Every other field is `Default::default()`, exactly as the derive would have
+/// produced, so this impl compiles wherever the derive did.
+fn emit_default_impl(
+    s: &mut String,
+    name: &str,
+    bo_typ_variant: &str,
+    fields: &[Field],
+    is_bo: bool,
+    schema_version: &str,
+) {
+    let has_typ_field = is_bo && fields.iter().any(|f| f.name == "_typ");
 
     s.push_str(&format!(
         "\nimpl Default for {name} {{\n    fn default() -> Self {{\n        Self {{\n"
     ));
-    s.push_str(&format!(
-        "            typ: Some(BoTyp::{bo_typ_variant}),\n"
-    ));
+    if has_typ_field {
+        s.push_str(&format!(
+            "            typ: Some(BoTyp::{bo_typ_variant}),\n"
+        ));
+    }
     for field in fields {
-        if field.name == "_typ" {
+        if has_typ_field && field.name == "_typ" {
             continue; // already emitted as `typ` above
+        }
+        if field.name == "_version" {
+            s.push_str(&format!(
+                "            {}: Some(\"{schema_version}\".to_owned()),\n",
+                field.rust_name
+            ));
+            continue;
         }
         s.push_str(&format!(
             "            {}: Default::default(),\n",
@@ -593,16 +758,16 @@ fn emit_struct_impls(
     // Bo4eObject impl — only BO types carry the BoTyp discriminant.
     // `type BoTyp = BoTyp;` binds the associated type from crate::Bo4eObject to the
     // local version-specific BoTyp enum so the impl compiles and dyn usage works as
-    // `dyn Bo4eObject<BoTyp = v202501::BoTyp>`.
+    // `dyn Bo4eObject<BoTyp = v202607::BoTyp>`.
     if is_bo {
-        // H-07: return the runtime `typ` field value so callers doing dynamic dispatch
+        // Return the runtime `typ` field value so callers doing dynamic dispatch
         // see the actual discriminant from the payload (e.g. "BUENDELVERTRAG"), not the
         // hardcoded struct name.  `unwrap_or` falls back to the compile-time constant only
         // when the field was explicitly set to `None` after construction.
         s.push_str(&format!("\nimpl Bo4eObject for {name} {{\n    type BoTyp = BoTyp;\n    fn bo_type(&self) -> BoTyp {{\n        self.typ.unwrap_or(BoTyp::{bo_typ_variant})\n    }}\n    fn schema_version(&self) -> &'static str {{\n        \"{schema_version}\"\n    }}\n}}\n"));
     }
 
-    // H-02: Sealed marker + Bo4eJsonExt impl — restricts trait to BO4E types only.
+    // Sealed marker + Bo4eJsonExt impl — restricts trait to BO4E types only.
     s.push_str(&format!(
         "\n#[cfg(feature = \"json\")]\nimpl crate::json::sealed::Sealed for {name} {{}}\n"
     ));
@@ -610,14 +775,14 @@ fn emit_struct_impls(
         "#[cfg(feature = \"json\")]\nimpl crate::json::Bo4eJsonExt for {name} {{}}\n"
     ));
 
-    // H-01/Bo4eExtensionData: lazy-init getter returns static empty map for None case.
+    // Bo4eExtensionData: lazy-init getter returns static empty map for None case.
     s.push_str(&format!(
         "\n#[cfg(feature = \"json\")]\nimpl crate::json::Bo4eExtensionData for {name} {{\n"
     ));
     s.push_str(
         "    fn extension_data(&self) -> &indexmap::IndexMap<String, serde_json::Value> {\n",
     );
-    // I-5: use the single crate-level EMPTY_EXTENSION_MAP instead of a per-struct
+    // Use the single crate-level EMPTY_EXTENSION_MAP instead of a per-struct
     // LazyLock static.  This reduces cold-start allocations from O(n_types) to O(1).
     s.push_str("        self._additional.as_map().unwrap_or(&crate::json::extension::EMPTY_EXTENSION_MAP)\n");
     s.push_str("    }\n");
@@ -645,7 +810,7 @@ fn emit_struct_impls(
     emit_strict_struct_impl(s, name, fields);
 }
 
-fn emit_field(s: &mut String, field: &Field) {
+fn emit_field(s: &mut String, field: &Field, schema_version: &str) {
     if let Some(doc) = &field.description {
         for line in clean_description(doc).lines() {
             s.push_str(&format!("    /// {}\n", line));
@@ -667,7 +832,18 @@ fn emit_field(s: &mut String, field: &Field) {
         // via `From<T> for Option<T>`, and `Option<T>: Into<Option<T>>` via identity.
         // This replaces `strip_option` and allows mapping from `Option`-valued sources
         // (e.g. EDIFACT parsing) without verbose `if let Some(v) = opt { b = b.f(v); }`.
-        s.push_str("    #[cfg_attr(feature = \"builder\", builder(default, setter(into)))]\n");
+        //
+        // `_version` defaults to the schema version this module was generated from,
+        // matching the Python and Go implementations, which stamp it on every BO and
+        // COM.  The setter stays available so a caller re-emitting a payload received
+        // under a different series can preserve its provenance.
+        if field.name == "_version" {
+            s.push_str(&format!(
+                "    #[cfg_attr(feature = \"builder\", builder(default = Some(\"{schema_version}\".to_owned()), setter(into)))]\n"
+            ));
+        } else {
+            s.push_str("    #[cfg_attr(feature = \"builder\", builder(default, setter(into)))]\n");
+        }
     }
 
     // garde: dive into identifier newtypes so their custom validators run.
@@ -705,7 +881,7 @@ fn emit_field(s: &mut String, field: &Field) {
             "    #[cfg_attr(feature = \"schemars\", schemars(schema_with = \"{schema_fn}\"))]\n"
         ));
 
-        // C-01 + serde bug-fix: without `#[serde(with = "time::serde::rfc3339")]`, the
+        // + serde bug-fix: without `#[serde(with = "time::serde::rfc3339")]`, the
         // `time` crate's default `Serialize` impl produces a tuple `[year,ordinal,…]`
         // instead of an ISO-8601 string — completely wrong for BO4E wire format.
         // The rfc3339 adapter is gated on BOTH `serde` and `time` features; when `time`
@@ -902,7 +1078,7 @@ fn primitive_to_rust(p: &PrimitiveType) -> &'static str {
         PrimitiveType::String => "String",
         PrimitiveType::Bool => "bool",
         PrimitiveType::I64 => "i64",
-        // C-01: these are the `time`-feature-active type strings; the emitter emits
+        // these are the `time`-feature-active type strings; the emitter emits
         // cfg-conditional fallbacks to `String` when the features are absent.
         PrimitiveType::Decimal => "rust_decimal::Decimal",
         PrimitiveType::OffsetDateTime => "time::OffsetDateTime",
@@ -943,7 +1119,7 @@ fn emit_enum(en: &EnumNode) -> Result<String> {
         }
     }
     // Prevents downstream exhaustive match arms; complements the `Unknown` catch-all
-    // by enforcing compile-time forward-compatibility for external crates (L-07).
+    // by enforcing compile-time forward-compatibility for external crates.
     s.push_str("#[non_exhaustive]\n");
     s.push_str(&format!("pub enum {} {{\n", en.name));
 
@@ -1005,7 +1181,7 @@ fn emit_enum(en: &EnumNode) -> Result<String> {
         seen_variants.insert(rust_variant.clone());
         variant_pairs.push((rust_variant.clone(), variant.clone()));
         // Always emit serde(rename) so the serialized value is the canonical JSON string.
-        // H-08: also emit strum(serialize) so strum::Display / AsRef / EnumString
+        // Also emit strum(serialize) so strum::Display / AsRef / EnumString
         // produce the same canonical string as serde — not the Rust variant name.
         s.push_str(&format!(
             "    #[cfg_attr(feature = \"serde\", serde(rename = \"{variant}\"))]\n"
@@ -1026,7 +1202,7 @@ fn emit_enum(en: &EnumNode) -> Result<String> {
     // is deserialization-only and `rename` applies to serialization.
     s.push_str("    #[cfg_attr(feature = \"serde\", serde(other, rename = \"UNKNOWN\"))]\n");
     // Use \"UNKNOWN\" so strum::Display is consistent with the SCREAMING_SNAKE_CASE
-    // convention of all other variants (L-01 fix: \"Unknown\" was the only variant
+    // convention of all other variants (\"Unknown\" was the only variant
     // that did not match the BO4E SCREAMING_SNAKE_CASE serialization convention).
     s.push_str("    #[cfg_attr(feature = \"strum\", strum(serialize = \"UNKNOWN\"))]\n");
     s.push_str("    Unknown,\n");
@@ -1056,6 +1232,18 @@ fn emit_enum(en: &EnumNode) -> Result<String> {
         .map(|(rust, wire)| format!("            \"{wire}\" => Ok(Self::{rust}),"))
         .collect::<Vec<_>>()
         .join("\n");
+    // A real variant to anchor the `from_wire` doctest, so the example asserts an
+    // actual wire→variant mapping rather than only the rejection path.  Every BO4E
+    // enum has at least one schema variant, but fall back gracefully if that ever
+    // stops holding.
+    let from_wire_positive = variant_pairs
+        .first()
+        .map(|(rust, wire)| {
+            format!(
+                "/// assert_eq!({enum_name}::from_wire(\"{wire}\"), Ok({enum_name}::{rust}));\n    "
+            )
+        })
+        .unwrap_or_default();
     s.push_str(&format!(
         r#"
 impl {enum_name} {{
@@ -1077,10 +1265,11 @@ impl {enum_name} {{
     /// Available **without** the `strum` feature.
     ///
     /// # Example
-    /// ```rust,ignore
-    /// for v in {enum_name}::iter_known() {{
-    ///     println!("{{}}", v.as_wire());
-    /// }}
+    /// ```
+    /// # use rubo4e::current::{enum_name};
+    /// // Never yields the `Unknown` catch-all, so the count matches `COUNT`.
+    /// assert_eq!({enum_name}::iter_known().count(), {enum_name}::COUNT);
+    /// assert!({enum_name}::iter_known().all(|v| v.is_known()));
     /// ```
     pub fn iter_known() -> impl Iterator<Item = Self> + Clone {{
         Self::VARIANTS.iter().copied()
@@ -1106,8 +1295,12 @@ impl {enum_name} {{
     /// reject bad values instead of silently degrading them.
     ///
     /// # Example
-    /// ```rust,ignore
+    /// ```
+    /// # use rubo4e::current::{enum_name};
+    /// {from_wire_positive}// Out-of-schema values are rejected rather than degraded:
     /// assert!({enum_name}::from_wire("NOT_A_REAL_VALUE").is_err());
+    /// // …including the `Unknown` catch-all's own wire spelling:
+    /// assert!({enum_name}::from_wire("UNKNOWN").is_err());
     /// ```
     pub fn from_wire(s: &str) -> Result<Self, crate::error::UnknownVariant> {{
         match s {{
@@ -1174,21 +1367,22 @@ impl crate::Bo4eStrict for {enum_name} {{
 "#
     ));
 
-    // SQLx impls for PostgreSQL — gated on both `sqlx` and `json` features so that
-    // serde_json is guaranteed to be available for encode/decode.
+    // SQLx impls for PostgreSQL.  Both directions go through the `as_wire` /
+    // `from_wire` pair, which is available without any optional dependency — so
+    // these need only the `sqlx` feature, not `json`.
     let enum_name = &en.name;
     s.push_str(&format!(
         r#"
-#[cfg(all(feature = "sqlx", feature = "json"))]
+#[cfg(feature = "sqlx")]
 impl sqlx::Type<sqlx::Postgres> for {enum_name} {{
     fn type_info() -> sqlx::postgres::PgTypeInfo {{
         <String as sqlx::Type<sqlx::Postgres>>::type_info()
     }}
 }}
 
-/// Encode via the canonical wire string (`as_wire`, always available) — no
-/// `serde_json::Value` intermediate, saving an allocation per encode (M-07).
-#[cfg(all(feature = "sqlx", feature = "json"))]
+/// Encodes as the canonical BO4E wire string, borrowed from `as_wire` — no
+/// intermediate `String` or `serde_json::Value` is allocated.
+#[cfg(feature = "sqlx")]
 impl<'q> sqlx::Encode<'q, sqlx::Postgres> for {enum_name} {{
     fn encode_by_ref(
         &self,
@@ -1199,14 +1393,19 @@ impl<'q> sqlx::Encode<'q, sqlx::Postgres> for {enum_name} {{
     }}
 }}
 
-#[cfg(all(feature = "sqlx", feature = "json"))]
+/// Decodes leniently, matching the `serde` path: a value the schema does not
+/// define becomes [`{enum_name}::Unknown`] rather than a decode error, so a
+/// database row written by a newer schema version still reads back.
+///
+/// Use [`{enum_name}::from_wire`] on a `String` column, or check
+/// [`{enum_name}::is_known`], where out-of-schema values must be rejected.
+#[cfg(feature = "sqlx")]
 impl<'r> sqlx::Decode<'r, sqlx::Postgres> for {enum_name} {{
     fn decode(
         value: <sqlx::Postgres as sqlx::Database>::ValueRef<'r>,
     ) -> Result<Self, sqlx::error::BoxDynError> {{
-        let s = <String as sqlx::Decode<sqlx::Postgres>>::decode(value)?;
-        serde_json::from_value(serde_json::Value::String(s))
-            .map_err(|e| Box::new(e) as sqlx::error::BoxDynError)
+        let s = <&str as sqlx::Decode<sqlx::Postgres>>::decode(value)?;
+        Ok(Self::from_wire(s).unwrap_or(Self::Unknown))
     }}
 }}
 "#
@@ -1234,7 +1433,7 @@ impl proptest::arbitrary::Arbitrary for {enum_name} {{
 /// Returns the fully-qualified path to a cross-field validator function, if any.
 ///
 /// The returned path is used in `#[garde(custom(...))]` on the struct.
-/// `ver` is the module version prefix, e.g. `"v202501"`.
+/// `ver` is the module version prefix, e.g. `"v202607"`.
 fn cross_field_validator(name: &str, ver: &str) -> Option<String> {
     match name {
         "Marktlokation" => Some(format!("crate::validation::{ver}::validate_marktlokation")),

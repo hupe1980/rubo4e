@@ -386,17 +386,28 @@ pub use zustaendigkeit::Zustaendigkeit;
 /// Use this when you receive a JSON message where the concrete BO type is
 /// determined at runtime by the `"_typ"` discriminant field.
 ///
-/// Deserialization requires the `json` feature (uses `serde_json::Value` for
-/// the two-pass `_typ` peeking strategy).  Serialization requires only `serde`.
+/// Deserialization requires the `json` feature: the payload is buffered once,
+/// the `"_typ"` discriminant is read from it, and the buffer is then
+/// dispatched to the concrete type.  Serialization requires only `serde`.
+///
+/// # Performance
+///
+/// Because the concrete type is not known until `"_typ"` has been read, this
+/// buffers an intermediate `serde_json::Value`.  Deserializing a concrete BO
+/// type directly skips that step, so prefer it on hot paths where the type is
+/// known ahead of time.
 ///
 /// # Example
-/// ```rust,ignore
-/// use rubo4e::v202501::AnyBo;
-/// let json = r#"{"_typ":"MARKTLOKATION","marktlokationsId":"51238696780"}"#;
-/// let bo: AnyBo = serde_json::from_str(json)?;
-/// if let AnyBo::Marktlokation(malo) = bo {
-///     println!("ID: {:?}", malo.marktlokations_id);
-/// }
+/// ```
+/// # #[cfg(feature = "json")] {
+/// use rubo4e::current::AnyBo;
+///
+/// let json = r#"{"_typ":"MARKTLOKATION","marktlokationsId":"51238696781"}"#;
+/// let bo: AnyBo = serde_json::from_str(json).unwrap();
+///
+/// let AnyBo::Marktlokation(malo) = bo else { panic!("expected a Marktlokation") };
+/// assert_eq!(malo.marktlokations_id.as_ref().map(|id| id.as_ref()), Some("51238696781"));
+/// # }
 /// ```
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(not(feature = "json"), derive(Hash))]
@@ -928,126 +939,123 @@ impl serde::Serialize for AnyBo {
 #[cfg(all(feature = "serde", feature = "json"))]
 impl<'de> serde::Deserialize<'de> for AnyBo {
     fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
-        let raw: Box<serde_json::value::RawValue> = serde::Deserialize::deserialize(d)?;
-        let typ_str = crate::json::peek_typ_field(raw.get()).unwrap_or("");
+        let value = serde_json::Value::deserialize(d)?;
+        let typ_str = value
+            .get("_typ")
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or("");
         match typ_str {
-            "ANGEBOT" => serde_json::from_str::<Angebot>(raw.get())
+            "ANGEBOT" => serde_json::from_value::<Angebot>(value)
                 .map(|v| AnyBo::Angebot(Box::new(v)))
                 .map_err(serde::de::Error::custom),
-            "AUSSCHREIBUNG" => serde_json::from_str::<Ausschreibung>(raw.get())
+            "AUSSCHREIBUNG" => serde_json::from_value::<Ausschreibung>(value)
                 .map(|v| AnyBo::Ausschreibung(Box::new(v)))
                 .map_err(serde::de::Error::custom),
-            "BILANZIERUNG" => serde_json::from_str::<Bilanzierung>(raw.get())
+            "BILANZIERUNG" => serde_json::from_value::<Bilanzierung>(value)
                 .map(|v| AnyBo::Bilanzierung(Box::new(v)))
                 .map_err(serde::de::Error::custom),
-            "BUENDELVERTRAG" => serde_json::from_str::<Buendelvertrag>(raw.get())
+            "BUENDELVERTRAG" => serde_json::from_value::<Buendelvertrag>(value)
                 .map(|v| AnyBo::Buendelvertrag(Box::new(v)))
                 .map_err(serde::de::Error::custom),
-            "ENERGIEMENGE" => serde_json::from_str::<Energiemenge>(raw.get())
+            "ENERGIEMENGE" => serde_json::from_value::<Energiemenge>(value)
                 .map(|v| AnyBo::Energiemenge(Box::new(v)))
                 .map_err(serde::de::Error::custom),
-            "FREMDKOSTEN" => serde_json::from_str::<Fremdkosten>(raw.get())
+            "FREMDKOSTEN" => serde_json::from_value::<Fremdkosten>(value)
                 .map(|v| AnyBo::Fremdkosten(Box::new(v)))
                 .map_err(serde::de::Error::custom),
-            "GERAET" => serde_json::from_str::<Geraet>(raw.get())
+            "GERAET" => serde_json::from_value::<Geraet>(value)
                 .map(|v| AnyBo::Geraet(Box::new(v)))
                 .map_err(serde::de::Error::custom),
-            "GESCHAEFTSPARTNER" => serde_json::from_str::<Geschaeftspartner>(raw.get())
+            "GESCHAEFTSPARTNER" => serde_json::from_value::<Geschaeftspartner>(value)
                 .map(|v| AnyBo::Geschaeftspartner(Box::new(v)))
                 .map_err(serde::de::Error::custom),
-            "KOSTEN" => serde_json::from_str::<Kosten>(raw.get())
+            "KOSTEN" => serde_json::from_value::<Kosten>(value)
                 .map(|v| AnyBo::Kosten(Box::new(v)))
                 .map_err(serde::de::Error::custom),
-            "LASTGANG" => serde_json::from_str::<Lastgang>(raw.get())
+            "LASTGANG" => serde_json::from_value::<Lastgang>(value)
                 .map(|v| AnyBo::Lastgang(Box::new(v)))
                 .map_err(serde::de::Error::custom),
-            "LOKATIONSZUORDNUNG" => serde_json::from_str::<Lokationszuordnung>(raw.get())
+            "LOKATIONSZUORDNUNG" => serde_json::from_value::<Lokationszuordnung>(value)
                 .map(|v| AnyBo::Lokationszuordnung(Box::new(v)))
                 .map_err(serde::de::Error::custom),
-            "MARKTLOKATION" => serde_json::from_str::<Marktlokation>(raw.get())
+            "MARKTLOKATION" => serde_json::from_value::<Marktlokation>(value)
                 .map(|v| AnyBo::Marktlokation(Box::new(v)))
                 .map_err(serde::de::Error::custom),
-            "MARKTTEILNEHMER" => serde_json::from_str::<Marktteilnehmer>(raw.get())
+            "MARKTTEILNEHMER" => serde_json::from_value::<Marktteilnehmer>(value)
                 .map(|v| AnyBo::Marktteilnehmer(Box::new(v)))
                 .map_err(serde::de::Error::custom),
-            "MESSLOKATION" => serde_json::from_str::<Messlokation>(raw.get())
+            "MESSLOKATION" => serde_json::from_value::<Messlokation>(value)
                 .map(|v| AnyBo::Messlokation(Box::new(v)))
                 .map_err(serde::de::Error::custom),
-            "NETZLOKATION" => serde_json::from_str::<Netzlokation>(raw.get())
+            "NETZLOKATION" => serde_json::from_value::<Netzlokation>(value)
                 .map(|v| AnyBo::Netzlokation(Box::new(v)))
                 .map_err(serde::de::Error::custom),
-            "PERSON" => serde_json::from_str::<Person>(raw.get())
+            "PERSON" => serde_json::from_value::<Person>(value)
                 .map(|v| AnyBo::Person(Box::new(v)))
                 .map_err(serde::de::Error::custom),
-            "PREISBLATT" => serde_json::from_str::<Preisblatt>(raw.get())
+            "PREISBLATT" => serde_json::from_value::<Preisblatt>(value)
                 .map(|v| AnyBo::Preisblatt(Box::new(v)))
                 .map_err(serde::de::Error::custom),
-            "PREISBLATTDIENSTLEISTUNG" => {
-                serde_json::from_str::<PreisblattDienstleistung>(raw.get())
-                    .map(|v| AnyBo::PreisblattDienstleistung(Box::new(v)))
-                    .map_err(serde::de::Error::custom)
-            }
-            "PREISBLATTHARDWARE" => serde_json::from_str::<PreisblattHardware>(raw.get())
+            "PREISBLATTDIENSTLEISTUNG" => serde_json::from_value::<PreisblattDienstleistung>(value)
+                .map(|v| AnyBo::PreisblattDienstleistung(Box::new(v)))
+                .map_err(serde::de::Error::custom),
+            "PREISBLATTHARDWARE" => serde_json::from_value::<PreisblattHardware>(value)
                 .map(|v| AnyBo::PreisblattHardware(Box::new(v)))
                 .map_err(serde::de::Error::custom),
             "PREISBLATTKONZESSIONSABGABE" => {
-                serde_json::from_str::<PreisblattKonzessionsabgabe>(raw.get())
+                serde_json::from_value::<PreisblattKonzessionsabgabe>(value)
                     .map(|v| AnyBo::PreisblattKonzessionsabgabe(Box::new(v)))
                     .map_err(serde::de::Error::custom)
             }
-            "PREISBLATTMESSUNG" => serde_json::from_str::<PreisblattMessung>(raw.get())
+            "PREISBLATTMESSUNG" => serde_json::from_value::<PreisblattMessung>(value)
                 .map(|v| AnyBo::PreisblattMessung(Box::new(v)))
                 .map_err(serde::de::Error::custom),
-            "PREISBLATTNETZNUTZUNG" => serde_json::from_str::<PreisblattNetznutzung>(raw.get())
+            "PREISBLATTNETZNUTZUNG" => serde_json::from_value::<PreisblattNetznutzung>(value)
                 .map(|v| AnyBo::PreisblattNetznutzung(Box::new(v)))
                 .map_err(serde::de::Error::custom),
-            "RECHNUNG" => serde_json::from_str::<Rechnung>(raw.get())
+            "RECHNUNG" => serde_json::from_value::<Rechnung>(value)
                 .map(|v| AnyBo::Rechnung(Box::new(v)))
                 .map_err(serde::de::Error::custom),
-            "REGION" => serde_json::from_str::<Region>(raw.get())
+            "REGION" => serde_json::from_value::<Region>(value)
                 .map(|v| AnyBo::Region(Box::new(v)))
                 .map_err(serde::de::Error::custom),
-            "STANDORTEIGENSCHAFTEN" => serde_json::from_str::<Standorteigenschaften>(raw.get())
+            "STANDORTEIGENSCHAFTEN" => serde_json::from_value::<Standorteigenschaften>(value)
                 .map(|v| AnyBo::Standorteigenschaften(Box::new(v)))
                 .map_err(serde::de::Error::custom),
-            "STEUERBARERESSOURCE" => serde_json::from_str::<SteuerbareRessource>(raw.get())
+            "STEUERBARERESSOURCE" => serde_json::from_value::<SteuerbareRessource>(value)
                 .map(|v| AnyBo::SteuerbareRessource(Box::new(v)))
                 .map_err(serde::de::Error::custom),
-            "TARIF" => serde_json::from_str::<Tarif>(raw.get())
+            "TARIF" => serde_json::from_value::<Tarif>(value)
                 .map(|v| AnyBo::Tarif(Box::new(v)))
                 .map_err(serde::de::Error::custom),
-            "TARIFINFO" => serde_json::from_str::<Tarifinfo>(raw.get())
+            "TARIFINFO" => serde_json::from_value::<Tarifinfo>(value)
                 .map(|v| AnyBo::Tarifinfo(Box::new(v)))
                 .map_err(serde::de::Error::custom),
-            "TARIFKOSTEN" => serde_json::from_str::<Tarifkosten>(raw.get())
+            "TARIFKOSTEN" => serde_json::from_value::<Tarifkosten>(value)
                 .map(|v| AnyBo::Tarifkosten(Box::new(v)))
                 .map_err(serde::de::Error::custom),
-            "TARIFPREISBLATT" => serde_json::from_str::<Tarifpreisblatt>(raw.get())
+            "TARIFPREISBLATT" => serde_json::from_value::<Tarifpreisblatt>(value)
                 .map(|v| AnyBo::Tarifpreisblatt(Box::new(v)))
                 .map_err(serde::de::Error::custom),
-            "TECHNISCHERESSOURCE" => serde_json::from_str::<TechnischeRessource>(raw.get())
+            "TECHNISCHERESSOURCE" => serde_json::from_value::<TechnischeRessource>(value)
                 .map(|v| AnyBo::TechnischeRessource(Box::new(v)))
                 .map_err(serde::de::Error::custom),
-            "VERTRAG" => serde_json::from_str::<Vertrag>(raw.get())
+            "VERTRAG" => serde_json::from_value::<Vertrag>(value)
                 .map(|v| AnyBo::Vertrag(Box::new(v)))
                 .map_err(serde::de::Error::custom),
-            "ZAEHLER" => serde_json::from_str::<Zaehler>(raw.get())
+            "ZAEHLER" => serde_json::from_value::<Zaehler>(value)
                 .map(|v| AnyBo::Zaehler(Box::new(v)))
                 .map_err(serde::de::Error::custom),
-            "ZAEHLZEITDEFINITION" => serde_json::from_str::<Zaehlzeitdefinition>(raw.get())
+            "ZAEHLZEITDEFINITION" => serde_json::from_value::<Zaehlzeitdefinition>(value)
                 .map(|v| AnyBo::Zaehlzeitdefinition(Box::new(v)))
                 .map_err(serde::de::Error::custom),
-            "ZEITREIHE" => serde_json::from_str::<Zeitreihe>(raw.get())
+            "ZEITREIHE" => serde_json::from_value::<Zeitreihe>(value)
                 .map(|v| AnyBo::Zeitreihe(Box::new(v)))
                 .map_err(serde::de::Error::custom),
-            _ => {
-                let data: serde_json::Value =
-                    serde_json::from_str(raw.get()).map_err(serde::de::Error::custom)?;
-                Ok(AnyBo::Unknown {
-                    typ: typ_str.to_owned(),
-                    data,
-                })
-            }
+            _ => Ok(AnyBo::Unknown {
+                typ: typ_str.to_owned(),
+                data: value,
+            }),
         }
     }
 }

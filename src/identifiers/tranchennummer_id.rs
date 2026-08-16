@@ -133,20 +133,6 @@ impl TranchennummerId {
 
 // ─── Standard trait implementations ─────────────────────────────────────────
 
-impl TryFrom<String> for TranchennummerId {
-    type Error = IdentifierError;
-    fn try_from(s: String) -> Result<Self, Self::Error> {
-        Self::new(&s)
-    }
-}
-
-impl TryFrom<&str> for TranchennummerId {
-    type Error = IdentifierError;
-    fn try_from(s: &str) -> Result<Self, Self::Error> {
-        Self::new(s)
-    }
-}
-
 impl TryFrom<u32> for TranchennummerId {
     type Error = IdentifierError;
     fn try_from(v: u32) -> Result<Self, Self::Error> {
@@ -163,56 +149,12 @@ impl From<TranchennummerId> for u32 {
     }
 }
 
-impl From<TranchennummerId> for String {
-    fn from(t: TranchennummerId) -> Self {
-        t.0.into()
-    }
-}
-
-impl AsRef<str> for TranchennummerId {
-    fn as_ref(&self) -> &str {
-        &self.0
-    }
-}
-
-impl std::fmt::Display for TranchennummerId {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(&self.0)
-    }
-}
-
-impl std::str::FromStr for TranchennummerId {
-    type Err = IdentifierError;
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Self::new(s)
-    }
-}
-
-#[cfg(feature = "serde")]
-impl serde::Serialize for TranchennummerId {
-    fn serialize<S: serde::Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
-        s.serialize_str(&self.0)
-    }
-}
-
-#[cfg(feature = "serde")]
-impl<'de> serde::Deserialize<'de> for TranchennummerId {
-    fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
-        struct Visitor;
-        impl<'de> serde::de::Visitor<'de> for Visitor {
-            type Value = TranchennummerId;
-            fn expecting(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                f.write_str("a 1–6 digit decimal string without leading zeros (Tranchennummer)")
-            }
-            fn visit_str<E: serde::de::Error>(self, v: &str) -> Result<TranchennummerId, E> {
-                TranchennummerId::new(v).map_err(E::custom)
-            }
-        }
-        d.deserialize_str(Visitor)
-    }
-}
-
 // ─── Tests ───────────────────────────────────────────────────────────────────
+
+impl_identifier_traits!(
+    TranchennummerId,
+    "a Tranchennummer of 1-6 decimal digits without leading zeros"
+);
 
 #[cfg(test)]
 mod tests {

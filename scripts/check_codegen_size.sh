@@ -9,12 +9,14 @@ cd "$ROOT_DIR"
 MAX_GENERATED_RS_FILES="${MAX_GENERATED_RS_FILES:-430}"
 MAX_GENERATED_RS_LINES="${MAX_GENERATED_RS_LINES:-62000}"
 
+# Covers every emitted schema series under src/generated/ rather than a
+# hard-coded list, which silently stopped matching when a series was retired.
 count_files() {
-  find src/generated/v202401 src/generated/v202501 -type f -name '*.rs' | wc -l | tr -d ' '
+  find src/generated -type f -name '*.rs' | wc -l | tr -d ' '
 }
 
 count_lines() {
-  find src/generated/v202401 src/generated/v202501 -type f -name '*.rs' -print0 \
+  find src/generated -type f -name '*.rs' -print0 \
     | xargs -0 wc -l \
     | tail -n 1 \
     | awk '{print $1}'

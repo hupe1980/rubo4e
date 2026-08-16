@@ -66,9 +66,6 @@ pub(crate) fn compute_check_char(prefix_bytes: &[u8; 15]) -> Option<char> {
 
 // ─── Validation ──────────────────────────────────────────────────────────────
 
-/// Valid EIC type characters (position 3) per ENTSO-E EIC definitions.
-const EIC_TYPE_CHARS: &[char] = &['A', 'T', 'V', 'W', 'X', 'Y', 'Z'];
-
 fn validate(s: &str) -> Result<(), IdentifierError> {
     // EIC codes are ASCII-only; reject multi-byte UTF-8 early.
     if !s.is_ascii() {
@@ -94,11 +91,11 @@ fn validate(s: &str) -> Result<(), IdentifierError> {
         }
     }
 
-    // Position 3 (index 2) must be a valid EIC type character.
-    let eic_type = s.as_bytes()[2] as char;
-    if !EIC_TYPE_CHARS.contains(&eic_type) {
+    // Position 3 (index 2) must be a valid EIC object-type character.
+    if EicType::from_char(s.as_bytes()[2] as char).is_none() {
         return Err(IdentifierError::InvalidFormat {
-            description: "position 3 must be a valid EIC type character (A/T/V/W/X/Y/Z)".into(),
+            description: "position 3 must be a valid EIC object-type character (A/T/V/W/X/Y/Z)"
+                .into(),
         });
     }
 
@@ -118,46 +115,140 @@ fn validate(s: &str) -> Result<(), IdentifierError> {
     Ok(())
 }
 
-// ─── Domain ──────────────────────────────────────────────────────────────────
+// ─── Object type ─────────────────────────────────────────────────────────────
 
-/// ENTSO-E EIC domain type, determined by position 3 (index 2) of the code.
+/// The ENTSO-E EIC **object type**, encoded in position 3 (index 2) of the code.
 ///
-/// This is a best-effort classification based on common ENTSO-E usage patterns
-/// in the German and European energy market.  The EIC Registry is the authoritative
-/// source; when in doubt, call [`EicCode::type_char`] to inspect the raw character.
+/// The seven object types are defined by the ENTSO-E EIC Reference Manual and are
+/// exhaustive: an EIC whose position-3 character is not one of them is malformed,
+/// so [`EicCode`] rejects it at construction and [`EicCode::eic_type`] is total.
 ///
-/// Position-3 mapping (per ENTSO-E EIC Reference Manual v5.5 and practical BO4E usage):
-/// - `A`, `Y`, `X`, `W`, `Z` → [`EicDomain::Area`] (control areas, bidding zones,
-///   metering grids, market areas)
-/// - `T`, `V` → [`EicDomain::Party`] (TSOs, DSOs, market participants)
+/// | Char | Variant | Meaning |
+/// |------|---------|---------|
+/// | `A` | [`Substation`](EicType::Substation) | Substation |
+/// | `T` | [`Tieline`](EicType::Tieline) | Tie line between two areas |
+/// | `V` | [`Location`](EicType::Location) | Physical location |
+/// | `W` | [`ResourceObject`](EicType::ResourceObject) | Resource object (generation/consumption unit) |
+/// | `X` | [`Party`](EicType::Party) | Market participant — **including Bilanzkreise** |
+/// | `Y` | [`Area`](EicType::Area) | Area or domain — control areas, bidding zones, Bilanzierungsgebiete |
+/// | `Z` | [`MeasurementPoint`](EicType::MeasurementPoint) | Measurement point |
+///
+/// # German market note
+///
+/// BDEW issues `11X…` codes for **Bilanzkreise** (balance groups) and `11Y…` codes
+/// for **Bilanzierungsgebiete** (balancing areas).  Those are [`Party`](EicType::Party)
+/// and [`Area`](EicType::Area) respectively — see [`BilanzkreisId`] and
+/// [`BilanzierungsgebietId`].
+///
+/// [`BilanzkreisId`]: crate::identifiers::BilanzkreisId
+/// [`BilanzierungsgebietId`]: crate::identifiers::BilanzierungsgebietId
 ///
 /// # Examples
 /// ```
-/// use rubo4e::identifiers::{EicCode, EicDomain};
+/// use rubo4e::identifiers::{EicCode, EicType};
 ///
-/// // 10YDE-EON------1 is the E.ON Germany control area (type Y = Area).
-/// let code = EicCode::new("10YDE-EON------1").expect("valid EIC area code");
-/// assert_eq!(code.domain(), EicDomain::Area);
-/// assert_eq!(code.type_char(), 'Y');
+/// // 10YDE-EON------1 is the TenneT German control area (type Y = Area).
+/// let area = EicCode::new("10YDE-EON------1").expect("valid EIC area code");
+/// assert_eq!(area.eic_type(), EicType::Area);
+///
+/// // 11XSUEDWESTSTRO8 is a Bilanzkreis, which is a market party (type X).
+/// let party = EicCode::new("11XSUEDWESTSTRO8").expect("valid EIC party code");
+/// assert_eq!(party.eic_type(), EicType::Party);
+/// assert_eq!(party.eic_type().as_char(), 'X');
 /// ```
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum EicDomain {
-    /// Area-type codes: control areas, bidding zones, market areas, metering grids.
-    ///
-    /// Type characters: `A`, `Y`, `X`, `W`, `Z`.
-    Area,
-    /// Party-type codes: market participants, TSOs, DSOs, suppliers.
-    ///
-    /// Type characters: `T`, `V`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum EicType {
+    /// `A` — Substation.
+    Substation,
+    /// `T` — Tie line between two areas.
+    Tieline,
+    /// `V` — Physical location.
+    Location,
+    /// `W` — Resource object (generation or consumption unit).
+    ResourceObject,
+    /// `X` — Market participant (party). German Bilanzkreise use this type.
     Party,
+    /// `Y` — Area or domain: control areas, bidding zones, Bilanzierungsgebiete.
+    Area,
+    /// `Z` — Measurement point.
+    MeasurementPoint,
 }
 
-impl std::fmt::Display for EicDomain {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl EicType {
+    /// Every EIC object type, in ENTSO-E documentation order.
+    ///
+    /// This is the single source of truth for which position-3 characters
+    /// [`EicCode`] accepts.
+    pub const ALL: [EicType; 7] = [
+        EicType::Substation,
+        EicType::Tieline,
+        EicType::Location,
+        EicType::ResourceObject,
+        EicType::Party,
+        EicType::Area,
+        EicType::MeasurementPoint,
+    ];
+
+    /// Returns the position-3 character for this object type.
+    #[must_use]
+    pub const fn as_char(self) -> char {
         match self {
-            EicDomain::Area => f.write_str("Area"),
-            EicDomain::Party => f.write_str("Party"),
+            EicType::Substation => 'A',
+            EicType::Tieline => 'T',
+            EicType::Location => 'V',
+            EicType::ResourceObject => 'W',
+            EicType::Party => 'X',
+            EicType::Area => 'Y',
+            EicType::MeasurementPoint => 'Z',
         }
+    }
+
+    /// Parses a position-3 character into an object type.
+    ///
+    /// Returns `None` for any character outside `A`, `T`, `V`, `W`, `X`, `Y`, `Z`.
+    ///
+    /// # Examples
+    /// ```
+    /// use rubo4e::identifiers::EicType;
+    ///
+    /// assert_eq!(EicType::from_char('X'), Some(EicType::Party));
+    /// assert_eq!(EicType::from_char('Y'), Some(EicType::Area));
+    /// assert_eq!(EicType::from_char('B'), None);
+    /// // Lowercase is not part of the EIC alphabet.
+    /// assert_eq!(EicType::from_char('x'), None);
+    /// ```
+    #[must_use]
+    pub const fn from_char(c: char) -> Option<EicType> {
+        match c {
+            'A' => Some(EicType::Substation),
+            'T' => Some(EicType::Tieline),
+            'V' => Some(EicType::Location),
+            'W' => Some(EicType::ResourceObject),
+            'X' => Some(EicType::Party),
+            'Y' => Some(EicType::Area),
+            'Z' => Some(EicType::MeasurementPoint),
+            _ => None,
+        }
+    }
+
+    /// Returns the ENTSO-E English name of this object type.
+    #[must_use]
+    pub const fn description(self) -> &'static str {
+        match self {
+            EicType::Substation => "Substation",
+            EicType::Tieline => "Tieline",
+            EicType::Location => "Location",
+            EicType::ResourceObject => "Resource Object",
+            EicType::Party => "Party",
+            EicType::Area => "Area or Domain",
+            EicType::MeasurementPoint => "Measurement Point",
+        }
+    }
+}
+
+impl std::fmt::Display for EicType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.description())
     }
 }
 
@@ -167,22 +258,22 @@ impl std::fmt::Display for EicDomain {
 ///
 /// Structure:
 /// - Positions 1–2:  Local Issuing Office (LIO) identifier (alphanumeric)
-/// - Position 3:     EIC type character (`A`, `T`, `V`, `W`, `X`, `Y`, or `Z`)
+/// - Position 3:     EIC object-type character (`A`, `T`, `V`, `W`, `X`, `Y`, or `Z`)
 /// - Positions 4–15: LIO-specific code body (alphanumeric or `-` as padding)
 /// - Position 16:    Check character computed by the ENTSO-E algorithm
 ///
-/// # Domain
+/// # Object type
 ///
-/// Use [`EicCode::domain`] to query whether this code is an Area or Party code.
-/// Use [`EicCode::type_char`] to get the raw type character (position 3).
+/// Use [`EicCode::eic_type`] to get the [`EicType`] encoded in position 3, or
+/// [`EicCode::type_char`] for the raw character.
 ///
 /// # Examples
 /// ```
-/// use rubo4e::identifiers::{EicCode, EicDomain};
+/// use rubo4e::identifiers::{EicCode, EicType};
 ///
-/// // 10YDE-EON------1 = E.ON Germany control area (type Y = Area).
+/// // 10YDE-EON------1 = TenneT German control area (type Y = Area).
 /// let area = EicCode::new("10YDE-EON------1").expect("valid area EIC");
-/// assert_eq!(area.domain(), EicDomain::Area);
+/// assert_eq!(area.eic_type(), EicType::Area);
 /// assert_eq!(area.type_char(), 'Y');
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -213,30 +304,76 @@ impl EicCode {
         Ok(Self(Box::from(s)))
     }
 
-    /// Returns the EIC domain (Area / Party) for this code.
+    /// Returns the [`EicType`] encoded in position 3 (index 2) of the code.
     ///
-    /// This is a heuristic based on position 3 (index 2) of the code.
-    /// See [`EicDomain`] for the exact character-to-domain mapping used.
+    /// Total: construction rejects any code whose position-3 character is not one
+    /// of the seven ENTSO-E object types, so this never fails.
     ///
-    /// # Panics
+    /// # Examples
+    /// ```
+    /// use rubo4e::identifiers::{EicCode, EicType};
     ///
-    /// Never panics on a validly-constructed `EicCode`.
+    /// let bk = EicCode::new("11XSUEDWESTSTRO8").unwrap();
+    /// assert_eq!(bk.eic_type(), EicType::Party);
+    /// ```
     #[must_use]
-    pub fn domain(&self) -> EicDomain {
-        match self.type_char() {
-            'T' | 'V' => EicDomain::Party,
-            _ => EicDomain::Area, // A, W, X, Y, Z are all area types per ENTSO-E
-        }
+    pub fn eic_type(&self) -> EicType {
+        EicType::from_char(self.type_char())
+            .expect("EicCode invariant: position 3 is validated at construction")
     }
 
-    /// Returns the raw EIC type character at position 3 (index 2) of the code.
+    /// Returns the raw EIC object-type character at position 3 (index 2).
     ///
-    /// Valid characters are `A`, `T`, `V`, `W`, `X`, `Y`, `Z` per ENTSO-E spec.
-    /// Use this when you need the raw type rather than the aggregated [`EicDomain`].
+    /// Always one of `A`, `T`, `V`, `W`, `X`, `Y`, `Z`.  Prefer
+    /// [`eic_type`](EicCode::eic_type) unless you specifically need the character.
     #[must_use]
     pub fn type_char(&self) -> char {
-        // SAFETY: validated at construction — index 2 is always a valid ASCII EIC type char.
+        // Validated at construction — index 2 is always a valid ASCII EIC type char.
         self.0.as_bytes()[2] as char
+    }
+
+    /// Builds a complete 16-character `EicCode` from its 15-character prefix by
+    /// computing and appending the ENTSO-E check character.
+    ///
+    /// # Errors
+    /// - [`IdentifierError::InvalidLength`] if `prefix` is not exactly 15 characters.
+    /// - [`IdentifierError::InvalidFormat`] if `prefix` is not ASCII.
+    /// - [`IdentifierError::InvalidChecksum`] if the check character cannot be
+    ///   computed — ENTSO-E prohibits `'-'` as a check character, so a prefix that
+    ///   would produce one has no valid completion.
+    /// - Any error from [`EicCode::new`] on the completed code.
+    ///
+    /// # Examples
+    /// ```
+    /// use rubo4e::identifiers::EicCode;
+    ///
+    /// let eic = EicCode::new_from_prefix("10YDE-EON------").unwrap();
+    /// assert_eq!(eic.as_ref(), "10YDE-EON------1");
+    /// ```
+    pub fn new_from_prefix(prefix: &str) -> Result<Self, IdentifierError> {
+        Self::new(&Self::complete_prefix(prefix)?)
+    }
+
+    /// Returns the 16-character code for a 15-character prefix, without
+    /// constructing an `EicCode`.  Shared by the EIC-restricted identifier types.
+    pub(super) fn complete_prefix(prefix: &str) -> Result<String, IdentifierError> {
+        if prefix.len() != 15 {
+            return Err(IdentifierError::InvalidLength {
+                expected: LengthExpectation::Exact(15),
+                actual: prefix.len(),
+            });
+        }
+        if !prefix.is_ascii() {
+            return Err(IdentifierError::InvalidFormat {
+                description: "EIC prefix must contain only ASCII characters".into(),
+            });
+        }
+        let bytes: &[u8; 15] = prefix.as_bytes().try_into().expect("length checked above");
+        let check = compute_check_char(bytes).ok_or(IdentifierError::InvalidChecksum)?;
+        let mut out = String::with_capacity(16);
+        out.push_str(prefix);
+        out.push(check);
+        Ok(out)
     }
 
     /// Computes the check character for a 15-character ASCII prefix string.
@@ -255,65 +392,7 @@ impl EicCode {
     }
 }
 
-impl TryFrom<String> for EicCode {
-    type Error = IdentifierError;
-    fn try_from(s: String) -> Result<Self, Self::Error> {
-        Self::new(&s)
-    }
-}
-
-impl TryFrom<&str> for EicCode {
-    type Error = IdentifierError;
-    fn try_from(s: &str) -> Result<Self, Self::Error> {
-        Self::new(s)
-    }
-}
-
-impl AsRef<str> for EicCode {
-    fn as_ref(&self) -> &str {
-        &self.0
-    }
-}
-
-impl std::fmt::Display for EicCode {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(&self.0)
-    }
-}
-
-impl std::str::FromStr for EicCode {
-    type Err = IdentifierError;
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Self::new(s)
-    }
-}
-
-#[cfg(feature = "serde")]
-impl serde::Serialize for EicCode {
-    fn serialize<S: serde::Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
-        s.serialize_str(&self.0)
-    }
-}
-
-#[cfg(feature = "serde")]
-impl<'de> serde::Deserialize<'de> for EicCode {
-    fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
-        struct Visitor;
-        impl<'de> serde::de::Visitor<'de> for Visitor {
-            type Value = EicCode;
-            fn expecting(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                f.write_str("a 16-character ENTSO-E Energy Identification Code")
-            }
-            fn visit_str<E: serde::de::Error>(self, v: &str) -> Result<EicCode, E> {
-                EicCode::new(v).map_err(|e| {
-                    crate::identifiers::trace_identifier_deser_error("EicCode", v, &e);
-                    serde::de::Error::custom(e)
-                })
-            }
-        }
-        d.deserialize_str(Visitor)
-    }
-}
+impl_identifier_traits!(EicCode, "a 16-character ENTSO-E Energy Identification Code");
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
@@ -488,5 +567,92 @@ mod tests {
         assert_eq!(EicCode::compute_check_char("10YDE-VE-------"), Some('2'));
         assert_eq!(EicCode::compute_check_char("10YDE-ENBW-----"), Some('N'));
         assert_eq!(EicCode::compute_check_char("10Y1001A1001A82"), Some('H'));
+    }
+
+    // ── Object type (position 3) ──────────────────────────────────────────
+
+    /// The seven ENTSO-E object types, pinned against the reference manual.
+    ///
+    /// This is the table that was previously wrong: `X` is the **party** type
+    /// (market participants, and every German Bilanzkreis), not an area type,
+    /// and `T`/`V` are Tieline/Location rather than party types.
+    #[test]
+    fn eic_type_char_mapping_matches_entso_e() {
+        for (c, want, desc) in [
+            ('A', EicType::Substation, "Substation"),
+            ('T', EicType::Tieline, "Tieline"),
+            ('V', EicType::Location, "Location"),
+            ('W', EicType::ResourceObject, "Resource Object"),
+            ('X', EicType::Party, "Party"),
+            ('Y', EicType::Area, "Area or Domain"),
+            ('Z', EicType::MeasurementPoint, "Measurement Point"),
+        ] {
+            assert_eq!(EicType::from_char(c), Some(want), "from_char({c:?})");
+            assert_eq!(want.as_char(), c, "as_char() for {want:?}");
+            assert_eq!(want.description(), desc);
+            assert_eq!(want.to_string(), desc);
+        }
+    }
+
+    /// `ALL` must be exactly the set of characters `validate` accepts — the two
+    /// are the same source of truth, so they cannot drift apart.
+    #[test]
+    fn eic_type_all_round_trips_and_is_exhaustive() {
+        assert_eq!(EicType::ALL.len(), 7);
+        for t in EicType::ALL {
+            assert_eq!(EicType::from_char(t.as_char()), Some(t));
+        }
+        // Every other ASCII uppercase letter must be rejected.
+        for c in 'A'..='Z' {
+            let accepted = EicType::ALL.iter().any(|t| t.as_char() == c);
+            assert_eq!(
+                EicType::from_char(c).is_some(),
+                accepted,
+                "from_char({c:?}) disagrees with ALL"
+            );
+        }
+    }
+
+    /// Real published codes, classified by object type.
+    ///
+    /// `11X…` codes are BDEW-issued Bilanzkreise — market parties. Reporting
+    /// them as areas (the previous behaviour) is wrong.
+    #[test]
+    fn real_codes_classify_correctly() {
+        for (code, want) in [
+            ("10YDE-EON------1", EicType::Area),
+            ("10YDE-RWENET---I", EicType::Area),
+            ("10YDE-VE-------2", EicType::Area),
+            ("10YDE-ENBW-----N", EicType::Area),
+            ("10Y1001A1001A82H", EicType::Area),
+            // BDEW-issued Bilanzkreise (balance groups) — party codes.
+            ("11XSUEDWESTSTRO8", EicType::Party),
+            ("11XENERGIE2----H", EicType::Party),
+            ("11XENAGISME----J", EicType::Party),
+        ] {
+            let eic = EicCode::new(code).unwrap_or_else(|e| panic!("{code} should be valid: {e}"));
+            assert_eq!(eic.eic_type(), want, "{code}");
+            assert_eq!(eic.type_char(), want.as_char(), "{code}");
+        }
+    }
+
+    // ── Shared trait surface ──────────────────────────────────────────────
+
+    /// `EicCode` must expose the same conversions as every other identifier.
+    #[test]
+    fn shares_the_common_identifier_trait_surface() {
+        use std::borrow::Borrow;
+
+        let eic = EicCode::new("11XSUEDWESTSTRO8").unwrap();
+        // Deref<Target = str>
+        assert!(eic.starts_with("11X"));
+        assert_eq!(eic.len(), 16);
+        // Borrow<str>
+        let borrowed: &str = eic.borrow();
+        assert_eq!(borrowed, "11XSUEDWESTSTRO8");
+        // Into<String>
+        assert_eq!(String::from(eic.clone()), "11XSUEDWESTSTRO8");
+        // TryFrom<String>
+        assert_eq!(EicCode::try_from("11XSUEDWESTSTRO8".to_string()), Ok(eic));
     }
 }

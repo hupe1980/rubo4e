@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+
+{% block seo %}
+<title>{{ config.title }} — BO4E for Rust</title>
+<meta name="description" content="{{ section.description | default(value=config.description) }}">
+<link rel="canonical" href="{{ config.base_url }}">
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="{{ config.title }}">
+<meta property="og:title" content="{{ config.title }}">
+<meta property="og:description" content="{{ section.description | default(value=config.description) }}">
+<meta property="og:url" content="{{ config.base_url }}">
+<meta property="og:locale" content="en">
+
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="{{ config.title }}">
+<meta name="twitter:description" content="{{ section.description | default(value=config.description) }}">
+{% endblock seo %}
+
+{% block content %}
+<section class="hero">
+  <div class="wrap">
+    <span class="eyebrow">BO4E {{ config.extra.schema_version }} · Rust {{ config.extra.msrv | default(value="1.87") }}+</span>
+    <h1>BO4E, with the Rust type system doing the checking.</h1>
+    <p class="lede">
+      <strong>rubo4e</strong> generates the full BO4E object model from the official JSON
+      Schema, then adds what the schema cannot express: market identifiers that verify
+      their own BDEW check digits, enums you can parse strictly at an ingest boundary,
+      and JSON that stays byte-compatible with the Python, Go, and .NET implementations.
+    </p>
+    <div class="cta">
+      <a class="btn btn-primary" href="{{ get_url(path='@/docs/_index.md') }}">Read the docs</a>
+      <a class="btn" href="{{ config.extra.api_docs }}" rel="noopener">API reference</a>
+      <a class="btn" href="{{ config.extra.repo }}" rel="noopener">GitHub</a>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="wrap">
+    <h2>Install</h2>
+    <p class="section-lede">
+      Nothing but identifier types is on by default. Every dependency past that is a
+      feature you opt into.
+    </p>
+{{ load_data(path="snippets/install.md", format="plain") | markdown | safe }}
+  </div>
+</section>
+
+<section class="section">
+  <div class="wrap">
+    <h2>What the schema cannot give you</h2>
+    <p class="section-lede">
+      Generated types get you the shape of the data. These are the parts that need
+      domain rules from BDEW documents, not the JSON Schema.
+    </p>
+    <div class="grid">
+      <div class="card">
+        <h3>Identifiers that verify themselves</h3>
+        <p>
+          A <code>MaloId</code> cannot exist with a bad check digit. The BDEW chapter-8
+          procedures are implemented once and shared by every identifier that uses them.
+        </p>
+      </div>
+      <div class="card">
+        <h3>Strict parsing where it matters</h3>
+        <p>
+          Unknown enum values decode to <code>Unknown</code> so tomorrow's schema does
+          not break today's build. At an ingest boundary, one call rejects them instead.
+        </p>
+      </div>
+      <div class="card">
+        <h3>Wire-compatible JSON</h3>
+        <p>
+          German camelCase output is checked against payloads produced by the Python and
+          Go implementations. Unknown fields survive a round-trip untouched.
+        </p>
+      </div>
+      <div class="card">
+        <h3>Hardened against untrusted input</h3>
+        <p>
+          Size, depth, and extension-data budgets are enforced during parsing at every
+          nesting level — not after the object tree has already been allocated.
+        </p>
+      </div>
+      <div class="card">
+        <h3>Fits your stack</h3>
+        <p>
+          Optional <code>serde</code>, <code>sqlx</code>, <code>schemars</code>,
+          <code>utoipa</code>, <code>garde</code>, and <code>typed-builder</code>
+          integrations. Enable only what you use.
+        </p>
+      </div>
+      <div class="card">
+        <h3>Versioning you can pin</h3>
+        <p>
+          Import <code>rubo4e::current</code> to track the latest schema series, or a
+          version module like <code>rubo4e::v202607</code> where membership must not move.
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="wrap">
+    <h2>A typical round-trip</h2>
+    <p class="section-lede">
+      Parse an incoming payload, reject anything outside the schema, then work with
+      ordinary Rust types.
+    </p>
+{{ load_data(path="snippets/quickstart.md", format="plain") | markdown | safe }}
+  </div>
+</section>
+
+<section class="section">
+  <div class="wrap">
+    <h2>Documentation</h2>
+    <p class="section-lede">Start with whichever question brought you here.</p>
+    {% set docs = get_section(path="docs/_index.md") %}
+    <div class="grid">
+      {% for p in docs.pages %}
+      <a class="card" href="{{ p.permalink }}">
+        <h3>{{ p.title }}</h3>
+        <p>{{ p.description }}</p>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% endblock %}
