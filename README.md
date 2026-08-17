@@ -13,7 +13,7 @@ stays byte-compatible with the Python, Go, and .NET implementations.
 [![Docs](https://img.shields.io/badge/docs-hupe1980.github.io%2Frubo4e-blue.svg)](https://hupe1980.github.io/rubo4e)
 [![API](https://img.shields.io/badge/api-docs.rs-blue.svg)](https://docs.rs/rubo4e)
 [![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](LICENSE-MIT)
-[![Rust 1.87+](https://img.shields.io/badge/rust-1.87%2B-orange.svg)](https://www.rust-lang.org/)
+[![Rust 1.88+](https://img.shields.io/badge/rust-1.88%2B-orange.svg)](https://www.rust-lang.org/)
 
 > **Independent implementation.** Not affiliated with or endorsed by the BO4E
 > project or BDEW; the reference implementation is
@@ -577,10 +577,18 @@ The site sources live in [`site/`](site/) and are built with [Zola](https://www.
 
 ## MSRV
 
-The minimum supported Rust version is **1.87**, declared as `rust-version` in
+The minimum supported Rust version is **1.88**, declared as `rust-version` in
 `Cargo.toml` and verified in CI on every push. MSRV advances only when the
 current floor is two stable releases behind, and a bump is a **minor** version
 change, never a patch.
+
+The floor is set by the dependency tree rather than by this crate's own source:
+`time`, `simd-json`, and `home` (via `sqlx`) all require 1.88. Because Cargo's
+default resolver picks the newest semver-compatible dependency without regard to
+`rust-version`, a toolchain below the floor fails at *resolution* time with
+`rustc 1.87.0 is not supported by the following packages` rather than at compile
+time. On an older toolchain, either pin those dependencies back with
+`cargo update <crate> --precise <version>` or enable Cargo's MSRV-aware resolver.
 
 ---
 

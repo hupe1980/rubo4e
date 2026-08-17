@@ -140,7 +140,7 @@ is a re-export, which is why a schema bump never requires hand-editing types.
 | `time` | — | `time` | none | `OffsetDateTime` for datetime fields; `Date` for date-only fields; enables `rubo4e::time_serde` when `serde` is also on |
 | `decimal` | — | `rust_decimal` | none | `Decimal` for all monetary/quantity fields |
 | `builder` | — | `typed-builder` | none | Typed builder derives on all BO/COM structs |
-| `validate` | — | `garde` | **1.87** | `.validate()` method on all structs |
+| `validate` | — | `garde` | none | `.validate()` method on all structs |
 | `schemars` | — | `schemars` | none | `JsonSchema` derive on all types; enables `rubo4e::schema_helpers` |
 | `versioned` | — | none | none | Conditional compilation of `v202607` and `current` modules; enables `rubo4e::convenience`, `rubo4e::strict`, and the `Bo4eEnum` / `Bo4eStrict` traits |
 | `sqlx` | — | `sqlx` | none | `sqlx::Type`/`Encode`/`Decode`/`PgHasArrayType` for every identifier and every enum; no `json` required — both directions go through `&str` |
@@ -149,7 +149,7 @@ is a re-export, which is why a schema bump never requires hand-editing types.
 | `tracing` | — | `tracing` | none | Structured diagnostics (identifier failures, extension-data events) |
 | `metrics` | — | `metrics` | none | Counter export hooks (metrics ecosystem) |
 
-> **MSRV:** The library targets Rust ≥ **1.87** (set in `Cargo.toml` via `rust-version`). The `validate` feature (via `garde` v0.23) requires 1.87 and is the binding constraint. Enabling `validate` with an older toolchain produces a clear compiler error.
+> **MSRV:** The library targets Rust ≥ **1.88** (set in `Cargo.toml` via `rust-version`). No feature raises the floor above the baseline any more — `garde` v0.23 needs only 1.87, and the binding constraint is now the always-available dependency tree (`time`, `simd-json`, and `home` via `sqlx` all require 1.88).
 
 ## Design Boundary
 
@@ -177,8 +177,13 @@ re-exported from the version-gated module in `src/lib.rs` (e.g., `pub mod v20260
 
 ## MSRV Policy
 
-- New code targeting Rust **1.85** or later is acceptable.
-- The `validate` feature requires **1.87** (garde's minimum). Document this prominently.
-- CI tests on the MSRV toolchain to prevent accidental regression.
-- `rust-version = "1.87"` is set in the root `Cargo.toml` (garde is a hard dep when `validate`
-  is active; setting MSRV conservatively avoids confusing errors).
+- `rust-version = "1.88"` is set in the root `Cargo.toml`, and CI checks the crate on exactly
+  that toolchain so the key is a verified claim rather than an unchecked promise.
+- The floor tracks the **dependency tree**, not this crate's own source. `time`, `simd-json`,
+  and `home` (via `sqlx`) require 1.88; `garde` needs only 1.87, so no individual feature is
+  the binding constraint any more.
+- A below-floor toolchain fails during dependency *resolution*, not compilation, because the
+  default resolver ignores `rust-version` when picking versions. The error names the offending
+  packages; pin them with `cargo update <crate> --precise <version>` to build on an older
+  toolchain.
+- Raising the floor is a **minor** version bump, never a patch.

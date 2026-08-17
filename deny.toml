@@ -54,7 +54,42 @@ deny = []
 allow = []
 # Known-safe version splits that cannot be resolved upstream yet.
 # Each entry must include a comment explaining why it is acceptable.
-skip = []
+#
+# Every entry below is a *transitive* split between two upstream crates that
+# each pin their own major — none is reachable from rubo4e's own dependency
+# declarations, so no `cargo update` or version bump here can collapse them.
+# All of them sit behind optional features (`sqlx`, `simd-json`) or dev-only
+# tooling, so they never reach a downstream build of the default feature set.
+#
+# Note for maintainers: this list only shrinks when upstream moves. If it starts
+# growing faster than it drains, the honest fix is `multiple-versions = "warn"`
+# rather than a skip entry per dependency bump.
+skip = [
+    # sqlx-postgres 0.8.6 -> etcetera 0.8.0 -> windows-sys 0.48
+    # vs. console / rustix / home / tempfile / winapi-util -> windows-sys 0.61.
+    # etcetera moved off 0.48 only after 0.8, and sqlx pins `etcetera = "0.8"`.
+    # Windows-only FFI shim; rubo4e never calls into it.
+    { crate = "windows-sys@0.48", reason = "sqlx-postgres pins etcetera 0.8, which predates the windows-sys 0.6x bump" },
+
+    # sqlx-core -> hashlink 0.10 -> hashbrown 0.15 -> foldhash 0.1
+    # vs. simd-json -> halfbrown / value-trait -> hashbrown 0.16 -> foldhash 0.2.
+    # Two independent optional features landing on adjacent hashbrown majors;
+    # both are pure in-memory hash-map implementations.
+    { crate = "hashbrown@0.15", reason = "sqlx pulls hashbrown 0.15 via hashlink; simd-json pulls 0.16 via halfbrown" },
+    { crate = "hashbrown@0.16", reason = "simd-json pulls hashbrown 0.16 via halfbrown; rubo4e itself is on 0.17 via indexmap" },
+    { crate = "foldhash@0.1", reason = "transitive consequence of the hashbrown 0.15/0.16 split above" },
+
+    # sqlx-core -> futures-intrusive -> parking_lot -> redox_syscall 0.5
+    # vs. sqlx-postgres -> whoami -> libredox -> redox_syscall 0.9.
+    # Both arms are inside sqlx itself. Redox-only; never built on any target
+    # this crate supports in practice.
+    { crate = "redox_syscall@0.5", reason = "sqlx reaches redox_syscall through both parking_lot (0.5) and whoami/libredox (0.9)" },
+
+    # garde_derive / sqlx-macros -> syn 2
+    # vs. url -> idna -> idna_adapter -> icu_normalizer -> displaydoc -> syn 3.
+    # Proc-macro dependency only; affects build time, not the shipped artifact.
+    { crate = "syn@2", reason = "the icu/idna chain moved to syn 3 while garde and sqlx macros are still on syn 2" },
+]
 
 # ─── Sources ─────────────────────────────────────────────────────────────────
 

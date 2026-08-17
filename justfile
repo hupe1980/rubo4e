@@ -139,8 +139,13 @@ check-docs-drift:
     fi
 
 # Run cargo-deny license/advisory/ban checks
+#
+# `--all-features` because that is what `cargo-deny-action` defaults to in CI.
+# Without it this recipe checks only the default feature set, which leaves the
+# optional dependencies (sqlx, simd-json, utoipa, …) out of the graph entirely —
+# a duplicate-version ban that CI rejected passed here for exactly that reason.
 deny-check:
-    cargo deny check
+    cargo deny --all-features check
 
 # Check with RUSTFLAGS=-D warnings (catches broken examples / cfg-gated items)
 check-strict:

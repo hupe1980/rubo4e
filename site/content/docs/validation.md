@@ -35,7 +35,7 @@ See [Identifiers](@/docs/identifiers.md) for the complete error type and per-typ
 ## Layer 2 — Struct-Level Validation (garde)
 
 **Feature flag:** `validate`  
-**Dependency:** `garde` v0.23 (MSRV **1.87**)
+**Dependency:** `garde` v0.23
 
 Struct-level validation checks cross-field constraints that cannot be enforced
 by the type system alone.

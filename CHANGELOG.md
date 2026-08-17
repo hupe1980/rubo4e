@@ -192,6 +192,22 @@ tests) can be updated deliberately instead of discovering drift at runtime.
 - The `*_hardened` methods on `Bo4eJsonExt` dropped their
   `where Self: Bo4eExtensionData` bound, which the parse-time budget made
   unnecessary.
+- **MSRV raised from 1.87 to 1.88.** Not a source change — `time`, `simd-json`,
+  and `home` (reached through `sqlx`) all now require 1.88, so the declared
+  `rust-version` was no longer achievable and CI's MSRV job failed at dependency
+  *resolution*, before compiling anything. The crate's own source still builds on
+  1.87; only the dependency tree does not. `garde` is no longer the binding
+  constraint, and the feature table no longer lists an MSRV impact for `validate`.
+- **`deny.toml` records six known-safe duplicate-version splits.** All are
+  transitive splits between upstream crates that each pin their own major
+  (`windows-sys`, `hashbrown` ×2, `foldhash`, `redox_syscall`, `syn`), reachable
+  only through the optional `sqlx` / `simd-json` features and dev-only tooling.
+  None can be collapsed from this crate. Skips are pinned at minor-version
+  granularity so a patch bump upstream does not silently re-break the gate.
+- **`just deny-check` now runs `--all-features`**, matching what
+  `cargo-deny-action` does in CI. The recipe previously checked only the default
+  feature set, which left every optional dependency out of the graph — a
+  duplicate-version ban that CI rejected passed cleanly on the same tree locally.
 - **`ObisCode` stores a canonical form and its parsed value groups.**
   Previously the input string was stored verbatim apart from `&`→`*`, and
   `components()` re-parsed it — allocating on every call and carrying an
