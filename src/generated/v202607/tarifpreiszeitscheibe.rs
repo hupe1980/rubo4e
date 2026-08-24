@@ -3,7 +3,7 @@ use super::{
     ZeitvariablePreisposition, ZusatzAttribut,
 };
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(not(feature = "json"), derive(Hash))]
+#[cfg_attr(not(feature = "json"), derive(Eq, Hash))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "builder", derive(typed_builder::TypedBuilder))]
 #[cfg_attr(feature = "validate", derive(garde::Validate))]
@@ -13,7 +13,7 @@ use super::{
 /// Mit dieser Komponente kann ein aus verschiedenen Preispositionen zusammengesetzter Tarifpreis zeitaufgelöst
 /// dargestellt werden.
 ///
-/// > **Note:** [Tarifpreiszeitscheibe JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/com/Tarifpreiszeitscheibe.json)
+/// > **Note:** [Tarifpreiszeitscheibe JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.1.0/src/bo4e_schemas/com/Tarifpreiszeitscheibe.json)
 pub struct Tarifpreiszeitscheibe {
     /// Eine Liste von Einheits-Preispositionen.
     #[cfg_attr(feature = "serde", serde(rename = "einheitsPreispositionen"))]
@@ -42,17 +42,20 @@ pub struct Tarifpreiszeitscheibe {
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub relative_preispositionen: Option<Vec<RelativePreisposition>>,
-    /// COM type identifier for this struct.
+    /// BO4E type discriminant — always `ComTyp::Tarifpreiszeitscheibe` for this struct.
     #[cfg_attr(feature = "serde", serde(rename = "_typ"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(
+        feature = "builder",
+        builder(default = Some(ComTyp::Tarifpreiszeitscheibe), setter(skip))
+    )]
     pub typ: Option<ComTyp>,
     /// Version der COM-Struktur aka "fachliche Versionierung"
     #[cfg_attr(feature = "serde", serde(rename = "_version"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(
         feature = "builder",
-        builder(default = Some("v202607.0.0".to_owned()), setter(into))
+        builder(default = Some("202607.1.0".to_owned()), setter(into))
     )]
     pub version: Option<String>,
     /// Gibt an für welchen Zeitraum dieser zusammengesetzte Tarifpreis gültig ist.
@@ -89,8 +92,8 @@ impl Default for Tarifpreiszeitscheibe {
             id: Default::default(),
             lastvariable_preispositionen: Default::default(),
             relative_preispositionen: Default::default(),
-            typ: Default::default(),
-            version: Some("v202607.0.0".to_owned()),
+            typ: Some(ComTyp::Tarifpreiszeitscheibe),
+            version: Some("202607.1.0".to_owned()),
             zeitscheibengueltigkeit: Default::default(),
             zeitvariable_preispositionen: Default::default(),
             zusatz_attribute: Default::default(),

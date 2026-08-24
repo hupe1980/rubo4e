@@ -5,6 +5,7 @@
 //! the output, the snapshot files in `tests/snapshots/` must be updated to
 //! match — making diffs explicit and reviewable.
 
+use std::collections::BTreeSet;
 use std::path::Path;
 
 use bo4e_generator::{emitter, parser};
@@ -14,6 +15,39 @@ fn workspace_root() -> std::path::PathBuf {
     // CARGO_MANIFEST_DIR is the generator/ subdirectory.
     let manifest = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     manifest.parent().unwrap().to_owned()
+}
+
+/// The committed schema snapshot for the `v202607` series, found rather than
+/// hard-coded.
+///
+/// BO4E ships patch releases inside a series (`v202607.0.0` → `v202607.1.0`);
+/// spelling the tag out in a `const` turns each one into a scavenger hunt
+/// through the test suite. Exactly one snapshot per series is committed, so the
+/// directory name *is* the pin.
+fn pinned_tag() -> String {
+    let root = workspace_root().join("generator/schemas");
+    let mut matches: Vec<String> = std::fs::read_dir(&root)
+        .unwrap_or_else(|e| panic!("reading {}: {e}", root.display()))
+        .filter_map(Result::ok)
+        .map(|e| e.path())
+        .filter(|p| p.is_dir())
+        .filter_map(|p| p.file_name()?.to_str().map(str::to_owned))
+        .filter(|n| n.starts_with("v202607"))
+        .collect();
+    matches.sort();
+    assert_eq!(
+        matches.len(),
+        1,
+        "expected exactly one committed v202607 schema snapshot, found {matches:?}"
+    );
+    matches.pop().expect("checked len")
+}
+
+/// The committed snapshot directory for the `v202607` series.
+fn pinned_schema_root() -> std::path::PathBuf {
+    workspace_root()
+        .join("generator/schemas")
+        .join(pinned_tag())
 }
 
 /// Loads the snapshot file at `tests/snapshots/<name>` and returns its content.
@@ -81,7 +115,8 @@ fn generate_one(schema_version: &str, category: &str, file_stem: &str) -> String
             )
         });
 
-    let (_filename, source) = emitter::emit_node(node, schema_version)
+    let names = emitter::DiscriminantNames::from_nodes(&nodes);
+    let (_filename, source) = emitter::emit_node(node, schema_version, &names)
         .unwrap_or_else(|e| panic!("emit_node failed: {e}"));
     source
 }
@@ -91,15 +126,14 @@ fn generate_one(schema_version: &str, category: &str, file_stem: &str) -> String
 /// `Menge` is a small, stable COM type — a good canary for emitter changes.
 #[test]
 fn v202607_menge_snapshot() {
-    let generated = generate_one("v202607.0.0", "com", "Menge");
+    let generated = generate_one(&pinned_tag(), "com", "Menge");
     assert_snapshot("v202607_menge.rs", &generated);
 }
 
 /// Smoke-test: every schema in v202607 must parse without error.
 #[test]
 fn v202607_all_schemas_parse() {
-    let root = workspace_root();
-    let schema_root = root.join("generator/schemas/v202607.0.0");
+    let schema_root = pinned_schema_root();
     let mut total = 0usize;
 
     for category in ["bo", "com", "enum"] {
@@ -118,9 +152,13 @@ fn v202607_all_schemas_parse() {
         total += 1;
     }
 
+    // A floor that catches a truncated or empty snapshot, not an exact count:
+    // BO4E retires types (v202607.1.0 dropped two enums, taking the set from 191
+    // to 189). `tests/generated_contract.rs` pins the exact set against the
+    // committed codegen.
     assert!(
-        total >= 191,
-        "expected at least 191 schema nodes, got {total}"
+        total >= 150,
+        "expected the full BO4E schema set, got only {total} nodes"
     );
 }
 
@@ -128,8 +166,7 @@ fn v202607_all_schemas_parse() {
 /// no emitter errors) for v202607.
 #[test]
 fn v202607_all_schemas_emit() {
-    let root = workspace_root();
-    let schema_root = root.join("generator/schemas/v202607.0.0");
+    let schema_root = pinned_schema_root();
     let mut nodes = Vec::new();
 
     for category in ["bo", "com", "enum"] {
@@ -148,10 +185,11 @@ fn v202607_all_schemas_emit() {
         nodes.push(n);
     }
 
+    let names = emitter::DiscriminantNames::from_nodes(&nodes);
     let errors: Vec<String> = nodes
         .iter()
         .filter_map(|n| {
-            emitter::emit_node(n, "v202607.0.0")
+            emitter::emit_node(n, &pinned_tag(), &names)
                 .err()
                 .map(|e| format!("{}: {e}", n.name()))
         })
@@ -162,16 +200,15 @@ fn v202607_all_schemas_emit() {
 
 // ─── AST shape tests ───────────────────────────────────────────────────────
 
-/// Verifies that `Vertrag.json` from v202607.0.0 parses into the expected AST shape.
+/// Verifies that `Vertrag.json` from the pinned snapshot parses into the expected AST shape.
 ///
 /// This test guards against parser regressions: if a field is silently dropped or its
 /// type inference changes, the assertion will catch it.
 #[test]
 fn v202607_vertrag_ast_shape() {
-    use bo4e_generator::ast::{FieldType, PrimitiveType, SchemaNode};
+    use bo4e_generator::ast::{FieldType, PrimitiveType};
 
-    let root = workspace_root();
-    let bo_dir = root.join("generator/schemas/v202607.0.0/bo");
+    let bo_dir = pinned_schema_root().join("bo");
     let nodes = parser::parse_dir(&bo_dir).expect("parse bo dir");
 
     let vertrag = nodes
@@ -179,11 +216,15 @@ fn v202607_vertrag_ast_shape() {
         .find(|n| n.name() == "Vertrag")
         .expect("Vertrag not found in BO schema dir");
 
-    // Must parse as a BO type.
-    let bo = match vertrag {
-        SchemaNode::Bo(b) => b,
-        other => panic!("expected BoNode, got {:?}", std::mem::discriminant(other)),
-    };
+    // Must parse as a BO struct node.
+    let bo = vertrag.as_struct().expect("expected a struct node");
+    assert!(bo.kind.is_bo(), "Vertrag must parse as a BO, not a COM");
+    assert_eq!(bo.typ_const.as_deref(), Some("VERTRAG"));
+    // The wire spelling of the pinned tag: the tag without its `v`.
+    assert_eq!(
+        bo.version_default.as_deref(),
+        Some(pinned_tag().trim_start_matches('v')),
+    );
 
     // Check that the expected fields are present.
     let field_names: Vec<&str> = bo.fields.iter().map(|f| f.name.as_str()).collect();
@@ -244,24 +285,102 @@ fn v202607_vertrag_ast_shape() {
 
 // ─── Inference audit ───────────────────────────────────────────────────────
 
-/// Verifies that the inference table correctly maps specific high-value fields
-/// across the real v202607.0.0 BO/COM schemas, guarding against regressions
-/// where a schema change or parser update silently switches a field's type.
+/// Every entry in the inference table must name a field that (a) exists and
+/// (b) the schema declares as a plain, unannotated `"string"`.
 ///
-/// Covers: identifier newtypes, OffsetDateTime, Decimal, and JsonValue fields.
-/// When a field is not present in a schema, the test simply skips it — this
-/// keeps the test forward-compatible with schema versions that drop optional fields.
+/// A dead entry is untested speculation that will fire the day some unrelated
+/// schema grows a field with the same name. An entry pointing at a field the
+/// schema types some other way is a Rust type narrower than the wire format,
+/// which cannot read what other BO4E implementations emit.
 #[test]
-fn v202607_inference_audit() {
+fn v202607_inference_entries_are_live_and_string_typed() {
+    use bo4e_generator::inference;
+
+    let root = pinned_schema_root();
+    let mut schemas: Vec<serde_json::Value> = Vec::new();
+    for category in ["bo", "com"] {
+        let dir = root.join(category);
+        let Ok(entries) = std::fs::read_dir(&dir) else {
+            continue;
+        };
+        for e in entries.filter_map(Result::ok) {
+            if e.path().extension().is_some_and(|x| x == "json") {
+                let raw = std::fs::read_to_string(e.path()).expect("readable schema");
+                schemas.push(serde_json::from_str(&raw).expect("valid schema JSON"));
+            }
+        }
+    }
+    assert!(schemas.len() >= 95, "expected the full BO/COM set");
+
+    let mut problems: Vec<String> = Vec::new();
+    for (struct_name, field) in inference::typed_fields() {
+        let Some(schema) = schemas
+            .iter()
+            .find(|s| s["title"].as_str() == Some(struct_name))
+        else {
+            problems.push(format!("{struct_name}: no such schema"));
+            continue;
+        };
+        let Some(prop) = schema["properties"].get(field) else {
+            problems.push(format!("{struct_name}.{field}: no such property"));
+            continue;
+        };
+        // Unwrap the `anyOf [T, null]` BO4E wraps every optional property in.
+        let inner = prop["anyOf"]
+            .as_array()
+            .and_then(|a| a.iter().find(|v| v["type"].as_str() != Some("null")))
+            .unwrap_or(prop);
+        let is_plain_string =
+            inner["type"].as_str() == Some("string") && inner.get("format").is_none();
+        if !is_plain_string {
+            problems.push(format!(
+                "{struct_name}.{field}: schema declares {}, which is authoritative — \
+                 the inference table must not override it",
+                serde_json::to_string(inner).unwrap_or_default()
+            ));
+        }
+    }
+    assert!(
+        problems.is_empty(),
+        "inference table is out of step with the schemas:\n  {}",
+        problems.join("\n  ")
+    );
+}
+
+/// Fields the inference table leaves alone, because their schema description
+/// says they hold something other than what a same-named field elsewhere holds.
+#[test]
+fn v202607_homonyms_and_near_misses_stay_untyped() {
+    use bo4e_generator::inference;
+
+    for (struct_name, field) in [
+        // "Der Name des Marktgebietes" / "Der Name der Regelzone" — not codes.
+        ("MarktgebietInfo", "marktgebiet"),
+        ("StandorteigenschaftenStrom", "regelzone"),
+        // "Die Nummer oder E-Mail-Adresse" — not a number.
+        ("Kontaktweg", "kontaktwert"),
+    ] {
+        assert_eq!(
+            inference::infer_with_parent(Some(struct_name), field),
+            None,
+            "{struct_name}.{field} must keep the type its schema declares"
+        );
+    }
+}
+
+/// Pins the resolved type of high-value fields against the real schemas.
+///
+/// The guards above cover the inference table itself; this covers the cases
+/// where the **schema** is what decides — a `$ref` or a `"format"` beating a
+/// name that looks like something else.
+#[test]
+fn v202607_resolved_field_types() {
     use bo4e_generator::ast::{FieldType, PrimitiveType, SchemaNode};
 
-    let root = workspace_root();
-    let schema_root = root.join("generator/schemas/v202607.0.0");
-
-    // Collect all BO and COM nodes.
+    let root = pinned_schema_root();
     let mut nodes: Vec<SchemaNode> = Vec::new();
     for category in ["bo", "com"] {
-        let dir = schema_root.join(category);
+        let dir = root.join(category);
         if dir.exists() {
             nodes.extend(
                 parser::parse_dir(&dir)
@@ -269,177 +388,118 @@ fn v202607_inference_audit() {
             );
         }
     }
-    if let Some(n) = parser::parse_file_as_com(&schema_root.join("ZusatzAttribut.json"))
+    if let Some(n) = parser::parse_file_as_com(&root.join("ZusatzAttribut.json"))
         .expect("parse ZusatzAttribut.json")
     {
         nodes.push(n);
     }
 
-    // Helper: find a field by JSON name in a node's field list.
-    let find_field = |node: &SchemaNode, field_name: &str| -> Option<FieldType> {
-        let fields: &[bo4e_generator::ast::Field] = match node {
-            SchemaNode::Bo(b) => &b.fields,
-            SchemaNode::Com(c) => &c.fields,
-            SchemaNode::Enum(_) => return None,
-        };
-        fields
-            .iter()
-            .find(|f| f.name == field_name)
-            .map(|f| f.field_type.clone())
-    };
+    let ident = |n: &str| FieldType::Identifier(n.into());
+    let com = |n: &str| FieldType::Com(n.into());
+    const DEC: FieldType = FieldType::Primitive(PrimitiveType::Decimal);
+    const DT: FieldType = FieldType::Primitive(PrimitiveType::OffsetDateTime);
+    const DATE: FieldType = FieldType::Primitive(PrimitiveType::Date);
+    const STR: FieldType = FieldType::Primitive(PrimitiveType::String);
 
-    /// Audit entry: (struct_name, field_json_name, expected_FieldType)
-    type Entry<'a> = (&'a str, &'a str, FieldType);
-
-    let cases: &[Entry] = &[
-        // ── Identifier newtypes ─────────────────────────────────────────────
+    let cases: &[(&str, &str, FieldType)] = &[
+        // ── Identifier newtypes, from the inference table ───────────────────
+        ("Marktlokation", "marktlokationsId", ident("MaloId")),
+        ("Messlokation", "messlokationsId", ident("MeloId")),
+        ("Netzlokation", "netzlokationsId", ident("NeloId")),
         (
-            "Marktlokation",
-            "marktlokationsId",
-            FieldType::Identifier("MaloId".into()),
+            "SteuerbareRessource",
+            "steuerbareRessourceId",
+            ident("SrId"),
         ),
         (
-            "Messlokation",
-            "messlokationsId",
-            FieldType::Identifier("MeloId".into()),
+            "TechnischeRessource",
+            "technischeRessourceId",
+            ident("TrId"),
         ),
-        (
-            "Netzlokation",
-            "netzlokationsId",
-            FieldType::Identifier("NeloId".into()),
-        ),
-        (
-            "Marktlokation",
-            "bilanzkreis",
-            FieldType::Identifier("EicCode".into()),
-        ),
-        (
-            "Marktlokation",
-            "obisKennzahl",
-            FieldType::Identifier("ObisCode".into()),
-        ),
+        ("Bilanzierung", "bilanzkreis", ident("EicCode")),
+        ("Marktlokation", "regelzone", ident("EicCode")),
+        ("Zaehlwerk", "obisKennzahl", ident("ObisCode")),
         (
             "Marktteilnehmer",
             "rollencodenummer",
-            FieldType::Identifier("MarktpartnerId".into()),
+            ident("MarktpartnerId"),
         ),
-        // ── OffsetDateTime fields ───────────────────────────────────────────
+        // ── Name / code pairs ───────────────────────────────────────────────
+        //
+        // The schema separates the two; only the code half carries a format.
+        ("MarktgebietInfo", "marktgebiet", STR), // "Der Name des Marktgebietes"
+        ("StandorteigenschaftenStrom", "regelzone", STR), // "Der Name der Regelzone"
         (
-            "Vertrag",
-            "vertragsbeginn",
-            FieldType::Primitive(PrimitiveType::OffsetDateTime),
-        ),
-        (
-            "Vertrag",
-            "vertragsende",
-            FieldType::Primitive(PrimitiveType::OffsetDateTime),
-        ),
-        (
-            "Rechnung",
-            "rechnungsdatum",
-            FieldType::Primitive(PrimitiveType::Date),
+            "StandorteigenschaftenStrom",
+            "regelzoneEic",
+            ident("EicCode"),
         ),
         (
-            "Rechnung",
-            "faelligkeitsdatum",
-            FieldType::Primitive(PrimitiveType::Date),
+            "StandorteigenschaftenStrom",
+            "bilanzierungsgebietEic",
+            ident("BilanzierungsgebietId"),
         ),
-        // ── Decimal fields ─────────────────────────────────────────────────
-        (
-            "Betrag",
-            "wert",
-            FieldType::Primitive(PrimitiveType::Decimal),
-        ),
-        (
-            "Preis",
-            "wert",
-            FieldType::Primitive(PrimitiveType::Decimal),
-        ),
-        (
-            "Menge",
-            "wert",
-            FieldType::Primitive(PrimitiveType::Decimal),
-        ),
-        // ── JsonValue (free-form struct override) ──────────────────────────
+        ("Fremdkostenposition", "gebietcodeEic", ident("EicCode")),
+        ("Kontaktweg", "kontaktwert", STR),
+        // Every OBIS-bearing field, including the one upstream spells with a
+        // lower-case `k`.
+        ("Netzlokation", "obiskennzahl", ident("ObisCode")),
+        // Untyped on purpose: the schema names no format for either.
+        ("MarktgebietInfo", "marktgebietcode", STR),
+        ("Fremdkostenposition", "marktpartnercode", STR),
+        // ── `"format"` wins over any name ───────────────────────────────────
+        ("Vertrag", "vertragsbeginn", DT),
+        ("Vertrag", "vertragsende", DT),
+        ("Rechnung", "rechnungsdatum", DT),
+        ("Rechnung", "faelligkeitsdatum", DT),
+        ("Zeitraum", "startdatum", DATE),
+        ("Zeitraum", "enddatum", DATE),
+        // ── `"type": "number"` needs no inference ───────────────────────────
+        ("Betrag", "wert", DEC),
+        ("Preis", "wert", DEC),
+        ("Menge", "wert", DEC),
+        ("Steuerbetrag", "steuerwert", DEC),
+        // ── A `$ref` wins over a name that suggests a scalar ────────────────
+        ("Rechnungsposition", "einzelpreis", com("Preis")),
+        ("Kostenposition", "einzelpreis", com("Preis")),
+        ("Kostenposition", "menge", com("Menge")),
+        ("Fremdkostenposition", "menge", com("Menge")),
+        ("Bilanzierung", "kundenwert", com("Menge")),
+        ("Angebotsposition", "positionspreis", com("Preis")),
+        // ── An untyped property stays free-form ─────────────────────────────
         ("ZusatzAttribut", "wert", FieldType::JsonValue),
-        // ── Schema $ref wins over suffix inference ──────────────────────────
-        // These fields end with a suffix in the inference table (e.g. "preis" →
-        // Decimal, "menge" → Decimal) but their schemas carry an explicit `$ref`
-        // to a structured COM type.  The parser must trust the `$ref` and produce
-        // the correct `Com(…)` variant rather than a bare `Primitive(Decimal)`.
-        (
-            "Rechnungsposition",
-            "einzelpreis",
-            FieldType::Com("Preis".into()),
-        ),
-        (
-            "Angebotsposition",
-            "positionsmenge",
-            FieldType::Com("Menge".into()),
-        ),
-        (
-            "Angebotsposition",
-            "positionspreis",
-            FieldType::Com("Preis".into()),
-        ),
-        (
-            "Kostenposition",
-            "einzelpreis",
-            FieldType::Com("Preis".into()),
-        ),
-        ("Kostenposition", "menge", FieldType::Com("Menge".into())),
-        (
-            "Fremdkostenposition",
-            "einzelpreis",
-            FieldType::Com("Preis".into()),
-        ),
-        (
-            "Fremdkostenposition",
-            "menge",
-            FieldType::Com("Menge".into()),
-        ),
-        (
-            "Tarifberechnungsparameter",
-            "mindestpreis",
-            FieldType::Com("Preis".into()),
-        ),
-        ("Bilanzierung", "kundenwert", FieldType::Com("Menge".into())),
     ];
 
     let mut failures: Vec<String> = Vec::new();
-
     for (struct_name, field_name, expected) in cases {
-        let node = match nodes.iter().find(|n| n.name() == *struct_name) {
-            Some(n) => n,
-            None => {
-                // Schema may not exist in this version — skip gracefully.
-                continue;
-            }
+        let Some(node) = nodes.iter().find(|n| n.name() == *struct_name) else {
+            failures.push(format!("{struct_name}: no such schema"));
+            continue;
         };
-        match find_field(node, field_name) {
-            None => {
-                // Field not in schema for this version — skip.
-                continue;
-            }
-            Some(actual) if &actual == expected => {} // ✓
-            Some(actual) => {
-                failures.push(format!(
-                    "{struct_name}.{field_name}: expected {expected:?}, got {actual:?}"
-                ));
-            }
+        let Some(field) = node
+            .as_struct()
+            .and_then(|st| st.fields.iter().find(|f| f.name == *field_name))
+        else {
+            failures.push(format!("{struct_name}.{field_name}: no such property"));
+            continue;
+        };
+        if field.field_type != *expected {
+            failures.push(format!(
+                "{struct_name}.{field_name}: expected {expected:?}, got {:?}",
+                field.field_type
+            ));
         }
     }
-
     assert!(
         failures.is_empty(),
-        "Inference audit failures:\n{}",
-        failures.join("\n")
+        "resolved field types changed:\n  {}",
+        failures.join("\n  ")
     );
 }
 
 // ─── Unknown-variant guard ─────────────────────────────────────────────────
 
-/// Asserts that no BO4E v202607.0.0 enum schema defines a variant literally
+/// Asserts that no BO4E v202607 enum schema defines a variant literally
 /// named `"UNKNOWN"`.
 ///
 /// The generated catch-all `Unknown` variant serializes as `"UNKNOWN"` — this
@@ -450,8 +510,7 @@ fn v202607_inference_audit() {
 fn v202607_no_enum_schema_has_unknown_variant() {
     use bo4e_generator::ast::SchemaNode;
 
-    let root = workspace_root();
-    let enum_dir = root.join("generator/schemas/v202607.0.0/enum");
+    let enum_dir = pinned_schema_root().join("enum");
 
     let nodes = parser::parse_dir(&enum_dir).expect("parse enum dir");
 
@@ -470,4 +529,84 @@ fn v202607_no_enum_schema_has_unknown_variant() {
         conflicts.is_empty(),
         "BO4E schema defines 'UNKNOWN' variant(s) that clash with the generated catch-all: {conflicts:?}"
     );
+}
+
+// ─── Schema `format` coverage ────────────────────────────────────────────────
+
+/// Every `"format"` the schema uses must be one the parser has a considered
+/// position on.
+///
+/// The parser's `match` ends in a catch-all that maps an unrecognised format to
+/// `String`. That is the right default — a Rust type narrower than the schema
+/// cannot read what the rest of the ecosystem emits — but it is a *silent* one:
+/// a release that starts annotating a field `"format": "uri"` or `"duration"`
+/// would map it to `String` with nobody deciding that it should.
+///
+/// So the set is pinned. A new format fails here, and the fix is to either map
+/// it or add it to this list with a reason.
+#[test]
+fn v202607_every_schema_format_has_a_decision() {
+    /// `(format, what the parser does with it)`.
+    const KNOWN: &[(&str, &str)] = &[
+        ("date-time", "time::OffsetDateTime"),
+        ("date", "time::Date"),
+        (
+            "time",
+            "String — BO4E's times carry a UTC offset and `time` has no \
+             offset-bearing time-of-day type; parsed on demand by \
+             Zeitraum::startuhrzeit_parsed",
+        ),
+        (
+            "decimal",
+            "rust_decimal::Decimal — reached via \"type\": \"number\", not via the \
+             format annotation",
+        ),
+    ];
+
+    let mut found: BTreeSet<String> = BTreeSet::new();
+    for dir in ["bo", "com", "enum"] {
+        let path = pinned_schema_root().join(dir);
+        if !path.exists() {
+            continue;
+        }
+        for entry in std::fs::read_dir(&path).expect("readable") {
+            let file = entry.expect("entry").path();
+            if file.extension().is_none_or(|e| e != "json") {
+                continue;
+            }
+            let doc: serde_json::Value =
+                serde_json::from_str(&std::fs::read_to_string(&file).expect("readable"))
+                    .expect("valid JSON");
+            collect_formats(&doc, &mut found);
+        }
+    }
+
+    assert!(!found.is_empty(), "the schema uses no formats at all?");
+    let known: BTreeSet<&str> = KNOWN.iter().map(|&(f, _)| f).collect();
+    let unknown: Vec<&String> = found
+        .iter()
+        .filter(|f| !known.contains(f.as_str()))
+        .collect();
+    assert!(
+        unknown.is_empty(),
+        "the schema uses format(s) {unknown:?} that `resolve_field_type` has no \
+         considered position on — they currently fall through to `String`. Map \
+         them in `generator/src/parser.rs`, or add them to KNOWN with the reason."
+    );
+}
+
+/// Every `"format"` string anywhere in `value`, however deeply nested.
+fn collect_formats(value: &serde_json::Value, out: &mut BTreeSet<String>) {
+    match value {
+        serde_json::Value::Object(map) => {
+            if let Some(f) = map.get("format").and_then(serde_json::Value::as_str) {
+                out.insert(f.to_owned());
+            }
+            for v in map.values() {
+                collect_formats(v, out);
+            }
+        }
+        serde_json::Value::Array(items) => items.iter().for_each(|v| collect_formats(v, out)),
+        _ => {}
+    }
 }

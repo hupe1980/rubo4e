@@ -4,7 +4,7 @@ use super::{
     ZusatzAttribut,
 };
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(not(feature = "json"), derive(Hash))]
+#[cfg_attr(not(feature = "json"), derive(Eq, Hash))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "builder", derive(typed_builder::TypedBuilder))]
 #[cfg_attr(feature = "validate", derive(garde::Validate))]
@@ -13,7 +13,7 @@ use super::{
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 /// Object containing information about a meter/"Zaehler".
 ///
-/// > **Note:** [Zaehler JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/bo/Zaehler.json)
+/// > **Note:** [Zaehler JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.1.0/src/bo4e_schemas/bo/Zaehler.json)
 pub struct Zaehler {
     /// Befestigungsart
     #[cfg_attr(feature = "serde", serde(rename = "befestigungsart"))]
@@ -100,7 +100,7 @@ pub struct Zaehler {
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub sparte: Option<Sparte>,
-    /// BO type identifier — always `BoTyp::Zaehler` for this struct.
+    /// BO4E type discriminant — always `BoTyp::Zaehler` for this struct.
     #[cfg_attr(feature = "serde", serde(rename = "_typ"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(
@@ -113,7 +113,7 @@ pub struct Zaehler {
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(
         feature = "builder",
-        builder(default = Some("v202607.0.0".to_owned()), setter(into))
+        builder(default = Some("202607.1.0".to_owned()), setter(into))
     )]
     pub version: Option<String>,
     /// Spezifikation die Richtung des Zählers betreffend
@@ -135,13 +135,23 @@ pub struct Zaehler {
     #[cfg_attr(feature = "serde", serde(rename = "zaehlerkonstante"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "serde", serde(default))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(deserialize_with = "crate::decimal_serde::deserialize_opt")
+    )]
     #[cfg(feature = "decimal")]
     pub zaehlerkonstante: Option<rust_decimal::Decimal>,
     /// Requires the `decimal` feature for the `rust_decimal::Decimal` representation.
-    /// Without `decimal`, stores the decimal string value unchanged.
+    /// Without `decimal`, stores the decimal's lexical form (a JSON string or number).
     #[cfg_attr(feature = "serde", serde(rename = "zaehlerkonstante"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "serde", serde(default))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(deserialize_with = "crate::decimal_serde::deserialize_opt")
+    )]
     #[cfg(not(feature = "decimal"))]
     pub zaehlerkonstante: Option<String>,
     /// Nummerierung des Zählers,vergeben durch den Messstellenbetreiber
@@ -182,7 +192,6 @@ pub struct Zaehler {
 impl Default for Zaehler {
     fn default() -> Self {
         Self {
-            typ: Some(BoTyp::Zaehler),
             befestigungsart: Default::default(),
             eichung_bis: Default::default(),
             geraete: Default::default(),
@@ -191,7 +200,8 @@ impl Default for Zaehler {
             letzte_eichung: Default::default(),
             registeranzahl: Default::default(),
             sparte: Default::default(),
-            version: Some("v202607.0.0".to_owned()),
+            typ: Some(BoTyp::Zaehler),
+            version: Some("202607.1.0".to_owned()),
             zaehlerauspraegung: Default::default(),
             zaehlergroesse: Default::default(),
             zaehlerhersteller: Default::default(),
@@ -211,7 +221,10 @@ impl Bo4eObject for Zaehler {
         self.typ.unwrap_or(BoTyp::Zaehler)
     }
     fn schema_version(&self) -> &'static str {
-        "v202607.0.0"
+        "202607.1.0"
+    }
+    fn schema_series(&self) -> &'static str {
+        "202607"
     }
 }
 #[cfg(feature = "json")]

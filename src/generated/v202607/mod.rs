@@ -65,7 +65,6 @@ pub mod lastgang;
 pub mod lastprofil;
 pub mod lastvariable_preisposition;
 pub mod leistungstyp;
-pub mod lokationstyp;
 pub mod lokationszuordnung;
 pub mod marktgebiet_info;
 pub mod marktlokation;
@@ -74,7 +73,6 @@ pub mod marktteilnehmer;
 pub mod medium;
 pub mod menge;
 pub mod mengeneinheit;
-pub mod mengenoperator;
 pub mod messart;
 pub mod messgroesse;
 pub mod messlokation;
@@ -257,7 +255,6 @@ pub use lastgang::Lastgang;
 pub use lastprofil::Lastprofil;
 pub use lastvariable_preisposition::LastvariablePreisposition;
 pub use leistungstyp::Leistungstyp;
-pub use lokationstyp::Lokationstyp;
 pub use lokationszuordnung::Lokationszuordnung;
 pub use marktgebiet_info::MarktgebietInfo;
 pub use marktlokation::Marktlokation;
@@ -266,7 +263,6 @@ pub use marktteilnehmer::Marktteilnehmer;
 pub use medium::Medium;
 pub use menge::Menge;
 pub use mengeneinheit::Mengeneinheit;
-pub use mengenoperator::Mengenoperator;
 pub use messart::Messart;
 pub use messgroesse::Messgroesse;
 pub use messlokation::Messlokation;
@@ -410,7 +406,7 @@ pub use zustaendigkeit::Zustaendigkeit;
 /// # }
 /// ```
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(not(feature = "json"), derive(Hash))]
+#[cfg_attr(not(feature = "json"), derive(Eq, Hash))]
 #[non_exhaustive]
 pub enum AnyBo {
     /// A [`Angebot`] Geschäftsobjekt.

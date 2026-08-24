@@ -1,6 +1,6 @@
 use super::{ComTyp, Messpreistyp, Preis, Tarifkalkulationsmethode, Tarifpreis, ZusatzAttribut};
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(not(feature = "json"), derive(Hash))]
+#[cfg_attr(not(feature = "json"), derive(Eq, Hash))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "builder", derive(typed_builder::TypedBuilder))]
 #[cfg_attr(feature = "validate", derive(garde::Validate))]
@@ -9,7 +9,7 @@ use super::{ComTyp, Messpreistyp, Preis, Tarifkalkulationsmethode, Tarifpreis, Z
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 /// In dieser Komponente sind die Berechnungsparameter für die Ermittlung der Tarifkosten zusammengefasst.
 ///
-/// > **Note:** [Tarifberechnungsparameter JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/com/Tarifberechnungsparameter.json)
+/// > **Note:** [Tarifberechnungsparameter JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.1.0/src/bo4e_schemas/com/Tarifberechnungsparameter.json)
 pub struct Tarifberechnungsparameter {
     /// Gibt an, wie die Einzelpreise des Tarifes zu verarbeiten sind
     #[cfg_attr(feature = "serde", serde(rename = "berechnungsmethode"))]
@@ -47,26 +47,46 @@ pub struct Tarifberechnungsparameter {
     #[cfg_attr(feature = "serde", serde(rename = "kwInklusive"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "serde", serde(default))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(deserialize_with = "crate::decimal_serde::deserialize_opt")
+    )]
     #[cfg(feature = "decimal")]
     pub kw_inklusive: Option<rust_decimal::Decimal>,
     /// Requires the `decimal` feature for the `rust_decimal::Decimal` representation.
-    /// Without `decimal`, stores the decimal string value unchanged.
+    /// Without `decimal`, stores the decimal's lexical form (a JSON string or number).
     #[cfg_attr(feature = "serde", serde(rename = "kwInklusive"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "serde", serde(default))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(deserialize_with = "crate::decimal_serde::deserialize_opt")
+    )]
     #[cfg(not(feature = "decimal"))]
     pub kw_inklusive: Option<String>,
     /// Intervall, indem die über "kwInklusive" hinaus abgenommene Leistung kostenpflichtig wird (z.B. je 5 kW 20 EURO)
     #[cfg_attr(feature = "serde", serde(rename = "kwWeitereMengen"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "serde", serde(default))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(deserialize_with = "crate::decimal_serde::deserialize_opt")
+    )]
     #[cfg(feature = "decimal")]
     pub kw_weitere_mengen: Option<rust_decimal::Decimal>,
     /// Requires the `decimal` feature for the `rust_decimal::Decimal` representation.
-    /// Without `decimal`, stores the decimal string value unchanged.
+    /// Without `decimal`, stores the decimal's lexical form (a JSON string or number).
     #[cfg_attr(feature = "serde", serde(rename = "kwWeitereMengen"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "serde", serde(default))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(deserialize_with = "crate::decimal_serde::deserialize_opt")
+    )]
     #[cfg(not(feature = "decimal"))]
     pub kw_weitere_mengen: Option<String>,
     /// Typ des Messpreises
@@ -79,17 +99,20 @@ pub struct Tarifberechnungsparameter {
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub mindestpreis: Option<Preis>,
-    /// COM type identifier for this struct.
+    /// BO4E type discriminant — always `ComTyp::Tarifberechnungsparameter` for this struct.
     #[cfg_attr(feature = "serde", serde(rename = "_typ"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(
+        feature = "builder",
+        builder(default = Some(ComTyp::Tarifberechnungsparameter), setter(skip))
+    )]
     pub typ: Option<ComTyp>,
     /// Version der COM-Struktur aka "fachliche Versionierung"
     #[cfg_attr(feature = "serde", serde(rename = "_version"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(
         feature = "builder",
-        builder(default = Some("v202607.0.0".to_owned()), setter(into))
+        builder(default = Some("202607.1.0".to_owned()), setter(into))
     )]
     pub version: Option<String>,
     #[cfg_attr(feature = "serde", serde(rename = "zusatzAttribute"))]
@@ -126,8 +149,8 @@ impl Default for Tarifberechnungsparameter {
             kw_weitere_mengen: Default::default(),
             messpreistyp: Default::default(),
             mindestpreis: Default::default(),
-            typ: Default::default(),
-            version: Some("v202607.0.0".to_owned()),
+            typ: Some(ComTyp::Tarifberechnungsparameter),
+            version: Some("202607.1.0".to_owned()),
             zusatz_attribute: Default::default(),
             zusatzpreise: Default::default(),
             _additional: Default::default(),

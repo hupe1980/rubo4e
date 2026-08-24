@@ -1,6 +1,6 @@
 use super::{ComTyp, Sigmoidparameter, ZusatzAttribut};
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(not(feature = "json"), derive(Hash))]
+#[cfg_attr(not(feature = "json"), derive(Eq, Hash))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "builder", derive(typed_builder::TypedBuilder))]
 #[cfg_attr(feature = "validate", derive(garde::Validate))]
@@ -9,7 +9,7 @@ use super::{ComTyp, Sigmoidparameter, ZusatzAttribut};
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 /// Gibt die Staffelgrenzen der jeweiligen Preise an
 ///
-/// > **Note:** [Preisstaffel JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/com/Preisstaffel.json)
+/// > **Note:** [Preisstaffel JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.1.0/src/bo4e_schemas/com/Preisstaffel.json)
 pub struct Preisstaffel {
     /// Standardisierte vom BDEW herausgegebene Liste, welche im Strommarkt die BDEW-Artikelnummer ablöst.
     #[cfg_attr(feature = "serde", serde(rename = "artikelId"))]
@@ -31,13 +31,23 @@ pub struct Preisstaffel {
     #[cfg_attr(feature = "serde", serde(rename = "preis"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "serde", serde(default))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(deserialize_with = "crate::decimal_serde::deserialize_opt")
+    )]
     #[cfg(feature = "decimal")]
     pub preis: Option<rust_decimal::Decimal>,
     /// Requires the `decimal` feature for the `rust_decimal::Decimal` representation.
-    /// Without `decimal`, stores the decimal string value unchanged.
+    /// Without `decimal`, stores the decimal's lexical form (a JSON string or number).
     #[cfg_attr(feature = "serde", serde(rename = "preis"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "serde", serde(default))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(deserialize_with = "crate::decimal_serde::deserialize_opt")
+    )]
     #[cfg(not(feature = "decimal"))]
     pub preis: Option<String>,
     /// Parameter zur Berechnung des Preises anhand der Jahresmenge und weiterer netzbezogener Parameter
@@ -51,13 +61,23 @@ pub struct Preisstaffel {
     #[cfg_attr(feature = "serde", serde(rename = "staffelgrenzeBis"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "serde", serde(default))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(deserialize_with = "crate::decimal_serde::deserialize_opt")
+    )]
     #[cfg(feature = "decimal")]
     pub staffelgrenze_bis: Option<rust_decimal::Decimal>,
     /// Requires the `decimal` feature for the `rust_decimal::Decimal` representation.
-    /// Without `decimal`, stores the decimal string value unchanged.
+    /// Without `decimal`, stores the decimal's lexical form (a JSON string or number).
     #[cfg_attr(feature = "serde", serde(rename = "staffelgrenzeBis"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "serde", serde(default))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(deserialize_with = "crate::decimal_serde::deserialize_opt")
+    )]
     #[cfg(not(feature = "decimal"))]
     pub staffelgrenze_bis: Option<String>,
     /// Inklusiver unterer Wert, ab dem die Staffel gilt (inklusiv).
@@ -66,26 +86,39 @@ pub struct Preisstaffel {
     #[cfg_attr(feature = "serde", serde(rename = "staffelgrenzeVon"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "serde", serde(default))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(deserialize_with = "crate::decimal_serde::deserialize_opt")
+    )]
     #[cfg(feature = "decimal")]
     pub staffelgrenze_von: Option<rust_decimal::Decimal>,
     /// Requires the `decimal` feature for the `rust_decimal::Decimal` representation.
-    /// Without `decimal`, stores the decimal string value unchanged.
+    /// Without `decimal`, stores the decimal's lexical form (a JSON string or number).
     #[cfg_attr(feature = "serde", serde(rename = "staffelgrenzeVon"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "serde", serde(default))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(deserialize_with = "crate::decimal_serde::deserialize_opt")
+    )]
     #[cfg(not(feature = "decimal"))]
     pub staffelgrenze_von: Option<String>,
-    /// COM type identifier for this struct.
+    /// BO4E type discriminant — always `ComTyp::Preisstaffel` for this struct.
     #[cfg_attr(feature = "serde", serde(rename = "_typ"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(
+        feature = "builder",
+        builder(default = Some(ComTyp::Preisstaffel), setter(skip))
+    )]
     pub typ: Option<ComTyp>,
     /// Version der COM-Struktur aka "fachliche Versionierung"
     #[cfg_attr(feature = "serde", serde(rename = "_version"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(
         feature = "builder",
-        builder(default = Some("v202607.0.0".to_owned()), setter(into))
+        builder(default = Some("202607.1.0".to_owned()), setter(into))
     )]
     pub version: Option<String>,
     #[cfg_attr(feature = "serde", serde(rename = "zusatzAttribute"))]
@@ -114,8 +147,8 @@ impl Default for Preisstaffel {
             sigmoidparameter: Default::default(),
             staffelgrenze_bis: Default::default(),
             staffelgrenze_von: Default::default(),
-            typ: Default::default(),
-            version: Some("v202607.0.0".to_owned()),
+            typ: Some(ComTyp::Preisstaffel),
+            version: Some("202607.1.0".to_owned()),
             zusatz_attribute: Default::default(),
             _additional: Default::default(),
         }

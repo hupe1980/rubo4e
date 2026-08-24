@@ -13,7 +13,7 @@ anyhow     = "1"
 
 [package]
 name        = "rubo4e"
-version     = "0.9.0"
+version     = "0.10.0"
 edition     = "2021"
 rust-version = "1.88"
 description = "Rust implementation of the BO4E energy-market data standard"
@@ -62,14 +62,6 @@ sqlx       = ["dep:sqlx"]
 utoipa     = ["dep:utoipa"]
 strum      = ["dep:strum"]
 
-# High-performance JSON parsing via SIMD instructions (x86_64 / aarch64).
-# Usually accelerates `from_json_german` and `from_json_snake_case` deserialization
-# on supported hardware.  Serialization paths still use serde_json.  Benchmark with
-# `cargo bench --bench json_perf --features versioned,json` and compare against
-# `cargo bench --bench json_perf --features versioned,json,simd-json`.
-# Requires `json` because it supplements that path.
-simd-json  = ["json", "dep:simd-json"]
-
 # Multi-version schema modules.
 #
 # `versioned` is a **minimal** feature: it enables only the generated BO/COM
@@ -83,9 +75,6 @@ simd-json  = ["json", "dep:simd-json"]
 # Minimal setup (no heavy date/money deps — fields become String):
 #   features = ["versioned"]
 versioned  = ["serde"]
-
-# Note: proptest is a dev-dependency. The former `testing` feature is removed;
-# proptest Arbitrary impls are compiled with `#[cfg(test)]` only.
 
 # Structured diagnostics: identifier validation failures, migration spans,
 # and extension-data capture events (warn on unexpected fields).
@@ -114,12 +103,14 @@ schemars      = { version = "1", optional = true, features = ["indexmap2", "rust
 sqlx          = { version = "0.8",  features = ["postgres"],             optional = true }
 utoipa        = { version = "5",    optional = true, features = ["time", "decimal", "indexmap"] }
 strum         = { version = "0.28", features = ["derive"],                optional = true }
-simd-json     = { version = "0.17", features = ["serde_impl"],            optional = true }
 tracing       = { version = "0.1",  default-features = false,             optional = true }
 metrics       = { version = "0.24", default-features = false,             optional = true }
 
 [dev-dependencies]
 insta      = "1"
+# Snake-casing schema titles to generated file names, so the drift guard in
+# `tests/generated_contract.rs` derives the same name the generator does.
+heck       = "0.5"
 serde_json = { workspace = true }
 criterion  = { version = "0.8", features = ["html_reports"] }
 proptest   = "1"

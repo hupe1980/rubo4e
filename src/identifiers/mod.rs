@@ -41,6 +41,8 @@
 //! | [`ObisCode`] | `[A-B:]C.D[.E][*F]` format | IEC 62056-61 (C=0 permitted) |
 //! | [`AkivId`] | 1–36 printable ASCII chars | BDEW WiM AHB BK6-24-174 |
 //! | [`TranchennummerId`] | 1–6 decimal digits, no leading zeros (0–999 999) | MABIS PID 13003 (BK6-06-009) |
+//! | [`Iban`] | 15–34 chars, registered per-country length, MOD-97-10 check digits | ISO 13616 / ISO 7064 |
+//! | [`Bic`] | 8 or 11 chars, letters in the institution and country codes | ISO 9362 — no checksum defined |
 //!
 //! ### The two BDEW check-digit procedures
 //!
@@ -68,6 +70,17 @@
 //! [`MarktpartnerId::new_checked`], [`MarktpartnerId::has_valid_bdew_check_digit`],
 //! and [`MarktpartnerId::has_valid_gln_check_digit`].
 //!
+//! ### The two bank identifiers, and where they are *not* used
+//!
+//! [`Iban`] and [`Bic`] exist for `Zahlungsinformation.iban` / `.bic`, but the
+//! generated struct keeps both fields as `String`. `Zahlungsinformation` hangs
+//! off `Rechnung` and nothing else, so a newtype that refuses a **masked** IBAN
+//! — `DE89 **** **** 3000`, routine on an invoice — would take the whole invoice
+//! down with it. `Zahlungsinformation::iban_checked()` runs the check on demand
+//! and returns an error instead, which costs the caller the field rather than
+//! the invoice. `Iban::new` normalises grouping spaces and case, so a value
+//! copied off a statement parses.
+//!
 //! ### Wire-format traits without feature flags
 //!
 //! All identifier types unconditionally implement `Display`, `FromStr`,
@@ -93,6 +106,7 @@ mod macros;
 
 mod akiv_id;
 mod ascii_ids;
+mod bank;
 mod bilanzkreis_id;
 mod checksum;
 mod eic_code;
@@ -106,6 +120,7 @@ mod tranchennummer_id;
 
 pub use akiv_id::{AkivId, AKIV_ID_MAX_LEN};
 pub use ascii_ids::{CrId, NebeId, NeloId, PaketId, SgId, SrId, TrId};
+pub use bank::{Bic, Iban, IBAN_MAX_LEN, IBAN_MIN_LEN};
 pub use bilanzkreis_id::{BilanzierungsgebietId, BilanzkreisId};
 pub use eic_code::{EicCode, EicType};
 pub use malo_id::{MaloId, MaloVergabestelle};

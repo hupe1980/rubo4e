@@ -90,9 +90,9 @@ mod tests {
 
     /// Real Bilanzkreis codes published by German market participants.
     ///
-    /// These are the regression guard for the defect this module used to have:
-    /// `BilanzkreisId` required object type `'Z'` (Measurement point), which
-    /// rejected every Bilanzkreis-ID that actually exists.
+    /// Testing against real codes rather than synthetic ones is what pins the
+    /// object type to `'X'` (Party): no registry issues a Bilanzkreis under any
+    /// other type.
     const REAL_BILANZKREISE: [&str; 3] =
         ["11XSUEDWESTSTRO8", "11XENERGIE2----H", "11XENAGISME----J"];
 

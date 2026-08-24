@@ -3,7 +3,7 @@ use super::{
     ZusatzAttribut,
 };
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(not(feature = "json"), derive(Hash))]
+#[cfg_attr(not(feature = "json"), derive(Eq, Hash))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "builder", derive(typed_builder::TypedBuilder))]
 #[cfg_attr(feature = "validate", derive(garde::Validate))]
@@ -13,7 +13,7 @@ use super::{
 /// Abbildung einer allgemeinen Zeitreihe mit einem Wertvektor.
 /// Die Werte können mit wahlfreier zeitlicher Distanz im Vektor abgelegt sein.
 ///
-/// > **Note:** [Zeitreihe JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/bo/Zeitreihe.json)
+/// > **Note:** [Zeitreihe JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.1.0/src/bo4e_schemas/bo/Zeitreihe.json)
 pub struct Zeitreihe {
     /// Beschreibt die Verwendung der Zeitreihe
     #[cfg_attr(feature = "serde", serde(rename = "beschreibung"))]
@@ -51,7 +51,7 @@ pub struct Zeitreihe {
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub messgroesse: Option<Messgroesse>,
-    /// BO type identifier — always `BoTyp::Zeitreihe` for this struct.
+    /// BO4E type discriminant — always `BoTyp::Zeitreihe` for this struct.
     #[cfg_attr(feature = "serde", serde(rename = "_typ"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(
@@ -93,7 +93,6 @@ pub struct Zeitreihe {
 impl Default for Zeitreihe {
     fn default() -> Self {
         Self {
-            typ: Some(BoTyp::Zeitreihe),
             beschreibung: Default::default(),
             bezeichnung: Default::default(),
             einheit: Default::default(),
@@ -101,6 +100,7 @@ impl Default for Zeitreihe {
             medium: Default::default(),
             messart: Default::default(),
             messgroesse: Default::default(),
+            typ: Some(BoTyp::Zeitreihe),
             version: Default::default(),
             werte: Default::default(),
             wertherkunft: Default::default(),
@@ -115,7 +115,10 @@ impl Bo4eObject for Zeitreihe {
         self.typ.unwrap_or(BoTyp::Zeitreihe)
     }
     fn schema_version(&self) -> &'static str {
-        "v202607.0.0"
+        "202607.1.0"
+    }
+    fn schema_series(&self) -> &'static str {
+        "202607"
     }
 }
 #[cfg(feature = "json")]

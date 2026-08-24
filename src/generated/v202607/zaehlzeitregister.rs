@@ -1,6 +1,6 @@
 use super::{ComTyp, ZusatzAttribut};
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(not(feature = "json"), derive(Hash))]
+#[cfg_attr(not(feature = "json"), derive(Eq, Hash))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "builder", derive(typed_builder::TypedBuilder))]
 #[cfg_attr(feature = "validate", derive(garde::Validate))]
@@ -10,7 +10,7 @@ use super::{ComTyp, ZusatzAttribut};
 /// Mit dieser Komponente werden Zählzeitregister modelliert. Ein Zählzeitregister beschreibt eine erweiterte Definition der Zählzeit
 /// in Bezug auf ein Register. Dabei werden alle Codes dazu vom Netzbetreiber vergeben.
 ///
-/// > **Note:** [Zaehlzeitregister JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/com/Zaehlzeitregister.json)
+/// > **Note:** [Zaehlzeitregister JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.1.0/src/bo4e_schemas/com/Zaehlzeitregister.json)
 pub struct Zaehlzeitregister {
     /// Eine generische ID, die für eigene Zwecke genutzt werden kann.
     /// Z.B. könnten hier UUIDs aus einer Datenbank stehen oder URLs zu einem Backend-System.
@@ -23,17 +23,20 @@ pub struct Zaehlzeitregister {
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub ist_schwachlastfaehig: Option<bool>,
-    /// COM type identifier for this struct.
+    /// BO4E type discriminant — always `ComTyp::Zaehlzeitregister` for this struct.
     #[cfg_attr(feature = "serde", serde(rename = "_typ"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(
+        feature = "builder",
+        builder(default = Some(ComTyp::Zaehlzeitregister), setter(skip))
+    )]
     pub typ: Option<ComTyp>,
     /// Version der COM-Struktur aka "fachliche Versionierung"
     #[cfg_attr(feature = "serde", serde(rename = "_version"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(
         feature = "builder",
-        builder(default = Some("v202607.0.0".to_owned()), setter(into))
+        builder(default = Some("202607.1.0".to_owned()), setter(into))
     )]
     pub version: Option<String>,
     /// Zählzeitdefinition
@@ -67,8 +70,8 @@ impl Default for Zaehlzeitregister {
         Self {
             id: Default::default(),
             ist_schwachlastfaehig: Default::default(),
-            typ: Default::default(),
-            version: Some("v202607.0.0".to_owned()),
+            typ: Some(ComTyp::Zaehlzeitregister),
+            version: Some("202607.1.0".to_owned()),
             zaehlzeit_definition: Default::default(),
             zaehlzeit_register: Default::default(),
             zusatz_attribute: Default::default(),

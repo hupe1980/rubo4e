@@ -1,4 +1,4 @@
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(
     feature = "strum",
@@ -29,10 +29,10 @@ pub enum NetznutzungRechnungstyp {
     Zwischenrechnung,
     #[cfg_attr(feature = "serde", serde(rename = "INTEGRIERTE_13TE_RECHNUNG"))]
     #[cfg_attr(feature = "strum", strum(serialize = "INTEGRIERTE_13TE_RECHNUNG"))]
-    Integrierte13teRechnung,
+    Integrierte13TeRechnung,
     #[cfg_attr(feature = "serde", serde(rename = "ZUSAETZLICHE_13TE_RECHNUNG"))]
     #[cfg_attr(feature = "strum", strum(serialize = "ZUSAETZLICHE_13TE_RECHNUNG"))]
-    Zusaetzliche13teRechnung,
+    Zusaetzliche13TeRechnung,
     #[cfg_attr(feature = "serde", serde(rename = "MEHRMINDERMENGENRECHNUNG"))]
     #[cfg_attr(feature = "strum", strum(serialize = "MEHRMINDERMENGENRECHNUNG"))]
     Mehrmindermengenrechnung,
@@ -55,8 +55,8 @@ impl NetznutzungRechnungstyp {
         Self::Monatsrechnung,
         Self::Wimrechnung,
         Self::Zwischenrechnung,
-        Self::Integrierte13teRechnung,
-        Self::Zusaetzliche13teRechnung,
+        Self::Integrierte13TeRechnung,
+        Self::Zusaetzliche13TeRechnung,
         Self::Mehrmindermengenrechnung,
     ];
     /// Number of schema-defined variants (equal to `VARIANTS.len()`), excluding the
@@ -89,8 +89,8 @@ impl NetznutzungRechnungstyp {
             Self::Monatsrechnung => "MONATSRECHNUNG",
             Self::Wimrechnung => "WIMRECHNUNG",
             Self::Zwischenrechnung => "ZWISCHENRECHNUNG",
-            Self::Integrierte13teRechnung => "INTEGRIERTE_13TE_RECHNUNG",
-            Self::Zusaetzliche13teRechnung => "ZUSAETZLICHE_13TE_RECHNUNG",
+            Self::Integrierte13TeRechnung => "INTEGRIERTE_13TE_RECHNUNG",
+            Self::Zusaetzliche13TeRechnung => "ZUSAETZLICHE_13TE_RECHNUNG",
             Self::Mehrmindermengenrechnung => "MEHRMINDERMENGENRECHNUNG",
             Self::Unknown => "UNKNOWN",
         }
@@ -107,7 +107,8 @@ impl NetznutzungRechnungstyp {
     /// # Example
     /// ```
     /// # use rubo4e::current::NetznutzungRechnungstyp;
-    /// /// assert_eq!(NetznutzungRechnungstyp::from_wire("ABSCHLUSSRECHNUNG"), Ok(NetznutzungRechnungstyp::Abschlussrechnung));
+    /// assert_eq!(NetznutzungRechnungstyp::from_wire("ABSCHLUSSRECHNUNG"), Ok(NetznutzungRechnungstyp::Abschlussrechnung));
+    /// // Out-of-schema values are rejected rather than degraded:
     /// assert!(NetznutzungRechnungstyp::from_wire("NOT_A_REAL_VALUE").is_err());
     /// // …including the `Unknown` catch-all's own wire spelling:
     /// assert!(NetznutzungRechnungstyp::from_wire("UNKNOWN").is_err());
@@ -120,8 +121,8 @@ impl NetznutzungRechnungstyp {
             "MONATSRECHNUNG" => Ok(Self::Monatsrechnung),
             "WIMRECHNUNG" => Ok(Self::Wimrechnung),
             "ZWISCHENRECHNUNG" => Ok(Self::Zwischenrechnung),
-            "INTEGRIERTE_13TE_RECHNUNG" => Ok(Self::Integrierte13teRechnung),
-            "ZUSAETZLICHE_13TE_RECHNUNG" => Ok(Self::Zusaetzliche13teRechnung),
+            "INTEGRIERTE_13TE_RECHNUNG" => Ok(Self::Integrierte13TeRechnung),
+            "ZUSAETZLICHE_13TE_RECHNUNG" => Ok(Self::Zusaetzliche13TeRechnung),
             "MEHRMINDERMENGENRECHNUNG" => Ok(Self::Mehrmindermengenrechnung),
             other => Err(crate::error::UnknownVariant::new(other)),
         }
@@ -201,6 +202,15 @@ impl<'r> sqlx::Decode<'r, sqlx::Postgres> for NetznutzungRechnungstyp {
     ) -> Result<Self, sqlx::error::BoxDynError> {
         let s = <&str as sqlx::Decode<sqlx::Postgres>>::decode(value)?;
         Ok(Self::from_wire(s).unwrap_or(Self::Unknown))
+    }
+}
+/// Lets `Vec<NetznutzungRechnungstyp>` bind to a `TEXT[]` column.  Only this crate can
+/// provide it: the trait and the enum are both foreign to any consumer, so the
+/// orphan rule rules out a downstream impl.
+#[cfg(feature = "sqlx")]
+impl sqlx::postgres::PgHasArrayType for NetznutzungRechnungstyp {
+    fn array_type_info() -> sqlx::postgres::PgTypeInfo {
+        <String as sqlx::postgres::PgHasArrayType>::array_type_info()
     }
 }
 #[cfg(test)]

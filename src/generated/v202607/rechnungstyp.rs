@@ -1,4 +1,4 @@
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(
     feature = "strum",
@@ -52,10 +52,10 @@ pub enum Rechnungstyp {
     Zwischenrechnung,
     #[cfg_attr(feature = "serde", serde(rename = "INTEGRIERTE_13TE_RECHNUNG"))]
     #[cfg_attr(feature = "strum", strum(serialize = "INTEGRIERTE_13TE_RECHNUNG"))]
-    Integrierte13teRechnung,
+    Integrierte13TeRechnung,
     #[cfg_attr(feature = "serde", serde(rename = "ZUSAETZLICHE_13TE_RECHNUNG"))]
     #[cfg_attr(feature = "strum", strum(serialize = "ZUSAETZLICHE_13TE_RECHNUNG"))]
-    Zusaetzliche13teRechnung,
+    Zusaetzliche13TeRechnung,
     /// Unknown or future variant — produced when deserializing a value
     /// that is not yet known to this version of the library.
     #[cfg_attr(feature = "serde", serde(other, rename = "UNKNOWN"))]
@@ -80,8 +80,8 @@ impl Rechnungstyp {
         Self::Turnusrechnung,
         Self::Monatsrechnung,
         Self::Zwischenrechnung,
-        Self::Integrierte13teRechnung,
-        Self::Zusaetzliche13teRechnung,
+        Self::Integrierte13TeRechnung,
+        Self::Zusaetzliche13TeRechnung,
     ];
     /// Number of schema-defined variants (equal to `VARIANTS.len()`), excluding the
     /// [`Rechnungstyp::Unknown`] catch-all.  Stable for this schema version.
@@ -118,8 +118,8 @@ impl Rechnungstyp {
             Self::Turnusrechnung => "TURNUSRECHNUNG",
             Self::Monatsrechnung => "MONATSRECHNUNG",
             Self::Zwischenrechnung => "ZWISCHENRECHNUNG",
-            Self::Integrierte13teRechnung => "INTEGRIERTE_13TE_RECHNUNG",
-            Self::Zusaetzliche13teRechnung => "ZUSAETZLICHE_13TE_RECHNUNG",
+            Self::Integrierte13TeRechnung => "INTEGRIERTE_13TE_RECHNUNG",
+            Self::Zusaetzliche13TeRechnung => "ZUSAETZLICHE_13TE_RECHNUNG",
             Self::Unknown => "UNKNOWN",
         }
     }
@@ -135,7 +135,8 @@ impl Rechnungstyp {
     /// # Example
     /// ```
     /// # use rubo4e::current::Rechnungstyp;
-    /// /// assert_eq!(Rechnungstyp::from_wire("ENDKUNDENRECHNUNG"), Ok(Rechnungstyp::Endkundenrechnung));
+    /// assert_eq!(Rechnungstyp::from_wire("ENDKUNDENRECHNUNG"), Ok(Rechnungstyp::Endkundenrechnung));
+    /// // Out-of-schema values are rejected rather than degraded:
     /// assert!(Rechnungstyp::from_wire("NOT_A_REAL_VALUE").is_err());
     /// // …including the `Unknown` catch-all's own wire spelling:
     /// assert!(Rechnungstyp::from_wire("UNKNOWN").is_err());
@@ -153,8 +154,8 @@ impl Rechnungstyp {
             "TURNUSRECHNUNG" => Ok(Self::Turnusrechnung),
             "MONATSRECHNUNG" => Ok(Self::Monatsrechnung),
             "ZWISCHENRECHNUNG" => Ok(Self::Zwischenrechnung),
-            "INTEGRIERTE_13TE_RECHNUNG" => Ok(Self::Integrierte13teRechnung),
-            "ZUSAETZLICHE_13TE_RECHNUNG" => Ok(Self::Zusaetzliche13teRechnung),
+            "INTEGRIERTE_13TE_RECHNUNG" => Ok(Self::Integrierte13TeRechnung),
+            "ZUSAETZLICHE_13TE_RECHNUNG" => Ok(Self::Zusaetzliche13TeRechnung),
             other => Err(crate::error::UnknownVariant::new(other)),
         }
     }
@@ -233,6 +234,15 @@ impl<'r> sqlx::Decode<'r, sqlx::Postgres> for Rechnungstyp {
     ) -> Result<Self, sqlx::error::BoxDynError> {
         let s = <&str as sqlx::Decode<sqlx::Postgres>>::decode(value)?;
         Ok(Self::from_wire(s).unwrap_or(Self::Unknown))
+    }
+}
+/// Lets `Vec<Rechnungstyp>` bind to a `TEXT[]` column.  Only this crate can
+/// provide it: the trait and the enum are both foreign to any consumer, so the
+/// orphan rule rules out a downstream impl.
+#[cfg(feature = "sqlx")]
+impl sqlx::postgres::PgHasArrayType for Rechnungstyp {
+    fn array_type_info() -> sqlx::postgres::PgTypeInfo {
+        <String as sqlx::postgres::PgHasArrayType>::array_type_info()
     }
 }
 #[cfg(test)]

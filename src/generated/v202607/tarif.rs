@@ -4,7 +4,7 @@ use super::{
     Vertragskonditionen, Zeitraum, ZusatzAttribut,
 };
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(not(feature = "json"), derive(Hash))]
+#[cfg_attr(not(feature = "json"), derive(Eq, Hash))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "builder", derive(typed_builder::TypedBuilder))]
 #[cfg_attr(feature = "validate", derive(garde::Validate))]
@@ -30,7 +30,7 @@ use super::{
 /// > Hinweis: Das Vorhandensein einer `COM DynamischePreisposition` dient gleichzeitig auch als "Flag" dafür, ob
 /// > es sich bei diesem Tarif um einen dynamischen handelt.
 ///
-/// > **Note:** [Tarif JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/bo/Tarif.json)
+/// > **Note:** [Tarif JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.1.0/src/bo4e_schemas/bo/Tarif.json)
 pub struct Tarif {
     /// Der Marktteilnehmer, der diesen Tarif anbietet, angeboten hat oder anbieten wird.
     #[cfg_attr(feature = "serde", serde(rename = "anbieter"))]
@@ -134,7 +134,7 @@ pub struct Tarif {
     /// Der Tariftyp. Bsp.: Grundversorgung, Ersatzversorgung, etc.
     #[cfg_attr(feature = "serde", serde(rename = "tariftyp"))]
     pub tariftyp: Tariftyp,
-    /// BO type identifier — always `BoTyp::Tarif` for this struct.
+    /// BO4E type discriminant — always `BoTyp::Tarif` for this struct.
     #[cfg_attr(feature = "serde", serde(rename = "_typ"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default = Some(BoTyp::Tarif), setter(skip)))]
@@ -144,7 +144,7 @@ pub struct Tarif {
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(
         feature = "builder",
-        builder(default = Some("v202607.0.0".to_owned()), setter(into))
+        builder(default = Some("202607.1.0".to_owned()), setter(into))
     )]
     pub version: Option<String>,
     /// Vertragskonditionen für diesen Tarif.
@@ -190,7 +190,10 @@ impl Bo4eObject for Tarif {
         self.typ.unwrap_or(BoTyp::Tarif)
     }
     fn schema_version(&self) -> &'static str {
-        "v202607.0.0"
+        "202607.1.0"
+    }
+    fn schema_series(&self) -> &'static str {
+        "202607"
     }
 }
 #[cfg(feature = "json")]

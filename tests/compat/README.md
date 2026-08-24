@@ -6,10 +6,9 @@ verify rubo4e can read what other implementations emit.
 
 Reading them only covers the **inbound** direction. `tests/compat.rs` therefore
 also has an `outbound_tests` module asserting that JSON rubo4e *produces* carries
-the metadata every other implementation emits — `_typ` on BOs, `_version` on both
-BOs and COMs. That gap is not hypothetical: `_version` was missing from every
-constructed value until it was closed, and no fixture here caught it, because
-round-tripping a vector carries `_version` in from the input.
+the metadata every other implementation emits — `_typ` and `_version` on both BOs
+and COMs. A round-trip cannot check that: it carries the metadata in from the
+input.
 
 ## Directory layout
 
@@ -55,11 +54,9 @@ Repeat for the other types (`Messlokation`, `Vertrag`, `Rechnung`).
 
 ### Go (go-bo4e)
 
-```bash
-go run ./cmd/dump-fixtures  # if such a tool exists in go-bo4e
-```
-
-Or instantiate the structs in a small Go program and use `json.MarshalIndent`.
+Instantiate the structs in a small Go program and use `json.MarshalIndent`.
+Note that go-bo4e writes decimals as JSON numbers where BO4E-python writes
+strings; the vectors keep both spellings on purpose.
 
 ## Running the tests
 
@@ -70,6 +67,6 @@ cargo test --features json,versioned --test compat
 ## When to update
 
 Update these vectors whenever:
-- A new BO4E schema version is adopted (update `_version` strings)
+- A new BO4E schema version is adopted (update `_typ` / `_version` strings)
 - A breaking field rename or type change occurs upstream
 - A new BO4E implementation is added to the compatibility matrix

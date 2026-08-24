@@ -1,6 +1,6 @@
 use super::{ComTyp, Marktteilnehmer, ZusatzAttribut};
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(not(feature = "json"), derive(Hash))]
+#[cfg_attr(not(feature = "json"), derive(Eq, Hash))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "builder", derive(typed_builder::TypedBuilder))]
 #[cfg_attr(feature = "validate", derive(garde::Validate))]
@@ -9,7 +9,7 @@ use super::{ComTyp, Marktteilnehmer, ZusatzAttribut};
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 /// Object containing information about a Konfigurationsprodukt
 ///
-/// > **Note:** [Konfigurationsprodukt JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/bo/Konfigurationsprodukt.json)
+/// > **Note:** [Konfigurationsprodukt JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.1.0/src/bo4e_schemas/bo/Konfigurationsprodukt.json)
 pub struct Konfigurationsprodukt {
     /// Eine generische ID, die für eigene Zwecke genutzt werden kann.
     /// Z.B. könnten hier UUIDs aus einer Datenbank stehen oder URLs zu einem Backend-System.
@@ -33,17 +33,20 @@ pub struct Konfigurationsprodukt {
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub schaltzeitdefinition: Option<String>,
-    /// COM type identifier for this struct.
+    /// BO4E type discriminant — always `ComTyp::Konfigurationsprodukt` for this struct.
     #[cfg_attr(feature = "serde", serde(rename = "_typ"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(
+        feature = "builder",
+        builder(default = Some(ComTyp::Konfigurationsprodukt), setter(skip))
+    )]
     pub typ: Option<ComTyp>,
     /// Version der COM-Struktur aka "fachliche Versionierung"
     #[cfg_attr(feature = "serde", serde(rename = "_version"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(
         feature = "builder",
-        builder(default = Some("v202607.0.0".to_owned()), setter(into))
+        builder(default = Some("202607.1.0".to_owned()), setter(into))
     )]
     pub version: Option<String>,
     #[cfg_attr(feature = "serde", serde(rename = "zusatzAttribute"))]
@@ -70,8 +73,8 @@ impl Default for Konfigurationsprodukt {
             marktpartner: Default::default(),
             produktcode: Default::default(),
             schaltzeitdefinition: Default::default(),
-            typ: Default::default(),
-            version: Some("v202607.0.0".to_owned()),
+            typ: Some(ComTyp::Konfigurationsprodukt),
+            version: Some("202607.1.0".to_owned()),
             zusatz_attribute: Default::default(),
             _additional: Default::default(),
         }

@@ -1,6 +1,6 @@
 use super::{Bo4eObject, BoTyp, Menge, Zeitraum, ZusatzAttribut};
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(not(feature = "json"), derive(Hash))]
+#[cfg_attr(not(feature = "json"), derive(Eq, Hash))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "builder", derive(typed_builder::TypedBuilder))]
 #[cfg_attr(feature = "validate", derive(garde::Validate))]
@@ -9,7 +9,7 @@ use super::{Bo4eObject, BoTyp, Menge, Zeitraum, ZusatzAttribut};
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 /// Abbildung von Mengen, die Lokationen zugeordnet sind
 ///
-/// > **Note:** [Energiemenge JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/bo/Energiemenge.json)
+/// > **Note:** [Energiemenge JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.1.0/src/bo4e_schemas/bo/Energiemenge.json)
 pub struct Energiemenge {
     /// Ergänzende Beschreibung zur Energiemenge
     #[cfg_attr(feature = "serde", serde(rename = "beschreibung"))]
@@ -33,7 +33,7 @@ pub struct Energiemenge {
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     #[cfg_attr(feature = "validate", garde(dive))]
     pub obis_kennzahl: Option<crate::identifiers::ObisCode>,
-    /// BO type identifier — always `BoTyp::Energiemenge` for this struct.
+    /// BO4E type discriminant — always `BoTyp::Energiemenge` for this struct.
     #[cfg_attr(feature = "serde", serde(rename = "_typ"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(
@@ -46,7 +46,7 @@ pub struct Energiemenge {
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(
         feature = "builder",
-        builder(default = Some("v202607.0.0".to_owned()), setter(into))
+        builder(default = Some("202607.1.0".to_owned()), setter(into))
     )]
     pub version: Option<String>,
     /// Zeitraum, in dem die Energiemenge angefallen ist/gemessen wurde
@@ -73,12 +73,12 @@ pub struct Energiemenge {
 impl Default for Energiemenge {
     fn default() -> Self {
         Self {
-            typ: Some(BoTyp::Energiemenge),
             beschreibung: Default::default(),
             id: Default::default(),
             menge: Default::default(),
             obis_kennzahl: Default::default(),
-            version: Some("v202607.0.0".to_owned()),
+            typ: Some(BoTyp::Energiemenge),
+            version: Some("202607.1.0".to_owned()),
             zeitraum: Default::default(),
             zusatz_attribute: Default::default(),
             _additional: Default::default(),
@@ -91,7 +91,10 @@ impl Bo4eObject for Energiemenge {
         self.typ.unwrap_or(BoTyp::Energiemenge)
     }
     fn schema_version(&self) -> &'static str {
-        "v202607.0.0"
+        "202607.1.0"
+    }
+    fn schema_series(&self) -> &'static str {
+        "202607"
     }
 }
 #[cfg(feature = "json")]

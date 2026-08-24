@@ -1,4 +1,4 @@
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(
     feature = "strum",
@@ -45,9 +45,15 @@ pub enum Messgroesse {
     #[cfg_attr(feature = "serde", serde(rename = "VOLUMENSTROM"))]
     #[cfg_attr(feature = "strum", strum(serialize = "VOLUMENSTROM"))]
     Volumenstrom,
-    #[cfg_attr(feature = "serde", serde(rename = "PREISE"))]
-    #[cfg_attr(feature = "strum", strum(serialize = "PREISE"))]
-    Preise,
+    #[cfg_attr(feature = "serde", serde(rename = "PHASENWINKEL"))]
+    #[cfg_attr(feature = "strum", strum(serialize = "PHASENWINKEL"))]
+    Phasenwinkel,
+    #[cfg_attr(feature = "serde", serde(rename = "LEISTUNGSFAKTOR"))]
+    #[cfg_attr(feature = "strum", strum(serialize = "LEISTUNGSFAKTOR"))]
+    Leistungsfaktor,
+    #[cfg_attr(feature = "serde", serde(rename = "FREQUENZ"))]
+    #[cfg_attr(feature = "strum", strum(serialize = "FREQUENZ"))]
+    Frequenz,
     /// Unknown or future variant — produced when deserializing a value
     /// that is not yet known to this version of the library.
     #[cfg_attr(feature = "serde", serde(other, rename = "UNKNOWN"))]
@@ -73,7 +79,9 @@ impl Messgroesse {
         Self::Brennwert,
         Self::Gradtzagszahlen,
         Self::Volumenstrom,
-        Self::Preise,
+        Self::Phasenwinkel,
+        Self::Leistungsfaktor,
+        Self::Frequenz,
     ];
     /// Number of schema-defined variants (equal to `VARIANTS.len()`), excluding the
     /// [`Messgroesse::Unknown`] catch-all.  Stable for this schema version.
@@ -111,7 +119,9 @@ impl Messgroesse {
             Self::Brennwert => "BRENNWERT",
             Self::Gradtzagszahlen => "GRADTZAGSZAHLEN",
             Self::Volumenstrom => "VOLUMENSTROM",
-            Self::Preise => "PREISE",
+            Self::Phasenwinkel => "PHASENWINKEL",
+            Self::Leistungsfaktor => "LEISTUNGSFAKTOR",
+            Self::Frequenz => "FREQUENZ",
             Self::Unknown => "UNKNOWN",
         }
     }
@@ -127,7 +137,8 @@ impl Messgroesse {
     /// # Example
     /// ```
     /// # use rubo4e::current::Messgroesse;
-    /// /// assert_eq!(Messgroesse::from_wire("STROM"), Ok(Messgroesse::Strom));
+    /// assert_eq!(Messgroesse::from_wire("STROM"), Ok(Messgroesse::Strom));
+    /// // Out-of-schema values are rejected rather than degraded:
     /// assert!(Messgroesse::from_wire("NOT_A_REAL_VALUE").is_err());
     /// // …including the `Unknown` catch-all's own wire spelling:
     /// assert!(Messgroesse::from_wire("UNKNOWN").is_err());
@@ -146,7 +157,9 @@ impl Messgroesse {
             "BRENNWERT" => Ok(Self::Brennwert),
             "GRADTZAGSZAHLEN" => Ok(Self::Gradtzagszahlen),
             "VOLUMENSTROM" => Ok(Self::Volumenstrom),
-            "PREISE" => Ok(Self::Preise),
+            "PHASENWINKEL" => Ok(Self::Phasenwinkel),
+            "LEISTUNGSFAKTOR" => Ok(Self::Leistungsfaktor),
+            "FREQUENZ" => Ok(Self::Frequenz),
             other => Err(crate::error::UnknownVariant::new(other)),
         }
     }
@@ -225,6 +238,15 @@ impl<'r> sqlx::Decode<'r, sqlx::Postgres> for Messgroesse {
     ) -> Result<Self, sqlx::error::BoxDynError> {
         let s = <&str as sqlx::Decode<sqlx::Postgres>>::decode(value)?;
         Ok(Self::from_wire(s).unwrap_or(Self::Unknown))
+    }
+}
+/// Lets `Vec<Messgroesse>` bind to a `TEXT[]` column.  Only this crate can
+/// provide it: the trait and the enum are both foreign to any consumer, so the
+/// orphan rule rules out a downstream impl.
+#[cfg(feature = "sqlx")]
+impl sqlx::postgres::PgHasArrayType for Messgroesse {
+    fn array_type_info() -> sqlx::postgres::PgTypeInfo {
+        <String as sqlx::postgres::PgHasArrayType>::array_type_info()
     }
 }
 #[cfg(test)]

@@ -1,5 +1,6 @@
 use bo4e_generator::{emitter, parser};
 
+use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
 use anyhow::{bail, Context, Result};
@@ -52,19 +53,32 @@ fn main() -> Result<()> {
 
     eprintln!("Parsed {} schemas.", all_nodes.len());
 
+    // `BoTyp` / `ComTyp` variants take their names from the structs they
+    // discriminate, so the registry has to see every node before any is emitted.
+    let names = emitter::DiscriminantNames::from_nodes(&all_nodes);
+
     // Emit Rust files.
     std::fs::create_dir_all(&out_root)
         .with_context(|| format!("creating output dir: {}", out_root.display()))?;
 
+    let mut emitted: HashSet<String> = HashSet::from(["mod.rs".to_owned()]);
     for node in &all_nodes {
-        let (filename, source) = emitter::emit_node(node, &args.schema_version)?;
+        let (filename, source) = emitter::emit_node(node, &args.schema_version, &names)?;
         let dest = out_root.join(&filename);
-        write_if_changed(&dest, &source)?
+        write_if_changed(&dest, &source)?;
+        emitted.insert(filename);
     }
 
     // Write mod.rs for this version's subdirectory.
     let mod_rs = emitter::emit_mod_rs(&all_nodes, &args.schema_version)?;
     write_if_changed(&out_root.join("mod.rs"), &mod_rs)?;
+
+    // A schema release can *remove* a type (v202607.1.0 dropped `Lokationstyp`
+    // and `Mengenoperator`).  `mod.rs` stops referencing it, so the crate still
+    // compiles — and the orphaned file sits in the tree forever, indistinguishable
+    // from a live one and passing every drift check.  Delete what this run did not
+    // emit.
+    prune_stale_files(&out_root, &emitted)?;
 
     // Write the parent src/generated/mod.rs by scanning all version
     // subdirectories that exist on disk.  This keeps the file fully generated
@@ -90,6 +104,28 @@ fn main() -> Result<()> {
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
+
+/// Deletes every `.rs` file in `dir` that this generation run did not write.
+///
+/// Keeps the output directory an exact mirror of the schema snapshot: a type the
+/// release removed leaves no file behind to be mistaken for a live one.
+fn prune_stale_files(dir: &Path, emitted: &HashSet<String>) -> Result<()> {
+    for entry in std::fs::read_dir(dir).with_context(|| format!("reading {}", dir.display()))? {
+        let path = entry?.path();
+        if path.extension().is_none_or(|x| x != "rs") {
+            continue;
+        }
+        let Some(name) = path.file_name().and_then(|n| n.to_str()) else {
+            continue;
+        };
+        if emitted.contains(name) {
+            continue;
+        }
+        std::fs::remove_file(&path).with_context(|| format!("removing {}", path.display()))?;
+        eprintln!("  removed {} (no longer in the schema)", path.display());
+    }
+    Ok(())
+}
 
 /// Writes `src/generated/mod.rs` by scanning all version subdirectories that
 /// contain a `mod.rs` file.

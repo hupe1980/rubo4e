@@ -1,4 +1,4 @@
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(
     feature = "strum",
@@ -11,7 +11,7 @@
 pub enum Zaehlergroesse {
     #[cfg_attr(feature = "serde", serde(rename = "G2KOMMA5"))]
     #[cfg_attr(feature = "strum", strum(serialize = "G2KOMMA5"))]
-    G2komma5,
+    G2Komma5,
     #[cfg_attr(feature = "serde", serde(rename = "G4"))]
     #[cfg_attr(feature = "strum", strum(serialize = "G4"))]
     G4,
@@ -85,7 +85,7 @@ impl Zaehlergroesse {
     /// is exactly the set of values that appear on the wire.  Available **without**
     /// the `strum` feature — use it to drift-guard SQL `CHECK` lists and mappings.
     pub const VARIANTS: &'static [Self] = &[
-        Self::G2komma5,
+        Self::G2Komma5,
         Self::G4,
         Self::G6,
         Self::G10,
@@ -131,7 +131,7 @@ impl Zaehlergroesse {
     /// [`Zaehlergroesse::Unknown`] renders as `"UNKNOWN"`, matching its serialized form.
     pub const fn as_wire(&self) -> &'static str {
         match self {
-            Self::G2komma5 => "G2KOMMA5",
+            Self::G2Komma5 => "G2KOMMA5",
             Self::G4 => "G4",
             Self::G6 => "G6",
             Self::G10 => "G10",
@@ -167,14 +167,15 @@ impl Zaehlergroesse {
     /// # Example
     /// ```
     /// # use rubo4e::current::Zaehlergroesse;
-    /// /// assert_eq!(Zaehlergroesse::from_wire("G2KOMMA5"), Ok(Zaehlergroesse::G2komma5));
+    /// assert_eq!(Zaehlergroesse::from_wire("G2KOMMA5"), Ok(Zaehlergroesse::G2Komma5));
+    /// // Out-of-schema values are rejected rather than degraded:
     /// assert!(Zaehlergroesse::from_wire("NOT_A_REAL_VALUE").is_err());
     /// // …including the `Unknown` catch-all's own wire spelling:
     /// assert!(Zaehlergroesse::from_wire("UNKNOWN").is_err());
     /// ```
     pub fn from_wire(s: &str) -> Result<Self, crate::error::UnknownVariant> {
         match s {
-            "G2KOMMA5" => Ok(Self::G2komma5),
+            "G2KOMMA5" => Ok(Self::G2Komma5),
             "G4" => Ok(Self::G4),
             "G6" => Ok(Self::G6),
             "G10" => Ok(Self::G10),
@@ -273,6 +274,15 @@ impl<'r> sqlx::Decode<'r, sqlx::Postgres> for Zaehlergroesse {
     ) -> Result<Self, sqlx::error::BoxDynError> {
         let s = <&str as sqlx::Decode<sqlx::Postgres>>::decode(value)?;
         Ok(Self::from_wire(s).unwrap_or(Self::Unknown))
+    }
+}
+/// Lets `Vec<Zaehlergroesse>` bind to a `TEXT[]` column.  Only this crate can
+/// provide it: the trait and the enum are both foreign to any consumer, so the
+/// orphan rule rules out a downstream impl.
+#[cfg(feature = "sqlx")]
+impl sqlx::postgres::PgHasArrayType for Zaehlergroesse {
+    fn array_type_info() -> sqlx::postgres::PgTypeInfo {
+        <String as sqlx::postgres::PgHasArrayType>::array_type_info()
     }
 }
 #[cfg(test)]

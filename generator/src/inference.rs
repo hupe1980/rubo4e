@@ -1,490 +1,220 @@
+//! Semantic field typing: which BO4E `"type": "string"` properties are really a
+//! validated domain identifier.
+//!
+//! BO4E declares every identifier as a bare string. This table is what turns
+//! `Marktlokation.marktlokationsId` into a `MaloId` that verifies its own BDEW
+//! check digit instead of a `String` that does not. Three rules govern it:
+//!
+//! 1. **Keyed on `(struct, field)`** — never a bare name, never a suffix. BO4E
+//!    reuses names: `Marktlokation.marktgebiet` is *"Code vom EIC"*, while
+//!    `MarktgebietInfo.marktgebiet` is *"Der Name des Marktgebietes"*.
+//! 2. **The schema wins.** The parser consults this table only for properties
+//!    typed as a plain, unannotated `"string"`. A `$ref`, a `"format"`, or
+//!    `"type": "number"` is authoritative.
+//! 3. **Type only what the schema names** — "EIC-Nummer", "OBIS-Kennzahl",
+//!    "Codenummer des Netzbetreibers" — not a field the schema calls merely *a
+//!    code*. A newtype that rejects a value takes the enclosing object down with
+//!    it; a missing one costs the caller one `EicCode::try_from(&s)`.
+//! 4. **Weigh the blast radius even when rule 3 is satisfied.** `Zahlungsinformation`
+//!    hangs off `Rechnung` and nothing else, so typing its `iban` as the
+//!    checksum-verified [`Iban`] would make a masked IBAN — `DE89 **** **** 3000`,
+//!    routine on an invoice — destroy the entire `Rechnung`: line items, amounts,
+//!    periods and all. The same goes for `bic`. Both types exist and are worth
+//!    using; `Zahlungsinformation::iban_checked()` runs the check on demand
+//!    without putting the invoice at risk.
+//!
+
+//!
+//! See `site/content/docs/generator.md` for the resulting table and the fields
+//! left untyped under rule 3.
+
 use std::collections::HashMap;
 use std::sync::LazyLock;
 
-/// Semantic type-inference table.
-///
-/// Maps JSON property names (or name patterns) to [`crate::ast::FieldType`]
-/// values that carry more semantic meaning than the raw JSON Schema type.
-///
-/// The lookup order is:
-/// 1. Exact match on `(parent_struct_name, json_property_name)` — highest priority.
-/// 2. Exact match on the JSON property name alone.
-/// 3. Suffix match (field name ends with the key); the longest match wins.
-///
-/// All keys are *camelCase* JSON property names as they appear in the BO4E schemas.
-use crate::ast::{FieldType, PrimitiveType};
+use crate::ast::FieldType;
 
-// ── Static lookup tables — built once, shared across all infer() calls ────────
-
-/// Per-struct field overrides: `(struct_title, json_field_name) → FieldType`.
+/// `(struct title, JSON property name) → FieldType`.
 ///
-/// Used for fields where the general-purpose inference rules produce the wrong
-/// type for a specific struct.  Takes priority over `EXACT_MAP` and `SUFFIX_MAP`.
-///
-/// **Schema-override entries** (marked with a `!`) also override the parser's
-/// schema-format detection (normally authoritative for `date`/`date-time` fields).
-/// Use sparingly — only when upstream schema has `"format": "date-time"` but
-/// BDEW practice is date-only (e.g. INVOIC DTM segments with qualifier 102).
-static STRUCT_FIELD_MAP: LazyLock<HashMap<(&'static str, &'static str), FieldType>> =
+/// Exhaustive: a property not listed here keeps the type its schema declares.
+static FIELD_TYPES: LazyLock<HashMap<(&'static str, &'static str), FieldType>> =
     LazyLock::new(|| {
+        fn id(name: &'static str) -> FieldType {
+            FieldType::Identifier(name.into())
+        }
         HashMap::from([
-            // ZusatzAttribut.wert is a free-form JSON value — string, number, boolean,
-            // or object.  The "Wert" suffix rule (→ Decimal) must not apply here.
-            (("ZusatzAttribut", "wert"), FieldType::JsonValue),
-            // ── Schema overrides: date-only BDEW fields ─────────────────────
-            // These fields carry `"format": "date-time"` in the upstream BO4E schema
-            // but BDEW INVOIC AHB uses date-only qualifiers (DTM qualifier 102,
-            // YYYYMMDD). Using `time::Date` avoids silent timezone assumptions and
-            // aligns with Zeitraum.startdatum/enddatum (which already use Date).
-
-            // Rechnung.faelligkeitsdatum — INVOIC DTM+92 (qualifier 102)
+            // ── Primary location identifiers ─────────────────────────────────
+            (("Marktlokation", "marktlokationsId"), id("MaloId")),
+            (("Bilanzierung", "marktlokationsId"), id("MaloId")),
+            (("Ausschreibungsdetail", "marktlokationsId"), id("MaloId")),
+            (("Messlokation", "messlokationsId"), id("MeloId")),
+            (("Netzlokation", "netzlokationsId"), id("NeloId")),
+            // ── Redispatch 2.0 resource identifiers ──────────────────────────
+            (("SteuerbareRessource", "steuerbareRessourceId"), id("SrId")),
+            (("TechnischeRessource", "technischeRessourceId"), id("TrId")),
+            // ── EIC codes ────────────────────────────────────────────────────
+            //
+            // Only where the schema says the field carries a *code*.  The same
+            // names elsewhere hold human-readable names and stay `String`.
+            (("Marktlokation", "marktgebiet"), id("EicCode")),
+            (("Marktlokation", "regelzone"), id("EicCode")),
+            // Left as the general `EicCode`: a German electricity Bilanzkreis is
+            // a party code (`11X…`), so `BilanzkreisId` would be tighter — but
+            // this field also carries gas Bilanzkreise (GaBi Gas BK7-14-020),
+            // whose object type is not established here.  Narrowing it would turn
+            // an unverified assumption into a hard deserialization failure on
+            // real payloads; callers opt in via `BilanzkreisId::try_from(eic)`.
+            (("Bilanzierung", "bilanzkreis"), id("EicCode")),
+            // Both name their format outright: "De EIC-Nummer der Regelzone" and
+            // "EIC-Code des Regel- oder Marktgebietes … Z.B. '10YDE-EON------1'".
             (
-                ("Rechnung", "faelligkeitsdatum"),
-                FieldType::Primitive(PrimitiveType::Date),
+                ("StandorteigenschaftenStrom", "regelzoneEic"),
+                id("EicCode"),
             ),
-            // Rechnung.rechnungsdatum — INVOIC DTM+137 (qualifier 102)
+            (("Fremdkostenposition", "gebietcodeEic"), id("EicCode")),
+            // A Bilanzierungsgebiet is an area code.  The schema documents this
+            // as "Die EIC-Nummer des Bilanzierungsgebietes" but declares it a
+            // plain string; all 645 codes in the TSOs' published
+            // VNB-Bilanzierungsgebiete list carry object type 'Y'.
             (
-                ("Rechnung", "rechnungsdatum"),
-                FieldType::Primitive(PrimitiveType::Date),
+                ("StandorteigenschaftenStrom", "bilanzierungsgebietEic"),
+                id("BilanzierungsgebietId"),
             ),
-            // Rechnungsposition.lieferungBis — INVOIC DTM+164 (qualifier 102)
+            // ── BDEW Marktpartner codes ──────────────────────────────────────
             (
-                ("Rechnungsposition", "lieferungBis"),
-                FieldType::Primitive(PrimitiveType::Date),
+                ("Marktteilnehmer", "rollencodenummer"),
+                id("MarktpartnerId"),
             ),
-            // Rechnungsposition.lieferungVon — INVOIC DTM+163 (qualifier 102)
             (
-                ("Rechnungsposition", "lieferungVon"),
-                FieldType::Primitive(PrimitiveType::Date),
+                ("Marktlokation", "grundversorgercodenr"),
+                id("MarktpartnerId"),
             ),
+            (
+                ("Marktlokation", "netzbetreibercodenr"),
+                id("MarktpartnerId"),
+            ),
+            (
+                ("Messlokation", "grundzustaendigerMsbCodenr"),
+                id("MarktpartnerId"),
+            ),
+            (
+                ("Messlokation", "grundzustaendigerMsbimCodenr"),
+                id("MarktpartnerId"),
+            ),
+            (
+                ("Netzlokation", "grundzustaendigerMsbCodenr"),
+                id("MarktpartnerId"),
+            ),
+            (
+                ("SteuerbareRessource", "zugeordneteMsbCodenummer"),
+                id("MarktpartnerId"),
+            ),
+            // ── OBIS ─────────────────────────────────────────────────────────
+            //
+            // `Netzlokation` spells the property `obiskennzahl`, the other three
+            // `obisKennzahl`.  The casing is an upstream inconsistency, not a
+            // difference in meaning — all four carry an OBIS code.
+            (("Energiemenge", "obisKennzahl"), id("ObisCode")),
+            (("Lastgang", "obisKennzahl"), id("ObisCode")),
+            (("Zaehlwerk", "obisKennzahl"), id("ObisCode")),
+            (("Netzlokation", "obiskennzahl"), id("ObisCode")),
         ])
     });
 
-/// Checks for a **struct-specific field override** that must take priority
-/// even over schema-format-detected types.
+/// Returns the domain type for `(parent, json_name)`, or `None` to keep the type
+/// the schema declares.
 ///
-/// Unlike [`infer_with_parent`], this function only checks [`STRUCT_FIELD_MAP`]
-/// and requires a parent struct name.  Use this in the parser after resolving
-/// the schema type to allow targeted schema corrections (e.g. `"date-time"` →
-/// `Date` for BDEW date-only fields).
-pub fn infer_schema_override(parent: &str, json_name: &str) -> Option<FieldType> {
-    STRUCT_FIELD_MAP.get(&(parent, json_name)).cloned()
-}
-
-/// Exact-name → FieldType mapping.
-///
-/// Constructed once on first use via `LazyLock`; never rebuilt.
-static EXACT_MAP: LazyLock<HashMap<&'static str, FieldType>> = LazyLock::new(|| {
-    HashMap::from([
-        // Identifier newtypes
-        ("marktlokationsId", FieldType::Identifier("MaloId".into())),
-        ("messlokationsId", FieldType::Identifier("MeloId".into())),
-        ("netzlokationsId", FieldType::Identifier("NeloId".into())),
-        (
-            "steuerbareRessourceId",
-            FieldType::Identifier("SrId".into()),
-        ),
-        (
-            "technischeRessourceId",
-            FieldType::Identifier("TrId".into()),
-        ),
-        // Left as the general `EicCode` on purpose. A German electricity
-        // Bilanzkreis is a party code (`11X…`), so `BilanzkreisId` would be the
-        // tighter type — but this field also carries gas Bilanzkreise (GaBi Gas
-        // BK7-14-020), whose object type is not established here. Narrowing it
-        // would turn an unverified assumption into a hard deserialization failure
-        // on real payloads, so the object type stays unconstrained and callers
-        // opt in via `BilanzkreisId::try_from(eic)`.
-        ("bilanzkreis", FieldType::Identifier("EicCode".into())),
-        // A Bilanzierungsgebiet is an area code. The schema documents this field
-        // as "Die EIC-Nummer des Bilanzierungsgebietes" but declares it a plain
-        // string; all 645 codes in the TSOs' published VNB-Bilanzierungsgebiete
-        // list carry object type 'Y', so the restricted type is safe here.
-        (
-            "bilanzierungsgebietEic",
-            FieldType::Identifier("BilanzierungsgebietId".into()),
-        ),
-        ("eicCode", FieldType::Identifier("EicCode".into())),
-        // control area and balance area codes are EIC codes.
-        ("marktgebiet", FieldType::Identifier("EicCode".into())),
-        ("regelzone", FieldType::Identifier("EicCode".into())),
-        ("obisKennzahl", FieldType::Identifier("ObisCode".into())),
-        (
-            "rollencodenummer",
-            FieldType::Identifier("MarktpartnerId".into()),
-        ),
-        ("codenummer", FieldType::Identifier("MarktpartnerId".into())),
-        // Grid/supplier operator codes — all carry BDEW Marktpartner IDs.
-        (
-            "grundversorgercodenr",
-            FieldType::Identifier("MarktpartnerId".into()),
-        ),
-        (
-            "netzbetreibercodenr",
-            FieldType::Identifier("MarktpartnerId".into()),
-        ),
-        (
-            "grundzustaendigerMsbCodenr",
-            FieldType::Identifier("MarktpartnerId".into()),
-        ),
-        (
-            "grundzustaendigerMsbimCodenr",
-            FieldType::Identifier("MarktpartnerId".into()),
-        ),
-        (
-            "zugeordneteMsbCodenummer",
-            FieldType::Identifier("MarktpartnerId".into()),
-        ),
-        // Decimal scalars
-        ("prozentsatz", FieldType::Primitive(PrimitiveType::Decimal)),
-        // Well-known enum types
-        ("waehrungscode", FieldType::BoEnum("Waehrungscode".into())),
-        ("mengeneinheit", FieldType::BoEnum("Mengeneinheit".into())),
-        // zeiteinheit references the Mengeneinheit enum in BO4E schemas (Mengeneinheit.json)
-        ("zeiteinheit", FieldType::BoEnum("Mengeneinheit".into())),
-    ])
-});
-
-/// Suffix-pattern → FieldType mapping.
-///
-/// All entries use the exact lowercase suffix as it appears in BO4E JSON
-/// property names (e.g. `"vertragsbeginn"` ends with `"beginn"`).
-///
-/// Declaration order is irrelevant: [`infer_with_parent`] picks the **longest**
-/// matching suffix, so a more specific pattern always wins over a shorter one it
-/// contains.
-///
-/// **Note:** since the parser now reads `"format"` from JSON Schema directly,
-/// these suffix rules only fire for string-typed fields with **no** format
-/// annotation.  Date/datetime fields with proper `"format": "date"` or
-/// `"format": "date-time"` annotations get their types from the schema and
-/// are never overridden here.
-///
-/// The `"datum"` suffix rule has been intentionally removed: German "datum"
-/// means "date" (date-only), not "datetime", and fields ending in "datum"
-/// in BO4E schemas carry `"format": "date"` annotations which are now handled
-/// directly by the parser.  Keeping the rule would produce incorrect
-/// `OffsetDateTime` types for any un-annotated future "datum" fields.
-static SUFFIX_MAP: LazyLock<Vec<(&'static str, FieldType)>> = LazyLock::new(|| {
-    vec![
-        // Identifiers
-        ("marktlokationsid", FieldType::Identifier("MaloId".into())),
-        ("messlokationsid", FieldType::Identifier("MeloId".into())),
-        ("netzlokationsid", FieldType::Identifier("NeloId".into())),
-        // Timestamps → time::OffsetDateTime (feature-gated).
-        // These fire only when the schema field has "type": "string" with no
-        // "format" annotation — a schema omission rather than a design choice.
-        (
-            "zeitpunkt",
-            FieldType::Primitive(PrimitiveType::OffsetDateTime),
-        ),
-        (
-            "beginn",
-            FieldType::Primitive(PrimitiveType::OffsetDateTime),
-        ),
-        ("ende", FieldType::Primitive(PrimitiveType::OffsetDateTime)),
-        // Monetary / quantity decimals
-        ("betrag", FieldType::Primitive(PrimitiveType::Decimal)),
-        ("preis", FieldType::Primitive(PrimitiveType::Decimal)),
-        ("menge", FieldType::Primitive(PrimitiveType::Decimal)),
-        ("wert", FieldType::Primitive(PrimitiveType::Decimal)),
-    ]
-});
-
-// ─── Public API ───────────────────────────────────────────────────────────────
-
-/// Returns the semantic field-type override for a given JSON property name,
-/// or `None` if no semantic mapping is registered.
-///
-/// Optionally accepts the parent struct title (e.g. `"ZusatzAttribut"`) to
-/// allow struct-specific overrides that supersede the general inference rules.
-///
-/// Lookup order:
-/// 1. Struct+field exact match in [`STRUCT_FIELD_MAP`] (highest priority).
-/// 2. Exact match in [`EXACT_MAP`].
-/// 3. Suffix match in [`SUFFIX_MAP`] (longest-suffix-first wins).
-pub fn infer(json_name: &str) -> Option<FieldType> {
-    infer_with_parent(None, json_name)
-}
-
-/// Like [`infer`] but also checks the per-struct override table first.
+/// `parent` is the enclosing schema's title. Without one there is no lookup: a
+/// field name alone is not enough to decide.
 pub fn infer_with_parent(parent: Option<&str>, json_name: &str) -> Option<FieldType> {
-    // 1. Struct-specific override (highest priority).
-    if let Some(p) = parent {
-        if let Some(ft) = STRUCT_FIELD_MAP.get(&(p, json_name)) {
-            return Some(ft.clone());
-        }
-    }
-    // 2. Exact name match.
-    if let Some(ft) = EXACT_MAP.get(json_name) {
-        return Some(ft.clone());
-    }
-    // 3. Suffix match — the *longest* matching suffix wins.
-    //
-    // Selecting the longest match rather than the first makes the result
-    // independent of SUFFIX_MAP's declaration order. Relying on order was a trap:
-    // the table documented itself as "longest first" but was not actually sorted
-    // that way, so it happened to be correct only because no entry was a suffix of
-    // another. Adding one that was (e.g. `"id"` alongside `"marktlokationsid"`)
-    // would have silently mistyped fields.
-    SUFFIX_MAP
-        .iter()
-        .filter(|(suffix, _)| json_name.ends_with(suffix))
-        .max_by_key(|(suffix, _)| suffix.len())
-        .map(|(_, ft)| ft.clone())
+    FIELD_TYPES.get(&(parent?, json_name)).cloned()
+}
+
+/// Every `(struct, field)` pair the table types, for the drift guard in
+/// `generator/tests/round_trip.rs`.
+pub fn typed_fields() -> impl Iterator<Item = (&'static str, &'static str)> {
+    FIELD_TYPES.keys().copied()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    // ── Helpers ───────────────────────────────────────────────────────────
-
     fn ident(name: &str) -> FieldType {
         FieldType::Identifier(name.into())
     }
-    fn bo_enum(name: &str) -> FieldType {
-        FieldType::BoEnum(name.into())
-    }
-    const DT: FieldType = FieldType::Primitive(PrimitiveType::OffsetDateTime);
-    const DEC: FieldType = FieldType::Primitive(PrimitiveType::Decimal);
-
-    // ── Exact identifier matches ──────────────────────────────────────────
 
     #[test]
-    fn exact_identifier_matches() {
-        // Primary BO identifiers
-        assert_eq!(infer("marktlokationsId"), Some(ident("MaloId")));
-        assert_eq!(infer("messlokationsId"), Some(ident("MeloId")));
-        assert_eq!(infer("netzlokationsId"), Some(ident("NeloId")));
-        assert_eq!(infer("steuerbareRessourceId"), Some(ident("SrId")));
-        assert_eq!(infer("technischeRessourceId"), Some(ident("TrId")));
-        // EIC codes: direct + balance-group + area uses
-        assert_eq!(infer("bilanzkreis"), Some(ident("EicCode")));
-        assert_eq!(infer("eicCode"), Some(ident("EicCode")));
-        assert_eq!(infer("marktgebiet"), Some(ident("EicCode")));
-        assert_eq!(infer("regelzone"), Some(ident("EicCode")));
-        // OBIS
-        assert_eq!(infer("obisKennzahl"), Some(ident("ObisCode")));
-        // Market partner codes
-        assert_eq!(infer("rollencodenummer"), Some(ident("MarktpartnerId")));
-        assert_eq!(infer("codenummer"), Some(ident("MarktpartnerId")));
-        assert_eq!(infer("grundversorgercodenr"), Some(ident("MarktpartnerId")));
-        assert_eq!(infer("netzbetreibercodenr"), Some(ident("MarktpartnerId")));
+    fn typed_fields_resolve() {
         assert_eq!(
-            infer("grundzustaendigerMsbCodenr"),
+            infer_with_parent(Some("Marktlokation"), "marktlokationsId"),
+            Some(ident("MaloId"))
+        );
+        assert_eq!(
+            infer_with_parent(Some("Marktteilnehmer"), "rollencodenummer"),
             Some(ident("MarktpartnerId"))
         );
         assert_eq!(
-            infer("grundzustaendigerMsbimCodenr"),
-            Some(ident("MarktpartnerId"))
+            infer_with_parent(Some("Zaehlwerk"), "obisKennzahl"),
+            Some(ident("ObisCode"))
         );
+    }
+
+    /// The same name in a different struct must not inherit the type.
+    #[test]
+    fn homonyms_in_other_structs_are_untyped() {
         assert_eq!(
-            infer("zugeordneteMsbCodenummer"),
-            Some(ident("MarktpartnerId"))
+            infer_with_parent(Some("Marktlokation"), "marktgebiet"),
+            Some(ident("EicCode"))
         );
-    }
-
-    // ── Exact enum matches ────────────────────────────────────────────────
-
-    #[test]
-    fn exact_enum_matches() {
-        assert_eq!(infer("waehrungscode"), Some(bo_enum("Waehrungscode")));
-        assert_eq!(infer("mengeneinheit"), Some(bo_enum("Mengeneinheit")));
-        // zeiteinheit references Mengeneinheit in BO4E schemas
-        assert_eq!(infer("zeiteinheit"), Some(bo_enum("Mengeneinheit")));
-    }
-
-    // ── Exact decimal matches ─────────────────────────────────────────────
-
-    #[test]
-    fn exact_decimal_matches() {
-        assert_eq!(infer("prozentsatz"), Some(DEC));
-    }
-
-    // ── Suffix: datetime (ends with "beginn", "ende", "zeitpunkt") ──────────
-    // NOTE: the "datum" suffix rule was removed — see SUFFIX_MAP comment.
-    // All "datum" fields in BO4E schemas carry "format": "date" annotations
-    // and are now typed as time::Date via the parser's schema-format detection.
-
-    #[test]
-    fn suffix_datetime_matches() {
-        // "beginn" suffix
-        assert_eq!(infer("vertragsbeginn"), Some(DT));
-        assert_eq!(infer("bilanzierungsbeginn"), Some(DT));
-        assert_eq!(infer("lieferbeginn"), Some(DT));
-        assert_eq!(infer("vertragsteilbeginn"), Some(DT));
-        // "ende" suffix
-        assert_eq!(infer("vertragsende"), Some(DT));
-        assert_eq!(infer("bilanzierungsende"), Some(DT));
-        assert_eq!(infer("vertragsteilende"), Some(DT));
-        // "zeitpunkt" suffix
-        assert_eq!(infer("veroeffentlichungszeitpunkt"), Some(DT));
-    }
-
-    // "datum" suffix no longer infers to OffsetDateTime (removed rule).
-    // "datum" in German means "date" (date-only) — these fields carry
-    // "format": "date" in the BO4E JSON Schema and are correctly typed
-    // as time::Date via parser schema-format detection.
-    #[test]
-    fn datum_suffix_no_longer_infers_to_offsetdatetime() {
-        // These used to return Some(DT) with the old "datum" inference rule.
-        // Now they return None (no inference override), so the parser's
-        // schema-format detection produces the correct time::Date type.
-        assert_eq!(infer("angebotsdatum"), None);
-        assert_eq!(infer("rechnungsdatum"), None);
-        assert_eq!(infer("faelligkeitsdatum"), None);
-        assert_eq!(infer("geburtsdatum"), None);
-        assert_eq!(infer("startdatum"), None);
-        assert_eq!(infer("enddatum"), None);
-    }
-
-    // ── Suffix: decimal (ends with "wert", "preis", "betrag", "menge") ───
-
-    #[test]
-    fn suffix_decimal_matches() {
-        // "wert" suffix
-        assert_eq!(infer("wert"), Some(DEC));
-        assert_eq!(infer("zeitreihenwert"), Some(DEC)); // struct-level override tested separately
-                                                        // "preis" suffix
-        assert_eq!(infer("grundpreis"), Some(DEC));
-        assert_eq!(infer("arbeitspreis"), Some(DEC));
-        assert_eq!(infer("einzelpreis"), Some(DEC));
-        // "betrag" suffix
-        assert_eq!(infer("gesamtbetrag"), Some(DEC));
-        assert_eq!(infer("nettobetrag"), Some(DEC));
-        // "menge" suffix — the suffix map uses case-sensitive "menge" (all lowercase).
-        // Any BO4E field whose JSON name ends with "menge" resolves to Decimal.
-        assert_eq!(infer("geliefertemenge"), Some(DEC)); // all-lowercase — matches
-        assert_eq!(infer("summierungsmenge"), Some(DEC)); // compound — matches
-                                                          // camelCase with uppercase does NOT match (different byte sequence)
-        assert_eq!(infer("gelieferteMenge"), None); // capital M — no match
-    }
-
-    // ── Struct-specific overrides ─────────────────────────────────────────
-
-    #[test]
-    fn zusatz_attribut_wert_is_json_value_not_decimal() {
-        // ZusatzAttribut.wert is free-form (string/number/bool/object).
-        // The "wert" suffix rule (→ Decimal) must NOT fire here.
+        // "Der Name des Marktgebietes" — a name, not a code.
         assert_eq!(
-            infer_with_parent(Some("ZusatzAttribut"), "wert"),
-            Some(FieldType::JsonValue)
+            infer_with_parent(Some("MarktgebietInfo"), "marktgebiet"),
+            None
         );
-    }
 
-    #[test]
-    fn other_structs_wert_still_decimal() {
-        // Struct override is per-(struct, field) — other structs still get Decimal.
-        assert_eq!(infer_with_parent(Some("Zeitreihenwert"), "wert"), Some(DEC),);
-        assert_eq!(infer_with_parent(Some("Betrag"), "wert"), Some(DEC),);
-        assert_eq!(infer_with_parent(Some("Menge"), "wert"), Some(DEC),);
-    }
-
-    // ── No-match cases ────────────────────────────────────────────────────
-
-    #[test]
-    fn unknown_fields_return_none() {
-        assert_eq!(infer("someUnknownField"), None);
-        assert_eq!(infer("beschreibung"), None);
-        assert_eq!(infer("name"), None);
-        assert_eq!(infer("version"), None);
-        assert_eq!(infer("id"), None);
-    }
-
-    // ── Case sensitivity: BO4E names are always lowercase JSON camelCase ──
-
-    #[test]
-    fn case_sensitive_no_camel_match() {
-        // Suffix map uses lowercase keys; camelCase variants must NOT match.
-        assert_eq!(infer("vertragsBeginn"), None); // camelCase — wrong
-        assert_eq!(infer("vertragsbeginn"), Some(DT)); // canonical lowercase — ok
-        assert_eq!(infer("Wert"), None); // uppercase first letter — wrong
-        assert_eq!(infer("WERT"), None); // all-caps — wrong
-    }
-
-    // ── Suffix uniqueness invariant ───────────────────────────────────────
-
-    /// The EIC-typed fields, including the one the schema leaves as a bare string.
-    #[test]
-    fn eic_field_types() {
-        // Generic EIC — object type deliberately unconstrained.
-        assert_eq!(infer("bilanzkreis"), Some(ident("EicCode")));
-        assert_eq!(infer("eicCode"), Some(ident("EicCode")));
-        assert_eq!(infer("marktgebiet"), Some(ident("EicCode")));
-        assert_eq!(infer("regelzone"), Some(ident("EicCode")));
-        // Restricted to object type 'Y' (Area).
         assert_eq!(
-            infer("bilanzierungsgebietEic"),
-            Some(ident("BilanzierungsgebietId"))
+            infer_with_parent(Some("Marktlokation"), "regelzone"),
+            Some(ident("EicCode"))
         );
-        // `Marktlokation.bilanzierungsgebiet` is a different, free-form field and
-        // must stay untyped.
-        assert_eq!(infer("bilanzierungsgebiet"), None);
+        // "Der Name der Regelzone".
+        assert_eq!(
+            infer_with_parent(Some("StandorteigenschaftenStrom"), "regelzone"),
+            None
+        );
     }
 
-    /// Suffix selection must not depend on declaration order.
-    ///
-    /// The table used to document itself as "longest first" while not being
-    /// sorted that way; this pins the property the lookup actually guarantees.
+    /// `Kontaktweg.kontaktwert` is *"Die Nummer oder E-Mail-Adresse"*. A suffix
+    /// rule on `wert` typed it as a `Decimal`, so any object carrying a contact
+    /// method failed to deserialize whole.
     #[test]
-    fn longest_matching_suffix_wins_regardless_of_order() {
-        // "marktlokationsid" and "menge" would both need considering for a name
-        // ending in the former; the longer, more specific one must win.
-        assert_eq!(infer("xmarktlokationsid"), Some(ident("MaloId")));
+    fn kontaktwert_is_not_a_decimal() {
+        assert_eq!(infer_with_parent(Some("Kontaktweg"), "kontaktwert"), None);
+    }
 
-        // Directly: for every field name built from a suffix, no *shorter*
-        // matching suffix may win.
-        for (suffix, expected) in SUFFIX_MAP.iter() {
-            let name = format!("zzz{suffix}");
-            let got = infer(&name).unwrap_or_else(|| panic!("{name} should match {suffix}"));
-            let longest = SUFFIX_MAP
-                .iter()
-                .filter(|(s, _)| name.ends_with(s))
-                .max_by_key(|(s, _)| s.len())
-                .expect("at least one match");
+    /// No suffix, prefix, or bare-name matching: an unlisted pair keeps its
+    /// schema type however much its name resembles one that is listed.
+    #[test]
+    fn unlisted_pairs_are_untyped() {
+        for (parent, field) in [
+            ("Betrag", "wert"),
+            ("Menge", "wert"),
+            ("ZusatzAttribut", "wert"),
+            ("Preisstaffel", "preis"),
+            ("Vertrag", "vertragsbeginn"),
+            ("Rechnung", "rechnungsdatum"),
+            ("Marktlokation", "someFutureField"),
+            ("Marktlokation", "xmarktlokationsId"),
+        ] {
             assert_eq!(
-                got,
-                longest.1.clone(),
-                "{name}: expected the longest suffix match"
+                infer_with_parent(Some(parent), field),
+                None,
+                "{parent}.{field} must keep its schema type"
             );
-            if longest.0 == *suffix {
-                assert_eq!(&got, expected, "{name}");
-            }
         }
     }
 
     #[test]
-    fn no_duplicate_suffixes() {
-        let suffixes: Vec<&str> = SUFFIX_MAP.iter().map(|(s, _)| *s).collect();
-        let mut seen = std::collections::HashSet::new();
-        for s in &suffixes {
-            assert!(seen.insert(*s), "duplicate suffix in SUFFIX_MAP: {s:?}");
-        }
-    }
-
-    // ── Suffix priority: longest suffix wins ─────────────────────────────
-
-    #[test]
-    fn suffix_priority_longest_wins() {
-        // "marktlokationsid" is in SUFFIX_MAP and is longer than any single-word suffix.
-        // It must resolve to MaloId, not trigger the generic "menge/wert/..." rules.
-        assert_eq!(infer("marktlokationsid"), Some(ident("MaloId")));
-        assert_eq!(infer("messlokationsid"), Some(ident("MeloId")));
-        assert_eq!(infer("netzlokationsid"), Some(ident("NeloId")));
-    }
-
-    // ── Struct override priority: beats exact and suffix matches ─────────
-
-    #[test]
-    fn struct_override_wins_over_exact_and_suffix() {
-        // "wert" is an exact match to Decimal, but the struct override for
-        // ZusatzAttribut.wert must take priority.
-        assert_eq!(
-            infer_with_parent(Some("ZusatzAttribut"), "wert"),
-            Some(FieldType::JsonValue),
-        );
-        // Without parent, falls through to exact/suffix rule.
-        assert_eq!(infer("wert"), Some(DEC));
+    fn without_a_parent_nothing_resolves() {
+        assert_eq!(infer_with_parent(None, "marktlokationsId"), None);
     }
 }

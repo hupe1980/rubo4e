@@ -1,6 +1,6 @@
 use super::{Adresse, ComTyp, Menge, Zaehlertyp, Zeitraum, ZusatzAttribut};
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(not(feature = "json"), derive(Hash))]
+#[cfg_attr(not(feature = "json"), derive(Eq, Hash))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "builder", derive(typed_builder::TypedBuilder))]
 #[cfg_attr(feature = "validate", derive(garde::Validate))]
@@ -10,7 +10,7 @@ use super::{Adresse, ComTyp, Menge, Zaehlertyp, Zeitraum, ZusatzAttribut};
 /// Die Komponente Ausschreibungsdetail wird verwendet um die Informationen zu einer Abnahmestelle innerhalb eines
 /// Ausschreibungsloses abzubilden.
 ///
-/// > **Note:** [Ausschreibungsdetail JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/com/Ausschreibungsdetail.json)
+/// > **Note:** [Ausschreibungsdetail JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.1.0/src/bo4e_schemas/com/Ausschreibungsdetail.json)
 pub struct Ausschreibungsdetail {
     /// Eine generische ID, die für eigene Zwecke genutzt werden kann.
     /// Z.B. könnten hier UUIDs aus einer Datenbank stehen oder URLs zu einem Backend-System.
@@ -85,17 +85,20 @@ pub struct Ausschreibungsdetail {
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub rechnungsadresse: Option<Adresse>,
-    /// COM type identifier for this struct.
+    /// BO4E type discriminant — always `ComTyp::Ausschreibungsdetail` for this struct.
     #[cfg_attr(feature = "serde", serde(rename = "_typ"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(
+        feature = "builder",
+        builder(default = Some(ComTyp::Ausschreibungsdetail), setter(skip))
+    )]
     pub typ: Option<ComTyp>,
     /// Version der COM-Struktur aka "fachliche Versionierung"
     #[cfg_attr(feature = "serde", serde(rename = "_version"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(
         feature = "builder",
-        builder(default = Some("v202607.0.0".to_owned()), setter(into))
+        builder(default = Some("202607.1.0".to_owned()), setter(into))
     )]
     pub version: Option<String>,
     /// Die Bezeichnung des Zählers an der Marktlokation
@@ -141,8 +144,8 @@ impl Default for Ausschreibungsdetail {
             prognose_jahresarbeit: Default::default(),
             prognose_leistung: Default::default(),
             rechnungsadresse: Default::default(),
-            typ: Default::default(),
-            version: Some("v202607.0.0".to_owned()),
+            typ: Some(ComTyp::Ausschreibungsdetail),
+            version: Some("202607.1.0".to_owned()),
             zaehlernummer: Default::default(),
             zaehlertechnik: Default::default(),
             zusatz_attribute: Default::default(),

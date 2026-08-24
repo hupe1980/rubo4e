@@ -4,7 +4,7 @@ use super::{
     Netzebene, Sparte, Verbrauchsart, Zaehlwerk, ZusatzAttribut,
 };
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(not(feature = "json"), derive(Hash))]
+#[cfg_attr(not(feature = "json"), derive(Eq, Hash))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "builder", derive(typed_builder::TypedBuilder))]
 #[cfg_attr(feature = "validate", derive(garde::Validate))]
@@ -17,7 +17,7 @@ use super::{
 )]
 /// Object containing information about a Marktlokation
 ///
-/// > **Note:** [Marktlokation JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/bo/Marktlokation.json)
+/// > **Note:** [Marktlokation JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.1.0/src/bo4e_schemas/bo/Marktlokation.json)
 pub struct Marktlokation {
     /// Bilanzierungsgebiet, dem das Netzgebiet zugeordnet ist - im Falle eines Strom Netzes
     #[cfg_attr(feature = "serde", serde(rename = "bilanzierungsgebiet"))]
@@ -134,7 +134,7 @@ pub struct Marktlokation {
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub sparte: Option<Sparte>,
-    /// BO type identifier — always `BoTyp::Marktlokation` for this struct.
+    /// BO4E type discriminant — always `BoTyp::Marktlokation` for this struct.
     #[cfg_attr(feature = "serde", serde(rename = "_typ"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(
@@ -156,7 +156,7 @@ pub struct Marktlokation {
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(
         feature = "builder",
-        builder(default = Some("v202607.0.0".to_owned()), setter(into))
+        builder(default = Some("202607.1.0".to_owned()), setter(into))
     )]
     pub version: Option<String>,
     #[cfg_attr(feature = "serde", serde(rename = "zaehlwerke"))]
@@ -189,7 +189,6 @@ pub struct Marktlokation {
 impl Default for Marktlokation {
     fn default() -> Self {
         Self {
-            typ: Some(BoTyp::Marktlokation),
             bilanzierungsgebiet: Default::default(),
             bilanzierungsmethode: Default::default(),
             endkunde: Default::default(),
@@ -211,9 +210,10 @@ impl Default for Marktlokation {
             netzgebietsnr: Default::default(),
             regelzone: Default::default(),
             sparte: Default::default(),
+            typ: Some(BoTyp::Marktlokation),
             verbrauchsart: Default::default(),
             verbrauchsmengen: Default::default(),
-            version: Some("v202607.0.0".to_owned()),
+            version: Some("202607.1.0".to_owned()),
             zaehlwerke: Default::default(),
             zaehlwerke_der_beteiligten_marktrolle: Default::default(),
             zusatz_attribute: Default::default(),
@@ -227,7 +227,10 @@ impl Bo4eObject for Marktlokation {
         self.typ.unwrap_or(BoTyp::Marktlokation)
     }
     fn schema_version(&self) -> &'static str {
-        "v202607.0.0"
+        "202607.1.0"
+    }
+    fn schema_series(&self) -> &'static str {
+        "202607"
     }
 }
 #[cfg(feature = "json")]

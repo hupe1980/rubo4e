@@ -1,5 +1,5 @@
 #[derive(Debug, Clone, PartialEq, Default)]
-#[cfg_attr(not(feature = "json"), derive(Hash))]
+#[cfg_attr(not(feature = "json"), derive(Eq, Hash))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "builder", derive(typed_builder::TypedBuilder))]
 #[cfg_attr(feature = "validate", derive(garde::Validate))]
@@ -10,7 +10,7 @@
 /// Beim Austausch von Datenobjekten zwischen verschiedenen Systemen ist es daher hilfreich,
 /// sich die eindeutigen IDs der anzubindenden Systeme zu merken.
 ///
-/// > **Note:** [ZusatzAttribut JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/ZusatzAttribut.json)
+/// > **Note:** [ZusatzAttribut JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.1.0/src/bo4e_schemas/ZusatzAttribut.json)
 pub struct ZusatzAttribut {
     #[cfg_attr(feature = "serde", serde(rename = "name"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]

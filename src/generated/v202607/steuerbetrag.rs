@@ -1,6 +1,6 @@
 use super::{ComTyp, Steuerart, Waehrungscode, ZusatzAttribut};
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(not(feature = "json"), derive(Hash))]
+#[cfg_attr(not(feature = "json"), derive(Eq, Hash))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "builder", derive(typed_builder::TypedBuilder))]
 #[cfg_attr(feature = "validate", derive(garde::Validate))]
@@ -9,19 +9,29 @@ use super::{ComTyp, Steuerart, Waehrungscode, ZusatzAttribut};
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 /// Abbildung eines Steuerbetrages.
 ///
-/// > **Note:** [Steuerbetrag JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/com/Steuerbetrag.json)
+/// > **Note:** [Steuerbetrag JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.1.0/src/bo4e_schemas/com/Steuerbetrag.json)
 pub struct Steuerbetrag {
     /// Nettobetrag für den die Steuer berechnet wurde. Z.B. 100
     #[cfg_attr(feature = "serde", serde(rename = "basiswert"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "serde", serde(default))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(deserialize_with = "crate::decimal_serde::deserialize_opt")
+    )]
     #[cfg(feature = "decimal")]
     pub basiswert: Option<rust_decimal::Decimal>,
     /// Requires the `decimal` feature for the `rust_decimal::Decimal` representation.
-    /// Without `decimal`, stores the decimal string value unchanged.
+    /// Without `decimal`, stores the decimal's lexical form (a JSON string or number).
     #[cfg_attr(feature = "serde", serde(rename = "basiswert"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "serde", serde(default))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(deserialize_with = "crate::decimal_serde::deserialize_opt")
+    )]
     #[cfg(not(feature = "decimal"))]
     pub basiswert: Option<String>,
     /// Eine generische ID, die für eigene Zwecke genutzt werden kann.
@@ -39,39 +49,62 @@ pub struct Steuerbetrag {
     #[cfg_attr(feature = "serde", serde(rename = "steuersatz"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "serde", serde(default))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(deserialize_with = "crate::decimal_serde::deserialize_opt")
+    )]
     #[cfg(feature = "decimal")]
     pub steuersatz: Option<rust_decimal::Decimal>,
     /// Requires the `decimal` feature for the `rust_decimal::Decimal` representation.
-    /// Without `decimal`, stores the decimal string value unchanged.
+    /// Without `decimal`, stores the decimal's lexical form (a JSON string or number).
     #[cfg_attr(feature = "serde", serde(rename = "steuersatz"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "serde", serde(default))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(deserialize_with = "crate::decimal_serde::deserialize_opt")
+    )]
     #[cfg(not(feature = "decimal"))]
     pub steuersatz: Option<String>,
     /// Aus dem Basiswert berechnete Steuer. Z.B. 19 (bei UST_19)
     #[cfg_attr(feature = "serde", serde(rename = "steuerwert"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "serde", serde(default))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(deserialize_with = "crate::decimal_serde::deserialize_opt")
+    )]
     #[cfg(feature = "decimal")]
     pub steuerwert: Option<rust_decimal::Decimal>,
     /// Requires the `decimal` feature for the `rust_decimal::Decimal` representation.
-    /// Without `decimal`, stores the decimal string value unchanged.
+    /// Without `decimal`, stores the decimal's lexical form (a JSON string or number).
     #[cfg_attr(feature = "serde", serde(rename = "steuerwert"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "serde", serde(default))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(deserialize_with = "crate::decimal_serde::deserialize_opt")
+    )]
     #[cfg(not(feature = "decimal"))]
     pub steuerwert: Option<String>,
-    /// COM type identifier for this struct.
+    /// BO4E type discriminant — always `ComTyp::Steuerbetrag` for this struct.
     #[cfg_attr(feature = "serde", serde(rename = "_typ"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(
+        feature = "builder",
+        builder(default = Some(ComTyp::Steuerbetrag), setter(skip))
+    )]
     pub typ: Option<ComTyp>,
     /// Version der COM-Struktur aka "fachliche Versionierung"
     #[cfg_attr(feature = "serde", serde(rename = "_version"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(
         feature = "builder",
-        builder(default = Some("v202607.0.0".to_owned()), setter(into))
+        builder(default = Some("202607.1.0".to_owned()), setter(into))
     )]
     pub version: Option<String>,
     /// Währung. Z.B. Euro.
@@ -103,8 +136,8 @@ impl Default for Steuerbetrag {
             steuerart: Default::default(),
             steuersatz: Default::default(),
             steuerwert: Default::default(),
-            typ: Default::default(),
-            version: Some("v202607.0.0".to_owned()),
+            typ: Some(ComTyp::Steuerbetrag),
+            version: Some("202607.1.0".to_owned()),
             waehrungscode: Default::default(),
             zusatz_attribute: Default::default(),
             _additional: Default::default(),

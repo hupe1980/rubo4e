@@ -1,6 +1,6 @@
 use super::{ComTyp, Preisgarantietyp, Zeitraum, ZusatzAttribut};
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(not(feature = "json"), derive(Hash))]
+#[cfg_attr(not(feature = "json"), derive(Eq, Hash))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "builder", derive(typed_builder::TypedBuilder))]
 #[cfg_attr(feature = "validate", derive(garde::Validate))]
@@ -9,7 +9,7 @@ use super::{ComTyp, Preisgarantietyp, Zeitraum, ZusatzAttribut};
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 /// Definition für eine Preisgarantie mit der Möglichkeit verschiedener Ausprägungen.
 ///
-/// > **Note:** [Preisgarantie JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/com/Preisgarantie.json)
+/// > **Note:** [Preisgarantie JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.1.0/src/bo4e_schemas/com/Preisgarantie.json)
 pub struct Preisgarantie {
     /// Freitext zur Beschreibung der Preisgarantie.
     #[cfg_attr(feature = "serde", serde(rename = "beschreibung"))]
@@ -27,17 +27,20 @@ pub struct Preisgarantie {
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub preisgarantietyp: Option<Preisgarantietyp>,
-    /// COM type identifier for this struct.
+    /// BO4E type discriminant — always `ComTyp::Preisgarantie` for this struct.
     #[cfg_attr(feature = "serde", serde(rename = "_typ"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(
+        feature = "builder",
+        builder(default = Some(ComTyp::Preisgarantie), setter(skip))
+    )]
     pub typ: Option<ComTyp>,
     /// Version der COM-Struktur aka "fachliche Versionierung"
     #[cfg_attr(feature = "serde", serde(rename = "_version"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(
         feature = "builder",
-        builder(default = Some("v202607.0.0".to_owned()), setter(into))
+        builder(default = Some("202607.1.0".to_owned()), setter(into))
     )]
     pub version: Option<String>,
     /// Zeitraum, bis zu dem die Preisgarantie gilt, z.B. bis zu einem absolutem / fixem Datum
@@ -68,8 +71,8 @@ impl Default for Preisgarantie {
             beschreibung: Default::default(),
             id: Default::default(),
             preisgarantietyp: Default::default(),
-            typ: Default::default(),
-            version: Some("v202607.0.0".to_owned()),
+            typ: Some(ComTyp::Preisgarantie),
+            version: Some("202607.1.0".to_owned()),
             zeitliche_gueltigkeit: Default::default(),
             zusatz_attribute: Default::default(),
             _additional: Default::default(),

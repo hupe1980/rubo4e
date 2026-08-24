@@ -26,7 +26,7 @@ fn bo_builder_auto_sets_typ_discriminant() {
     assert_eq!(vertrag.typ, Some(BoTyp::Vertrag));
 }
 
-/// `setter(into)` replaces `strip_option`: the setter now accepts *both* `T`
+/// `setter(into)` rather than `strip_option`: the setter accepts *both* `T`
 /// (via `From<T> for Option<T>`) and `Option<T>` (identity conversion).
 ///
 /// This is the fix for the user feedback about EDIFACT-parsing ergonomics: code
@@ -41,7 +41,7 @@ fn builder_setter_into_accepts_option_and_value() {
     // assertion is independent of the `decimal` feature flag.
     use rubo4e::v202607::Geschaeftspartner;
 
-    // 1. Passing `T` directly — same ergonomics as the old strip_option.
+    // 1. Passing `T` directly.
     let g1 = Geschaeftspartner::builder()
         .organisationsname("ACME GmbH".to_owned())
         .build();
@@ -85,16 +85,14 @@ fn builder_setter_into_accepts_option_and_value() {
 /// External crates can use `..Default::default()` (functional update syntax)
 /// because `_additional` is now `pub` (with `#[doc(hidden)]`).
 ///
-/// This is the fix for the private-field `_additional` bug that blocked users
-/// from writing single-expression struct literals with partial field overrides.
+/// A struct literal with partial field overrides must compile: `_additional` is
+/// `pub` (and `#[doc(hidden)]`) so `..Default::default()` reaches it.
 #[cfg(feature = "versioned")]
 #[test]
 fn functional_update_syntax_works() {
     use rubo4e::v202607::Geschaeftspartner;
 
-    // Previously: `error[E0451]: field `_additional` is private`
-    // Now: compiles cleanly — the `_additional` field is `pub #[doc(hidden)]`.
-    // Use Geschaeftspartner (String-only fields) so test is feature-independent.
+    // Geschaeftspartner has String-only fields, so this is feature-independent.
     let g = Geschaeftspartner {
         organisationsname: Some("ACME GmbH".to_owned()),
         ..Default::default()

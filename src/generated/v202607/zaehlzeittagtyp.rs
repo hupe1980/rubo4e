@@ -1,6 +1,6 @@
 use super::{ComTyp, Umschaltzeit, Wiederholungstyp, ZusatzAttribut};
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(not(feature = "json"), derive(Hash))]
+#[cfg_attr(not(feature = "json"), derive(Eq, Hash))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "builder", derive(typed_builder::TypedBuilder))]
 #[cfg_attr(feature = "validate", derive(garde::Validate))]
@@ -17,7 +17,7 @@ use super::{ComTyp, Umschaltzeit, Wiederholungstyp, ZusatzAttribut};
 /// Die jeweilige Umschaltzeit definiert (wenn der Größe nach sortiert) die untere Grenze (inklusiv);
 /// der Beginn des Tages (00:00 Uhr) und das Ende des Tages (24:00 Uhr) bilden die äußeren Grenzen.
 ///
-/// > **Note:** [Zaehlzeittagtyp JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/com/Zaehlzeittagtyp.json)
+/// > **Note:** [Zaehlzeittagtyp JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.1.0/src/bo4e_schemas/com/Zaehlzeittagtyp.json)
 pub struct Zaehlzeittagtyp {
     /// Eine generische ID, die für eigene Zwecke genutzt werden kann.
     /// Z.B. könnten hier UUIDs aus einer Datenbank stehen oder URLs zu einem Backend-System.
@@ -30,10 +30,13 @@ pub struct Zaehlzeittagtyp {
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub tagtyp: Option<Wiederholungstyp>,
-    /// COM type identifier for this struct.
+    /// BO4E type discriminant — always `ComTyp::Zaehlzeittagtyp` for this struct.
     #[cfg_attr(feature = "serde", serde(rename = "_typ"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(
+        feature = "builder",
+        builder(default = Some(ComTyp::Zaehlzeittagtyp), setter(skip))
+    )]
     pub typ: Option<ComTyp>,
     /// Die Umschaltzeiten dieses Tagtyps. Sortiert ergibt sich daraus das Schaltschema für einen Tag.
     #[cfg_attr(feature = "serde", serde(rename = "umschaltzeiten"))]
@@ -45,7 +48,7 @@ pub struct Zaehlzeittagtyp {
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(
         feature = "builder",
-        builder(default = Some("v202607.0.0".to_owned()), setter(into))
+        builder(default = Some("202607.1.0".to_owned()), setter(into))
     )]
     pub version: Option<String>,
     #[cfg_attr(feature = "serde", serde(rename = "zusatzAttribute"))]
@@ -69,9 +72,9 @@ impl Default for Zaehlzeittagtyp {
         Self {
             id: Default::default(),
             tagtyp: Default::default(),
-            typ: Default::default(),
+            typ: Some(ComTyp::Zaehlzeittagtyp),
             umschaltzeiten: Default::default(),
-            version: Some("v202607.0.0".to_owned()),
+            version: Some("202607.1.0".to_owned()),
             zusatz_attribute: Default::default(),
             _additional: Default::default(),
         }

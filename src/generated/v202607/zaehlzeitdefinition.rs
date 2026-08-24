@@ -1,6 +1,6 @@
 use super::{Bo4eObject, BoTyp, Marktteilnehmer, Zaehlzeitsaison, ZusatzAttribut};
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(not(feature = "json"), derive(Hash))]
+#[cfg_attr(not(feature = "json"), derive(Eq, Hash))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "builder", derive(typed_builder::TypedBuilder))]
 #[cfg_attr(feature = "validate", derive(garde::Validate))]
@@ -24,7 +24,7 @@ use super::{Bo4eObject, BoTyp, Marktteilnehmer, Zaehlzeitsaison, ZusatzAttribut}
 /// 3. Pro Tagtyp: ``umschaltzeiten`` – die eigentlichen Uhrzeiten, zu denen auf welches Register
 ///    umgeschaltet wird.
 ///
-/// > **Note:** [Zaehlzeitdefinition JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/bo/Zaehlzeitdefinition.json)
+/// > **Note:** [Zaehlzeitdefinition JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.1.0/src/bo4e_schemas/bo/Zaehlzeitdefinition.json)
 pub struct Zaehlzeitdefinition {
     /// Bezeichnung des Feiertagskalenders, nach dem `FEIERTAGS`-Tagtypen aufgelöst werden (z.B. "BDEW",
     /// landes- oder gemeindespezifische Kalender). Frei wählbare Zeichenkette, deren Bedeutung zwischen
@@ -50,7 +50,7 @@ pub struct Zaehlzeitdefinition {
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub saisons: Option<Vec<Zaehlzeitsaison>>,
-    /// BO type identifier — always `BoTyp::Zaehlzeitdefinition` for this struct.
+    /// BO4E type discriminant — always `BoTyp::Zaehlzeitdefinition` for this struct.
     #[cfg_attr(feature = "serde", serde(rename = "_typ"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(
@@ -70,7 +70,7 @@ pub struct Zaehlzeitdefinition {
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(
         feature = "builder",
-        builder(default = Some("v202607.0.0".to_owned()), setter(into))
+        builder(default = Some("202607.1.0".to_owned()), setter(into))
     )]
     pub version: Option<String>,
     #[cfg_attr(feature = "serde", serde(rename = "zusatzAttribute"))]
@@ -92,13 +92,13 @@ pub struct Zaehlzeitdefinition {
 impl Default for Zaehlzeitdefinition {
     fn default() -> Self {
         Self {
-            typ: Some(BoTyp::Zaehlzeitdefinition),
             feiertagskalender: Default::default(),
             id: Default::default(),
             saisonprofil: Default::default(),
             saisons: Default::default(),
+            typ: Some(BoTyp::Zaehlzeitdefinition),
             urheber: Default::default(),
-            version: Some("v202607.0.0".to_owned()),
+            version: Some("202607.1.0".to_owned()),
             zusatz_attribute: Default::default(),
             _additional: Default::default(),
         }
@@ -110,7 +110,10 @@ impl Bo4eObject for Zaehlzeitdefinition {
         self.typ.unwrap_or(BoTyp::Zaehlzeitdefinition)
     }
     fn schema_version(&self) -> &'static str {
-        "v202607.0.0"
+        "202607.1.0"
+    }
+    fn schema_series(&self) -> &'static str {
+        "202607"
     }
 }
 #[cfg(feature = "json")]

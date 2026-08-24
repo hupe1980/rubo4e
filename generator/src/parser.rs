@@ -5,7 +5,7 @@ use anyhow::{Context, Result};
 use heck::ToSnakeCase;
 use serde_json::Value;
 
-use crate::ast::{BoNode, ComNode, EnumNode, Field, FieldType, PrimitiveType, SchemaNode};
+use crate::ast::{EnumNode, Field, FieldType, PrimitiveType, SchemaNode, StructKind, StructNode};
 use crate::inference;
 
 // ─── Entry point ─────────────────────────────────────────────────────────────
@@ -88,6 +88,10 @@ fn parse_schema(value: &Value, path: &Path) -> Result<SchemaNode> {
         })
         .unwrap_or_else(|| "com".to_owned());
 
+    if category == "enum" {
+        return parse_enum(value, title, description);
+    }
+
     let properties = value.get("properties").and_then(|v| v.as_object());
     let required: Vec<String> = value
         .get("required")
@@ -105,19 +109,33 @@ fn parse_schema(value: &Value, path: &Path) -> Result<SchemaNode> {
         Vec::new()
     };
 
-    match category.as_str() {
-        "bo" => Ok(SchemaNode::Bo(BoNode {
-            name: title,
-            fields,
-            description,
-        })),
-        "enum" => parse_enum(value, title, description),
-        _ => Ok(SchemaNode::Com(ComNode {
-            name: title,
-            fields,
-            description,
-        })),
-    }
+    Ok(SchemaNode::Struct(StructNode {
+        name: title,
+        kind: if category == "bo" {
+            StructKind::Bo
+        } else {
+            StructKind::Com
+        },
+        fields,
+        description,
+        typ_const: properties.and_then(|p| metadata_literal(p, "_typ")),
+        version_default: properties.and_then(|p| metadata_literal(p, "_version")),
+    }))
+}
+
+/// Reads the wire value a BO4E metadata property (`_typ`, `_version`) pins.
+///
+/// BO4E declares these two ways: `_typ` is usually `{"const": "MARKTLOKATION",
+/// "default": "MARKTLOKATION"}`, but a few schemas declare it as a nullable
+/// `$ref` to `BoTyp` carrying only a `default`. `_version` only ever has a
+/// `default`, and it is **not** the release tag — the tag is `v202607.0.0`, the
+/// wire value `202607.0.0`.
+fn metadata_literal(props: &serde_json::Map<String, Value>, key: &str) -> Option<String> {
+    let prop = props.get(key)?;
+    prop.get("const")
+        .or_else(|| prop.get("default"))
+        .and_then(|v| v.as_str())
+        .map(str::to_owned)
 }
 
 // ─── Enum parsing ─────────────────────────────────────────────────────────────
@@ -193,28 +211,20 @@ fn parse_field(
     let schema_type = resolve_field_type(schema);
 
     // Semantic inference enriches raw primitive types (string → identifier newtype,
-    // number → Decimal, string → OffsetDateTime).  However, when the schema
-    // explicitly references a structured BO or COM type via `$ref`, that reference
-    // is the authoritative type declaration — inference must not override it with a
-    // primitive alias.  For example, `einzelpreis` ends with the "preis" suffix but
-    // its schema says `$ref: Preis.json`; the field must be `Option<Preis>`, not
-    // `Option<Decimal>`.
+    // number → Decimal, string → OffsetDateTime).  It never overrides a type the
+    // schema states outright:
+    //
+    // * A `$ref` to a BO or COM is authoritative.  `einzelpreis` ends with the
+    //   "preis" suffix but its schema says `$ref: Preis.json`, so the field is
+    //   `Option<Preis>`, not `Option<Decimal>`.
+    // * A `"format": "date"` / `"date-time"` annotation is authoritative too.
+    //   A Rust type narrower than the schema cannot read what the rest of the
+    //   ecosystem emits for that field.
     let field_type = match &schema_type {
-        // $ref types are authoritative — never override with name-based inference.
-        FieldType::Bo(_) | FieldType::Com(_) => schema_type,
-        // Schema-detected datetime/date types are normally authoritative over
-        // name-based inference.  However, STRUCT_FIELD_MAP schema-override entries
-        // take priority even here: they correct upstream schema mistakes where BDEW
-        // practice differs from the JSON Schema annotation (e.g. fields that carry
-        // `"format": "date-time"` but are transmitted as date-only in EDIFACT).
-        FieldType::Primitive(PrimitiveType::OffsetDateTime)
-        | FieldType::Primitive(PrimitiveType::Date) => {
-            if let Some(p) = parent_name {
-                inference::infer_schema_override(p, json_name).unwrap_or(schema_type)
-            } else {
-                schema_type
-            }
-        }
+        FieldType::Bo(_)
+        | FieldType::Com(_)
+        | FieldType::Primitive(PrimitiveType::OffsetDateTime)
+        | FieldType::Primitive(PrimitiveType::Date) => schema_type,
         _ => inference::infer_with_parent(parent_name, json_name).unwrap_or(schema_type),
     };
 
@@ -258,6 +268,17 @@ fn resolve_field_type(schema: &Value) -> FieldType {
         Some("string") => match schema.get("format").and_then(|v| v.as_str()) {
             Some("date-time") => FieldType::Primitive(PrimitiveType::OffsetDateTime),
             Some("date") => FieldType::Primitive(PrimitiveType::Date),
+            // `time` is a *deliberate* passthrough, not an oversight. BO4E's
+            // examples carry a UTC offset (`"18:00:00+01:00"`) and the `time`
+            // crate has no offset-bearing time-of-day type, so there is nothing
+            // narrower than `String` to map it to without dropping the offset.
+            // `Zeitraum::startuhrzeit_parsed` parses it on demand instead.
+            //
+            // Any *other* format falls through here too, which is the right
+            // default — but a silent one. `generator/tests/round_trip.rs` fails
+            // if the schema introduces a format this match has no considered
+            // position on, so the decision gets made rather than defaulted.
+            Some("time") | None => FieldType::Primitive(PrimitiveType::String),
             _ => FieldType::Primitive(PrimitiveType::String),
         },
         Some("boolean") => FieldType::Primitive(PrimitiveType::Bool),

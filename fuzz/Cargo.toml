@@ -16,7 +16,11 @@ serde_json = "1"
 [dependencies.rubo4e]
 path = ".."
 package = "rubo4e"
-features = ["json", "versioned"]
+# `time` and `decimal` are in here deliberately: they replace `String` fields with
+# `time::OffsetDateTime`, `time::Date`, and `rust_decimal::Decimal`, each of which
+# runs a real parser over attacker-controlled text. Fuzzing without them exercised
+# the one configuration where those parsers are not compiled in at all.
+features = ["json", "versioned", "time", "decimal"]
 
 [[bin]]
 name = "fuzz_deserialize_vertrag"

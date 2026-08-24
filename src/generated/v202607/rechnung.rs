@@ -5,7 +5,7 @@ use super::{
     Zaehler, Zahlungsinformation, Zeitraum, ZusatzAttribut,
 };
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(not(feature = "json"), derive(Hash))]
+#[cfg_attr(not(feature = "json"), derive(Eq, Hash))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "builder", derive(typed_builder::TypedBuilder))]
 #[cfg_attr(feature = "validate", derive(garde::Validate))]
@@ -18,7 +18,7 @@ use super::{
 )]
 /// Modell für die Abbildung von Rechnungen und Netznutzungsrechnungen im Kontext der Energiewirtschaft;
 ///
-/// > **Note:** [Rechnung JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/bo/Rechnung.json)
+/// > **Note:** [Rechnung JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.1.0/src/bo4e_schemas/bo/Rechnung.json)
 pub struct Rechnung {
     /// Verbrauch des abgerechneten Zeitraums, Pflicht für Rechnungen gemäß EnWG § 40
     #[cfg_attr(feature = "serde", serde(rename = "aktuellerVerbrauch"))]
@@ -42,23 +42,23 @@ pub struct Rechnung {
     #[cfg_attr(feature = "serde", serde(default))]
     #[cfg_attr(
         feature = "schemars",
-        schemars(schema_with = "crate::schema_helpers::opt_date_schema")
+        schemars(schema_with = "crate::schema_helpers::opt_datetime_schema")
     )]
     #[cfg_attr(
         all(feature = "serde", feature = "time"),
-        serde(with = "crate::time_serde::opt_date_serde")
+        serde(with = "time::serde::rfc3339::option")
     )]
     #[cfg(feature = "time")]
-    pub faelligkeitsdatum: Option<time::Date>,
-    /// Requires the `time` feature for the `time::Date` representation.
-    /// Without `time`, stores the ISO 8601 date string (`YYYY-MM-DD`) unchanged.
+    pub faelligkeitsdatum: Option<time::OffsetDateTime>,
+    /// Requires the `time` feature for the `time::OffsetDateTime` representation.
+    /// Without `time`, stores the ISO-8601 string value unchanged.
     #[cfg_attr(feature = "serde", serde(rename = "faelligkeitsdatum"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "serde", serde(default))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     #[cfg_attr(
         feature = "schemars",
-        schemars(schema_with = "crate::schema_helpers::opt_date_schema")
+        schemars(schema_with = "crate::schema_helpers::opt_datetime_schema")
     )]
     #[cfg(not(feature = "time"))]
     pub faelligkeitsdatum: Option<String>,
@@ -160,23 +160,23 @@ pub struct Rechnung {
     #[cfg_attr(feature = "serde", serde(default))]
     #[cfg_attr(
         feature = "schemars",
-        schemars(schema_with = "crate::schema_helpers::opt_date_schema")
+        schemars(schema_with = "crate::schema_helpers::opt_datetime_schema")
     )]
     #[cfg_attr(
         all(feature = "serde", feature = "time"),
-        serde(with = "crate::time_serde::opt_date_serde")
+        serde(with = "time::serde::rfc3339::option")
     )]
     #[cfg(feature = "time")]
-    pub rechnungsdatum: Option<time::Date>,
-    /// Requires the `time` feature for the `time::Date` representation.
-    /// Without `time`, stores the ISO 8601 date string (`YYYY-MM-DD`) unchanged.
+    pub rechnungsdatum: Option<time::OffsetDateTime>,
+    /// Requires the `time` feature for the `time::OffsetDateTime` representation.
+    /// Without `time`, stores the ISO-8601 string value unchanged.
     #[cfg_attr(feature = "serde", serde(rename = "rechnungsdatum"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "serde", serde(default))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     #[cfg_attr(
         feature = "schemars",
-        schemars(schema_with = "crate::schema_helpers::opt_date_schema")
+        schemars(schema_with = "crate::schema_helpers::opt_datetime_schema")
     )]
     #[cfg(not(feature = "time"))]
     pub rechnungsdatum: Option<String>,
@@ -241,7 +241,7 @@ pub struct Rechnung {
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub teilrechnungen: Option<Vec<Box<Rechnung>>>,
-    /// BO type identifier — always `BoTyp::Rechnung` for this struct.
+    /// BO4E type discriminant — always `BoTyp::Rechnung` for this struct.
     #[cfg_attr(feature = "serde", serde(rename = "_typ"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(
@@ -254,7 +254,7 @@ pub struct Rechnung {
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(
         feature = "builder",
-        builder(default = Some("v202607.0.0".to_owned()), setter(into))
+        builder(default = Some("202607.1.0".to_owned()), setter(into))
     )]
     pub version: Option<String>,
     /// enthält Informationen über den der Rechnung zugrundeliegenden Vertrag für Rechnungen nach EnWG § 40
@@ -309,7 +309,6 @@ pub struct Rechnung {
 impl Default for Rechnung {
     fn default() -> Self {
         Self {
-            typ: Some(BoTyp::Rechnung),
             aktueller_verbrauch: Default::default(),
             anfangszaehlerstand: Default::default(),
             endzaehlerstand: Default::default(),
@@ -345,7 +344,8 @@ impl Default for Rechnung {
             sparte: Default::default(),
             steuerbetraege: Default::default(),
             teilrechnungen: Default::default(),
-            version: Some("v202607.0.0".to_owned()),
+            typ: Some(BoTyp::Rechnung),
+            version: Some("202607.1.0".to_owned()),
             vertrag: Default::default(),
             vorauszahlungen: Default::default(),
             vorjahresverbrauch: Default::default(),
@@ -364,7 +364,10 @@ impl Bo4eObject for Rechnung {
         self.typ.unwrap_or(BoTyp::Rechnung)
     }
     fn schema_version(&self) -> &'static str {
-        "v202607.0.0"
+        "202607.1.0"
+    }
+    fn schema_series(&self) -> &'static str {
+        "202607"
     }
 }
 #[cfg(feature = "json")]

@@ -4,5 +4,7 @@ pub mod ast;
 pub mod emitter;
 /// Type-inference table (JSON property name → Rust type override).
 pub mod inference;
+/// Rust identifier naming for BO4E schema values.
+pub mod naming;
 /// JSON-Schema parser: JSON → AST.
 pub mod parser;

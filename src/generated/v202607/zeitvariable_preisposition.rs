@@ -1,6 +1,6 @@
 use super::{ComTyp, Preis, Preisreferenz, Zaehlzeitdefinition, ZusatzAttribut};
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(not(feature = "json"), derive(Hash))]
+#[cfg_attr(not(feature = "json"), derive(Eq, Hash))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "builder", derive(typed_builder::TypedBuilder))]
 #[cfg_attr(feature = "validate", derive(garde::Validate))]
@@ -9,7 +9,7 @@ use super::{ComTyp, Preis, Preisreferenz, Zaehlzeitdefinition, ZusatzAttribut};
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 /// Modelliert eine zeitvariable Preisposition.
 ///
-/// > **Note:** [ZeitvariablePreisposition JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/com/ZeitvariablePreisposition.json)
+/// > **Note:** [ZeitvariablePreisposition JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.1.0/src/bo4e_schemas/com/ZeitvariablePreisposition.json)
 pub struct ZeitvariablePreisposition {
     /// Eine (beliebige) Bezeichnung für die Preisposition.
     #[cfg_attr(feature = "serde", serde(rename = "bezeichnung"))]
@@ -33,17 +33,20 @@ pub struct ZeitvariablePreisposition {
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub preisreferenz: Option<Preisreferenz>,
-    /// COM type identifier for this struct.
+    /// BO4E type discriminant — always `ComTyp::ZeitvariablePreisposition` for this struct.
     #[cfg_attr(feature = "serde", serde(rename = "_typ"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(
+        feature = "builder",
+        builder(default = Some(ComTyp::ZeitvariablePreisposition), setter(skip))
+    )]
     pub typ: Option<ComTyp>,
     /// Version der COM-Struktur aka "fachliche Versionierung"
     #[cfg_attr(feature = "serde", serde(rename = "_version"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(
         feature = "builder",
-        builder(default = Some("v202607.0.0".to_owned()), setter(into))
+        builder(default = Some("202607.1.0".to_owned()), setter(into))
     )]
     pub version: Option<String>,
     /// Die Zählzeitdefinition, deren Schaltschema bestimmt, wann diese Preisposition gilt.
@@ -82,8 +85,8 @@ impl Default for ZeitvariablePreisposition {
             id: Default::default(),
             preis: Default::default(),
             preisreferenz: Default::default(),
-            typ: Default::default(),
-            version: Some("v202607.0.0".to_owned()),
+            typ: Some(ComTyp::ZeitvariablePreisposition),
+            version: Some("202607.1.0".to_owned()),
             zaehlzeitdefinition: Default::default(),
             zaehlzeitregister: Default::default(),
             zusatz_attribute: Default::default(),

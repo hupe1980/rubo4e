@@ -3,7 +3,7 @@ use super::{
     ZusatzAttribut,
 };
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(not(feature = "json"), derive(Hash))]
+#[cfg_attr(not(feature = "json"), derive(Eq, Hash))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "builder", derive(typed_builder::TypedBuilder))]
 #[cfg_attr(feature = "validate", derive(garde::Validate))]
@@ -12,7 +12,7 @@ use super::{
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 /// Modelliert eine lastvariable Preisposition.
 ///
-/// > **Note:** [LastvariablePreisposition JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/com/LastvariablePreisposition.json)
+/// > **Note:** [LastvariablePreisposition JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.1.0/src/bo4e_schemas/com/LastvariablePreisposition.json)
 pub struct LastvariablePreisposition {
     /// Eine (beliebige) Bezeichnung für die Preisposition.
     #[cfg_attr(feature = "serde", serde(rename = "bezeichnung"))]
@@ -56,17 +56,20 @@ pub struct LastvariablePreisposition {
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub tarifkalkulationsmethode: Option<Tarifkalkulationsmethode>,
-    /// COM type identifier for this struct.
+    /// BO4E type discriminant — always `ComTyp::LastvariablePreisposition` for this struct.
     #[cfg_attr(feature = "serde", serde(rename = "_typ"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(
+        feature = "builder",
+        builder(default = Some(ComTyp::LastvariablePreisposition), setter(skip))
+    )]
     pub typ: Option<ComTyp>,
     /// Version der COM-Struktur aka "fachliche Versionierung"
     #[cfg_attr(feature = "serde", serde(rename = "_version"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(
         feature = "builder",
-        builder(default = Some("v202607.0.0".to_owned()), setter(into))
+        builder(default = Some("202607.1.0".to_owned()), setter(into))
     )]
     pub version: Option<String>,
     #[cfg_attr(feature = "serde", serde(rename = "zusatzAttribute"))]
@@ -96,8 +99,8 @@ impl Default for LastvariablePreisposition {
             preisstaffeln: Default::default(),
             staffelgrenzeneinheit: Default::default(),
             tarifkalkulationsmethode: Default::default(),
-            typ: Default::default(),
-            version: Some("v202607.0.0".to_owned()),
+            typ: Some(ComTyp::LastvariablePreisposition),
+            version: Some("202607.1.0".to_owned()),
             zusatz_attribute: Default::default(),
             _additional: Default::default(),
         }

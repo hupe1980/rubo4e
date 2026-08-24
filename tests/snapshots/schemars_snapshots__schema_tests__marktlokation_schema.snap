@@ -5,7 +5,7 @@ expression: "schema_json::<Marktlokation>()"
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Marktlokation",
-  "description": "Object containing information about a Marktlokation\n\n> **Note:** [Marktlokation JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/bo/Marktlokation.json)",
+  "description": "Object containing information about a Marktlokation\n\n> **Note:** [Marktlokation JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.1.0/src/bo4e_schemas/bo/Marktlokation.json)",
   "type": "object",
   "properties": {
     "_id": {
@@ -16,7 +16,7 @@ expression: "schema_json::<Marktlokation>()"
       ]
     },
     "_typ": {
-      "description": "BO type identifier — always `BoTyp::Marktlokation` for this struct.",
+      "description": "BO4E type discriminant — always `BoTyp::Marktlokation` for this struct.",
       "anyOf": [
         {
           "$ref": "#/$defs/BoTyp"
@@ -314,7 +314,7 @@ expression: "schema_json::<Marktlokation>()"
       ]
     },
     "Adresse": {
-      "description": "Contains an address that can be used for most purposes.\n\n> **Note:** [Adresse JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/com/Adresse.json)",
+      "description": "Contains an address that can be used for most purposes.\n\n> **Note:** [Adresse JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.1.0/src/bo4e_schemas/com/Adresse.json)",
       "type": "object",
       "properties": {
         "_id": {
@@ -325,7 +325,7 @@ expression: "schema_json::<Marktlokation>()"
           ]
         },
         "_typ": {
-          "description": "COM type identifier for this struct.",
+          "description": "BO4E type discriminant — always `ComTyp::Adresse` for this struct.",
           "anyOf": [
             {
               "$ref": "#/$defs/ComTyp"
@@ -613,7 +613,7 @@ expression: "schema_json::<Marktlokation>()"
       ]
     },
     "Dienstleistung": {
-      "description": "Abbildung einer abrechenbaren Dienstleistung.\n\n> **Note:** [Dienstleistung JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/com/Dienstleistung.json)",
+      "description": "Abbildung einer abrechenbaren Dienstleistung.\n\n> **Note:** [Dienstleistung JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.1.0/src/bo4e_schemas/com/Dienstleistung.json)",
       "type": "object",
       "properties": {
         "_id": {
@@ -624,7 +624,7 @@ expression: "schema_json::<Marktlokation>()"
           ]
         },
         "_typ": {
-          "description": "COM type identifier for this struct.",
+          "description": "BO4E type discriminant — always `ComTyp::Dienstleistung` for this struct.",
           "anyOf": [
             {
               "$ref": "#/$defs/ComTyp"
@@ -744,7 +744,7 @@ expression: "schema_json::<Marktlokation>()"
       "type": "string"
     },
     "Energiemenge": {
-      "description": "Abbildung von Mengen, die Lokationen zugeordnet sind\n\n> **Note:** [Energiemenge JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/bo/Energiemenge.json)",
+      "description": "Abbildung von Mengen, die Lokationen zugeordnet sind\n\n> **Note:** [Energiemenge JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.1.0/src/bo4e_schemas/bo/Energiemenge.json)",
       "type": "object",
       "properties": {
         "_id": {
@@ -755,7 +755,7 @@ expression: "schema_json::<Marktlokation>()"
           ]
         },
         "_typ": {
-          "description": "BO type identifier — always `BoTyp::Energiemenge` for this struct.",
+          "description": "BO4E type discriminant — always `BoTyp::Energiemenge` for this struct.",
           "anyOf": [
             {
               "$ref": "#/$defs/BoTyp"
@@ -912,7 +912,7 @@ expression: "schema_json::<Marktlokation>()"
       ]
     },
     "Geokoordinaten": {
-      "description": "This component provides the geo-coordinates for a location.\n\n> **Note:** [Geokoordinaten JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/com/Geokoordinaten.json)",
+      "description": "This component provides the geo-coordinates for a location.\n\n> **Note:** [Geokoordinaten JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.1.0/src/bo4e_schemas/com/Geokoordinaten.json)",
       "type": "object",
       "properties": {
         "_id": {
@@ -923,7 +923,7 @@ expression: "schema_json::<Marktlokation>()"
           ]
         },
         "_typ": {
-          "description": "COM type identifier for this struct.",
+          "description": "BO4E type discriminant — always `ComTyp::Geokoordinaten` for this struct.",
           "anyOf": [
             {
               "$ref": "#/$defs/ComTyp"
@@ -969,7 +969,7 @@ expression: "schema_json::<Marktlokation>()"
       "additionalProperties": true
     },
     "Geraet": {
-      "description": "Mit diesem BO werden alle Geräte modelliert, die keine Zähler sind.\n\n> **Note:** [Geraet JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/bo/Geraet.json)",
+      "description": "Mit diesem BO werden alle Geräte modelliert, die keine Zähler sind.\n\n> **Note:** [Geraet JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.1.0/src/bo4e_schemas/bo/Geraet.json)",
       "type": "object",
       "properties": {
         "_id": {
@@ -980,7 +980,7 @@ expression: "schema_json::<Marktlokation>()"
           ]
         },
         "_typ": {
-          "description": "BO type identifier — always `BoTyp::Geraet` for this struct.",
+          "description": "BO4E type discriminant — always `BoTyp::Geraet` for this struct.",
           "anyOf": [
             {
               "$ref": "#/$defs/BoTyp"
@@ -1133,7 +1133,7 @@ expression: "schema_json::<Marktlokation>()"
       ]
     },
     "Geschaeftspartner": {
-      "description": "Mit diesem Objekt können Geschäftspartner übertragen werden.\nSowohl Unternehmen, als auch Privatpersonen können Geschäftspartner sein.\nHinweis: \"Marktteilnehmer\" haben ein eigenes BO, welches sich von diesem BO ableitet.\nHier sollte daher keine Zuordnung zu Marktrollen erfolgen.\n\n> **Note:** [Geschaeftspartner JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/bo/Geschaeftspartner.json)",
+      "description": "Mit diesem Objekt können Geschäftspartner übertragen werden.\nSowohl Unternehmen, als auch Privatpersonen können Geschäftspartner sein.\nHinweis: \"Marktteilnehmer\" haben ein eigenes BO, welches sich von diesem BO ableitet.\nHier sollte daher keine Zuordnung zu Marktrollen erfolgen.\n\n> **Note:** [Geschaeftspartner JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.1.0/src/bo4e_schemas/bo/Geschaeftspartner.json)",
       "type": "object",
       "properties": {
         "_id": {
@@ -1144,7 +1144,7 @@ expression: "schema_json::<Marktlokation>()"
           ]
         },
         "_typ": {
-          "description": "BO type identifier — always `BoTyp::Geschaeftspartner` for this struct.",
+          "description": "BO4E type discriminant — always `BoTyp::Geschaeftspartner` for this struct.",
           "anyOf": [
             {
               "$ref": "#/$defs/BoTyp"
@@ -1330,7 +1330,7 @@ expression: "schema_json::<Marktlokation>()"
       ]
     },
     "Katasteradresse": {
-      "description": "Dient der Adressierung über die Liegenschafts-Information.\n\n> **Note:** [Katasteradresse JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/com/Katasteradresse.json)",
+      "description": "Dient der Adressierung über die Liegenschafts-Information.\n\n> **Note:** [Katasteradresse JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.1.0/src/bo4e_schemas/com/Katasteradresse.json)",
       "type": "object",
       "properties": {
         "_id": {
@@ -1341,7 +1341,7 @@ expression: "schema_json::<Marktlokation>()"
           ]
         },
         "_typ": {
-          "description": "COM type identifier for this struct.",
+          "description": "BO4E type discriminant — always `ComTyp::Katasteradresse` for this struct.",
           "anyOf": [
             {
               "$ref": "#/$defs/ComTyp"
@@ -1383,7 +1383,7 @@ expression: "schema_json::<Marktlokation>()"
       "additionalProperties": true
     },
     "Konfigurationsprodukt": {
-      "description": "Object containing information about a Konfigurationsprodukt\n\n> **Note:** [Konfigurationsprodukt JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/bo/Konfigurationsprodukt.json)",
+      "description": "Object containing information about a Konfigurationsprodukt\n\n> **Note:** [Konfigurationsprodukt JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.1.0/src/bo4e_schemas/bo/Konfigurationsprodukt.json)",
       "type": "object",
       "properties": {
         "_id": {
@@ -1394,7 +1394,7 @@ expression: "schema_json::<Marktlokation>()"
           ]
         },
         "_typ": {
-          "description": "COM type identifier for this struct.",
+          "description": "BO4E type discriminant — always `ComTyp::Konfigurationsprodukt` for this struct.",
           "anyOf": [
             {
               "$ref": "#/$defs/ComTyp"
@@ -1472,7 +1472,7 @@ expression: "schema_json::<Marktlokation>()"
       ]
     },
     "Kontaktweg": {
-      "description": "Die Komponente wird dazu verwendet, die Kontaktwege innerhalb des BOs Person darzustellen\n\n> **Note:** [Kontakt JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/com/Kontakt.json)",
+      "description": "Die Komponente wird dazu verwendet, die Kontaktwege innerhalb des BOs Person darzustellen\n\n> **Note:** [Kontakt JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.1.0/src/bo4e_schemas/com/Kontakt.json)",
       "type": "object",
       "properties": {
         "_id": {
@@ -1483,7 +1483,7 @@ expression: "schema_json::<Marktlokation>()"
           ]
         },
         "_typ": {
-          "description": "COM type identifier for this struct.",
+          "description": "BO4E type discriminant — always `ComTyp::Kontaktweg` for this struct.",
           "anyOf": [
             {
               "$ref": "#/$defs/ComTyp"
@@ -1529,10 +1529,8 @@ expression: "schema_json::<Marktlokation>()"
           "description": "Die Nummer oder E-Mail-Adresse.",
           "type": [
             "string",
-            "number",
             "null"
-          ],
-          "pattern": "^-?\\d+(\\.\\d+)?([eE]\\d+)?$"
+          ]
         },
         "zusatzAttribute": {
           "type": [
@@ -1547,7 +1545,7 @@ expression: "schema_json::<Marktlokation>()"
       "additionalProperties": true
     },
     "Konzessionsabgabe": {
-      "description": "Diese Komponente wird zur Übertagung der Details zu einer Konzessionsabgabe verwendet.\n\n> **Note:** [Konzessionsabgabe JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/com/Konzessionsabgabe.json)",
+      "description": "Diese Komponente wird zur Übertagung der Details zu einer Konzessionsabgabe verwendet.\n\n> **Note:** [Konzessionsabgabe JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.1.0/src/bo4e_schemas/com/Konzessionsabgabe.json)",
       "type": "object",
       "properties": {
         "_id": {
@@ -1558,7 +1556,7 @@ expression: "schema_json::<Marktlokation>()"
           ]
         },
         "_typ": {
-          "description": "COM type identifier for this struct.",
+          "description": "BO4E type discriminant — always `ComTyp::Konzessionsabgabe` for this struct.",
           "anyOf": [
             {
               "$ref": "#/$defs/ComTyp"
@@ -1909,7 +1907,7 @@ expression: "schema_json::<Marktlokation>()"
       ]
     },
     "Lokationszuordnung": {
-      "description": "Modell für die Abbildung der Referenz auf die Lokationsbündelstruktur. Diese gibt an welche Marktlokationen,\nMesslokationen, Netzlokationen, technische/steuerbaren Ressourcen an einer Lokation vorhanden sind.\n\n> **Note:** [Lokationszuordnung JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/bo/Lokationszuordnung.json)",
+      "description": "Modell für die Abbildung der Referenz auf die Lokationsbündelstruktur. Diese gibt an welche Marktlokationen,\nMesslokationen, Netzlokationen, technische/steuerbaren Ressourcen an einer Lokation vorhanden sind.\n\n> **Note:** [Lokationszuordnung JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.1.0/src/bo4e_schemas/bo/Lokationszuordnung.json)",
       "type": "object",
       "properties": {
         "_id": {
@@ -1920,7 +1918,7 @@ expression: "schema_json::<Marktlokation>()"
           ]
         },
         "_typ": {
-          "description": "BO type identifier — always `BoTyp::Lokationszuordnung` for this struct.",
+          "description": "BO4E type discriminant — always `BoTyp::Lokationszuordnung` for this struct.",
           "anyOf": [
             {
               "$ref": "#/$defs/BoTyp"
@@ -2069,7 +2067,7 @@ expression: "schema_json::<Marktlokation>()"
       ]
     },
     "Marktteilnehmer": {
-      "description": "Objekt zur Aufnahme der Information zu einem Marktteilnehmer\n\n> **Note:** [Marktteilnehmer JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/bo/Marktteilnehmer.json)",
+      "description": "Objekt zur Aufnahme der Information zu einem Marktteilnehmer\n\n> **Note:** [Marktteilnehmer JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.1.0/src/bo4e_schemas/bo/Marktteilnehmer.json)",
       "type": "object",
       "properties": {
         "_id": {
@@ -2080,7 +2078,7 @@ expression: "schema_json::<Marktlokation>()"
           ]
         },
         "_typ": {
-          "description": "BO type identifier — always `BoTyp::Marktteilnehmer` for this struct.",
+          "description": "BO4E type discriminant — always `BoTyp::Marktteilnehmer` for this struct.",
           "anyOf": [
             {
               "$ref": "#/$defs/BoTyp"
@@ -2183,7 +2181,7 @@ expression: "schema_json::<Marktlokation>()"
       "pattern": "^[A-Z]{2}[A-Za-z0-9]{31}$"
     },
     "Menge": {
-      "description": "Abbildung einer Menge mit Wert und Einheit.\n\n> **Note:** [Menge JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/com/Menge.json)",
+      "description": "Abbildung einer Menge mit Wert und Einheit.\n\n> **Note:** [Menge JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.1.0/src/bo4e_schemas/com/Menge.json)",
       "type": "object",
       "properties": {
         "_id": {
@@ -2194,7 +2192,7 @@ expression: "schema_json::<Marktlokation>()"
           ]
         },
         "_typ": {
-          "description": "COM type identifier for this struct.",
+          "description": "BO4E type discriminant — always `ComTyp::Menge` for this struct.",
           "anyOf": [
             {
               "$ref": "#/$defs/ComTyp"
@@ -2272,7 +2270,9 @@ expression: "schema_json::<Marktlokation>()"
             "KVAR",
             "KWHK",
             "VAR",
-            "VARH"
+            "VARH",
+            "HZ",
+            "DIMENSIONSLOS"
           ]
         },
         {
@@ -2283,7 +2283,7 @@ expression: "schema_json::<Marktlokation>()"
       ]
     },
     "Messlokation": {
-      "description": "Object containing information about a Messlokation\n\n> **Note:** [Messlokation JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/bo/Messlokation.json)",
+      "description": "Object containing information about a Messlokation\n\n> **Note:** [Messlokation JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.1.0/src/bo4e_schemas/bo/Messlokation.json)",
       "type": "object",
       "properties": {
         "_id": {
@@ -2294,7 +2294,7 @@ expression: "schema_json::<Marktlokation>()"
           ]
         },
         "_typ": {
-          "description": "BO type identifier — always `BoTyp::Messlokation` for this struct.",
+          "description": "BO4E type discriminant — always `BoTyp::Messlokation` for this struct.",
           "anyOf": [
             {
               "$ref": "#/$defs/BoTyp"
@@ -2466,7 +2466,7 @@ expression: "schema_json::<Marktlokation>()"
       "additionalProperties": true
     },
     "Messwert": {
-      "description": "Abbildung eines Messwertes mit Stati, Zeitpunkt und Wert.\n\n> **Note:** [Messwert JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/com/Messwert.json)",
+      "description": "Abbildung eines Messwertes mit Stati, Zeitpunkt und Wert.\n\n> **Note:** [Messwert JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.1.0/src/bo4e_schemas/com/Messwert.json)",
       "type": "object",
       "properties": {
         "_id": {
@@ -2477,7 +2477,7 @@ expression: "schema_json::<Marktlokation>()"
           ]
         },
         "_typ": {
-          "description": "COM type identifier for this struct.",
+          "description": "BO4E type discriminant — always `ComTyp::Messwert` for this struct.",
           "anyOf": [
             {
               "$ref": "#/$defs/ComTyp"
@@ -2659,7 +2659,7 @@ expression: "schema_json::<Marktlokation>()"
       ]
     },
     "Netzlokation": {
-      "description": "Object containing information about a Netzlokation\n\n> **Note:** [Netzlokation JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/bo/Netzlokation.json)",
+      "description": "Object containing information about a Netzlokation\n\n> **Note:** [Netzlokation JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.1.0/src/bo4e_schemas/bo/Netzlokation.json)",
       "type": "object",
       "properties": {
         "_id": {
@@ -2670,7 +2670,7 @@ expression: "schema_json::<Marktlokation>()"
           ]
         },
         "_typ": {
-          "description": "BO type identifier — always `BoTyp::Netzlokation` for this struct.",
+          "description": "BO4E type discriminant — always `BoTyp::Netzlokation` for this struct.",
           "anyOf": [
             {
               "$ref": "#/$defs/BoTyp"
@@ -2760,9 +2760,13 @@ expression: "schema_json::<Marktlokation>()"
         },
         "obiskennzahl": {
           "description": "Die OBIS-Kennzahl für die Netzlokation",
-          "type": [
-            "string",
-            "null"
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ObisCode"
+            },
+            {
+              "type": "null"
+            }
           ]
         },
         "sparte": {
@@ -2836,7 +2840,7 @@ expression: "schema_json::<Marktlokation>()"
       ]
     },
     "Person": {
-      "description": "Object containing information about a Person\n\n> **Note:** [Person JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/bo/Person.json)",
+      "description": "Object containing information about a Person\n\n> **Note:** [Person JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.1.0/src/bo4e_schemas/bo/Person.json)",
       "type": "object",
       "properties": {
         "_id": {
@@ -2847,7 +2851,7 @@ expression: "schema_json::<Marktlokation>()"
           ]
         },
         "_typ": {
-          "description": "BO type identifier — always `BoTyp::Person` for this struct.",
+          "description": "BO4E type discriminant — always `BoTyp::Person` for this struct.",
           "anyOf": [
             {
               "$ref": "#/$defs/BoTyp"
@@ -3051,7 +3055,7 @@ expression: "schema_json::<Marktlokation>()"
       "pattern": "^C[A-Z0-9]{9}[0-9]$"
     },
     "SteuerbareRessource": {
-      "description": "Object containing information about a steuerbare Ressource\n\n> **Note:** [SteuerbareRessource JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/bo/SteuerbareRessource.json)",
+      "description": "Object containing information about a steuerbare Ressource\n\n> **Note:** [SteuerbareRessource JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.1.0/src/bo4e_schemas/bo/SteuerbareRessource.json)",
       "type": "object",
       "properties": {
         "_id": {
@@ -3062,7 +3066,7 @@ expression: "schema_json::<Marktlokation>()"
           ]
         },
         "_typ": {
-          "description": "BO type identifier — always `BoTyp::SteuerbareRessource` for this struct.",
+          "description": "BO4E type discriminant — always `BoTyp::SteuerbareRessource` for this struct.",
           "anyOf": [
             {
               "$ref": "#/$defs/BoTyp"
@@ -3180,7 +3184,7 @@ expression: "schema_json::<Marktlokation>()"
       ]
     },
     "TechnischeRessource": {
-      "description": "Object containing information about a technische Ressource\n\n> **Note:** [TechnischeRessource JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/bo/TechnischeRessource.json)",
+      "description": "Object containing information about a technische Ressource\n\n> **Note:** [TechnischeRessource JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.1.0/src/bo4e_schemas/bo/TechnischeRessource.json)",
       "type": "object",
       "properties": {
         "_id": {
@@ -3191,7 +3195,7 @@ expression: "schema_json::<Marktlokation>()"
           ]
         },
         "_typ": {
-          "description": "BO type identifier — always `BoTyp::TechnischeRessource` for this struct.",
+          "description": "BO4E type discriminant — always `BoTyp::TechnischeRessource` for this struct.",
           "anyOf": [
             {
               "$ref": "#/$defs/BoTyp"
@@ -3563,7 +3567,7 @@ expression: "schema_json::<Marktlokation>()"
       ]
     },
     "VerwendungszweckProMarktrolle": {
-      "description": "Dient zur Identifizierung des Verwendungszwecks der Marktrolle an der Marktlokation, der die Werte zu übermitteln sind.\n\n> **Note:** [VerwendungszweckProMarktrolle JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/com/VerwendungszweckProMarktrolle.json)",
+      "description": "Dient zur Identifizierung des Verwendungszwecks der Marktrolle an der Marktlokation, der die Werte zu übermitteln sind.\n\n> **Note:** [VerwendungszweckProMarktrolle JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.1.0/src/bo4e_schemas/com/VerwendungszweckProMarktrolle.json)",
       "type": "object",
       "properties": {
         "_id": {
@@ -3574,7 +3578,7 @@ expression: "schema_json::<Marktlokation>()"
           ]
         },
         "_typ": {
-          "description": "COM type identifier for this struct.",
+          "description": "BO4E type discriminant — always `ComTyp::VerwendungszweckProMarktrolle` for this struct.",
           "anyOf": [
             {
               "$ref": "#/$defs/ComTyp"
@@ -3643,7 +3647,7 @@ expression: "schema_json::<Marktlokation>()"
       ]
     },
     "Zaehler": {
-      "description": "Object containing information about a meter/\"Zaehler\".\n\n> **Note:** [Zaehler JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/bo/Zaehler.json)",
+      "description": "Object containing information about a meter/\"Zaehler\".\n\n> **Note:** [Zaehler JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.1.0/src/bo4e_schemas/bo/Zaehler.json)",
       "type": "object",
       "properties": {
         "_id": {
@@ -3654,7 +3658,7 @@ expression: "schema_json::<Marktlokation>()"
           ]
         },
         "_typ": {
-          "description": "BO type identifier — always `BoTyp::Zaehler` for this struct.",
+          "description": "BO4E type discriminant — always `BoTyp::Zaehler` for this struct.",
           "anyOf": [
             {
               "$ref": "#/$defs/BoTyp"
@@ -3935,7 +3939,7 @@ expression: "schema_json::<Marktlokation>()"
       ]
     },
     "Zaehlwerk": {
-      "description": "Mit dieser Komponente werden Zählwerke modelliert.\n\n> **Note:** [Zaehlwerk JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/com/Zaehlwerk.json)",
+      "description": "Mit dieser Komponente werden Zählwerke modelliert.\n\n> **Note:** [Zaehlwerk JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.1.0/src/bo4e_schemas/com/Zaehlwerk.json)",
       "type": "object",
       "properties": {
         "_id": {
@@ -3946,7 +3950,7 @@ expression: "schema_json::<Marktlokation>()"
           ]
         },
         "_typ": {
-          "description": "COM type identifier for this struct.",
+          "description": "BO4E type discriminant — always `ComTyp::Zaehlwerk` for this struct.",
           "anyOf": [
             {
               "$ref": "#/$defs/ComTyp"
@@ -4141,7 +4145,7 @@ expression: "schema_json::<Marktlokation>()"
       "additionalProperties": true
     },
     "Zaehlzeitregister": {
-      "description": "Mit dieser Komponente werden Zählzeitregister modelliert. Ein Zählzeitregister beschreibt eine erweiterte Definition der Zählzeit\nin Bezug auf ein Register. Dabei werden alle Codes dazu vom Netzbetreiber vergeben.\n\n> **Note:** [Zaehlzeitregister JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/com/Zaehlzeitregister.json)",
+      "description": "Mit dieser Komponente werden Zählzeitregister modelliert. Ein Zählzeitregister beschreibt eine erweiterte Definition der Zählzeit\nin Bezug auf ein Register. Dabei werden alle Codes dazu vom Netzbetreiber vergeben.\n\n> **Note:** [Zaehlzeitregister JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.1.0/src/bo4e_schemas/com/Zaehlzeitregister.json)",
       "type": "object",
       "properties": {
         "_id": {
@@ -4152,7 +4156,7 @@ expression: "schema_json::<Marktlokation>()"
           ]
         },
         "_typ": {
-          "description": "COM type identifier for this struct.",
+          "description": "BO4E type discriminant — always `ComTyp::Zaehlzeitregister` for this struct.",
           "anyOf": [
             {
               "$ref": "#/$defs/ComTyp"
@@ -4203,7 +4207,7 @@ expression: "schema_json::<Marktlokation>()"
       "additionalProperties": true
     },
     "Zeitraum": {
-      "description": "Diese Komponente wird zur Abbildung von Zeiträumen in Form von Dauern oder der Angabe von Start und Ende verwendet.\nEs muss daher eine der drei Möglichkeiten angegeben sein:\n- Einheit und Dauer oder\n- Zeitraum: Startdatum bis Enddatum oder\n- Zeitraum: Startzeitpunkt (Datum und Uhrzeit) bis Endzeitpunkt (Datum und Uhrzeit)\n\n> **Note:** [Zeitraum JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/com/Zeitraum.json)",
+      "description": "Diese Komponente wird zur Abbildung von Zeiträumen in Form von Dauern oder der Angabe von Start und Ende verwendet.\nEs muss daher eine der drei Möglichkeiten angegeben sein:\n- Einheit und Dauer oder\n- Zeitraum: Startdatum bis Enddatum oder\n- Zeitraum: Startzeitpunkt (Datum und Uhrzeit) bis Endzeitpunkt (Datum und Uhrzeit)\n\n> **Note:** [Zeitraum JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.1.0/src/bo4e_schemas/com/Zeitraum.json)",
       "type": "object",
       "properties": {
         "_id": {
@@ -4214,7 +4218,7 @@ expression: "schema_json::<Marktlokation>()"
           ]
         },
         "_typ": {
-          "description": "COM type identifier for this struct.",
+          "description": "BO4E type discriminant — always `ComTyp::Zeitraum` for this struct.",
           "anyOf": [
             {
               "$ref": "#/$defs/ComTyp"
@@ -4281,7 +4285,7 @@ expression: "schema_json::<Marktlokation>()"
       "additionalProperties": true
     },
     "ZusatzAttribut": {
-      "description": "Viele Datenobjekte weisen in unterschiedlichen Systemen eine eindeutige ID (Kundennummer, GP-Nummer etc.) auf.\nBeim Austausch von Datenobjekten zwischen verschiedenen Systemen ist es daher hilfreich,\nsich die eindeutigen IDs der anzubindenden Systeme zu merken.\n\n> **Note:** [ZusatzAttribut JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/ZusatzAttribut.json)",
+      "description": "Viele Datenobjekte weisen in unterschiedlichen Systemen eine eindeutige ID (Kundennummer, GP-Nummer etc.) auf.\nBeim Austausch von Datenobjekten zwischen verschiedenen Systemen ist es daher hilfreich,\nsich die eindeutigen IDs der anzubindenden Systeme zu merken.\n\n> **Note:** [ZusatzAttribut JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.1.0/src/bo4e_schemas/ZusatzAttribut.json)",
       "type": "object",
       "properties": {
         "name": {
@@ -4295,7 +4299,7 @@ expression: "schema_json::<Marktlokation>()"
       "additionalProperties": true
     },
     "Zustaendigkeit": {
-      "description": "Enthält die zeitliche Zuordnung eines Ansprechpartners zu Abteilungen und Zuständigkeiten.\n\n> **Note:** [Zustaendigkeit JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/com/Zustaendigkeit.json)",
+      "description": "Enthält die zeitliche Zuordnung eines Ansprechpartners zu Abteilungen und Zuständigkeiten.\n\n> **Note:** [Zustaendigkeit JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.1.0/src/bo4e_schemas/com/Zustaendigkeit.json)",
       "type": "object",
       "properties": {
         "_id": {
@@ -4306,7 +4310,7 @@ expression: "schema_json::<Marktlokation>()"
           ]
         },
         "_typ": {
-          "description": "COM type identifier for this struct.",
+          "description": "BO4E type discriminant — always `ComTyp::Zustaendigkeit` for this struct.",
           "anyOf": [
             {
               "$ref": "#/$defs/ComTyp"

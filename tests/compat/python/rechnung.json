@@ -1,21 +1,32 @@
 {
   "_typ": "RECHNUNG",
-  "_version": "v202607.0.0",
+  "_version": "202607.0.0",
   "rechnungsnummer": "R-2025-0042",
   "rechnungstitel": "Jahresrechnung 2025",
   "sparte": "STROM",
+  "rechnungsdatum": "2025-03-01T00:00:00+00:00",
+  "faelligkeitsdatum": "2025-03-15T00:00:00+00:00",
+  "rechnungsperiode": {
+    "_typ": "ZEITRAUM",
+    "_version": "202607.0.0",
+    "startdatum": "2025-01-01",
+    "enddatum": "2025-12-31"
+  },
   "gesamtnetto": {
-    "_version": "v202607.0.0",
+    "_typ": "BETRAG",
+    "_version": "202607.0.0",
     "wert": "840.34",
     "waehrung": "EUR"
   },
   "gesamtsteuer": {
-    "_version": "v202607.0.0",
+    "_typ": "BETRAG",
+    "_version": "202607.0.0",
     "wert": "159.66",
     "waehrung": "EUR"
   },
   "gesamtbrutto": {
-    "_version": "v202607.0.0",
+    "_typ": "BETRAG",
+    "_version": "202607.0.0",
     "wert": "1000.00",
     "waehrung": "EUR"
   }

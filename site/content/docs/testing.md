@@ -1,23 +1,58 @@
 +++
 title = "Testing Strategy"
-description = "The seven testing layers that back this crate: golden corpus, snapshots, property tests, fuzzing, cross-implementation compatibility, doctests, and the feature matrix."
+description = "The eight testing layers that back this crate: schema drift guards, golden corpus, snapshots, property tests, fuzzing, cross-implementation compatibility, doctests, and the feature matrix."
 weight = 80
 +++
 
-`rubo4e` uses seven distinct testing layers. Each layer has its own purpose, test corpus,
+`rubo4e` uses eight distinct testing layers. Each layer has its own purpose, test corpus,
 and command to run.
 
 ## Test Layer Summary
 
 | Layer | Purpose | Feature flags | Location | Approx. runtime |
 |-------|---------|---------------|----------|-----------------|
+| 0. Drift guard | Committed codegen matches the schemas | `versioned` | `tests/generated_contract.rs` | < 1 s |
 | 1. Golden | Wire compatibility | `json`, `versioned` | `tests/golden/` | < 5 s |
-| 2. Snapshot | Serialization stability | `schemars` | `tests/schemars_snapshots/` | < 5 s |
+| 2. Snapshot | Serialization stability | `schemars` | `tests/snapshots/` | < 5 s |
 | 3. Property | Identifier invariants | (dev dep only) | `tests/proptest_roundtrips.rs` | 30–60 s |
 | 4. Fuzz | Panic safety | nightly + `json` | `fuzz/` | minutes (CI: 1M runs) |
 | 5. Compat | Cross-impl interop | `json`, `versioned` | `tests/compat/` | < 10 s |
 | 6. Doctest | Documentation is executable | all | `src/**` rustdoc comments | ~50 s |
 | 7. Feature matrix | Every feature builds warning-free | (per combination) | CI job / `just lint-features` | minutes |
+
+## Layer 0 — Schema Drift Guards
+
+`src/generated/` is committed, so nothing at build time forces it to agree with
+`generator/schemas/`. These tests read both sides and compare.
+
+**Run:**
+```bash
+cargo test --features versioned --test generated_contract
+```
+
+**What the tests check:**
+- Every schema emitted exactly one Rust module, and no module is left over
+- Every struct stamps the `_typ` its schema pins with a `const` — BOs *and* COMs
+- Every struct stamps the `_version` its schema declares as a default
+- `BoTyp` / `ComTyp` variants are named after the structs they discriminate
+- No two BO4E wire values collapse onto one Rust enum variant
+
+`just check-docs-drift` complements this by regenerating into a scratch copy and
+diffing, which catches changes these assertions do not name.
+
+None of these — nor the justfile, nor the other test binaries — spells the pinned
+schema tag out in a constant. Each reads it off the single committed snapshot
+directory under `generator/schemas/`, and fails if it finds none or more than
+one. A within-series bump (`v202607.0.0` → `v202607.1.0`) therefore touches the
+snapshot, the codegen, and the changelog — not a scattering of string literals.
+
+Two more guards sit alongside them, in `tests/`:
+
+| Test | Catches |
+|---|---|
+| `prelude_surface.rs` | an identifier type reachable via `rubo4e::identifiers::` but missing from the prelude |
+| `extension_round_trip.rs` | the snake_case key transform renaming keys inside extension data |
+| `hash_keys.rs` | generated types deriving `Hash` without `Eq`, which no `HashMap` key can use |
 
 ## Layer 1 — Golden Schema Tests
 
@@ -81,9 +116,8 @@ enum `Display`/`FromStr` for all generated variants.
 cargo test --all-features --test proptest_roundtrips
 ```
 
-> **Note:** there is no `testing` feature flag. `proptest` is a plain dev-dependency.
-> `Arbitrary` impls for identifier types are compiled `#[cfg(test)]` only and
-> are not available to external crates.
+> **Note:** `proptest` is a plain dev-dependency, and the `Arbitrary` impls for
+> identifier types are `#[cfg(test)]` only — not available to external crates.
 
 **Properties covered:**
 
@@ -224,9 +258,8 @@ still type-checked, just not executed.
 - bindings left unread when a feature compiles a function body away,
 - a feature that does not build **at all** on its own.
 
-All three shipped undetected before this layer existed. Every feature is
-therefore checked in isolation and in realistic combinations, with warnings
-denied.
+Every feature is therefore checked in isolation and in realistic combinations,
+with warnings denied.
 
 **Run:**
 ```bash
@@ -234,6 +267,17 @@ just lint-features
 ```
 
 In CI this is a matrix job, so a failing combination names itself in the job list.
+
+## Keeping the fuzz targets alive
+
+`fuzz/` declares its own `[workspace]`, so `cargo check --workspace` does not see
+it. `just check-fuzz` (and a CI step) type-checks the targets on stable; only
+*running* them needs nightly.
+
+The targets build with `time` and `decimal` enabled: those two features replace
+`String` fields with `time::OffsetDateTime`, `time::Date`, and
+`rust_decimal::Decimal` — three parsers over attacker-controlled text that are
+not compiled in at all without them.
 
 ## CI Safety Notes
 

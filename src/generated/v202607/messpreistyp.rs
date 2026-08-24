@@ -1,4 +1,5 @@
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[allow(non_camel_case_types)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(
     feature = "strum",
@@ -11,7 +12,7 @@
 pub enum Messpreistyp {
     #[cfg_attr(feature = "serde", serde(rename = "MESSPREIS_G2_5"))]
     #[cfg_attr(feature = "strum", strum(serialize = "MESSPREIS_G2_5"))]
-    MesspreisG25,
+    MesspreisG2_5,
     #[cfg_attr(feature = "serde", serde(rename = "MESSPREIS_G4"))]
     #[cfg_attr(feature = "strum", strum(serialize = "MESSPREIS_G4"))]
     MesspreisG4,
@@ -26,7 +27,7 @@ pub enum Messpreistyp {
     MesspreisG16,
     #[cfg_attr(feature = "serde", serde(rename = "MESSPREIS_G25"))]
     #[cfg_attr(feature = "strum", strum(serialize = "MESSPREIS_G25"))]
-    MESSPREISG25,
+    MesspreisG25,
     #[cfg_attr(feature = "serde", serde(rename = "MESSPREIS_G40"))]
     #[cfg_attr(feature = "strum", strum(serialize = "MESSPREIS_G40"))]
     MesspreisG40,
@@ -35,7 +36,7 @@ pub enum Messpreistyp {
     ElektronischerAufsatz,
     #[cfg_attr(feature = "serde", serde(rename = "SMART_METER_MESSPREIS_G2_5"))]
     #[cfg_attr(feature = "strum", strum(serialize = "SMART_METER_MESSPREIS_G2_5"))]
-    SmartMeterMesspreisG25,
+    SmartMeterMesspreisG2_5,
     #[cfg_attr(feature = "serde", serde(rename = "SMART_METER_MESSPREIS_G4"))]
     #[cfg_attr(feature = "strum", strum(serialize = "SMART_METER_MESSPREIS_G4"))]
     SmartMeterMesspreisG4,
@@ -50,7 +51,7 @@ pub enum Messpreistyp {
     SmartMeterMesspreisG16,
     #[cfg_attr(feature = "serde", serde(rename = "SMART_METER_MESSPREIS_G25"))]
     #[cfg_attr(feature = "strum", strum(serialize = "SMART_METER_MESSPREIS_G25"))]
-    SMARTMETERMESSPREISG25,
+    SmartMeterMesspreisG25,
     #[cfg_attr(feature = "serde", serde(rename = "SMART_METER_MESSPREIS_G40"))]
     #[cfg_attr(feature = "strum", strum(serialize = "SMART_METER_MESSPREIS_G40"))]
     SmartMeterMesspreisG40,
@@ -94,20 +95,20 @@ impl Messpreistyp {
     /// is exactly the set of values that appear on the wire.  Available **without**
     /// the `strum` feature — use it to drift-guard SQL `CHECK` lists and mappings.
     pub const VARIANTS: &'static [Self] = &[
-        Self::MesspreisG25,
+        Self::MesspreisG2_5,
         Self::MesspreisG4,
         Self::MesspreisG6,
         Self::MesspreisG10,
         Self::MesspreisG16,
-        Self::MESSPREISG25,
+        Self::MesspreisG25,
         Self::MesspreisG40,
         Self::ElektronischerAufsatz,
-        Self::SmartMeterMesspreisG25,
+        Self::SmartMeterMesspreisG2_5,
         Self::SmartMeterMesspreisG4,
         Self::SmartMeterMesspreisG6,
         Self::SmartMeterMesspreisG10,
         Self::SmartMeterMesspreisG16,
-        Self::SMARTMETERMESSPREISG25,
+        Self::SmartMeterMesspreisG25,
         Self::SmartMeterMesspreisG40,
         Self::VerrechnungspreisEtWechsel,
         Self::VerrechnungspreisEtDreh,
@@ -143,20 +144,20 @@ impl Messpreistyp {
     /// [`Messpreistyp::Unknown`] renders as `"UNKNOWN"`, matching its serialized form.
     pub const fn as_wire(&self) -> &'static str {
         match self {
-            Self::MesspreisG25 => "MESSPREIS_G2_5",
+            Self::MesspreisG2_5 => "MESSPREIS_G2_5",
             Self::MesspreisG4 => "MESSPREIS_G4",
             Self::MesspreisG6 => "MESSPREIS_G6",
             Self::MesspreisG10 => "MESSPREIS_G10",
             Self::MesspreisG16 => "MESSPREIS_G16",
-            Self::MESSPREISG25 => "MESSPREIS_G25",
+            Self::MesspreisG25 => "MESSPREIS_G25",
             Self::MesspreisG40 => "MESSPREIS_G40",
             Self::ElektronischerAufsatz => "ELEKTRONISCHER_AUFSATZ",
-            Self::SmartMeterMesspreisG25 => "SMART_METER_MESSPREIS_G2_5",
+            Self::SmartMeterMesspreisG2_5 => "SMART_METER_MESSPREIS_G2_5",
             Self::SmartMeterMesspreisG4 => "SMART_METER_MESSPREIS_G4",
             Self::SmartMeterMesspreisG6 => "SMART_METER_MESSPREIS_G6",
             Self::SmartMeterMesspreisG10 => "SMART_METER_MESSPREIS_G10",
             Self::SmartMeterMesspreisG16 => "SMART_METER_MESSPREIS_G16",
-            Self::SMARTMETERMESSPREISG25 => "SMART_METER_MESSPREIS_G25",
+            Self::SmartMeterMesspreisG25 => "SMART_METER_MESSPREIS_G25",
             Self::SmartMeterMesspreisG40 => "SMART_METER_MESSPREIS_G40",
             Self::VerrechnungspreisEtWechsel => "VERRECHNUNGSPREIS_ET_WECHSEL",
             Self::VerrechnungspreisEtDreh => "VERRECHNUNGSPREIS_ET_DREH",
@@ -182,27 +183,28 @@ impl Messpreistyp {
     /// # Example
     /// ```
     /// # use rubo4e::current::Messpreistyp;
-    /// /// assert_eq!(Messpreistyp::from_wire("MESSPREIS_G2_5"), Ok(Messpreistyp::MesspreisG25));
+    /// assert_eq!(Messpreistyp::from_wire("MESSPREIS_G2_5"), Ok(Messpreistyp::MesspreisG2_5));
+    /// // Out-of-schema values are rejected rather than degraded:
     /// assert!(Messpreistyp::from_wire("NOT_A_REAL_VALUE").is_err());
     /// // …including the `Unknown` catch-all's own wire spelling:
     /// assert!(Messpreistyp::from_wire("UNKNOWN").is_err());
     /// ```
     pub fn from_wire(s: &str) -> Result<Self, crate::error::UnknownVariant> {
         match s {
-            "MESSPREIS_G2_5" => Ok(Self::MesspreisG25),
+            "MESSPREIS_G2_5" => Ok(Self::MesspreisG2_5),
             "MESSPREIS_G4" => Ok(Self::MesspreisG4),
             "MESSPREIS_G6" => Ok(Self::MesspreisG6),
             "MESSPREIS_G10" => Ok(Self::MesspreisG10),
             "MESSPREIS_G16" => Ok(Self::MesspreisG16),
-            "MESSPREIS_G25" => Ok(Self::MESSPREISG25),
+            "MESSPREIS_G25" => Ok(Self::MesspreisG25),
             "MESSPREIS_G40" => Ok(Self::MesspreisG40),
             "ELEKTRONISCHER_AUFSATZ" => Ok(Self::ElektronischerAufsatz),
-            "SMART_METER_MESSPREIS_G2_5" => Ok(Self::SmartMeterMesspreisG25),
+            "SMART_METER_MESSPREIS_G2_5" => Ok(Self::SmartMeterMesspreisG2_5),
             "SMART_METER_MESSPREIS_G4" => Ok(Self::SmartMeterMesspreisG4),
             "SMART_METER_MESSPREIS_G6" => Ok(Self::SmartMeterMesspreisG6),
             "SMART_METER_MESSPREIS_G10" => Ok(Self::SmartMeterMesspreisG10),
             "SMART_METER_MESSPREIS_G16" => Ok(Self::SmartMeterMesspreisG16),
-            "SMART_METER_MESSPREIS_G25" => Ok(Self::SMARTMETERMESSPREISG25),
+            "SMART_METER_MESSPREIS_G25" => Ok(Self::SmartMeterMesspreisG25),
             "SMART_METER_MESSPREIS_G40" => Ok(Self::SmartMeterMesspreisG40),
             "VERRECHNUNGSPREIS_ET_WECHSEL" => Ok(Self::VerrechnungspreisEtWechsel),
             "VERRECHNUNGSPREIS_ET_DREH" => Ok(Self::VerrechnungspreisEtDreh),
@@ -291,6 +293,15 @@ impl<'r> sqlx::Decode<'r, sqlx::Postgres> for Messpreistyp {
     ) -> Result<Self, sqlx::error::BoxDynError> {
         let s = <&str as sqlx::Decode<sqlx::Postgres>>::decode(value)?;
         Ok(Self::from_wire(s).unwrap_or(Self::Unknown))
+    }
+}
+/// Lets `Vec<Messpreistyp>` bind to a `TEXT[]` column.  Only this crate can
+/// provide it: the trait and the enum are both foreign to any consumer, so the
+/// orphan rule rules out a downstream impl.
+#[cfg(feature = "sqlx")]
+impl sqlx::postgres::PgHasArrayType for Messpreistyp {
+    fn array_type_info() -> sqlx::postgres::PgTypeInfo {
+        <String as sqlx::postgres::PgHasArrayType>::array_type_info()
     }
 }
 #[cfg(test)]

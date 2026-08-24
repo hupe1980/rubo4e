@@ -13,9 +13,8 @@
 //! | `identifiers`  | ✓       | Identifier types (`MaloId`, `EicCode`, `ObisCode`, …) + serde  |
 //! | `serde`        | ✓       | Serde derives + extension-data map                             |
 //! | `json`         |         | `serde_json` helpers (`to_json_*`, `from_json_*`)              |
-//! | `simd-json`    |         | SIMD parser backend for `from_json_*` (workload-dependent)    |
 //! | `time`         |         | `time` crate for timestamps                                    |
-//! | `decimal`      |         | `rust_decimal::Decimal` for amounts/prices (see note below)   |
+//! | `decimal`      |         | `rust_decimal::Decimal` for amounts/prices (see note below)     |
 //! | `builder`      |         | `typed-builder` derives with `setter(into)` — accepts both `T` and `Option<T>`  |
 //! | `validate`     |         | `garde` validation                                             |
 //! | `schemars`     |         | JSON Schema generation                                         |
@@ -63,21 +62,32 @@
 //! - Access fields through JSON round-trip (`to_json_german` / `from_json_german`)
 //!   which is feature-independent.
 //!
-//! The string fallback preserves the ISO-8601 / decimal string value from JSON
-//! so data is never lost when these features are absent.
+//! The string fallback keeps the value's lexical form, so nothing is lost when
+//! these features are absent.
 //!
-//! ## Why generated structs do not implement `Eq`
+//! Decimal fields read a JSON number as well as a JSON string, because BO4E
+//! producers use both — but only the string spelling is exact. A number has
+//! already passed through `f64` before this crate sees it, losing its scale
+//! (`119.00` → `119`) and any precision past ~15 significant digits.
+//! [`decimal_serde`] documents the whole picture and counts every such read.
 //!
-//! Generated BO and COM structs derive `PartialEq` but **not `Eq`**.  The
-//! `_additional` extension-data field (present when the `json` feature is active)
-//! has type `LimitedExtensionMap` whose inner map contains `serde_json::Value`.
-//! `serde_json::Value` does not implement `Eq` because it wraps `f64` (JSON
-//! numbers), and `f64` is not `Eq` (`NaN ≠ NaN`).  This is intentional and
-//! correct behaviour.
+//! ## `Eq` and `Hash` on generated structs
 //!
-//! For content-addressed equality comparisons, use `to_json_canonical()`
-//! (from `Bo4eJsonExt` in the `json` module) which produces a deterministic
-//! byte string that can be compared with `==`.
+//! Generated BO and COM structs always derive `PartialEq`. They additionally
+//! derive **`Eq` and `Hash` when the `json` feature is off**, which is what lets
+//! them key a `HashMap` or a `HashSet`.
+//!
+//! One type blocks both: `serde_json::Value`, which appears in a generated
+//! struct twice when `json` is on — inside `LimitedExtensionMap` (the
+//! `_additional` field) and as `ZusatzAttribut::wert`. `Value` is neither `Eq`
+//! nor `Hash`, because it wraps `f64` and `NaN != NaN`. With `json` off both
+//! degrade to a ZST stub and a `String`, and the whole tree becomes `Eq + Hash`.
+//!
+//! Generated **enums** are always `Eq + Ord + Hash`, whatever the features.
+//!
+//! For content-addressed equality across every feature set, compare
+//! `to_json_canonical()` (from `Bo4eJsonExt` in the `json` module), which
+//! produces a deterministic byte string.
 
 /// Error types returned by identifier construction.
 pub mod error;
@@ -138,6 +148,34 @@ pub mod schema_helpers;
 #[cfg_attr(docsrs, doc(cfg(all(feature = "time", feature = "serde"))))]
 pub mod time_serde;
 
+/// Time-of-day parsing for BO4E's `format: "time"` fields.
+///
+/// `Zeitraum.startuhrzeit`, `.enduhrzeit`, and `Umschaltzeit.umschaltzeit` carry
+/// a UTC offset (`"18:00:00+01:00"`), which no `time` type holds alongside a
+/// time of day — so the fields stay `String` and this reads them.
+#[cfg(feature = "time")]
+#[cfg_attr(docsrs, doc(cfg(feature = "time")))]
+pub mod offset_time;
+
+/// ISO 8601 duration parsing for BO4E's `dauer` fields.
+///
+/// `Zeitraum.dauer` is a string like `"P1DT30H4S"` that neither `serde` nor
+/// `time` parses. Years and months are refused rather than approximated — see
+/// the module docs.
+#[cfg(feature = "time")]
+#[cfg_attr(docsrs, doc(cfg(feature = "time")))]
+pub mod iso8601_duration;
+
+/// Decimal deserialization, and what BO4E's two spellings of a number cost.
+///
+/// BO4E-python writes `"wert": "119.00"`, go-bo4e writes `"wert": 119.00`.
+/// Both are read; only the string spelling is exact. See the module docs, and
+/// [`decimal_serde::decimal_from_json_number_count`] for the counter that tells
+/// you which one your producers use.
+#[cfg(feature = "serde")]
+#[cfg_attr(docsrs, doc(cfg(feature = "serde")))]
+pub mod decimal_serde;
+
 /// Strict-decoding support: reject out-of-schema (`Unknown`) enum values anywhere
 /// in a deserialized payload. See [`Bo4eStrict`] and [`strict::StrictError`].
 #[cfg(feature = "versioned")]
@@ -157,13 +195,13 @@ mod generated;
 
 /// Hand-written convenience methods on generated BO4E types.
 ///
-/// Provides ergonomic accessors such as [`Zeitraum::as_closed_range`][az],
+/// Provides ergonomic accessors such as [`Zeitraum::as_inclusive_range`][az],
 /// [`Rechnung::billing_period`][bp], and [`PreisblattNetznutzung::validity`][va].
 ///
 /// All methods are gated on the feature flags that make their return types
 /// available (`versioned`, `time`, `decimal`).
 ///
-/// [az]: crate::current::Zeitraum::as_closed_range
+/// [az]: crate::current::Zeitraum::as_inclusive_range
 /// [bp]: crate::current::Rechnung::billing_period
 /// [va]: crate::current::PreisblattNetznutzung::validity
 #[cfg(feature = "versioned")]
@@ -231,15 +269,48 @@ pub mod current {
 ///
 /// let v = Vertrag::default();
 /// assert_eq!(v.bo_type(), BoTyp::Vertrag);
-/// assert_eq!(v.schema_version(), "v202607.0.0");
+/// assert_eq!(v.schema_version(), "202607.1.0");  // exact release
+/// assert_eq!(v.schema_series(), "202607");       // the series this module covers
 /// ```
 pub trait Bo4eObject: bo4e_object_sealed::Sealed {
     /// The BO type discriminant enum for this schema version (e.g. `v202607::BoTyp`).
     type BoTyp;
     /// Returns the [`Self::BoTyp`] discriminant identifying this business object.
     fn bo_type(&self) -> Self::BoTyp;
-    /// Returns the BO4E schema version tag used to generate this type (e.g. `"v202607.0.0"`).
+    /// Returns the exact BO4E schema release this type was generated from, in the
+    /// spelling the `_version` wire field carries (e.g. `"202607.1.0"`).
+    ///
+    /// Note the missing `v`: BO4E prefixes its *git tags* with one
+    /// (`v202607.1.0`) but the value inside a payload never has it. This
+    /// accessor reports the wire spelling so it can be compared against a
+    /// `_version` read off a message without a normalisation step.
+    ///
+    /// **Do not dispatch on this value.** BO4E ships patch releases *inside* a
+    /// series, so a producer one patch ahead sends `"202607.2.0"` and an equality
+    /// match on `"202607.1.0"` rejects a payload this module handles perfectly.
+    /// Match on [`schema_series`](Bo4eObject::schema_series) instead.
     fn schema_version(&self) -> &'static str;
+
+    /// Returns the schema **series** — the `YYYYMM` prefix of the release
+    /// (e.g. `"202607"`), without the `v` the git tag prefixes it with.
+    ///
+    /// This is the granularity at which the crate exposes a module
+    /// ([`crate::v202607`]), and the right key for version dispatch: every
+    /// release within a series deserializes into the same types.
+    ///
+    /// ```
+    /// # #[cfg(feature = "versioned")] {
+    /// use rubo4e::{current::Rechnung, Bo4eObject as _};
+    ///
+    /// // A payload's own `_version`, whatever patch the sender is on:
+    /// let incoming = "202607.4.0";
+    /// assert_eq!(
+    ///     incoming.split('.').next(),
+    ///     Some(Rechnung::default().schema_series()),
+    /// );
+    /// # }
+    /// ```
+    fn schema_series(&self) -> &'static str;
 }
 
 #[cfg(feature = "versioned")]
@@ -294,6 +365,20 @@ pub mod bo4e_object_sealed {
 /// assert!(z.is_unknown());
 /// # }
 /// ```
+///
+/// # Derived traits on every BO4E enum
+///
+/// `Debug`, `Clone`, `Copy`, `PartialEq`, `Eq`, `PartialOrd`, `Ord`, `Hash` —
+/// so an enum can key a `HashMap` or a `BTreeMap`, be sorted, and let a caller's
+/// own struct derive `Ord`.
+///
+/// **`Ord` is declaration order, not a business ranking.** The variants follow
+/// the order the BO4E schema lists them in, with the `Unknown` catch-all last.
+/// It is a *total* order — which is all `BTreeMap` and `sort()` need — but a
+/// schema release may reorder the values, so never persist a sort key derived
+/// from it or compare two variants expecting a domain meaning. Compare
+/// [`as_wire`](Bo4eEnum::as_wire) when the order has to be stable across
+/// releases.
 ///
 /// # Sealed trait
 ///
@@ -413,18 +498,37 @@ pub trait Bo4eStrict {
 
 /// Re-exports the most commonly used types.
 ///
-/// `use rubo4e::prelude::*;` gives you all identifiers, the `Bo4eJsonExt` trait
-/// (when `json` feature is active), the [`Bo4eObject`] marker trait (when
-/// `versioned` feature is active), and the ergonomic COM extension traits
-/// [`BetragExt`](crate::convenience::BetragExt),
-/// [`MengeExt`](crate::convenience::MengeExt),
-/// [`PreisExt`](crate::convenience::PreisExt)
-/// (when `versioned` + `decimal` features are active).
+/// `use rubo4e::prelude::*;` gives you:
+///
+/// - **every** identifier type and its error type — always;
+/// - [`Bo4eJsonExt`](crate::json::Bo4eJsonExt) and
+///   [`Bo4eExtensionData`](crate::json::Bo4eExtensionData), with `json`;
+/// - [`Bo4eObject`], [`Bo4eEnum`], and [`Bo4eStrict`], with `versioned`;
+/// - [`Validate`](garde::Validate), [`Validated`](crate::validation::Validated),
+///   and the report helpers, with `validate`;
+/// - the COM extension traits [`BetragExt`](crate::convenience::BetragExt),
+///   [`MengeExt`](crate::convenience::MengeExt),
+///   [`PreisExt`](crate::convenience::PreisExt), and
+///   [`PreisstaffelSliceExt`](crate::convenience::PreisstaffelSliceExt), with
+///   `versioned` + `decimal`.
+///
+/// It deliberately does **not** re-export the generated BO/COM types: they are
+/// version-scoped, and `use rubo4e::current::*` is the import that says which
+/// schema series you meant.
+///
+/// `tests/prelude_surface.rs` holds the guard that keeps the first bullet true.
 pub mod prelude {
-    pub use crate::error::{IdentifierError, UnknownVariant};
+    pub use crate::error::{IdentifierError, LengthExpectation, UnknownVariant};
+    /// Every identifier type, and the helper enums their accessors return.
+    ///
+    /// The BDEW Ressourcen-ID family (`CrId`, `NebeId`, `PaketId`, `SgId`, …) is
+    /// here for the same reason `MaloId` is: a crate that touches Redispatch 2.0
+    /// or a Netzbetreiberwechsel needs them, and having to remember which four of
+    /// the fourteen the prelude forgot is not a distinction worth making.
     pub use crate::identifiers::{
-        AkivId, BilanzierungsgebietId, BilanzkreisId, EicCode, EicType, MaloId, MarktpartnerId,
-        MeloId, NeloId, ObisCode, ObisComponents, SrId, TrId, TranchennummerId,
+        AkivId, Bic, BilanzierungsgebietId, BilanzkreisId, CrId, EicCode, EicType, Iban, MaloId,
+        MaloVergabestelle, MarktpartnerId, MeloId, MpIdAuthority, NebeId, NeloId, ObisCode,
+        ObisComponents, PaketId, SgId, SrId, TrId, TranchennummerId,
     };
 
     /// Uniform enum introspection + strict parsing (`VARIANTS`, `from_wire`, …).
@@ -466,4 +570,8 @@ pub mod prelude {
     /// Flatten `Option<Preis>` → `Option<Decimal>` in one call.
     #[cfg(all(feature = "versioned", feature = "decimal"))]
     pub use crate::convenience::PreisExt;
+
+    /// Pick the price tier that applies to a quantity, honouring BO4E's gap rule.
+    #[cfg(all(feature = "versioned", feature = "decimal"))]
+    pub use crate::convenience::PreisstaffelSliceExt;
 }

@@ -38,6 +38,12 @@ jobs:
           RUSTFLAGS: "-D warnings"
         run: cargo check --workspace --all-targets --all-features
 
+      # `fuzz/` declares its own `[workspace]`, so the check above never sees it
+      # and the targets rot silently. This needs no nightly toolchain — only
+      # `cargo fuzz run` does.
+      - name: Fuzz targets type-check
+        run: cargo check --all-targets --manifest-path fuzz/Cargo.toml
+
       - name: Rustdoc (deny broken intra-doc links)
         env:
           RUSTDOCFLAGS: "-D warnings"
@@ -93,7 +99,6 @@ jobs:
           - versioned,validate
           - versioned,builder,validate
           - versioned,json,schemars,utoipa
-          - versioned,json,simd-json
           - versioned,sqlx
           - versioned,json,sqlx
           - versioned,strum,tracing,metrics

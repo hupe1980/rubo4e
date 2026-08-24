@@ -156,11 +156,8 @@ mod extension_data_tests {
 /// has no algorithmic inverse.
 ///
 /// These four types are the whole population of that problem in v202607:
-/// `hoechstpreisHT`/`hoechstpreisNT` (trailing acronym), `kundengruppeKA`
-/// (trailing acronym), and `Sigmoidparameter`'s single-letter `A`–`D`. Each one
-/// previously deserialized into `_additional` instead of its typed field, so a
-/// `to_json_snake_case` → `from_json_snake_case` round-trip returned a value that
-/// compared unequal while reporting no error.
+/// `hoechstpreisHT`/`hoechstpreisNT` and `kundengruppeKA` (trailing acronyms),
+/// and `Sigmoidparameter`'s single-letter `A`–`D`.
 #[cfg(all(feature = "versioned", feature = "json", feature = "decimal"))]
 mod snake_case_round_trip {
     use rubo4e::current::{

@@ -142,6 +142,10 @@ macro_rules! impl_validators {
 
             /// Exactly one of `lokationsadresse`, `geoadresse`, or
             /// `katasterinformation` must be `Some`.
+            ///
+            /// BO4E states this rule but enforces it nowhere — BO4E-python
+            /// carries it only as a source comment. Checked here only when you
+            /// call `.validate()`; a violating payload still deserializes.
             pub fn validate_marktlokation(v: &Marktlokation, _: &()) -> Result<(), garde::Error> {
                 let count = v.lokationsadresse.is_some() as usize
                     + v.geoadresse.is_some() as usize
@@ -158,6 +162,9 @@ macro_rules! impl_validators {
 
             /// Exactly one of `messadresse`, `geoadresse`, or
             /// `katasterinformation` must be `Some`.
+            ///
+            /// Same provenance as [`validate_marktlokation`]: stated by BO4E,
+            /// enforced by no reference implementation, opt-in here.
             pub fn validate_messlokation(v: &Messlokation, _: &()) -> Result<(), garde::Error> {
                 let count = v.messadresse.is_some() as usize
                     + v.geoadresse.is_some() as usize
@@ -213,16 +220,30 @@ macro_rules! impl_validators {
                 Ok(())
             }
 
-            /// Invoice arithmetic checks:
+            /// Invoice consistency checks, each traceable to a sentence in the
+            /// BO4E schema:
             ///
-            /// 1. If exactly two of `gesamtnetto`, `gesamtsteuer`, `gesamtbrutto` are
-            ///    `Some`, all three must be present (partial amounts are not checkable).
-            /// 2. When all three totals are present:
-            ///    `gesamtnetto + gesamtsteuer == gesamtbrutto`
-            /// 3. When `gesamtbrutto` and `zu_zahlen` are both present:
-            ///    `gesamtbrutto - rabatt_netto - sum(vorauszahlungen) == zu_zahlen`
+            /// 1. All monetary fields must agree on a currency. Two `Betrag`s in
+            ///    one invoice denominated differently cannot be summed, so any
+            ///    downstream total would be meaningless.
+            /// 2. `gesamtbrutto` is *"Die Summe aus Netto- und Steuerbetrag"* —
+            ///    so `gesamtnetto + gesamtsteuer == gesamtbrutto` when all three
+            ///    are present.
+            /// 3. If exactly two of the three totals are present, the third is
+            ///    derivable and its absence is a data-quality defect.
+            /// 4. `steuerbetraege` is *"eine Liste mit Steuerbeträgen … die Summe
+            ///    dieser Beträge ergibt den Wert für gesamtsteuer"* — so the
+            ///    line-level tax amounts must sum to `gesamtsteuer`.
             ///
-            /// The arithmetic checks are gated on the `decimal` feature; without it
+            /// # Not checked: `zuZahlen`
+            ///
+            /// Its schema description reads *"(gesamtbrutto - vorausbezahlt -
+            /// rabattBrutto)"*, but v202607 has no `rabattBrutto` — only
+            /// `rabattNetto`, a **net** discount, which cannot be subtracted from
+            /// a gross total. The equation is not reconstructible from the
+            /// payload, so nothing is asserted about it.
+            ///
+            /// The arithmetic is gated on the `decimal` feature; without it
             /// `Betrag.wert` is `Option<String>` and numeric comparison is unsafe.
             // Without `decimal` the body compiles away and `v` goes unread.
             #[cfg_attr(not(feature = "decimal"), allow(unused_variables))]
@@ -234,7 +255,7 @@ macro_rules! impl_validators {
                     let wert =
                         |b: &Option<Betrag>| -> Option<Decimal> { b.as_ref().and_then(|b| b.wert) };
 
-                    // Currency-mismatch guard — all monetary fields must use the same Waehrungscode.
+                    // 1. Currency-mismatch guard.
                     let waehrung = |b: &Option<Betrag>| b.as_ref().and_then(|b| b.waehrung);
                     let currencies = [
                         ("gesamtnetto", waehrung(&v.gesamtnetto)),
@@ -268,6 +289,7 @@ macro_rules! impl_validators {
                     let steuer = wert(&v.gesamtsteuer);
                     let brutto = wert(&v.gesamtbrutto);
 
+                    // 3. Two of three present means the third was simply omitted.
                     let present_count = netto.is_some() as usize
                         + steuer.is_some() as usize
                         + brutto.is_some() as usize;
@@ -278,6 +300,7 @@ macro_rules! impl_validators {
                         ));
                     }
 
+                    // 2. gesamtbrutto = gesamtnetto + gesamtsteuer.
                     if let (Some(n), Some(s), Some(b)) = (netto, steuer, brutto) {
                         if n + s != b {
                             return Err(garde::Error::new(format!(
@@ -287,23 +310,33 @@ macro_rules! impl_validators {
                         }
                     }
 
-                    // zu_zahlen = gesamtbrutto - rabatt_netto - sum(vorauszahlungen)
-                    if let (Some(b), Some(z)) = (wert(&v.gesamtbrutto), wert(&v.zu_zahlen)) {
-                        let rabatt = wert(&v.rabatt_netto).unwrap_or(Decimal::ZERO);
-                        let vorauszahlungen: Decimal = v
-                            .vorauszahlungen
-                            .as_deref()
-                            .unwrap_or_default()
-                            .iter()
-                            .filter_map(|p| p.betrag.as_ref().and_then(|b| b.wert))
-                            .fold(Decimal::ZERO, |acc, v| acc + v);
-                        let expected = b - rabatt - vorauszahlungen;
-                        if expected != z {
-                            return Err(garde::Error::new(format!(
-                                "gesamtbrutto ({b}) - rabatt_netto ({rabatt}) \
-                                 - vorauszahlungen ({vorauszahlungen}) = {expected}, \
-                                 but zu_zahlen is {z}"
-                            )));
+                    // 4. sum(steuerbetraege[*].steuerwert) = gesamtsteuer.
+                    //
+                    // Only checked when every entry states a `steuerwert`: a list
+                    // that omits one is incomplete rather than wrong, and summing
+                    // the rest would report a mismatch that is not there.
+                    if let (Some(entries), Some(total)) = (v.steuerbetraege.as_deref(), steuer) {
+                        let all_stated =
+                            !entries.is_empty() && entries.iter().all(|e| e.steuerwert.is_some());
+                        if all_stated {
+                            let summed = entries
+                                .iter()
+                                .filter_map(|e| e.steuerwert)
+                                .try_fold(Decimal::ZERO, |acc, v| acc.checked_add(v));
+                            match summed {
+                                Some(sum) if sum != total => {
+                                    return Err(garde::Error::new(format!(
+                                        "steuerbetraege sum to {sum}, but gesamtsteuer \
+                                         is {total}"
+                                    )));
+                                }
+                                None => {
+                                    return Err(garde::Error::new(
+                                        "steuerbetraege overflow the Decimal range when summed",
+                                    ));
+                                }
+                                _ => {}
+                            }
                         }
                     }
                 } // end #[cfg(feature = "decimal")]
@@ -321,8 +354,16 @@ macro_rules! impl_validators {
             /// produce (e.g. a date range annotated with an explicit duration).
             /// An entirely empty `Zeitraum` carries no information and is rejected.
             ///
-            /// When both `startdatum` and `enddatum` are present, `startdatum` must
-            /// be strictly before `enddatum` (only checked when `time` is active).
+            /// When both dates are present, `startdatum` must be **on or before**
+            /// `enddatum` (only checked when `time` is active).
+            ///
+            /// # Why `<=` and not `<`
+            ///
+            /// BO4E declares both dates **inclusive**, and gives `'2025-01-01'` as
+            /// the example for *both* of them: `startdatum == enddatum` is a valid
+            /// one-day period, not an empty one. Requiring a strict `<` — as an
+            /// earlier revision did, on the assumption that `enddatum` was
+            /// exclusive — rejected every single-day Zeitraum in circulation.
             pub fn validate_zeitraum(v: &Zeitraum, _: &()) -> Result<(), garde::Error> {
                 let has_duration = v.dauer.is_some();
                 let has_date = v.startdatum.is_some() || v.enddatum.is_some();
@@ -335,13 +376,16 @@ macro_rules! impl_validators {
                     ));
                 }
 
-                // Date-ordering invariant: only enforced when time feature provides
-                // native OffsetDateTime comparison semantics.
+                // Date ordering is only checked with `time`, where the fields are
+                // `time::Date` and compare chronologically.  Without it they are
+                // `String`, and a lexicographic comparison of partial ISO-8601
+                // forms is not the same order.
                 #[cfg(feature = "time")]
                 if let (Some(start), Some(end)) = (v.startdatum, v.enddatum) {
-                    if start >= end {
+                    if start > end {
                         return Err(garde::Error::new(format!(
-                            "startdatum ({start}) must be strictly before enddatum ({end})"
+                            "startdatum ({start}) must be on or before enddatum ({end}); \
+                             both bounds are inclusive, so a one-day period has start == end"
                         )));
                     }
                 }
@@ -349,11 +393,27 @@ macro_rules! impl_validators {
                 Ok(())
             }
 
-            /// Kostenposition arithmetic: `einzelpreis * menge == betrag_kostenposition.wert`
-            /// when all three values are present.
+            /// Kostenposition arithmetic: the line total must be the product of
+            /// unit price and quantity.
             ///
-            /// Gated on the `decimal` feature; without it the fields are `Option<String>`
-            /// and numeric arithmetic is not available.
+            /// The schema describes `betragKostenposition` as the result of
+            /// *"<Menge * Einzelpreis>"* **or** *"<Einzelpreis / (Anzahl Tage
+            /// Jahr) * zeitmenge"*. Only the first form is checkable from the
+            /// fields alone — the second needs the day count of the billing
+            /// year, which the COM does not carry — so a position that states a
+            /// `zeitmenge` is skipped rather than measured against the wrong
+            /// formula.
+            ///
+            /// # Rounding
+            ///
+            /// The product is compared at the **scale of the stated amount**.
+            /// A unit price of `0.2843 €/kWh` over `3333 kWh` is `947.5119`,
+            /// which every invoice in circulation writes as `947.51`; demanding
+            /// exact equality (or equality at ten decimal places, as an earlier
+            /// revision did) rejects the entire real-world corpus.
+            ///
+            /// Gated on the `decimal` feature; without it the fields are
+            /// `Option<String>` and numeric arithmetic is not available.
             // Without `decimal` the body compiles away and `v` goes unread.
             #[cfg_attr(not(feature = "decimal"), allow(unused_variables))]
             pub fn validate_kostenposition_arithmetic(
@@ -362,20 +422,34 @@ macro_rules! impl_validators {
             ) -> Result<(), garde::Error> {
                 #[cfg(feature = "decimal")]
                 {
-                    // einzelpreis and menge are now typed structs (Preis / Menge) whose
-                    // `.wert` holds the numeric amount as a Decimal.  Extract it with
-                    // `and_then` so we skip the arithmetic check when the sub-field is absent.
+                    use rust_decimal::Decimal;
+
+                    // A time-proportional position uses the other formula.
+                    if v.zeitmenge.is_some() {
+                        return Ok(());
+                    }
                     let betrag = v.betrag_kostenposition.as_ref().and_then(|b| b.wert);
                     let einzelpreis = v.einzelpreis.as_ref().and_then(|p| p.wert);
                     let menge = v.menge.as_ref().and_then(|m| m.wert);
 
                     if let (Some(ep), Some(m), Some(b)) = (einzelpreis, menge, betrag) {
-                        let expected = (ep * m).round_dp(10);
-                        let actual = b.round_dp(10);
-                        if expected != actual {
+                        let Some(product) = ep.checked_mul(m) else {
                             return Err(garde::Error::new(format!(
-                                "einzelpreis.wert ({ep}) * menge.wert ({m}) = {expected}, \
-                                 but betrag_kostenposition.wert is {actual}"
+                                "einzelpreis ({ep}) * menge ({m}) overflows the Decimal range"
+                            )));
+                        };
+                        // Accept the amount if it is *a* correct rounding of the
+                        // product to its own scale — i.e. within half a unit in
+                        // the last stated place.  Comparing against one rounding
+                        // mode would reject the other: invoices round halves up,
+                        // `Decimal::round_dp` rounds them to even.
+                        let scale = b.scale();
+                        let half_ulp = Decimal::new(5, scale.saturating_add(1));
+                        if (product - b).abs() > half_ulp {
+                            return Err(garde::Error::new(format!(
+                                "einzelpreis.wert ({ep}) * menge.wert ({m}) = {product}, \
+                                 which does not round to betrag_kostenposition.wert ({b}) \
+                                 at its own scale of {scale} decimal place(s)"
                             )));
                         }
                     }
@@ -402,11 +476,11 @@ pub struct ValidationFailure {
     pub message: String,
 }
 
-/// Converts a [`garde::Report`] into an iterator of structured [`ValidationFailure`]s.
+/// Flattens a [`garde::Report`] into one [`ValidationFailure`] per field error.
 ///
-/// `garde::Report` only implements `Display` (one big string), making it hard to
-/// handle individual failures programmatically.  This function flattens the report
-/// into one `ValidationFailure` per field error so callers can:
+/// `garde::Report` only implements `Display` — one string with every failure in
+/// it — which is unusable for anything but a log line. The flattened form lets
+/// callers:
 /// - render structured API error responses
 /// - log individual field names with key-value pairs
 /// - build test assertions per field

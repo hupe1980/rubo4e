@@ -48,7 +48,7 @@ name = "bo4e-fuzz"
 version = "0.0.0"
 dependencies = [
  "libfuzzer-sys",
- "rustbo4e",
+ "rubo4e",
  "serde_json",
 ]
 
@@ -456,6 +456,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "rubo4e"
+version = "0.10.0"
+dependencies = [
+ "indexmap",
+ "rust_decimal",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "time",
+]
+
+[[package]]
 name = "rust_decimal"
 version = "1.42.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -470,18 +482,6 @@ dependencies = [
  "serde",
  "serde_json",
  "wasm-bindgen",
-]
-
-[[package]]
-name = "rustbo4e"
-version = "0.1.0"
-dependencies = [
- "indexmap",
- "rust_decimal",
- "serde",
- "serde_json",
- "thiserror",
- "time",
 ]
 
 [[package]]

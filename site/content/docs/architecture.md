@@ -42,10 +42,11 @@ rubo4e/
 │   ├── src/
 │   │   ├── main.rs
 │   │   ├── parser.rs        — JSON Schema → AST
-│   │   ├── inference.rs     — semantic type inference (suffix-based heuristics)
+│   │   ├── inference.rs     — semantic type inference, where the schema is vague
+│   │   ├── naming.rs        — BO4E wire values → Rust identifiers
 │   │   └── emitter.rs       — AST → Rust source
 │   ├── schemas/
-│   │   └── v202607.0.0/     — pinned schema snapshot
+│   │   └── v202607.1.0/     — pinned schema snapshot
 │   └── tests/
 │       ├── round_trip.rs    — generator snapshot tests
 │       └── snapshots/       — expected generator output
@@ -59,6 +60,7 @@ rubo4e/
 │   └── serialize.rs
 │
 └── tests/
+    ├── generated_contract.rs — drift guards: schemas ↔ committed generated code
     ├── golden/              — official JSON payloads for round-trip tests (flat, no version subdir)
     ├── compat/              — cross-implementation compatibility vectors
     │   ├── python/
@@ -125,20 +127,54 @@ is a re-export, which is why a schema bump never requires hand-editing types.
 </svg>
 <figcaption>
   Both import paths resolve to the same types. Choose <code>::current</code> to follow
-  the newest schema series automatically, or the version module where enum membership
-  must not move underneath you.
+  the newest schema series automatically, or the version module to stay on one series
+  across a format-version cutover.
 </figcaption>
 </figure>
+
+## What a generated type gives you
+
+Every generated struct and enum carries the same trait surface, so nothing about
+a type has to be looked up per type.
+
+| | BO / COM structs | Enums |
+|---|---|---|
+| Always | `Debug`, `Clone`, `PartialEq`, `Default`&nbsp;\* | `Debug`, `Clone`, `Copy`, `PartialEq`, `Eq`, `PartialOrd`, `Ord`, `Hash` |
+| Without `json` | **`Eq`, `Hash`** | — |
+| `versioned` | `Bo4eObject` (BOs only), `Bo4eStrict` | `Bo4eEnum`, `VARIANTS` / `COUNT` / `as_wire` / `from_wire` / `iter_known` |
+| `json` | `Bo4eJsonExt`, `Bo4eExtensionData`, `Display` | — |
+| `serde` | `Serialize`, `Deserialize` | `Serialize`, `Deserialize` |
+| `builder` | `TypedBuilder` | — |
+| `validate` | `garde::Validate` | — |
+| `schemars` / `utoipa` | `JsonSchema` / `ToSchema` | `JsonSchema` / `ToSchema` |
+| `strum` | — | `EnumString`, `EnumIter`, `IntoStaticStr` |
+| `sqlx` | — | `Type` / `Encode` / `Decode` / `PgHasArrayType` |
+
+\* `Default` is absent on the two structs BO4E declares a *required* field on
+(`Lastgang`, `Tarif`) — a required field's type need not have one. Those stamp
+`_typ` and `_version` through the builder instead.
+
+**`Eq` and `Hash` on structs move together**, and only without `json`. One type
+blocks both: `serde_json::Value`, which reaches a generated struct through
+`_additional` and `ZusatzAttribut.wert` and is neither, because it wraps `f64`.
+With `json` off those become a zero-sized stub and a `String`, every remaining
+field type is `Eq + Hash`, and a BO can key a `HashMap` — which a `Hash` without
+an `Eq` could not.
+
+**`Ord` on enums is declaration order**, `Unknown` last. A total order, which is
+what `BTreeMap` and `sort()` need, but not a business ranking — and a release may
+reorder the values, so never persist a sort key derived from it. Compare
+`as_wire()` where the order must be stable across releases.
 
 ## Feature Gate Reference
 
 | Feature | Default | External dep added | MSRV impact | Description |
 |---------|---------|-------------------|-------------|-------------|
-| `serde` | ✓ | `serde` | none | Derive `Serialize`/`Deserialize` on all types |
+| `identifiers` | ✓ | `serde` | none | Identifier newtypes with serde, without the versioned schema |
+| `serde` | ✓ (via `identifiers`) | `serde` | none | Derive `Serialize`/`Deserialize` on all types |
 | `json` | — | `serde_json` | none | `to_json_*()` methods; `serde` implied |
-| `simd-json` | — | `simd-json` | none | SIMD-accelerated JSON (x86_64 AVX2 / ARM NEON) |
 | `time` | — | `time` | none | `OffsetDateTime` for datetime fields; `Date` for date-only fields; enables `rubo4e::time_serde` when `serde` is also on |
-| `decimal` | — | `rust_decimal` | none | `Decimal` for all monetary/quantity fields |
+| `decimal` | — | `rust_decimal` | none | `Decimal` for all monetary/quantity fields; without it they are `String` and still accept a JSON number |
 | `builder` | — | `typed-builder` | none | Typed builder derives on all BO/COM structs |
 | `validate` | — | `garde` | none | `.validate()` method on all structs |
 | `schemars` | — | `schemars` | none | `JsonSchema` derive on all types; enables `rubo4e::schema_helpers` |
@@ -149,7 +185,7 @@ is a re-export, which is why a schema bump never requires hand-editing types.
 | `tracing` | — | `tracing` | none | Structured diagnostics (identifier failures, extension-data events) |
 | `metrics` | — | `metrics` | none | Counter export hooks (metrics ecosystem) |
 
-> **MSRV:** The library targets Rust ≥ **1.88** (set in `Cargo.toml` via `rust-version`). No feature raises the floor above the baseline any more — `garde` v0.23 needs only 1.87, and the binding constraint is now the always-available dependency tree (`time`, `simd-json`, and `home` via `sqlx` all require 1.88).
+> **MSRV:** The library targets Rust ≥ **1.88** (set in `Cargo.toml` via `rust-version`). No feature raises the floor: the binding constraint is the always-available dependency tree (`time` and `home` via `sqlx` both require 1.88).
 
 ## Design Boundary
 
@@ -168,8 +204,11 @@ The generator (`generator/`) is the only component that writes to `src/generated
 Generated code is **committed to the repository** so that:
 
 1. `cargo build` works without running the generator
-2. CI can verify that committed code matches the pinned schema (diff check)
-3. Code review can inspect schema-driven changes
+2. Code review can inspect schema-driven changes as an ordinary diff
+
+Committing it means nothing at build time forces the output to match the schemas,
+so `tests/generated_contract.rs` and `just check-docs-drift` supply that force:
+they read both sides and compare. See [Code Generator](@/docs/generator.md#drift-guards).
 
 The `generated/` subtree is never `pub` beyond the crate boundary. All public types
 are flat-re-exported through `src/generated/v<version>/mod.rs`, which is then
@@ -179,9 +218,8 @@ re-exported from the version-gated module in `src/lib.rs` (e.g., `pub mod v20260
 
 - `rust-version = "1.88"` is set in the root `Cargo.toml`, and CI checks the crate on exactly
   that toolchain so the key is a verified claim rather than an unchecked promise.
-- The floor tracks the **dependency tree**, not this crate's own source. `time`, `simd-json`,
-  and `home` (via `sqlx`) require 1.88; `garde` needs only 1.87, so no individual feature is
-  the binding constraint any more.
+- The floor tracks the **dependency tree**, not this crate's own source: `time`
+  and `home` (via `sqlx`) require 1.88, and no individual feature raises it further.
 - A below-floor toolchain fails during dependency *resolution*, not compilation, because the
   default resolver ignores `rust-version` when picking versions. The error names the offending
   packages; pin them with `cargo update <crate> --precise <version>` to build on an older

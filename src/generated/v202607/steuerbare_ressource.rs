@@ -3,7 +3,7 @@ use super::{
     SteuerkanalLeistungsbeschreibung, ZusatzAttribut,
 };
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(not(feature = "json"), derive(Hash))]
+#[cfg_attr(not(feature = "json"), derive(Eq, Hash))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "builder", derive(typed_builder::TypedBuilder))]
 #[cfg_attr(feature = "validate", derive(garde::Validate))]
@@ -12,7 +12,7 @@ use super::{
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 /// Object containing information about a steuerbare Ressource
 ///
-/// > **Note:** [SteuerbareRessource JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/bo/SteuerbareRessource.json)
+/// > **Note:** [SteuerbareRessource JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.1.0/src/bo4e_schemas/bo/SteuerbareRessource.json)
 pub struct SteuerbareRessource {
     /// Eigenschaft des Messstellenbetreibers an der Lokation
     #[cfg_attr(feature = "serde", serde(rename = "eigenschaftMsbLokation"))]
@@ -51,12 +51,12 @@ pub struct SteuerbareRessource {
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub steuerkanal_leistungsbeschreibung: Option<SteuerkanalLeistungsbeschreibung>,
-    /// BO type identifier — always `BoTyp::SteuerbareRessource` for this struct.
+    /// BO4E type discriminant — always `BoTyp::SteuerbareRessource` for this struct.
     #[cfg_attr(feature = "serde", serde(rename = "_typ"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(
         feature = "builder",
-        builder(default = Some(BoTyp::Steuerbareressource), setter(skip))
+        builder(default = Some(BoTyp::SteuerbareRessource), setter(skip))
     )]
     pub typ: Option<BoTyp>,
     /// Version der BO-Struktur aka "fachliche Versionierung"
@@ -64,7 +64,7 @@ pub struct SteuerbareRessource {
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(
         feature = "builder",
-        builder(default = Some("v202607.0.0".to_owned()), setter(into))
+        builder(default = Some("202607.1.0".to_owned()), setter(into))
     )]
     pub version: Option<String>,
     /// Angabe des Messstellenbetreibers, der der Steuerbaren Ressource zugeordnet ist.
@@ -92,7 +92,6 @@ pub struct SteuerbareRessource {
 impl Default for SteuerbareRessource {
     fn default() -> Self {
         Self {
-            typ: Some(BoTyp::Steuerbareressource),
             eigenschaft_msb_lokation: Default::default(),
             id: Default::default(),
             konfigurationsprodukte: Default::default(),
@@ -100,7 +99,8 @@ impl Default for SteuerbareRessource {
             lokationszuordnungen: Default::default(),
             steuerbare_ressource_id: Default::default(),
             steuerkanal_leistungsbeschreibung: Default::default(),
-            version: Some("v202607.0.0".to_owned()),
+            typ: Some(BoTyp::SteuerbareRessource),
+            version: Some("202607.1.0".to_owned()),
             zugeordnete_msb_codenummer: Default::default(),
             zusatz_attribute: Default::default(),
             _additional: Default::default(),
@@ -110,10 +110,13 @@ impl Default for SteuerbareRessource {
 impl Bo4eObject for SteuerbareRessource {
     type BoTyp = BoTyp;
     fn bo_type(&self) -> BoTyp {
-        self.typ.unwrap_or(BoTyp::Steuerbareressource)
+        self.typ.unwrap_or(BoTyp::SteuerbareRessource)
     }
     fn schema_version(&self) -> &'static str {
-        "v202607.0.0"
+        "202607.1.0"
+    }
+    fn schema_series(&self) -> &'static str {
+        "202607"
     }
 }
 #[cfg(feature = "json")]

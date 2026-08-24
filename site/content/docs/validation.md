@@ -59,26 +59,39 @@ use rubo4e::validation::Validated;
 let validated: Validated<Vertrag> = Validated::new(vertrag)?;
 ```
 
-### Newtypes with `#[garde(transparent)]`
+### How the derives are wired
 
-The `transparent` attribute flattens the error path for newtypes, giving clean messages:
+Identifier newtypes wrap a `Box<str>` and re-run the *same* validator garde saw
+at construction, so `garde` and `Identifier::new` can never disagree:
 
 ```rust
 #[derive(garde::Validate)]
-#[garde(transparent)]
-pub struct MaloId(
-    #[garde(length(equal = 11), custom(check_malo_checksum))]
-    String,
-);
+#[garde(allow_unvalidated)]
+pub struct MaloId(#[garde(custom(check_malo_id))] Box<str>);
 
-#[derive(garde::Validate)]
-pub struct Vertrag {
-    #[garde(required, dive)]
-    pub marktlokations_id: Option<MaloId>,
+fn check_malo_id(value: &str, _: &()) -> Result<(), garde::Error> {
+    validate(value).map_err(garde::Error::from)   // the constructor's own check
 }
 ```
 
-Error path for an invalid ID: `"marktlokations_id"` (not `"marktlokations_id[0]"`).
+Generated BO/COM structs use `#[garde(allow_unvalidated)]` too — a field with no
+explicit attribute is simply accepted — and mark identifier-typed fields
+`#[garde(dive)]` so the newtype's validator runs on the way through:
+
+```rust
+#[derive(garde::Validate)]
+#[garde(allow_unvalidated)]
+#[garde(custom(crate::validation::v202607::validate_marktlokation))]
+pub struct Marktlokation {
+    #[garde(dive)]
+    pub marktlokations_id: Option<crate::identifiers::MaloId>,
+    // … every other field: unvalidated
+}
+```
+
+Note that BO4E declares almost every field optional, so `garde` cannot enforce
+"required" for you. The cross-field validators below are where the invariants
+BO4E states in prose become checkable.
 
 ## Validation Rules Reference
 
@@ -100,6 +113,11 @@ Exactly **one** of the following address fields must be `Some`:
 ✗  two fields = Some →  "exactly one address field must be set"
 ```
 
+BO4E states this rule without enforcing it — BO4E-python carries it as a source
+comment (*"only one of the following three optional attributes can be set"*) with
+no validator behind it. rubo4e checks it only when you call `.validate()`; a
+violating payload still deserializes, as it does everywhere else.
+
 ### Date Range Constraints
 
 **Vertrag** (fields: `Option<time::OffsetDateTime>`):
@@ -114,8 +132,21 @@ bilanzierungsbeginn ≤ bilanzierungsende   (when both are Some; equal is valid)
 
 **Zeitraum** (fields: `Option<time::Date>`):
 ```
-startdatum < enddatum   (when both are Some; strict — same day is invalid)
+startdatum <= enddatum   (when both are Some; equal is a valid one-day period)
 ```
+
+Non-strict because BO4E declares **both** dates inclusive and gives
+`'2025-01-01'` as the example for each: `startdatum == enddatum` is a one-day
+period, not an empty one. The accessors in `rubo4e::convenience` read the
+interval the same way — `Zeitraum::contains` includes both bounds, and
+`whole_days()` counts a one-day period as 1 and January as 31.
+
+Note the contrast with the two rules above it: `vertragsbeginn`/`vertragsende`
+are `date-time` and BO4E declares *that* end **exclusive**, which is why
+`Vertrag` requires a strict `<` and `Zeitraum` does not. The same release uses
+three interval conventions; `tests/interval_conventions.rs` reads each one out of
+the committed schema and checks it against the code, so a release that flips one
+fails CI rather than an invoice.
 
 Additionally, a `Zeitraum` must have at least one temporal attribute set (`dauer`,
 `startdatum`, `enddatum`, `startuhrzeit`, or `enduhrzeit`). A completely empty
@@ -125,35 +156,57 @@ If only one boundary is `Some`, no ordering constraint is checked.
 Date-ordering constraints require the `time` feature — without it the comparison
 is not emitted.
 
-### Rechnung Arithmetic Constraints
+### Rechnung Consistency Constraints
 
-All arithmetic uses `rust_decimal::Decimal`. Tolerance is exactly zero.
+All arithmetic uses `rust_decimal::Decimal` (feature `decimal`); without it the
+amount fields are `Option<String>` and the checks compile away. Every rule below
+traces to a sentence in the BO4E schema.
 
-```
-gesamt_netto + gesamt_steuer == gesamt_brutto
-gesamt_brutto - vorausgezahlt - rabatt_brutto == zuzahlen
-```
+**Currency agreement.** All `Betrag` fields on one invoice (`gesamtnetto`,
+`gesamtsteuer`, `gesamtbrutto`, `rabatt_netto`, `zu_zahlen`) must name the same
+`Waehrungscode`; amounts in different currencies cannot be summed.
 
-Validation only runs when all four fields are `Some`. If any is `None`, no arithmetic
-constraint is checked.
-
-**Error format:**
-```
-rechnung.gesamt_brutto: expected 119.00, got 118.99 (netto=100.00, steuer=19.00)
-```
-
-### Avis Sum Constraint
+**Totals.** The schema describes `gesamtbrutto` as *"Die Summe aus Netto- und
+Steuerbetrag"*:
 
 ```
-sum(positionen[*].betrag) == zu_zahlen
+gesamtnetto + gesamtsteuer == gesamtbrutto      (when all three are Some)
 ```
 
-All position amounts are summed using `Decimal`. The sum must exactly equal `zu_zahlen`.
+If exactly **two** of the three are `Some`, validation fails — the third is
+derivable, so its absence is a defect. Fewer than two present means no check.
+
+**Tax lines.** The schema describes `steuerbetraege` as *"eine Liste mit
+Steuerbeträgen … die Summe dieser Beträge ergibt den Wert für gesamtsteuer"*:
 
 ```
-✓  positions = [50.00, 30.00, 20.00], zu_zahlen = 100.00
-✗  positions = [],                    zu_zahlen = 50.00   →  "sum 0.00 ≠ 50.00"
+sum(steuerbetraege[*].steuerwert) == gesamtsteuer
 ```
+
+Only checked when every entry states a `steuerwert`; a list with one omitted is
+incomplete rather than inconsistent.
+
+#### Not checked: `zuZahlen`
+
+The schema describes `zuZahlen` as *"(gesamtbrutto - vorausbezahlt -
+rabattBrutto)"*, but v202607 ships no `rabattBrutto` — only `rabattNetto`, a
+**net** figure, which cannot be subtracted from a gross total. The equation is
+not reconstructible from the payload, so nothing is asserted about it. Read
+`zu_zahlen_decimal()` and check it against your own books.
+
+### Kostenposition Line Totals
+
+The schema computes `betragKostenposition` as *"<Menge * Einzelpreis>"* **or**
+*"<Einzelpreis / (Anzahl Tage Jahr) * zeitmenge>"*. Only the first is checkable
+from the COM alone, so a position that states a `zeitmenge` is skipped.
+
+```
+einzelpreis.wert * menge.wert  ≈  betrag_kostenposition.wert
+```
+
+The comparison allows **half a unit in the last stated decimal place** of the
+amount, which accepts either rounding mode: `0.2843 €/kWh × 3333 kWh` is
+`947.5719`, written on the invoice as `947.57`.
 
 ## Layer 3 — Schema Validation
 

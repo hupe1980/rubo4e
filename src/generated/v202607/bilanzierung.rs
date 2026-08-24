@@ -4,7 +4,7 @@ use super::{
     ZusatzAttribut,
 };
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(not(feature = "json"), derive(Hash))]
+#[cfg_attr(not(feature = "json"), derive(Eq, Hash))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "builder", derive(typed_builder::TypedBuilder))]
 #[cfg_attr(feature = "validate", derive(garde::Validate))]
@@ -138,7 +138,7 @@ pub struct Bilanzierung {
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub temperatur_arbeit: Option<Menge>,
-    /// BO type identifier — always `BoTyp::Bilanzierung` for this struct.
+    /// BO4E type discriminant — always `BoTyp::Bilanzierung` for this struct.
     #[cfg_attr(feature = "serde", serde(rename = "_typ"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(
@@ -157,13 +157,23 @@ pub struct Bilanzierung {
     #[cfg_attr(feature = "serde", serde(rename = "verbrauchsaufteilung"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "serde", serde(default))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(deserialize_with = "crate::decimal_serde::deserialize_opt")
+    )]
     #[cfg(feature = "decimal")]
     pub verbrauchsaufteilung: Option<rust_decimal::Decimal>,
     /// Requires the `decimal` feature for the `rust_decimal::Decimal` representation.
-    /// Without `decimal`, stores the decimal string value unchanged.
+    /// Without `decimal`, stores the decimal's lexical form (a JSON string or number).
     #[cfg_attr(feature = "serde", serde(rename = "verbrauchsaufteilung"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "serde", serde(default))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(deserialize_with = "crate::decimal_serde::deserialize_opt")
+    )]
     #[cfg(not(feature = "decimal"))]
     pub verbrauchsaufteilung: Option<String>,
     /// Version der BO-Struktur aka "fachliche Versionierung"
@@ -171,7 +181,7 @@ pub struct Bilanzierung {
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(
         feature = "builder",
-        builder(default = Some("v202607.0.0".to_owned()), setter(into))
+        builder(default = Some("202607.1.0".to_owned()), setter(into))
     )]
     pub version: Option<String>,
     /// Wahlrecht der Prognosegrundlage.
@@ -202,7 +212,6 @@ pub struct Bilanzierung {
 impl Default for Bilanzierung {
     fn default() -> Self {
         Self {
-            typ: Some(BoTyp::Bilanzierung),
             abwicklungsmodell: Default::default(),
             aggregationsverantwortung: Default::default(),
             bilanzierungsbeginn: Default::default(),
@@ -219,8 +228,9 @@ impl Default for Bilanzierung {
             prioritaet: Default::default(),
             prognosegrundlage: Default::default(),
             temperatur_arbeit: Default::default(),
+            typ: Some(BoTyp::Bilanzierung),
             verbrauchsaufteilung: Default::default(),
-            version: Some("v202607.0.0".to_owned()),
+            version: Some("202607.1.0".to_owned()),
             wahlrecht_prognosegrundlage: Default::default(),
             zeitreihentyp: Default::default(),
             zusatz_attribute: Default::default(),
@@ -234,7 +244,10 @@ impl Bo4eObject for Bilanzierung {
         self.typ.unwrap_or(BoTyp::Bilanzierung)
     }
     fn schema_version(&self) -> &'static str {
-        "v202607.0.0"
+        "202607.1.0"
+    }
+    fn schema_series(&self) -> &'static str {
+        "202607"
     }
 }
 #[cfg(feature = "json")]

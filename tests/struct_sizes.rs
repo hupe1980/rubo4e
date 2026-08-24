@@ -133,13 +133,8 @@ mod generated_type_sizes {
 
 /// Every identifier must expose the *same* conversion surface.
 ///
-/// These traits used to be hand-written per type, and the copies had drifted:
-/// `MaloId` implemented `Deref`/`Borrow`/`Into<String>` while `EicCode`,
-/// `BilanzkreisId`, `MeloId`, `ObisCode`, `AkivId`, and `TranchennummerId`
-/// implemented only a subset — so `String::from(malo)` compiled and
-/// `String::from(eic)` did not. All identifiers now share one macro-generated
-/// implementation; this asserts that, so a future hand-written type cannot
-/// quietly ship with a smaller API than its siblings.
+/// They all share one macro-generated implementation; this asserts it, so a
+/// hand-written type cannot ship with a smaller API than its siblings.
 mod uniform_trait_surface {
     use rubo4e::identifiers::*;
     use std::borrow::Borrow;

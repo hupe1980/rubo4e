@@ -1,6 +1,6 @@
 use super::{Angebotsposition, Betrag, ComTyp, Marktlokation, Menge, Zeitraum, ZusatzAttribut};
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(not(feature = "json"), derive(Hash))]
+#[cfg_attr(not(feature = "json"), derive(Eq, Hash))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "builder", derive(typed_builder::TypedBuilder))]
 #[cfg_attr(feature = "validate", derive(garde::Validate))]
@@ -13,7 +13,7 @@ use super::{Angebotsposition, Betrag, ComTyp, Marktlokation, Menge, Zeitraum, Zu
 /// Hier werden die Mengen und Gesamtkosten aller Angebotspositionen zusammengefasst.
 /// Eine Variante besteht mindestens aus einem Angebotsteil.
 ///
-/// > **Note:** [Angebotsteil JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/com/Angebotsteil.json)
+/// > **Note:** [Angebotsteil JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.1.0/src/bo4e_schemas/com/Angebotsteil.json)
 pub struct Angebotsteil {
     /// Identifizierung eines Subkapitels einer Anfrage, beispielsweise das Los einer Ausschreibung
     #[cfg_attr(feature = "serde", serde(rename = "anfrageSubreferenz"))]
@@ -52,17 +52,20 @@ pub struct Angebotsteil {
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub positionen: Option<Vec<Angebotsposition>>,
-    /// COM type identifier for this struct.
+    /// BO4E type discriminant — always `ComTyp::Angebotsteil` for this struct.
     #[cfg_attr(feature = "serde", serde(rename = "_typ"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(
+        feature = "builder",
+        builder(default = Some(ComTyp::Angebotsteil), setter(skip))
+    )]
     pub typ: Option<ComTyp>,
     /// Version der COM-Struktur aka "fachliche Versionierung"
     #[cfg_attr(feature = "serde", serde(rename = "_version"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(
         feature = "builder",
-        builder(default = Some("v202607.0.0".to_owned()), setter(into))
+        builder(default = Some("202607.1.0".to_owned()), setter(into))
     )]
     pub version: Option<String>,
     #[cfg_attr(feature = "serde", serde(rename = "zusatzAttribute"))]
@@ -91,8 +94,8 @@ impl Default for Angebotsteil {
             lieferstellenangebotsteil: Default::default(),
             lieferzeitraum: Default::default(),
             positionen: Default::default(),
-            typ: Default::default(),
-            version: Some("v202607.0.0".to_owned()),
+            typ: Some(ComTyp::Angebotsteil),
+            version: Some("202607.1.0".to_owned()),
             zusatz_attribute: Default::default(),
             _additional: Default::default(),
         }

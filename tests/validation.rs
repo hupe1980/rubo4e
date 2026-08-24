@@ -208,37 +208,31 @@ mod rechnung_tests {
         assert!(r.validate().is_err());
     }
 
+    /// `zuZahlen` is deliberately unchecked: the equation its schema names
+    /// references a `rabattBrutto` field v202607 does not have, and deriving it
+    /// from the **net** discount instead is off by the VAT on that discount.
+    /// This invoice was rejected by that derived rule, and is perfectly valid.
     #[test]
-    fn zu_zahlen_simple_ok() {
-        // no discount, no advance payments → zu_zahlen == gesamtbrutto
-        let r = Rechnung {
-            gesamtnetto: betrag(dec("100.00")),
-            gesamtsteuer: betrag(dec("19.00")),
-            gesamtbrutto: betrag(dec("119.00")),
-            zu_zahlen: betrag(dec("119.00")),
-            ..Default::default()
-        };
-        assert!(r.validate().is_ok());
-    }
-
-    #[test]
-    fn zu_zahlen_with_discount_ok() {
-        // gesamtbrutto 119 - rabatt_netto 10 = 109
+    fn net_discount_does_not_constrain_zu_zahlen() {
         let r = Rechnung {
             gesamtnetto: betrag(dec("100.00")),
             gesamtsteuer: betrag(dec("19.00")),
             gesamtbrutto: betrag(dec("119.00")),
             rabatt_netto: betrag(dec("10.00")),
-            zu_zahlen: betrag(dec("109.00")),
+            // 119 − (10 net + 1.90 VAT on the discount) = 107.10.
+            zu_zahlen: betrag(dec("107.10")),
             ..Default::default()
         };
-        assert!(r.validate().is_ok());
+        assert!(
+            r.validate().is_ok(),
+            "a correctly discounted invoice must not be rejected: {:?}",
+            r.validate().unwrap_err()
+        );
     }
 
     #[test]
-    fn zu_zahlen_with_advance_ok() {
+    fn zu_zahlen_after_advance_payment_ok() {
         use rubo4e::v202607::Vorauszahlung;
-        // gesamtbrutto 119 - vorauszahlung 20 = 99
         let r = Rechnung {
             gesamtnetto: betrag(dec("100.00")),
             gesamtsteuer: betrag(dec("19.00")),
@@ -253,16 +247,143 @@ mod rechnung_tests {
         assert!(r.validate().is_ok());
     }
 
+    // ── steuerbetraege must sum to gesamtsteuer ──────────────────────────────
+
     #[test]
-    fn zu_zahlen_mismatch_fails() {
+    fn tax_lines_summing_to_total_ok() {
+        use rubo4e::v202607::Steuerbetrag;
         let r = Rechnung {
             gesamtnetto: betrag(dec("100.00")),
             gesamtsteuer: betrag(dec("19.00")),
             gesamtbrutto: betrag(dec("119.00")),
-            zu_zahlen: betrag(dec("118.00")), // off by 1
+            steuerbetraege: Some(vec![
+                Steuerbetrag {
+                    steuerwert: Some(dec("11.40")),
+                    ..Default::default()
+                },
+                Steuerbetrag {
+                    steuerwert: Some(dec("7.60")),
+                    ..Default::default()
+                },
+            ]),
             ..Default::default()
         };
-        assert!(r.validate().is_err());
+        assert!(r.validate().is_ok());
+    }
+
+    #[test]
+    fn tax_lines_not_summing_to_total_fails() {
+        use rubo4e::v202607::Steuerbetrag;
+        let r = Rechnung {
+            gesamtnetto: betrag(dec("100.00")),
+            gesamtsteuer: betrag(dec("19.00")),
+            gesamtbrutto: betrag(dec("119.00")),
+            steuerbetraege: Some(vec![Steuerbetrag {
+                steuerwert: Some(dec("18.00")),
+                ..Default::default()
+            }]),
+            ..Default::default()
+        };
+        let err = r.validate().unwrap_err().to_string();
+        assert!(err.contains("steuerbetraege"), "unexpected error: {err}");
+    }
+
+    /// A tax list with an unstated `steuerwert` is incomplete, not inconsistent —
+    /// summing the rest would report a mismatch that is not there.
+    #[test]
+    fn tax_lines_with_missing_amounts_are_skipped() {
+        use rubo4e::v202607::Steuerbetrag;
+        let r = Rechnung {
+            gesamtnetto: betrag(dec("100.00")),
+            gesamtsteuer: betrag(dec("19.00")),
+            gesamtbrutto: betrag(dec("119.00")),
+            steuerbetraege: Some(vec![
+                Steuerbetrag {
+                    steuerwert: Some(dec("11.40")),
+                    ..Default::default()
+                },
+                Steuerbetrag::default(),
+            ]),
+            ..Default::default()
+        };
+        assert!(r.validate().is_ok());
+    }
+}
+
+/// `Kostenposition` line-total arithmetic: the product must round to the stated
+/// amount at its own scale, and time-proportional positions are out of scope.
+#[cfg(all(
+    feature = "validate",
+    feature = "versioned",
+    feature = "decimal",
+    feature = "time"
+))]
+mod kostenposition_tests {
+    use garde::Validate as _;
+    use rubo4e::v202607::{Kostenposition, Menge, Preis};
+    use rust_decimal::Decimal;
+    use std::str::FromStr as _;
+
+    fn dec(s: &str) -> Decimal {
+        Decimal::from_str(s).unwrap()
+    }
+
+    fn position(einzelpreis: &str, menge: &str, betrag: &str) -> Kostenposition {
+        Kostenposition {
+            einzelpreis: Some(Preis {
+                wert: Some(dec(einzelpreis)),
+                ..Default::default()
+            }),
+            menge: Some(Menge {
+                wert: Some(dec(menge)),
+                ..Default::default()
+            }),
+            betrag_kostenposition: Some(rubo4e::v202607::Betrag {
+                wert: Some(dec(betrag)),
+                ..Default::default()
+            }),
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn exact_product_ok() {
+        assert!(position("2.00", "3", "6.00").validate().is_ok());
+    }
+
+    /// The case that mattered: a real unit price times a real consumption gives
+    /// a product with more decimals than any invoice prints.
+    #[test]
+    fn product_rounded_to_the_stated_scale_ok() {
+        // 0.2843 €/kWh × 3333 kWh = 947.5719 → printed as 947.57
+        let p = position("0.2843", "3333", "947.57");
+        assert!(
+            p.validate().is_ok(),
+            "rounding to the stated scale must be accepted: {:?}",
+            p.validate().unwrap_err()
+        );
+    }
+
+    #[test]
+    fn genuinely_wrong_total_fails() {
+        let err = position("0.2843", "3333", "900.00")
+            .validate()
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("betrag_kostenposition"), "unexpected: {err}");
+    }
+
+    /// A time-proportional position is computed by the schema's other formula,
+    /// which needs a day count this COM does not carry — so it is not measured
+    /// against the product formula at all.
+    #[test]
+    fn time_proportional_position_is_not_checked() {
+        let mut p = position("55.00", "1", "13.75"); // a quarter of a yearly rate
+        p.zeitmenge = Some(Menge {
+            wert: Some(dec("3")),
+            ..Default::default()
+        });
+        assert!(p.validate().is_ok());
     }
 }
 
@@ -343,13 +464,15 @@ mod zeitraum_tests {
         assert!(z.validate().is_ok(), "closed range start < end must pass");
     }
 
+    /// BO4E declares both dates **inclusive** and gives `'2025-01-01'` as the
+    /// example for each, so `start == end` is a one-day period — valid, and the
+    /// commonest shape in a daily-granularity payload.
     #[test]
-    fn same_day_fails() {
-        // validate_zeitraum requires start < end (strict)
+    fn same_day_is_a_valid_one_day_period() {
         let z = zeitraum(Some(date!(2025 - 06 - 15)), Some(date!(2025 - 06 - 15)));
         assert!(
-            z.validate().is_err(),
-            "start == end should be rejected (not a valid interval)"
+            z.validate().is_ok(),
+            "start == end is a one-day period, not an empty one"
         );
     }
 
@@ -442,44 +565,121 @@ mod convenience_tests {
         }
     }
 
-    // ── Zeitraum::as_closed_range ────────────────────────────────────────────
+    // ── Zeitraum::as_inclusive_range ─────────────────────────────────────────
+    //
+    // BO4E declares both dates **inclusive**, so `closed_zeitraum()` is the whole
+    // of 2025 and its `enddatum` is inside the period, not the first day after it.
 
     #[test]
-    fn closed_range_both_present() {
-        let r = closed_zeitraum().as_closed_range();
-        assert_eq!(r, Some((date!(2025 - 01 - 01), date!(2025 - 12 - 31))));
+    fn inclusive_range_both_present() {
+        let r = closed_zeitraum()
+            .as_inclusive_range()
+            .expect("both dates present");
+        assert_eq!(*r.start(), date!(2025 - 01 - 01));
+        assert_eq!(*r.end(), date!(2025 - 12 - 31));
+        assert!(r.contains(&date!(2025 - 12 - 31)), "the end date is inside");
     }
 
     #[test]
-    fn closed_range_open_end_returns_none() {
-        assert_eq!(open_zeitraum().as_closed_range(), None);
+    fn inclusive_range_needs_both_bounds() {
+        assert!(open_zeitraum().as_inclusive_range().is_none());
+        assert!(no_start_zeitraum().as_inclusive_range().is_none());
     }
 
-    #[test]
-    fn closed_range_no_start_returns_none() {
-        assert_eq!(no_start_zeitraum().as_closed_range(), None);
-    }
-
-    // ── Zeitraum::as_half_open_range ─────────────────────────────────────────
+    // ── Zeitraum::bounds ─────────────────────────────────────────────────────
 
     #[test]
-    fn half_open_range_both_present() {
-        let r = closed_zeitraum().as_half_open_range();
+    fn bounds_reports_each_side_independently() {
         assert_eq!(
-            r,
-            Some((date!(2025 - 01 - 01), Some(date!(2025 - 12 - 31))))
+            closed_zeitraum().bounds(),
+            (Some(date!(2025 - 01 - 01)), Some(date!(2025 - 12 - 31)))
         );
+        assert_eq!(
+            open_zeitraum().bounds(),
+            (Some(date!(2025 - 01 - 01)), None)
+        );
+        assert_eq!(
+            no_start_zeitraum().bounds(),
+            (None, Some(date!(2025 - 12 - 31)))
+        );
+        assert_eq!(Zeitraum::default().bounds(), (None, None));
+    }
+
+    // ── Zeitraum::contains ───────────────────────────────────────────────────
+
+    /// `enddatum` is **inclusive** per the schema, so the last day of a period
+    /// is inside it. Reading it exclusively drops a day from every billing
+    /// period and every price-sheet validity.
+    #[test]
+    fn contains_includes_both_boundaries() {
+        let z = closed_zeitraum();
+        assert!(z.contains(date!(2025 - 01 - 01)), "startdatum is inside");
+        assert!(z.contains(date!(2025 - 07 - 01)));
+        assert!(z.contains(date!(2025 - 12 - 31)), "enddatum is inside");
+
+        assert!(!z.contains(date!(2024 - 12 - 31)));
+        assert!(!z.contains(date!(2026 - 01 - 01)));
+    }
+
+    /// BO4E gives `'2025-01-01'` as the example for *both* dates, so a one-day
+    /// period is `start == end`.
+    #[test]
+    fn a_single_day_period_contains_its_one_day() {
+        let one_day = Zeitraum {
+            startdatum: Some(date!(2025 - 03 - 15)),
+            enddatum: Some(date!(2025 - 03 - 15)),
+            ..Default::default()
+        };
+        assert!(one_day.contains(date!(2025 - 03 - 15)));
+        assert!(!one_day.contains(date!(2025 - 03 - 14)));
+        assert!(!one_day.contains(date!(2025 - 03 - 16)));
+        assert_eq!(one_day.whole_days(), Some(1));
+
+        // …and it must validate: the ordering rule is `<=`, not `<`.
+        #[cfg(feature = "validate")]
+        {
+            use garde::Validate as _;
+            assert!(one_day.validate().is_ok(), "a one-day period is valid BO4E");
+        }
     }
 
     #[test]
-    fn half_open_range_open_end() {
-        let r = open_zeitraum().as_half_open_range();
-        assert_eq!(r, Some((date!(2025 - 01 - 01), None)));
+    fn an_absent_boundary_is_unbounded_on_that_side() {
+        assert!(open_zeitraum().contains(date!(2099 - 12 - 31)));
+        assert!(!open_zeitraum().contains(date!(2024 - 12 - 31)));
+
+        assert!(no_start_zeitraum().contains(date!(1900 - 01 - 01)));
+        assert!(!no_start_zeitraum().contains(date!(2026 - 01 - 01)));
+    }
+
+    // ── Zeitraum::whole_days ─────────────────────────────────────────────────
+
+    #[test]
+    fn whole_days_counts_both_boundaries() {
+        // January 2026: 31 days, not 30 and not 32.
+        let january = Zeitraum {
+            startdatum: Some(date!(2026 - 01 - 01)),
+            enddatum: Some(date!(2026 - 01 - 31)),
+            ..Default::default()
+        };
+        assert_eq!(january.whole_days(), Some(31));
+
+        // A full non-leap year.
+        assert_eq!(closed_zeitraum().whole_days(), Some(365));
+
+        // A leap year.
+        let leap = Zeitraum {
+            startdatum: Some(date!(2024 - 01 - 01)),
+            enddatum: Some(date!(2024 - 12 - 31)),
+            ..Default::default()
+        };
+        assert_eq!(leap.whole_days(), Some(366));
     }
 
     #[test]
-    fn half_open_range_no_start_returns_none() {
-        assert_eq!(no_start_zeitraum().as_half_open_range(), None);
+    fn whole_days_needs_both_bounds() {
+        assert_eq!(open_zeitraum().whole_days(), None);
+        assert_eq!(no_start_zeitraum().whole_days(), None);
     }
 
     // ── Rechnung::billing_period ─────────────────────────────────────────────
@@ -490,9 +690,12 @@ mod convenience_tests {
             rechnungsperiode: Some(closed_zeitraum()),
             ..Default::default()
         };
-        assert_eq!(
-            r.billing_period(),
-            Some((date!(2025 - 01 - 01), date!(2025 - 12 - 31)))
+        let period = r.billing_period().expect("both dates present");
+        assert_eq!(*period.start(), date!(2025 - 01 - 01));
+        assert_eq!(*period.end(), date!(2025 - 12 - 31));
+        assert!(
+            period.contains(&date!(2025 - 12 - 31)),
+            "the last day of the period is billed"
         );
     }
 
@@ -502,30 +705,33 @@ mod convenience_tests {
             rechnungsperiode: None,
             ..Default::default()
         };
-        assert_eq!(r.billing_period(), None);
+        assert!(r.billing_period().is_none());
     }
 
     #[test]
     fn billing_period_open_ended_returns_none() {
-        // open-ended rechnungsperiode → billing_period() returns None (no closed range)
         let r = Rechnung {
             rechnungsperiode: Some(open_zeitraum()),
             ..Default::default()
         };
-        assert_eq!(r.billing_period(), None);
+        assert!(r.billing_period().is_none());
     }
 
     // ── PreisblattNetznutzung::validity ──────────────────────────────────────
 
     #[test]
-    fn validity_closed_range() {
+    fn validity_reports_both_bounds() {
         let p = PreisblattNetznutzung {
             gueltigkeit: Some(closed_zeitraum()),
             ..Default::default()
         };
         assert_eq!(
             p.validity(),
-            Some((date!(2025 - 01 - 01), Some(date!(2025 - 12 - 31))))
+            (Some(date!(2025 - 01 - 01)), Some(date!(2025 - 12 - 31)))
+        );
+        assert!(
+            p.is_valid_at(date!(2025 - 12 - 31)),
+            "a price sheet is still valid on its enddatum"
         );
     }
 
@@ -535,15 +741,19 @@ mod convenience_tests {
             gueltigkeit: Some(open_zeitraum()),
             ..Default::default()
         };
-        assert_eq!(p.validity(), Some((date!(2025 - 01 - 01), None)));
+        assert_eq!(p.validity(), (Some(date!(2025 - 01 - 01)), None));
     }
 
     #[test]
-    fn validity_no_gueltigkeit_returns_none() {
+    fn validity_without_gueltigkeit_is_unstated_and_never_valid() {
         let p = PreisblattNetznutzung {
             gueltigkeit: None,
             ..Default::default()
         };
-        assert_eq!(p.validity(), None);
+        assert_eq!(p.validity(), (None, None));
+        assert!(
+            !p.is_valid_at(date!(2025 - 06 - 01)),
+            "an unstated validity must not read as valid"
+        );
     }
 }

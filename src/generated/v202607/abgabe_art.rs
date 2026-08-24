@@ -1,4 +1,4 @@
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(
     feature = "strum",
@@ -107,7 +107,8 @@ impl AbgabeArt {
     /// # Example
     /// ```
     /// # use rubo4e::current::AbgabeArt;
-    /// /// assert_eq!(AbgabeArt::from_wire("KAS"), Ok(AbgabeArt::Kas));
+    /// assert_eq!(AbgabeArt::from_wire("KAS"), Ok(AbgabeArt::Kas));
+    /// // Out-of-schema values are rejected rather than degraded:
     /// assert!(AbgabeArt::from_wire("NOT_A_REAL_VALUE").is_err());
     /// // …including the `Unknown` catch-all's own wire spelling:
     /// assert!(AbgabeArt::from_wire("UNKNOWN").is_err());
@@ -201,6 +202,15 @@ impl<'r> sqlx::Decode<'r, sqlx::Postgres> for AbgabeArt {
     ) -> Result<Self, sqlx::error::BoxDynError> {
         let s = <&str as sqlx::Decode<sqlx::Postgres>>::decode(value)?;
         Ok(Self::from_wire(s).unwrap_or(Self::Unknown))
+    }
+}
+/// Lets `Vec<AbgabeArt>` bind to a `TEXT[]` column.  Only this crate can
+/// provide it: the trait and the enum are both foreign to any consumer, so the
+/// orphan rule rules out a downstream impl.
+#[cfg(feature = "sqlx")]
+impl sqlx::postgres::PgHasArrayType for AbgabeArt {
+    fn array_type_info() -> sqlx::postgres::PgTypeInfo {
+        <String as sqlx::postgres::PgHasArrayType>::array_type_info()
     }
 }
 #[cfg(test)]

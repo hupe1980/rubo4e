@@ -10,11 +10,11 @@
 
 // ─── Shared strategies ───────────────────────────────────────────────────────
 //
-// These deliberately build identifiers through the crate's **public** `from_base`
-// constructors instead of mirroring the check-digit arithmetic. An earlier version
-// of this file reimplemented the algorithm, which meant the tests agreed with the
-// implementation even while both disagreed with the BDEW specification. The
-// reference vectors that pin the arithmetic live in `src/identifiers/checksum.rs`.
+// These build identifiers through the crate's **public** `from_base` constructors
+// rather than mirroring the check-digit arithmetic: a test that reimplements the
+// algorithm agrees with the implementation even when both disagree with BDEW.
+// The reference vectors that pin the arithmetic live in
+// `src/identifiers/checksum.rs`.
 
 use proptest::prelude::*;
 
@@ -187,8 +187,6 @@ mod display_from_str_roundtrips {
 
 /// `Serialize` → `Deserialize` must be the identity, and identifiers must be
 /// transparent on the wire (a bare JSON string, not a wrapper object).
-///
-/// Previously only `MaloId` and `EicCode` were covered here.
 #[cfg(feature = "serde")]
 mod serde_roundtrips {
     use super::*;

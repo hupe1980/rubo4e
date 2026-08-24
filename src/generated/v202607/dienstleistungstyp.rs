@@ -1,4 +1,4 @@
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(
     feature = "strum",
@@ -71,7 +71,7 @@ pub enum Dienstleistungstyp {
         feature = "strum",
         strum(serialize = "AUSLESUNG_2X_TAEGLICH_FERNAUSLESUNG")
     )]
-    Auslesung2xTaeglichFernauslesung,
+    Auslesung2XTaeglichFernauslesung,
     #[cfg_attr(feature = "serde", serde(rename = "AUSLESUNG_TAEGLICH_FERNAUSLESUNG"))]
     #[cfg_attr(
         feature = "strum",
@@ -203,7 +203,7 @@ impl Dienstleistungstyp {
         Self::DatenbereitstellungHalbjaehrlich,
         Self::DatenbereitstellungMonatlichZusaetzlich,
         Self::DatenbereitstellungEinmalig,
-        Self::Auslesung2xTaeglichFernauslesung,
+        Self::Auslesung2XTaeglichFernauslesung,
         Self::AuslesungTaeglichFernauslesung,
         Self::AuslesungManuellMsb,
         Self::AuslesungMonatlichFernauslesung,
@@ -265,7 +265,7 @@ impl Dienstleistungstyp {
                 "DATENBEREITSTELLUNG_MONATLICH_ZUSAETZLICH"
             }
             Self::DatenbereitstellungEinmalig => "DATENBEREITSTELLUNG_EINMALIG",
-            Self::Auslesung2xTaeglichFernauslesung => "AUSLESUNG_2X_TAEGLICH_FERNAUSLESUNG",
+            Self::Auslesung2XTaeglichFernauslesung => "AUSLESUNG_2X_TAEGLICH_FERNAUSLESUNG",
             Self::AuslesungTaeglichFernauslesung => "AUSLESUNG_TAEGLICH_FERNAUSLESUNG",
             Self::AuslesungManuellMsb => "AUSLESUNG_MANUELL_MSB",
             Self::AuslesungMonatlichFernauslesung => "AUSLESUNG_MONATLICH_FERNAUSLESUNG",
@@ -305,7 +305,8 @@ impl Dienstleistungstyp {
     /// # Example
     /// ```
     /// # use rubo4e::current::Dienstleistungstyp;
-    /// /// assert_eq!(Dienstleistungstyp::from_wire("DATENBEREITSTELLUNG_TAEGLICH"), Ok(Dienstleistungstyp::DatenbereitstellungTaeglich));
+    /// assert_eq!(Dienstleistungstyp::from_wire("DATENBEREITSTELLUNG_TAEGLICH"), Ok(Dienstleistungstyp::DatenbereitstellungTaeglich));
+    /// // Out-of-schema values are rejected rather than degraded:
     /// assert!(Dienstleistungstyp::from_wire("NOT_A_REAL_VALUE").is_err());
     /// // …including the `Unknown` catch-all's own wire spelling:
     /// assert!(Dienstleistungstyp::from_wire("UNKNOWN").is_err());
@@ -324,7 +325,7 @@ impl Dienstleistungstyp {
                 Ok(Self::DatenbereitstellungMonatlichZusaetzlich)
             }
             "DATENBEREITSTELLUNG_EINMALIG" => Ok(Self::DatenbereitstellungEinmalig),
-            "AUSLESUNG_2X_TAEGLICH_FERNAUSLESUNG" => Ok(Self::Auslesung2xTaeglichFernauslesung),
+            "AUSLESUNG_2X_TAEGLICH_FERNAUSLESUNG" => Ok(Self::Auslesung2XTaeglichFernauslesung),
             "AUSLESUNG_TAEGLICH_FERNAUSLESUNG" => Ok(Self::AuslesungTaeglichFernauslesung),
             "AUSLESUNG_MANUELL_MSB" => Ok(Self::AuslesungManuellMsb),
             "AUSLESUNG_MONATLICH_FERNAUSLESUNG" => Ok(Self::AuslesungMonatlichFernauslesung),
@@ -429,6 +430,15 @@ impl<'r> sqlx::Decode<'r, sqlx::Postgres> for Dienstleistungstyp {
     ) -> Result<Self, sqlx::error::BoxDynError> {
         let s = <&str as sqlx::Decode<sqlx::Postgres>>::decode(value)?;
         Ok(Self::from_wire(s).unwrap_or(Self::Unknown))
+    }
+}
+/// Lets `Vec<Dienstleistungstyp>` bind to a `TEXT[]` column.  Only this crate can
+/// provide it: the trait and the enum are both foreign to any consumer, so the
+/// orphan rule rules out a downstream impl.
+#[cfg(feature = "sqlx")]
+impl sqlx::postgres::PgHasArrayType for Dienstleistungstyp {
+    fn array_type_info() -> sqlx::postgres::PgTypeInfo {
+        <String as sqlx::postgres::PgHasArrayType>::array_type_info()
     }
 }
 #[cfg(test)]

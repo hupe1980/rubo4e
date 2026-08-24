@@ -1,6 +1,6 @@
 +++
 title = "Identifiers"
-description = "Every BO4E market identifier as a validated newtype: MaLo-ID, MeLo-ID, EIC, OBIS, Marktpartner-ID and the Redispatch 2.0 resource IDs, with the BDEW check-digit procedures behind them."
+description = "Every BO4E market identifier as a validated newtype: MaLo-ID, MeLo-ID, EIC, OBIS, Marktpartner-ID, the Redispatch 2.0 resource IDs and the SEPA bank identifiers, with the check-digit procedures behind them."
 weight = 20
 +++
 
@@ -513,6 +513,72 @@ assert!(TranchennummerId::new("0").is_ok());
 // Reject out-of-range values
 assert!(TranchennummerId::from_value(1_000_000).is_err());
 ```
+
+## Iban and Bic — SEPA bank identifiers
+
+**Source:** ISO 13616 (IBAN), ISO 9362 (BIC)
+**Checksum:** IBAN — ISO 7064 MOD-97-10. BIC — none defined by the standard.
+
+`Zahlungsinformation.iban` and `.bic` are the two fields on a BO4E invoice that
+money actually moves against, and the schema declares both as bare strings. An
+IBAN's check digits catch **every** single-character error and **every**
+transposition of adjacent characters, so leaving them unverified was the one
+obvious hole in the identifier family.
+
+```rust
+use rubo4e::identifiers::{Bic, Iban};
+
+// Grouping spaces and lowercase normalise away — a value pasted from a bank
+// statement parses.
+let iban = Iban::new("de89 3704 0044 0532 0130 00").unwrap();
+assert_eq!(iban.as_ref(), "DE89370400440532013000");   // wire form
+assert_eq!(iban.to_grouped_string(), "DE89 3704 0044 0532 0130 00"); // print form
+
+// German IBANs split into their Bundesbank parts.
+assert_eq!(iban.country_code(), "DE");
+assert_eq!(iban.bankleitzahl(), Some("37040044"));
+assert_eq!(iban.kontonummer(), Some("0532013000"));
+
+// A transposed digit fails the MOD-97 check.
+assert!(Iban::new("DE89370400440532013090").is_err());
+
+let bic = Bic::new("GENODEF1S04").unwrap();
+assert_eq!(bic.institution_code(), "GENO");
+assert_eq!(bic.country_code(), "DE");
+assert_eq!(bic.branch_code(), Some("S04"));
+assert!(bic.is_passive());        // location code ending in 1
+assert!(!bic.is_head_office());   // …and not the XXX / 8-char head office
+```
+
+Country-specific lengths are enforced for the codes in the ISO 13616 registry, so
+a 21-character German IBAN is rejected here rather than by the bank. A country
+the crate's table does not yet list is **not** rejected on length — the registry
+grows, and a stale table should not refuse a valid IBAN — but its checksum is
+still verified.
+
+### These two fields stay `String` on the generated struct
+
+Deliberately, and against the usual rule. `Zahlungsinformation` hangs off
+`Rechnung` and nothing else, so typing `iban` as a validated newtype would mean a
+**masked** IBAN — `DE89 **** **** 3000`, routine on an invoice — destroys the
+entire `Rechnung`: line items, amounts, periods and all. That is a bad trade for
+a field most consumers never read.
+
+The check is one call away instead, and it hands you an error rather than
+costing you the invoice:
+
+```rust
+let z: Zahlungsinformation = todo!();
+
+match z.iban_checked() {
+    None            => { /* no IBAN stated */ }
+    Some(Ok(iban))  => { /* verified */ }
+    Some(Err(e))    => { /* stated but invalid — masked, mistyped, truncated */ }
+}
+```
+
+See [Semantic Field Typing](@/docs/generator.md#semantic-field-typing) for the
+rule this is an exception to, and why.
 
 ## Serialization
 

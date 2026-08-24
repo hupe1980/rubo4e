@@ -3,7 +3,7 @@ use super::{
     Netzebene, Preisposition, Preisstatus, Sparte, Zaehler, Zeitraum, ZusatzAttribut,
 };
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(not(feature = "json"), derive(Hash))]
+#[cfg_attr(not(feature = "json"), derive(Eq, Hash))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "builder", derive(typed_builder::TypedBuilder))]
 #[cfg_attr(feature = "validate", derive(garde::Validate))]
@@ -12,7 +12,7 @@ use super::{
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 /// Variante des Preisblattmodells zur Abbildung der Preise des Messstellenbetriebs und damit verbundener Leistungen
 ///
-/// > **Note:** [PreisblattMessung JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/bo/PreisblattMessung.json)
+/// > **Note:** [PreisblattMessung JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.1.0/src/bo4e_schemas/bo/PreisblattMessung.json)
 pub struct PreisblattMessung {
     /// Eine Bezeichnung für das Preisblatt
     #[cfg_attr(feature = "serde", serde(rename = "bezeichnung"))]
@@ -70,12 +70,12 @@ pub struct PreisblattMessung {
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub sparte: Option<Sparte>,
-    /// BO type identifier — always `BoTyp::PreisblattMessung` for this struct.
+    /// BO4E type discriminant — always `BoTyp::PreisblattMessung` for this struct.
     #[cfg_attr(feature = "serde", serde(rename = "_typ"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(
         feature = "builder",
-        builder(default = Some(BoTyp::Preisblattmessung), setter(skip))
+        builder(default = Some(BoTyp::PreisblattMessung), setter(skip))
     )]
     pub typ: Option<BoTyp>,
     /// Version der BO-Struktur aka "fachliche Versionierung"
@@ -83,7 +83,7 @@ pub struct PreisblattMessung {
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(
         feature = "builder",
-        builder(default = Some("v202607.0.0".to_owned()), setter(into))
+        builder(default = Some("202607.1.0".to_owned()), setter(into))
     )]
     pub version: Option<String>,
     /// Der Preis betrifft den hier angegebenen Zähler, z.B. einen Drehstromzähler
@@ -110,7 +110,6 @@ pub struct PreisblattMessung {
 impl Default for PreisblattMessung {
     fn default() -> Self {
         Self {
-            typ: Some(BoTyp::Preisblattmessung),
             bezeichnung: Default::default(),
             bilanzierungsmethode: Default::default(),
             gueltigkeit: Default::default(),
@@ -122,7 +121,8 @@ impl Default for PreisblattMessung {
             preispositionen: Default::default(),
             preisstatus: Default::default(),
             sparte: Default::default(),
-            version: Some("v202607.0.0".to_owned()),
+            typ: Some(BoTyp::PreisblattMessung),
+            version: Some("202607.1.0".to_owned()),
             zaehler: Default::default(),
             zusatz_attribute: Default::default(),
             _additional: Default::default(),
@@ -132,10 +132,13 @@ impl Default for PreisblattMessung {
 impl Bo4eObject for PreisblattMessung {
     type BoTyp = BoTyp;
     fn bo_type(&self) -> BoTyp {
-        self.typ.unwrap_or(BoTyp::Preisblattmessung)
+        self.typ.unwrap_or(BoTyp::PreisblattMessung)
     }
     fn schema_version(&self) -> &'static str {
-        "v202607.0.0"
+        "202607.1.0"
+    }
+    fn schema_series(&self) -> &'static str {
+        "202607"
     }
 }
 #[cfg(feature = "json")]

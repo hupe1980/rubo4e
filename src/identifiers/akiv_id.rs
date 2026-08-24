@@ -83,7 +83,8 @@ impl AkivId {
     /// Creates a new `AkivId` after validation (1–36 printable ASCII characters).
     ///
     /// # Errors
-    /// - [`IdentifierError::InvalidLength`] if `s` is empty or longer than 35 characters.
+    /// - [`IdentifierError::InvalidLength`] if `s` is empty or longer than
+    ///   [`AKIV_ID_MAX_LEN`] characters.
     /// - [`IdentifierError::InvalidCharacter`] if any character is a control character, space,
     ///   or non-ASCII.
     #[must_use = "the validated identifier is returned; ignoring it discards the result"]

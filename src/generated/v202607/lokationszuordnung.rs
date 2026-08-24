@@ -3,7 +3,7 @@ use super::{
     TechnischeRessource, Zeitraum, ZusatzAttribut,
 };
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(not(feature = "json"), derive(Hash))]
+#[cfg_attr(not(feature = "json"), derive(Eq, Hash))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "builder", derive(typed_builder::TypedBuilder))]
 #[cfg_attr(feature = "validate", derive(garde::Validate))]
@@ -13,7 +13,7 @@ use super::{
 /// Modell für die Abbildung der Referenz auf die Lokationsbündelstruktur. Diese gibt an welche Marktlokationen,
 /// Messlokationen, Netzlokationen, technische/steuerbaren Ressourcen an einer Lokation vorhanden sind.
 ///
-/// > **Note:** [Lokationszuordnung JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/bo/Lokationszuordnung.json)
+/// > **Note:** [Lokationszuordnung JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.1.0/src/bo4e_schemas/bo/Lokationszuordnung.json)
 pub struct Lokationszuordnung {
     /// Zeitraum der Gültigkeit
     #[cfg_attr(feature = "serde", serde(rename = "gueltigkeit"))]
@@ -56,7 +56,7 @@ pub struct Lokationszuordnung {
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub technische_ressourcen: Option<Vec<Box<TechnischeRessource>>>,
-    /// BO type identifier — always `BoTyp::Lokationszuordnung` for this struct.
+    /// BO4E type discriminant — always `BoTyp::Lokationszuordnung` for this struct.
     #[cfg_attr(feature = "serde", serde(rename = "_typ"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(
@@ -69,7 +69,7 @@ pub struct Lokationszuordnung {
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(
         feature = "builder",
-        builder(default = Some("v202607.0.0".to_owned()), setter(into))
+        builder(default = Some("202607.1.0".to_owned()), setter(into))
     )]
     pub version: Option<String>,
     /// Verknüpfungsrichtung z.B. Malo-Melo [TODO: Eventuell anderer Datentyp]
@@ -96,7 +96,6 @@ pub struct Lokationszuordnung {
 impl Default for Lokationszuordnung {
     fn default() -> Self {
         Self {
-            typ: Some(BoTyp::Lokationszuordnung),
             gueltigkeit: Default::default(),
             id: Default::default(),
             lokationsbuendelcode: Default::default(),
@@ -105,7 +104,8 @@ impl Default for Lokationszuordnung {
             netzlokationen: Default::default(),
             steuerbare_ressourcen: Default::default(),
             technische_ressourcen: Default::default(),
-            version: Some("v202607.0.0".to_owned()),
+            typ: Some(BoTyp::Lokationszuordnung),
+            version: Some("202607.1.0".to_owned()),
             zuordnungstyp: Default::default(),
             zusatz_attribute: Default::default(),
             _additional: Default::default(),
@@ -118,7 +118,10 @@ impl Bo4eObject for Lokationszuordnung {
         self.typ.unwrap_or(BoTyp::Lokationszuordnung)
     }
     fn schema_version(&self) -> &'static str {
-        "v202607.0.0"
+        "202607.1.0"
+    }
+    fn schema_series(&self) -> &'static str {
+        "202607"
     }
 }
 #[cfg(feature = "json")]

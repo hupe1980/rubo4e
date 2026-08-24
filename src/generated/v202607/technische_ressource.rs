@@ -3,7 +3,7 @@ use super::{
     TechnischeRessourceNutzung, TechnischeRessourceVerbrauchsart, Waermenutzung, ZusatzAttribut,
 };
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(not(feature = "json"), derive(Hash))]
+#[cfg_attr(not(feature = "json"), derive(Eq, Hash))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "builder", derive(typed_builder::TypedBuilder))]
 #[cfg_attr(feature = "validate", derive(garde::Validate))]
@@ -12,7 +12,7 @@ use super::{
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 /// Object containing information about a technische Ressource
 ///
-/// > **Note:** [TechnischeRessource JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/bo/TechnischeRessource.json)
+/// > **Note:** [TechnischeRessource JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.1.0/src/bo4e_schemas/bo/TechnischeRessource.json)
 pub struct TechnischeRessource {
     /// Art der E-Mobilität
     #[cfg_attr(feature = "serde", serde(rename = "emobilitaetsart"))]
@@ -86,12 +86,12 @@ pub struct TechnischeRessource {
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub technische_ressource_verbrauchsart: Option<TechnischeRessourceVerbrauchsart>,
-    /// BO type identifier — always `BoTyp::TechnischeRessource` for this struct.
+    /// BO4E type discriminant — always `BoTyp::TechnischeRessource` for this struct.
     #[cfg_attr(feature = "serde", serde(rename = "_typ"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(
         feature = "builder",
-        builder(default = Some(BoTyp::Technischeressource), setter(skip))
+        builder(default = Some(BoTyp::TechnischeRessource), setter(skip))
     )]
     pub typ: Option<BoTyp>,
     /// Version der BO-Struktur aka "fachliche Versionierung"
@@ -99,7 +99,7 @@ pub struct TechnischeRessource {
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(
         feature = "builder",
-        builder(default = Some("v202607.0.0".to_owned()), setter(into))
+        builder(default = Some("202607.1.0".to_owned()), setter(into))
     )]
     pub version: Option<String>,
     /// Vorgelagerte Messlokation ID
@@ -141,7 +141,6 @@ pub struct TechnischeRessource {
 impl Default for TechnischeRessource {
     fn default() -> Self {
         Self {
-            typ: Some(BoTyp::Technischeressource),
             emobilitaetsart: Default::default(),
             erzeugungsart: Default::default(),
             id: Default::default(),
@@ -156,7 +155,8 @@ impl Default for TechnischeRessource {
             technische_ressource_id: Default::default(),
             technische_ressource_nutzung: Default::default(),
             technische_ressource_verbrauchsart: Default::default(),
-            version: Some("v202607.0.0".to_owned()),
+            typ: Some(BoTyp::TechnischeRessource),
+            version: Some("202607.1.0".to_owned()),
             vorgelagerte_messlokation_id: Default::default(),
             waermenutzung: Default::default(),
             zugeordnete_marktlokation_id: Default::default(),
@@ -169,10 +169,13 @@ impl Default for TechnischeRessource {
 impl Bo4eObject for TechnischeRessource {
     type BoTyp = BoTyp;
     fn bo_type(&self) -> BoTyp {
-        self.typ.unwrap_or(BoTyp::Technischeressource)
+        self.typ.unwrap_or(BoTyp::TechnischeRessource)
     }
     fn schema_version(&self) -> &'static str {
-        "v202607.0.0"
+        "202607.1.0"
+    }
+    fn schema_series(&self) -> &'static str {
+        "202607"
     }
 }
 #[cfg(feature = "json")]

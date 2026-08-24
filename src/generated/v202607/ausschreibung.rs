@@ -3,7 +3,7 @@ use super::{
     BoTyp, Geschaeftspartner, Zeitraum, ZusatzAttribut,
 };
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(not(feature = "json"), derive(Hash))]
+#[cfg_attr(not(feature = "json"), derive(Eq, Hash))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "builder", derive(typed_builder::TypedBuilder))]
 #[cfg_attr(feature = "validate", derive(garde::Validate))]
@@ -12,7 +12,7 @@ use super::{
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 /// Das BO Ausschreibung dient zur detaillierten Darstellung von ausgeschriebenen Energiemengen in der Energiewirtschaft
 ///
-/// > **Note:** [Ausschreibung JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/bo/Ausschreibung.json)
+/// > **Note:** [Ausschreibung JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.1.0/src/bo4e_schemas/bo/Ausschreibung.json)
 pub struct Ausschreibung {
     /// Diese Komponente wird zur Abbildung von Zeiträumen in Form von Dauern oder der Angabe von Start und Ende verwendet.
     /// Es muss daher entweder eine Dauer oder ein Zeitraum in Form von Start und Ende angegeben sein
@@ -68,7 +68,7 @@ pub struct Ausschreibung {
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub lose: Option<Vec<Ausschreibungslos>>,
-    /// BO type identifier — always `BoTyp::Ausschreibung` for this struct.
+    /// BO4E type discriminant — always `BoTyp::Ausschreibung` for this struct.
     #[cfg_attr(feature = "serde", serde(rename = "_typ"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(
@@ -108,7 +108,7 @@ pub struct Ausschreibung {
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(
         feature = "builder",
-        builder(default = Some("v202607.0.0".to_owned()), setter(into))
+        builder(default = Some("202607.1.0".to_owned()), setter(into))
     )]
     pub version: Option<String>,
     /// Internetseite, auf der die Ausschreibung veröffentlicht wurde (falls vorhanden)
@@ -135,7 +135,6 @@ pub struct Ausschreibung {
 impl Default for Ausschreibung {
     fn default() -> Self {
         Self {
-            typ: Some(BoTyp::Ausschreibung),
             abgabefrist: Default::default(),
             ausschreibender: Default::default(),
             ausschreibungportal: Default::default(),
@@ -146,8 +145,9 @@ impl Default for Ausschreibung {
             id: Default::default(),
             ist_kostenpflichtig: Default::default(),
             lose: Default::default(),
+            typ: Some(BoTyp::Ausschreibung),
             veroeffentlichungszeitpunkt: Default::default(),
-            version: Some("v202607.0.0".to_owned()),
+            version: Some("202607.1.0".to_owned()),
             webseite: Default::default(),
             zusatz_attribute: Default::default(),
             _additional: Default::default(),
@@ -160,7 +160,10 @@ impl Bo4eObject for Ausschreibung {
         self.typ.unwrap_or(BoTyp::Ausschreibung)
     }
     fn schema_version(&self) -> &'static str {
-        "v202607.0.0"
+        "202607.1.0"
+    }
+    fn schema_series(&self) -> &'static str {
+        "202607"
     }
 }
 #[cfg(feature = "json")]

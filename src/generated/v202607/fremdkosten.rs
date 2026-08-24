@@ -1,6 +1,6 @@
 use super::{Betrag, Bo4eObject, BoTyp, Fremdkostenblock, Zeitraum, ZusatzAttribut};
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(not(feature = "json"), derive(Hash))]
+#[cfg_attr(not(feature = "json"), derive(Eq, Hash))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "builder", derive(typed_builder::TypedBuilder))]
 #[cfg_attr(feature = "validate", derive(garde::Validate))]
@@ -11,7 +11,7 @@ use super::{Betrag, Bo4eObject, BoTyp, Fremdkostenblock, Zeitraum, ZusatzAttribu
 /// übertragen.
 /// Die Fremdkosten enthalten dabei alle Kostenblöcke, die von anderen Marktteilnehmern oder Instanzen erhoben werden.
 ///
-/// > **Note:** [Fremdkosten JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/bo/Fremdkosten.json)
+/// > **Note:** [Fremdkosten JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.1.0/src/bo4e_schemas/bo/Fremdkosten.json)
 pub struct Fremdkosten {
     /// Für diesen Zeitraum wurden die Kosten ermittelt
     #[cfg_attr(feature = "serde", serde(rename = "gueltigkeit"))]
@@ -34,7 +34,7 @@ pub struct Fremdkosten {
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub summe_kosten: Option<Betrag>,
-    /// BO type identifier — always `BoTyp::Fremdkosten` for this struct.
+    /// BO4E type discriminant — always `BoTyp::Fremdkosten` for this struct.
     #[cfg_attr(feature = "serde", serde(rename = "_typ"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(
@@ -47,7 +47,7 @@ pub struct Fremdkosten {
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(
         feature = "builder",
-        builder(default = Some("v202607.0.0".to_owned()), setter(into))
+        builder(default = Some("202607.1.0".to_owned()), setter(into))
     )]
     pub version: Option<String>,
     #[cfg_attr(feature = "serde", serde(rename = "zusatzAttribute"))]
@@ -69,12 +69,12 @@ pub struct Fremdkosten {
 impl Default for Fremdkosten {
     fn default() -> Self {
         Self {
-            typ: Some(BoTyp::Fremdkosten),
             gueltigkeit: Default::default(),
             id: Default::default(),
             kostenbloecke: Default::default(),
             summe_kosten: Default::default(),
-            version: Some("v202607.0.0".to_owned()),
+            typ: Some(BoTyp::Fremdkosten),
+            version: Some("202607.1.0".to_owned()),
             zusatz_attribute: Default::default(),
             _additional: Default::default(),
         }
@@ -86,7 +86,10 @@ impl Bo4eObject for Fremdkosten {
         self.typ.unwrap_or(BoTyp::Fremdkosten)
     }
     fn schema_version(&self) -> &'static str {
-        "v202607.0.0"
+        "202607.1.0"
+    }
+    fn schema_series(&self) -> &'static str {
+        "202607"
     }
 }
 #[cfg(feature = "json")]

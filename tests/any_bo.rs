@@ -44,44 +44,44 @@ mod any_bo_tests {
 
     #[test]
     fn marktlokation_dispatch() {
-        let json = r#"{"_typ":"MARKTLOKATION","_version":"v202607.0.0"}"#;
+        let json = r#"{"_typ":"MARKTLOKATION","_version":"202607.0.0"}"#;
         assert_any_bo_roundtrip(json, BoTyp::Marktlokation);
     }
 
     #[test]
     fn messlokation_dispatch() {
-        let json = r#"{"_typ":"MESSLOKATION","_version":"v202607.0.0"}"#;
+        let json = r#"{"_typ":"MESSLOKATION","_version":"202607.0.0"}"#;
         assert_any_bo_roundtrip(json, BoTyp::Messlokation);
     }
 
     #[test]
     fn vertrag_dispatch() {
-        let json = r#"{"_typ":"VERTRAG","_version":"v202607.0.0"}"#;
+        let json = r#"{"_typ":"VERTRAG","_version":"202607.0.0"}"#;
         assert_any_bo_roundtrip(json, BoTyp::Vertrag);
     }
 
     #[test]
     fn rechnung_dispatch() {
-        let json = r#"{"_typ":"RECHNUNG","_version":"v202607.0.0"}"#;
+        let json = r#"{"_typ":"RECHNUNG","_version":"202607.0.0"}"#;
         assert_any_bo_roundtrip(json, BoTyp::Rechnung);
     }
 
     #[test]
     fn lastgang_dispatch() {
         // Lastgang requires zeitIntervallLaenge (non-optional Menge field).
-        let json = r#"{"_typ":"LASTGANG","_version":"v202607.0.0","zeitIntervallLaenge":{}}"#;
+        let json = r#"{"_typ":"LASTGANG","_version":"202607.0.0","zeitIntervallLaenge":{}}"#;
         assert_any_bo_roundtrip(json, BoTyp::Lastgang);
     }
 
     #[test]
     fn energiemenge_dispatch() {
-        let json = r#"{"_typ":"ENERGIEMENGE","_version":"v202607.0.0"}"#;
+        let json = r#"{"_typ":"ENERGIEMENGE","_version":"202607.0.0"}"#;
         assert_any_bo_roundtrip(json, BoTyp::Energiemenge);
     }
 
     #[test]
     fn geschaeftspartner_dispatch() {
-        let json = r#"{"_typ":"GESCHAEFTSPARTNER","_version":"v202607.0.0"}"#;
+        let json = r#"{"_typ":"GESCHAEFTSPARTNER","_version":"202607.0.0"}"#;
         assert_any_bo_roundtrip(json, BoTyp::Geschaeftspartner);
     }
 
@@ -115,7 +115,7 @@ mod any_bo_tests {
 
     #[test]
     fn unknown_typ_produces_unknown_variant() {
-        let json = r#"{"_typ":"ZUKUNFTSTYP","_version":"v202607.0.0","someField":"value"}"#;
+        let json = r#"{"_typ":"ZUKUNFTSTYP","_version":"202607.0.0","someField":"value"}"#;
         let any: AnyBo = serde_json::from_str(json).expect("AnyBo::Unknown should parse");
         assert_eq!(
             any.bo_type(),
@@ -135,14 +135,14 @@ mod any_bo_tests {
     #[test]
     fn missing_typ_produces_unknown_variant() {
         // No _typ field at all → Unknown with empty string.
-        let json = r#"{"_version":"v202607.0.0","someField":42}"#;
+        let json = r#"{"_version":"202607.0.0","someField":42}"#;
         let any: AnyBo = serde_json::from_str(json).expect("AnyBo should accept missing _typ");
         assert_eq!(any.bo_type(), BoTyp::Unknown);
     }
 
     #[test]
     fn empty_typ_produces_unknown_variant() {
-        let json = r#"{"_typ":"","_version":"v202607.0.0"}"#;
+        let json = r#"{"_typ":"","_version":"202607.0.0"}"#;
         let any: AnyBo = serde_json::from_str(json).expect("AnyBo should accept empty _typ");
         assert_eq!(any.bo_type(), BoTyp::Unknown);
     }
@@ -199,18 +199,17 @@ mod any_bo_tests {
     }
 }
 
-// ─── Regression: AnyBo must honour the caller's deserializer ─────────────────
+// ─── AnyBo must honour the caller's deserializer ─────────────────────────────
 //
-// `AnyBo::deserialize` has to buffer the payload before it can read `"_typ"` and
-// pick a concrete type. It previously did that by capturing a `Box<RawValue>` and
-// re-parsing it with `serde_json::from_str`, which threw away the deserializer the
-// caller passed in — and with it both wrappers this crate relies on.
+// `AnyBo::deserialize` buffers the payload before it can read `"_typ"` and pick a
+// concrete type.  It has to buffer *through* the deserializer it was given, or it
+// loses the two wrappers this crate installs: the key transform and the depth
+// limiter.
 
 /// `to_json_snake_case` → `from_json_snake_case` must round-trip through `AnyBo`.
 ///
-/// Re-parsing the raw capture skipped the snake_case → German key transform, so
-/// every typed field silently landed in `_additional` instead: the call returned
-/// `Ok` with an empty object rather than failing.
+/// Without the key transform every typed field lands in `_additional` instead,
+/// and the call returns `Ok` with an empty object rather than failing.
 #[cfg(all(feature = "versioned", feature = "json"))]
 #[test]
 fn any_bo_snake_case_round_trip_preserves_typed_fields() {
@@ -261,10 +260,7 @@ fn any_bo_enforces_hardened_nesting_depth() {
         format!(r#"{{"_typ":"MARKTLOKATION","marktlokationsId":"51238696781","x":{open}1{close}}}"#)
     }
 
-    let limits = JsonParseLimits {
-        max_nesting_depth: Some(8),
-        ..JsonParseLimits::unlimited()
-    };
+    let limits = JsonParseLimits::unlimited().with_max_nesting_depth(Some(8));
 
     // Within the limit: both accept.
     assert!(Marktlokation::from_json_german_hardened(&payload(4), limits).is_ok());

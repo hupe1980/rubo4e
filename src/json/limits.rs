@@ -12,20 +12,6 @@ use serde::de::Error as _;
 // no true circular data dependency exists, Rust handles this fine within a module tree.
 use super::depth::{DepthLimitedDeserializer, DepthState};
 
-#[cfg(feature = "simd-json")]
-// Threshold below which serde_json is used even when `simd-json` is enabled.
-// simd-json's parser setup cost exceeds its throughput advantage on small
-// payloads; 2 KiB was empirically chosen on a 2024 ARM workstation
-// (see `benches/json_perf.rs`). Adjust if your payload distribution differs.
-const SIMD_JSON_STR_MIN_BYTES: usize = 2048;
-
-// For mutable-byte APIs, simd-json can still lose on small/medium payloads due
-// to parser setup costs. Prefer serde_json below this threshold.
-// 1.5 KiB is slightly lower than the str threshold because the byte path avoids
-// the UTF-8 validation copy that the str path pays.
-#[cfg(feature = "simd-json")]
-const SIMD_JSON_BYTES_MIN_BYTES: usize = 1536;
-
 #[inline]
 pub(super) fn trace_deser_error<T>(result: &Result<T, serde_json::Error>, context: &'static str) {
     #[cfg(feature = "tracing")]
@@ -148,28 +134,66 @@ pub fn json_limit_hit_counters() -> JsonLimitHitCounters {
     }
 }
 
-/// Optional hardening limits for JSON deserialization entry points.
+/// Hardening limits for the `*_hardened` deserialization entry points.
 ///
-/// Use with the `*_hardened` methods on `Bo4eJsonExt` to constrain resource
-/// usage when parsing untrusted payloads.
-#[derive(Debug, Clone, Copy, Default)]
+/// Start from a profile and narrow it; every field is `Option`, and `None` means
+/// that particular cap is off.
+///
+/// ```
+/// # #[cfg(feature = "json")] {
+/// use rubo4e::json::JsonParseLimits;
+///
+/// // The recommended profile for anything arriving over a network:
+/// let limits = JsonParseLimits::untrusted_defaults();
+///
+/// // …tightened where you know your own payloads:
+/// let limits = JsonParseLimits::untrusted_defaults()
+///     .with_max_payload_bytes(Some(64 * 1024))
+///     .with_max_extension_field_count(Some(0));   // reject any unknown field
+/// # let _ = limits;
+/// # }
+/// ```
+///
+/// The type is `#[non_exhaustive]`, so there is no struct literal: new limits get
+/// added as new amplification paths are found, and a literal would make each one
+/// a breaking change.
+///
+/// # What is *not* capped
+///
+/// These bound the parser, not the object graph it produces. `[{},{},{}…]` is
+/// three wire bytes and one full struct per element, so a payload well inside
+/// `max_payload_bytes` can still allocate two orders of magnitude more. Size the
+/// cap against the expanded cost, and put a concurrency limit in front of the
+/// endpoint.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct JsonParseLimits {
-    /// Maximum allowed input payload size in bytes.
+    /// Maximum accepted input payload size in bytes, checked before parsing.
     pub max_payload_bytes: Option<usize>,
-    /// Maximum allowed JSON nesting depth.
-    pub max_nesting_depth: Option<usize>,
-    /// Maximum cumulative size budget for captured extension values.
-    pub max_extension_value_bytes: Option<usize>,
-    /// Maximum number of extension fields accepted per struct.
+    /// Maximum accepted JSON nesting depth.
     ///
-    /// This is a softer per-call limit that sits below the process-wide hard cap
-    /// of [`crate::json::MAX_EXTENSION_FIELDS`], which is enforced during deserialization.
-    /// Use this to apply a tighter bound for specific untrusted inputs.
+    /// Leaving it `None` does not disable depth checking: every entry point,
+    /// hardened or not, enforces a default cap of 128 so a deeply nested payload
+    /// cannot overflow the stack. This only lowers it.
+    pub max_nesting_depth: Option<usize>,
+    /// Cumulative byte budget for all captured extension values in one call,
+    /// charged across every nesting level rather than only the root.
+    pub max_extension_value_bytes: Option<usize>,
+    /// Maximum number of extension fields accepted **per struct**.
+    ///
+    /// A per-call tightening of the process-wide hard cap
+    /// [`crate::json::MAX_EXTENSION_FIELDS`], which applies regardless. `Some(0)`
+    /// rejects any payload carrying a field the schema does not define.
     pub max_extension_field_count: Option<usize>,
 }
 
 impl JsonParseLimits {
-    /// Returns a limit set with all caps disabled.
+    /// Every cap off — the parser's own defaults still apply.
+    ///
+    /// Note that this is not "no protection": the non-hardened entry points, and
+    /// this one, still enforce a default nesting-depth cap of 128 so a deeply
+    /// nested payload cannot overflow the stack. Use it for payloads you produced
+    /// yourself, or as a base for a profile with exactly one cap set.
     #[must_use]
     pub const fn unlimited() -> Self {
         Self {
@@ -180,7 +204,12 @@ impl JsonParseLimits {
         }
     }
 
-    /// Returns a conservative default profile for untrusted external inputs.
+    /// A conservative profile for input from an untrusted caller.
+    ///
+    /// 1 MB payload, depth 64, 64 KB of extension values, 32 extension fields
+    /// per struct. Comfortably above any BO4E document in circulation — real
+    /// ones are a few kilobytes and 6–8 levels deep — and far below what it
+    /// takes to hurt a service.
     #[must_use]
     pub const fn untrusted_defaults() -> Self {
         Self {
@@ -189,6 +218,34 @@ impl JsonParseLimits {
             max_extension_value_bytes: Some(64_000),
             max_extension_field_count: Some(32),
         }
+    }
+
+    /// Sets [`max_payload_bytes`](Self::max_payload_bytes).
+    #[must_use]
+    pub const fn with_max_payload_bytes(mut self, bytes: Option<usize>) -> Self {
+        self.max_payload_bytes = bytes;
+        self
+    }
+
+    /// Sets [`max_nesting_depth`](Self::max_nesting_depth).
+    #[must_use]
+    pub const fn with_max_nesting_depth(mut self, depth: Option<usize>) -> Self {
+        self.max_nesting_depth = depth;
+        self
+    }
+
+    /// Sets [`max_extension_value_bytes`](Self::max_extension_value_bytes).
+    #[must_use]
+    pub const fn with_max_extension_value_bytes(mut self, bytes: Option<usize>) -> Self {
+        self.max_extension_value_bytes = bytes;
+        self
+    }
+
+    /// Sets [`max_extension_field_count`](Self::max_extension_field_count).
+    #[must_use]
+    pub const fn with_max_extension_field_count(mut self, count: Option<usize>) -> Self {
+        self.max_extension_field_count = count;
+        self
     }
 }
 
@@ -234,18 +291,16 @@ impl Drop for BudgetGuard {
 
 /// Installs the extension budget described by `limits` for the current scope.
 ///
-/// Returns `None` when `limits` constrains nothing, so the common path costs no
-/// thread-local access during parsing.
-pub(super) fn install_extension_budget(limits: JsonParseLimits) -> Option<BudgetGuard> {
-    if limits.max_extension_value_bytes.is_none() && limits.max_extension_field_count.is_none() {
-        return None;
-    }
+/// A hardened call **always** installs one, even when `limits` constrains
+/// nothing: skipping it would let an inner call inherit an outer call's remaining
+/// allowance instead of its own.
+pub(super) fn install_extension_budget(limits: JsonParseLimits) -> BudgetGuard {
     let budget = ExtensionBudget {
         remaining_bytes: limits.max_extension_value_bytes,
         max_fields_per_struct: limits.max_extension_field_count,
     };
     let previous = EXTENSION_BUDGET.with(|b| b.replace(Some(budget)));
-    Some(BudgetGuard(previous))
+    BudgetGuard(previous)
 }
 
 /// Returns the per-struct extension field-count cap, if a budget is installed.
@@ -258,10 +313,11 @@ pub(super) fn budget_max_fields_per_struct() -> Option<usize> {
 
 /// Charges `bytes` against the cumulative value-byte allowance.
 ///
-/// Returns `Err` with the exceeded limit once the allowance is exhausted. A
-/// no-op when no budget is installed or no byte cap was configured.
+/// Returns `Err((requested, remaining))` once the allowance is exhausted, so the
+/// caller can report both halves of the overrun. A no-op when no budget is
+/// installed or no byte cap was configured.
 #[inline]
-pub(super) fn charge_extension_bytes(bytes: usize) -> Result<(), usize> {
+pub(super) fn charge_extension_bytes(bytes: usize) -> Result<(), (usize, usize)> {
     EXTENSION_BUDGET.with(|cell| {
         let Some(mut budget) = cell.get() else {
             return Ok(());
@@ -270,7 +326,7 @@ pub(super) fn charge_extension_bytes(bytes: usize) -> Result<(), usize> {
             return Ok(());
         };
         let Some(left) = remaining.checked_sub(bytes) else {
-            return Err(bytes);
+            return Err((bytes, remaining));
         };
         budget.remaining_bytes = Some(left);
         cell.set(Some(budget));
@@ -284,57 +340,15 @@ pub(super) fn charge_extension_bytes(bytes: usize) -> Result<(), usize> {
 /// generous allowance that eliminates the stack-overflow DoS surface while
 /// accepting all legitimate payloads.
 ///
+/// This duplicates `serde_json`'s own recursion limit, which also defaults to
+/// 128, so `serde_json` usually reports first with its own wording. Enforcing it
+/// here as well keeps the limit a property of *this* crate rather than of the
+/// backend's default, and keeps the message actionable — it names the hardened
+/// entry point that can change it.
+///
 /// The `_hardened` variants accept an explicit [`JsonParseLimits::max_nesting_depth`]
 /// which, when set, takes priority over this default.
 pub(super) const DEFAULT_MAX_NESTING_DEPTH: usize = 128;
-
-/// Scans `bytes` for the maximum JSON nesting depth without parsing.
-///
-/// Only reachable on the `simd-json` code path; the `serde_json` path enforces
-/// depth inline via `DepthLimitedDeserializer` and never needs a pre-scan.
-///
-/// This is a single-pass linear scan that correctly skips `{` / `[` / `}` / `]`
-/// characters inside JSON string values (honouring `\"` escape sequences).  It
-/// does **not** do full JSON validation — it is only used to guard against
-/// deeply-nested payloads before handing off to the real parser.
-///
-/// Used by [`deserialize_german_from_str`] / [`deserialize_german_from_slice`]
-/// on code paths where `simd-json` is active, because the SIMD parser does not
-/// support visitor wrapping and therefore cannot use `DepthLimitedDeserializer`.
-/// The `_hardened` variants use the true single-pass visitor approach instead.
-#[cfg(feature = "simd-json")]
-pub(super) fn scan_max_nesting_depth(bytes: &[u8]) -> usize {
-    let mut depth: usize = 0;
-    let mut max: usize = 0;
-    let mut in_string = false;
-    let mut i = 0;
-    while i < bytes.len() {
-        let b = bytes[i];
-        if in_string {
-            if b == b'\\' {
-                i += 1; // skip the next escaped byte (could be '"' or another escape)
-            } else if b == b'"' {
-                in_string = false;
-            }
-        } else {
-            match b {
-                b'"' => in_string = true,
-                b'{' | b'[' => {
-                    depth += 1;
-                    if depth > max {
-                        max = depth;
-                    }
-                }
-                b'}' | b']' => {
-                    depth = depth.saturating_sub(1);
-                }
-                _ => {}
-            }
-        }
-        i += 1;
-    }
-    max
-}
 
 pub(super) fn check_payload_limit(
     payload_len: usize,
@@ -351,40 +365,9 @@ pub(super) fn check_payload_limit(
     Ok(())
 }
 
-/// Checks `bytes` against [`DEFAULT_MAX_NESTING_DEPTH`] using a pre-scan.
-///
-/// Returns a serde error if the depth is exceeded.  Called on paths where
-/// `DepthLimitedDeserializer` cannot be used (simd-json).
-#[cfg(feature = "simd-json")]
-pub(super) fn check_default_depth(bytes: &[u8]) -> Result<(), serde_json::Error> {
-    let actual = scan_max_nesting_depth(bytes);
-    if actual > DEFAULT_MAX_NESTING_DEPTH {
-        trace_limit_violation(LimitKind::NestingDepth, actual, DEFAULT_MAX_NESTING_DEPTH);
-        Err(serde_json::Error::custom(format!(
-            "JSON nesting depth {actual} exceeds default limit {DEFAULT_MAX_NESTING_DEPTH}; \
-             use from_json_german_hardened with a JsonParseLimits to adjust"
-        )))
-    } else {
-        Ok(())
-    }
-}
-
 pub(super) fn deserialize_german_from_str<T: DeserializeOwned>(
     s: &str,
 ) -> Result<T, serde_json::Error> {
-    #[cfg(feature = "simd-json")]
-    {
-        if s.len() < SIMD_JSON_STR_MIN_BYTES {
-            // Small payload: fall through to the serde_json single-pass path below.
-        } else {
-            // Large payload: simd-json does not support visitor wrapping, so we
-            // pre-scan the raw bytes for nesting depth before dispatching.
-            check_default_depth(s.as_bytes())?;
-            let mut buf = s.as_bytes().to_vec();
-            return simd_json::from_slice::<T>(&mut buf).map_err(serde_json::Error::custom);
-        }
-    }
-    // serde_json path: single-pass depth enforcement via DepthLimitedDeserializer.
     let state = DepthState::new(DEFAULT_MAX_NESTING_DEPTH);
     let mut de = serde_json::Deserializer::from_str(s);
     T::deserialize(DepthLimitedDeserializer::new(&mut de, &state))
@@ -393,18 +376,6 @@ pub(super) fn deserialize_german_from_str<T: DeserializeOwned>(
 pub(super) fn deserialize_german_from_slice<T: DeserializeOwned>(
     bytes: &[u8],
 ) -> Result<T, serde_json::Error> {
-    #[cfg(feature = "simd-json")]
-    {
-        if bytes.len() < SIMD_JSON_BYTES_MIN_BYTES {
-            // Small payload: fall through to the serde_json single-pass path below.
-        } else {
-            // Large payload: pre-scan depth before simd-json (no visitor wrapping available).
-            check_default_depth(bytes)?;
-            let mut buf = bytes.to_vec();
-            return simd_json::from_slice::<T>(&mut buf).map_err(serde_json::Error::custom);
-        }
-    }
-    // serde_json path: single-pass depth enforcement via DepthLimitedDeserializer.
     let state = DepthState::new(DEFAULT_MAX_NESTING_DEPTH);
     let mut de = serde_json::Deserializer::from_slice(bytes);
     T::deserialize(DepthLimitedDeserializer::new(&mut de, &state))

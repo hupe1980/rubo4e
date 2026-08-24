@@ -1,6 +1,6 @@
 use super::{Angebotsstatus, Angebotsteil, Betrag, ComTyp, Menge, ZusatzAttribut};
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(not(feature = "json"), derive(Hash))]
+#[cfg_attr(not(feature = "json"), derive(Eq, Hash))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "builder", derive(typed_builder::TypedBuilder))]
 #[cfg_attr(feature = "validate", derive(garde::Validate))]
@@ -9,7 +9,7 @@ use super::{Angebotsstatus, Angebotsteil, Betrag, ComTyp, Menge, ZusatzAttribut}
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 /// Führt die verschiedenen Ausprägungen der Angebotsberechnung auf
 ///
-/// > **Note:** [Angebotsvariante JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/com/Angebotsvariante.json)
+/// > **Note:** [Angebotsvariante JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.1.0/src/bo4e_schemas/com/Angebotsvariante.json)
 pub struct Angebotsvariante {
     /// Gibt den Status eines Angebotes an.
     #[cfg_attr(feature = "serde", serde(rename = "angebotsstatus"))]
@@ -93,17 +93,20 @@ pub struct Angebotsvariante {
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub teile: Option<Vec<Angebotsteil>>,
-    /// COM type identifier for this struct.
+    /// BO4E type discriminant — always `ComTyp::Angebotsvariante` for this struct.
     #[cfg_attr(feature = "serde", serde(rename = "_typ"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(
+        feature = "builder",
+        builder(default = Some(ComTyp::Angebotsvariante), setter(skip))
+    )]
     pub typ: Option<ComTyp>,
     /// Version der COM-Struktur aka "fachliche Versionierung"
     #[cfg_attr(feature = "serde", serde(rename = "_version"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(
         feature = "builder",
-        builder(default = Some("v202607.0.0".to_owned()), setter(into))
+        builder(default = Some("202607.1.0".to_owned()), setter(into))
     )]
     pub version: Option<String>,
     #[cfg_attr(feature = "serde", serde(rename = "zusatzAttribute"))]
@@ -132,8 +135,8 @@ impl Default for Angebotsvariante {
             gesamtmenge: Default::default(),
             id: Default::default(),
             teile: Default::default(),
-            typ: Default::default(),
-            version: Some("v202607.0.0".to_owned()),
+            typ: Some(ComTyp::Angebotsvariante),
+            version: Some("202607.1.0".to_owned()),
             zusatz_attribute: Default::default(),
             _additional: Default::default(),
         }

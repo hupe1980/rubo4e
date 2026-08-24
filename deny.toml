@@ -58,7 +58,7 @@ allow = []
 # Every entry below is a *transitive* split between two upstream crates that
 # each pin their own major — none is reachable from rubo4e's own dependency
 # declarations, so no `cargo update` or version bump here can collapse them.
-# All of them sit behind optional features (`sqlx`, `simd-json`) or dev-only
+# All of them sit behind optional features (`sqlx`) or dev-only
 # tooling, so they never reach a downstream build of the default feature set.
 #
 # Note for maintainers: this list only shrinks when upstream moves. If it starts
@@ -71,13 +71,10 @@ skip = [
     # Windows-only FFI shim; rubo4e never calls into it.
     { crate = "windows-sys@0.48", reason = "sqlx-postgres pins etcetera 0.8, which predates the windows-sys 0.6x bump" },
 
-    # sqlx-core -> hashlink 0.10 -> hashbrown 0.15 -> foldhash 0.1
-    # vs. simd-json -> halfbrown / value-trait -> hashbrown 0.16 -> foldhash 0.2.
-    # Two independent optional features landing on adjacent hashbrown majors;
-    # both are pure in-memory hash-map implementations.
-    { crate = "hashbrown@0.15", reason = "sqlx pulls hashbrown 0.15 via hashlink; simd-json pulls 0.16 via halfbrown" },
-    { crate = "hashbrown@0.16", reason = "simd-json pulls hashbrown 0.16 via halfbrown; rubo4e itself is on 0.17 via indexmap" },
-    { crate = "foldhash@0.1", reason = "transitive consequence of the hashbrown 0.15/0.16 split above" },
+    # sqlx-core -> hashlink 0.10 -> hashbrown 0.15, vs. rubo4e -> indexmap ->
+    # hashbrown 0.17. Both are pure in-memory hash-map implementations, and the
+    # split is behind the optional `sqlx` feature.
+    { crate = "hashbrown@0.15", reason = "sqlx pulls hashbrown 0.15 via hashlink; rubo4e itself is on 0.17 via indexmap" },
 
     # sqlx-core -> futures-intrusive -> parking_lot -> redox_syscall 0.5
     # vs. sqlx-postgres -> whoami -> libredox -> redox_syscall 0.9.

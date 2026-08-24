@@ -3,7 +3,7 @@ use super::{
     Person, Titel, ZusatzAttribut,
 };
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(not(feature = "json"), derive(Hash))]
+#[cfg_attr(not(feature = "json"), derive(Eq, Hash))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "builder", derive(typed_builder::TypedBuilder))]
 #[cfg_attr(feature = "validate", derive(garde::Validate))]
@@ -15,7 +15,7 @@ use super::{
 /// Hinweis: "Marktteilnehmer" haben ein eigenes BO, welches sich von diesem BO ableitet.
 /// Hier sollte daher keine Zuordnung zu Marktrollen erfolgen.
 ///
-/// > **Note:** [Geschaeftspartner JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/bo/Geschaeftspartner.json)
+/// > **Note:** [Geschaeftspartner JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.1.0/src/bo4e_schemas/bo/Geschaeftspartner.json)
 pub struct Geschaeftspartner {
     /// Adresse des Geschäftspartners
     #[cfg_attr(feature = "serde", serde(rename = "adresse"))]
@@ -88,7 +88,7 @@ pub struct Geschaeftspartner {
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub titel: Option<Titel>,
-    /// BO type identifier — always `BoTyp::Geschaeftspartner` for this struct.
+    /// BO4E type discriminant — always `BoTyp::Geschaeftspartner` for this struct.
     #[cfg_attr(feature = "serde", serde(rename = "_typ"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(
@@ -106,7 +106,7 @@ pub struct Geschaeftspartner {
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(
         feature = "builder",
-        builder(default = Some("v202607.0.0".to_owned()), setter(into))
+        builder(default = Some("202607.1.0".to_owned()), setter(into))
     )]
     pub version: Option<String>,
     /// Vorname der Person
@@ -138,7 +138,6 @@ pub struct Geschaeftspartner {
 impl Default for Geschaeftspartner {
     fn default() -> Self {
         Self {
-            typ: Some(BoTyp::Geschaeftspartner),
             adresse: Default::default(),
             amtsgericht: Default::default(),
             anrede: Default::default(),
@@ -153,8 +152,9 @@ impl Default for Geschaeftspartner {
             organisationsname: Default::default(),
             organisationstyp: Default::default(),
             titel: Default::default(),
+            typ: Some(BoTyp::Geschaeftspartner),
             umsatzsteuer_id: Default::default(),
-            version: Some("v202607.0.0".to_owned()),
+            version: Some("202607.1.0".to_owned()),
             vorname: Default::default(),
             website: Default::default(),
             zusatz_attribute: Default::default(),
@@ -168,7 +168,10 @@ impl Bo4eObject for Geschaeftspartner {
         self.typ.unwrap_or(BoTyp::Geschaeftspartner)
     }
     fn schema_version(&self) -> &'static str {
-        "v202607.0.0"
+        "202607.1.0"
+    }
+    fn schema_series(&self) -> &'static str {
+        "202607"
     }
 }
 #[cfg(feature = "json")]

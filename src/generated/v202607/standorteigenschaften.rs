@@ -2,7 +2,7 @@ use super::{
     Bo4eObject, BoTyp, StandorteigenschaftenGas, StandorteigenschaftenStrom, ZusatzAttribut,
 };
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(not(feature = "json"), derive(Hash))]
+#[cfg_attr(not(feature = "json"), derive(Eq, Hash))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "builder", derive(typed_builder::TypedBuilder))]
 #[cfg_attr(feature = "validate", derive(garde::Validate))]
@@ -11,7 +11,7 @@ use super::{
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 /// Modelliert die regionalen und spartenspezifischen Eigenschaften einer gegebenen Adresse.
 ///
-/// > **Note:** [Standorteigenschaften JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/bo/Standorteigenschaften.json)
+/// > **Note:** [Standorteigenschaften JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.1.0/src/bo4e_schemas/bo/Standorteigenschaften.json)
 pub struct Standorteigenschaften {
     /// Eigenschaften zur Sparte Gas
     #[cfg_attr(feature = "serde", serde(rename = "eigenschaftenGas"))]
@@ -29,7 +29,7 @@ pub struct Standorteigenschaften {
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub id: Option<String>,
-    /// BO type identifier — always `BoTyp::Standorteigenschaften` for this struct.
+    /// BO4E type discriminant — always `BoTyp::Standorteigenschaften` for this struct.
     #[cfg_attr(feature = "serde", serde(rename = "_typ"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(
@@ -42,7 +42,7 @@ pub struct Standorteigenschaften {
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(
         feature = "builder",
-        builder(default = Some("v202607.0.0".to_owned()), setter(into))
+        builder(default = Some("202607.1.0".to_owned()), setter(into))
     )]
     pub version: Option<String>,
     #[cfg_attr(feature = "serde", serde(rename = "zusatzAttribute"))]
@@ -64,11 +64,11 @@ pub struct Standorteigenschaften {
 impl Default for Standorteigenschaften {
     fn default() -> Self {
         Self {
-            typ: Some(BoTyp::Standorteigenschaften),
             eigenschaften_gas: Default::default(),
             eigenschaften_strom: Default::default(),
             id: Default::default(),
-            version: Some("v202607.0.0".to_owned()),
+            typ: Some(BoTyp::Standorteigenschaften),
+            version: Some("202607.1.0".to_owned()),
             zusatz_attribute: Default::default(),
             _additional: Default::default(),
         }
@@ -80,7 +80,10 @@ impl Bo4eObject for Standorteigenschaften {
         self.typ.unwrap_or(BoTyp::Standorteigenschaften)
     }
     fn schema_version(&self) -> &'static str {
-        "v202607.0.0"
+        "202607.1.0"
+    }
+    fn schema_series(&self) -> &'static str {
+        "202607"
     }
 }
 #[cfg(feature = "json")]

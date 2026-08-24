@@ -2,7 +2,7 @@ use super::{
     Adresse, Anrede, Bo4eObject, BoTyp, Kontaktweg, Titel, ZusatzAttribut, Zustaendigkeit,
 };
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(not(feature = "json"), derive(Hash))]
+#[cfg_attr(not(feature = "json"), derive(Eq, Hash))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "builder", derive(typed_builder::TypedBuilder))]
 #[cfg_attr(feature = "validate", derive(garde::Validate))]
@@ -11,7 +11,7 @@ use super::{
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 /// Object containing information about a Person
 ///
-/// > **Note:** [Person JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/bo/Person.json)
+/// > **Note:** [Person JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.1.0/src/bo4e_schemas/bo/Person.json)
 pub struct Person {
     /// Adresse der Person, falls diese von der Adresse des Geschäftspartners abweicht
     #[cfg_attr(feature = "serde", serde(rename = "adresse"))]
@@ -82,7 +82,7 @@ pub struct Person {
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub titel: Option<Titel>,
-    /// BO type identifier — always `BoTyp::Person` for this struct.
+    /// BO4E type discriminant — always `BoTyp::Person` for this struct.
     #[cfg_attr(feature = "serde", serde(rename = "_typ"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(
@@ -95,7 +95,7 @@ pub struct Person {
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(
         feature = "builder",
-        builder(default = Some("v202607.0.0".to_owned()), setter(into))
+        builder(default = Some("202607.1.0".to_owned()), setter(into))
     )]
     pub version: Option<String>,
     /// Vorname der Person
@@ -127,7 +127,6 @@ pub struct Person {
 impl Default for Person {
     fn default() -> Self {
         Self {
-            typ: Some(BoTyp::Person),
             adresse: Default::default(),
             anrede: Default::default(),
             geburtsdatum: Default::default(),
@@ -137,7 +136,8 @@ impl Default for Person {
             kontaktwege: Default::default(),
             nachname: Default::default(),
             titel: Default::default(),
-            version: Some("v202607.0.0".to_owned()),
+            typ: Some(BoTyp::Person),
+            version: Some("202607.1.0".to_owned()),
             vorname: Default::default(),
             zusatz_attribute: Default::default(),
             zustaendigkeiten: Default::default(),
@@ -151,7 +151,10 @@ impl Bo4eObject for Person {
         self.typ.unwrap_or(BoTyp::Person)
     }
     fn schema_version(&self) -> &'static str {
-        "v202607.0.0"
+        "202607.1.0"
+    }
+    fn schema_series(&self) -> &'static str {
+        "202607"
     }
 }
 #[cfg(feature = "json")]

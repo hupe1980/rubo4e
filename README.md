@@ -7,7 +7,8 @@ contracts, metering points, invoices, and the parties involved.
 `rubo4e` generates the full object model from the official JSON Schema, then adds
 what the schema cannot express: market identifiers that verify their own BDEW
 check digits, enums you can parse strictly at an ingest boundary, and JSON that
-stays byte-compatible with the Python, Go, and .NET implementations.
+reads what Python, Go, and .NET write — and writes what the reference Python
+implementation does.
 
 [![Crates.io](https://img.shields.io/crates/v/rubo4e.svg)](https://crates.io/crates/rubo4e)
 [![Docs](https://img.shields.io/badge/docs-hupe1980.github.io%2Frubo4e-blue.svg)](https://hupe1980.github.io/rubo4e)
@@ -21,16 +22,17 @@ stays byte-compatible with the Python, Go, and .NET implementations.
 
 ## Features
 
-- **Generated types** from the official BO4E JSON Schema (v202607)
-- **Strong domain identifiers** — the complete BDEW identifier family (`MaloId`, `MeloId`, `NeloId`, `NebeId`, `CrId`, `SgId`, `SrId`, `TrId`, `PaketId`, `EicCode`, `ObisCode`, `MarktpartnerId`, …) with spec-accurate check digits and domain helpers
+- **Generated types** from the official BO4E JSON Schema, generated from a committed snapshot (`v202607.1.0`) so the codegen is reproducible
+- **Strong domain identifiers** — the complete BDEW identifier family (`MaloId`, `MeloId`, `NeloId`, `NebeId`, `CrId`, `SgId`, `SrId`, `TrId`, `PaketId`, `EicCode`, `ObisCode`, `MarktpartnerId`, …) plus the SEPA pair (`Iban`, `Bic`), with spec-accurate check digits and domain helpers
 - **Three-layer validation** — constructor checks, `garde` struct rules, cross-field business logic
 - **Strict enum parsing & introspection** — `from_wire` (reject out-of-schema values), `VARIANTS` / `COUNT` / `iter_known`, `Display` / `AsRef<str>`, `is_unknown`, unified by the `Bo4eEnum` trait — all **without** the `strum` feature
 - **Recursive strict decoding** — `Bo4eStrict::ensure_known_enums()` rejects any `Unknown` enum value anywhere in a deserialized payload, with JSON-paths — one call replaces hand-written per-field checks
 - **Typed builders** — readable, diffable construction via `typed-builder`; setters accept both `T` and `Option<T>` (note: BO4E BO fields are schema-optional, so AHB-mandatory contracts are enforced by your ingest layer, not the type system)
-- **German / snake_case / canonical JSON** — BO4E wire format out of the box
+- **German / snake_case / canonical JSON** — BO4E wire format out of the box, with a hardened path for untrusted input
+- **`Eq` + `Hash` on generated types** without the `json` feature, so a BO can key a `HashMap`; enums are always `Eq + Ord + Hash`
 - **Ergonomic convenience API** — extension traits, billing-period helpers, EDIFACT agency codes
 - **JSON Schema** via `schemars`, OpenAPI via `utoipa`, PostgreSQL via `sqlx`
-- **Golden corpus** and **fuzz harnesses** included; proptest round-trip tests run as dev tests
+- **Golden corpus**, **fuzz harnesses**, and **drift guards** that fail the build when the committed codegen stops matching the pinned schema
 
 ---
 
@@ -84,7 +86,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 | `identifiers` | ✓       | Identifier types (`MaloId`, `EicCode`, `ObisCode`, …) + serde — zero schema overhead |
 | `serde`       | ✓       | Serde derives + extension-data map                |
 | `json`      |         | `serde_json` helpers (`to_json_german()`, …)      |
-| `simd-json` |         | SIMD-accelerated JSON parsing backend             |
 | `time`      |         | `time` crate — `Date` for date fields, `OffsetDateTime` for timestamps |
 | `decimal`   |         | `rust_decimal::Decimal` for amounts and prices    |
 | `builder`   |         | `typed-builder` derives on all BO/COM structs     |
@@ -106,23 +107,41 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 ## Schema Versions
 
-| Module    | Schema tag    | Status            |
-|-----------|---------------|-------------------|
-| `v202607` | v202607.0.0   | Current stable    |
+| Module    | Built from  | Status         |
+|-----------|-------------|----------------|
+| `v202607` | v202607.1.0 | Current stable |
 
 ```rust
-use rubo4e::v202607::Marktlokation;  // pin to v202607
-use rubo4e::current::Marktlokation;  // always the latest stable — advances with crate updates
+use rubo4e::v202607::Marktlokation;  // the v202607 series
+use rubo4e::current::Marktlokation;  // whichever series is newest — moves with crate updates
 ```
 
-**Versioning contract.** `rubo4e::current` re-exports the newest stable schema
-series. A minor `rubo4e` bump *can* therefore change enum membership or codelist
-coverage under `current` (a new variant, a new code) without a source change on
-your side. **Pin to the version module (`rubo4e::v202607::…`) for anything whose
-shape you guard** (SQL `CHECK` lists, exhaustive mappings, variant-count
-assertions); use `current` for code that should always track the latest series.
-Every release that changes schema-derived membership records it in the
-[CHANGELOG](CHANGELOG.md) **Schema deltas** section. See
+**Three spellings of a release.** The Rust module is the *series* (`v202607`).
+The git tag carries a `v` and the full triple (`v202607.1.0`). The `_version`
+field *inside a payload* has the triple without the `v` (`202607.1.0`).
+`Bo4eObject::schema_version()` returns the wire spelling;
+`Bo4eObject::schema_series()` returns the series.
+
+**Dispatch on the series, not the release.** BO4E ships patch releases inside a
+series, so a sender one patch ahead stamps a `_version` that an equality match
+rejects — for a payload these types read perfectly:
+
+```rust
+match incoming_version.split('.').next() {
+    Some("202607") => { /* rubo4e::v202607::… */ }
+    _ => return Err(unsupported),
+}
+```
+
+**Versioning contract, stated honestly.** The module path pins the *series*; the
+`rubo4e` version pins the *values*. Enum membership can move inside a series
+because BO4E moves it — `v202607.1.0` removed `Messgroesse::PREISE` and dropped
+two enums outright. Importing `rubo4e::v202607::…` rather than `rubo4e::current::…`
+means you will not silently cross a format-version cutover, but it does not
+freeze a variant set: for that, pin the crate version and upgrade deliberately.
+Guard the rest structurally with `T::VARIANTS` / `T::COUNT` so a schema bump
+fails in CI. Every release that changes schema-derived membership records it in
+the [CHANGELOG](CHANGELOG.md) **Schema deltas** section, removals included. See
 [Schema Versioning](https://hupe1980.github.io/rubo4e/docs/versioning/) for the full contract.
 
 ---
@@ -163,11 +182,11 @@ assert!(z.is_unknown());
 | `T::as_wire(&self)`          | none    | canonical BO4E wire string                                     |
 | `T::from_wire(s)`            | none    | **strict** parse → `Result<T, UnknownVariant>`                 |
 | `T::is_known` / `is_unknown` | none    | detect the `Unknown` catch-all                                 |
-| `Display`, `AsRef<str>`      | none    | canonical wire string — now available **without** `strum`      |
+| `Display`, `AsRef<str>`      | none    | canonical wire string, **without** `strum`                     |
 | `Bo4eEnum` trait             | `versioned` | the above, generic over the enum type                      |
 
 > `Display`, `AsRef<str>`, `as_wire`, `from_wire`, `VARIANTS`, `COUNT`, and
-> `iter_known` are all feature-independent. The `strum` feature now only adds
+> `iter_known` are all feature-independent. The `strum` feature adds only
 > `FromStr`, `EnumIter`, and `Into<&'static str>`.
 
 ### Strict decoding of whole payloads (`Bo4eStrict`)
@@ -321,37 +340,78 @@ assert_eq!((parts.a, parts.c, parts.f), (Some(1), 1, Some(255)));
 assert_eq!(ObisCode::new("1-0:1.8.0*255")?.to_pia_string(), "1-0:1.8.0");
 ```
 
+### IBAN and BIC
+
+`Zahlungsinformation.iban` and `.bic` are the two fields on a BO4E invoice that
+money moves against, and the schema declares both as bare strings. An IBAN's
+ISO 7064 MOD-97-10 check digits catch **every** single-character error and
+**every** adjacent transposition.
+
+```rust
+// Grouping spaces and lowercase normalise away, so a value pasted from a bank
+// statement parses; `as_ref()` always returns the compact wire form.
+let iban = Iban::new("de89 3704 0044 0532 0130 00")?;
+assert_eq!(iban.as_ref(), "DE89370400440532013000");
+assert_eq!(iban.to_grouped_string(), "DE89 3704 0044 0532 0130 00");
+assert_eq!(iban.bankleitzahl(), Some("37040044"));
+assert!(Iban::new("DE89370400440532013090").is_err());   // transposed digits
+
+let bic = Bic::new("GENODEF1S04")?;
+assert_eq!((bic.institution_code(), bic.country_code()), ("GENO", "DE"));
+assert!(bic.is_passive());   // location code ending in 1, per ISO 9362
+```
+
+The generated `Zahlungsinformation` keeps both fields as `String`, deliberately:
+it hangs off `Rechnung` and nothing else, so a **masked** IBAN
+(`DE89 **** **** 3000`, routine on an invoice) would take the whole invoice down
+with it. Run the check on demand instead — the error costs you the field, not the
+invoice:
+
+```rust
+match zahlungsinformation.iban_checked() {
+    None           => { /* no IBAN stated */ }
+    Some(Ok(iban)) => { /* verified */ }
+    Some(Err(e))   => { /* stated but invalid — masked, mistyped, truncated */ }
+}
+```
+
 ---
 
 ## Multi-version Dispatch
 
 When a storage layer (e.g. PostgreSQL `JSONB`) writes a `bo4e_version` column alongside
-BO4E JSON, the idiomatic dispatch pattern is a plain `match`:
+BO4E JSON, the idiomatic dispatch is a plain `match` — on the **series**, not the
+exact release:
 
 ```rust
 use rubo4e::{v202607, Bo4eObject as _};
 
 fn process_rechnung(
     json: &str,
-    bo4e_version: &str,
+    bo4e_version: &str,          // the payload's own `_version`, e.g. "202607.1.0"
 ) -> Result<(), Box<dyn std::error::Error>> {
-    match bo4e_version {
-        "v202607.0.0" => {
+    match bo4e_version.split('.').next() {
+        Some("202607") => {
             let r: v202607::Rechnung = serde_json::from_str(json)?;
-            // r.schema_version() == "v202607.0.0"
+            // r.schema_series() == "202607" — always matches this arm
             handle_v202607(r)
         }
-        // When v202801 ships, add one arm:
-        // "v202801.0.0" => handle_v202801(serde_json::from_str::<v202801::Rechnung>(json)?),
-        _ => Err(format!("unsupported schema version: {bo4e_version}").into()),
+        // When the v202801 series ships, add one arm:
+        // Some("202801") => handle_v202801(serde_json::from_str::<v202801::Rechnung>(json)?),
+        _ => Err(format!("unsupported schema series: {bo4e_version}").into()),
     }
 }
 ```
 
+Matching the full `_version` string instead would reject a payload from a sender
+one BO4E patch ahead of you — `"202607.2.0"` against a `"202607.1.0"` arm — even
+though the `v202607` types read it perfectly. `schema_series()` returns exactly
+the value the `match` keys on, so a test can assert the two agree.
+
 This pattern:
-- Requires no new rubo4e API — `schema_version()` is already on every BO type via `Bo4eObject`
-- Is trivially extensible: each new schema version is one `match` arm
-- Localises migration to the storage layer; business logic only handles the current version
+- Requires no new rubo4e API — `schema_series()` is already on every BO type via `Bo4eObject`
+- Is trivially extensible: each new schema series is one `match` arm, and patches inside a series need none
+- Localises migration to the storage layer; business logic only handles the series it was written for
 - Avoids over-engineering (`trait` objects, `Any*` enums) for a straightforward branch
 
 See [Schema Versioning](https://hupe1980.github.io/rubo4e/docs/versioning/) for the full upgrade workflow.
@@ -418,11 +478,39 @@ let in_period: bool = pos.lieferungszeitraum_contains(date!(2026-10-01));
 // PreisblattNetznutzung — point-in-time validity check
 let valid = preisblatt.is_valid_at(date!(2026-10-01));
 
-// Zeitraum — open/closed range helpers
-let closed    = z.as_closed_range();     // Option<(Date, Date)>
-let half_open = z.as_half_open_range();  // Option<(Date, Option<Date>)>
-let contains  = z.contains(date!(2026-01-15)); // bool — [start, end) half-open
+// Zeitraum — BO4E declares *both* dates inclusive: the period is [start, end]
+let range    = z.as_inclusive_range();        // Option<RangeInclusive<Date>>
+let bounds   = z.bounds();                    // (Option<Date>, Option<Date>)
+let days     = z.whole_days();                // Option<i64> — January is 31
+let contains = z.contains(date!(2026-01-31)); // bool — the end date is inside
+let dauer    = z.duration();                  // Option<Result<time::Duration, _>>
+let start    = z.startuhrzeit_parsed();       // Option<Result<(Time, Option<UtcOffset>), _>>
 ```
+
+**Interval conventions are not uniform in BO4E**, and this is the trap:
+
+| Kind | Interval |
+|---|---|
+| `date-time` pairs (`vertragsbeginn`/`vertragsende`, `von`/`bis`) | `[start, end)` |
+| `Zeitraum`'s **date** pair | `[start, end]` |
+| `Zeitraum`'s **time** pair (`startuhrzeit`/`enduhrzeit`) | `[start, end)` |
+| price-tier bounds (`staffelgrenzeVon`/`Bis`) | `[von, bis]`, plus a gap rule |
+
+`enddatum` is inclusive — *"Enddatum des betrachteten Zeitraums ist
+**inklusiv**"*, with `'2025-01-01'` given as the example for *both* date fields,
+so `start == end` is a valid one-day period. Reading it exclusively drops a day
+from every period. `as_inclusive_range` returns a `RangeInclusive` so the
+convention travels with the value.
+[`tests/interval_conventions.rs`](tests/interval_conventions.rs) reads each
+convention out of the committed schema and checks it against the code.
+
+Three `Zeitraum` values have no `time` type that holds them, so they keep the
+wire string and an accessor parses on demand: `dauer` is an ISO 8601 duration
+(`duration()` refuses `P1Y`/`P1M` rather than guessing their length), and the two
+`*uhrzeit` fields are times of day **with a UTC offset**.
+`PreisstaffelSliceExt::select_for` picks a price tier, including BO4E's rule that
+a value between two tiers *"rutscht in die obere Zone"* — which a plain
+`von <= x <= bis` scan misses entirely.
 
 ---
 
@@ -447,14 +535,27 @@ Unknown JSON fields are **preserved through round-trips** via the `_additional`
 extension-data map (requires `json` feature). This allows forward-compatible
 handling of new BO4E fields without library updates.
 
-The snake_case mapping is an exact table emitted by the code generator, not a
-runtime heuristic, so `from_json_snake_case(to_json_snake_case(x)) == x` holds
-for every generated type. That is not achievable algorithmically: BO4E names like
-`hoechstpreisHT`, `kundengruppeKA`, and `Sigmoidparameter`'s `A`/`B`/`C`/`D`
-render to a snake form a heuristic maps back to a *different* camelCase name,
-which silently diverts the value into `_additional`. BO4E metadata keys (`_typ`,
-`_version`, `_id`) and unknown extension keys pass through byte-for-byte in both
-directions. See [Serialization](https://hupe1980.github.io/rubo4e/docs/serialization/#how-snake-case-keys-are-mapped).
+**Decimal amounts serialize as JSON strings** (`"wert": "119.00"`), matching
+BO4E-python. Deserialization accepts JSON numbers too, the way go-bo4e writes
+them — but only the string spelling is exact. A JSON number has already passed
+through `f64` before any Rust deserializer sees it, so `119.00` arrives as `119`
+(scale lost) and anything past ~15 significant digits is rounded. Nothing in the
+German energy market comes near that many digits, so this is a fidelity question
+rather than a correctness one; `decimal_serde::decimal_from_json_number_count()`
+counts every such read so you can tell which spelling your producers use. See
+[Serialization](https://hupe1980.github.io/rubo4e/docs/serialization/#decimal-amounts-are-written-as-json-strings).
+
+The snake_case mapping is an exact table emitted by the generator, not a runtime
+heuristic, so `from_json_snake_case(to_json_snake_case(x)) == x` holds for every
+generated type — which a heuristic cannot: `hoechstpreisHT`, `kundengruppeKA`, and
+`Sigmoidparameter`'s `A`/`B`/`C`/`D` all invert to a *different* camelCase name.
+BO4E metadata keys (`_typ`, `_version`, `_id`) pass through byte-for-byte, and so
+does extension data **including everything nested under it** — the transform
+switches off at the edge of the schema, so a vendor blob holding `{"a": 3}` is not
+rewritten to `{"A": 3}`. One ambiguity it cannot resolve: a *top-level* extension
+key that is a field's own snake spelling is indistinguishable from that field, so
+prefer the German mode whenever extension data is in play. See
+[Serialization](https://hupe1980.github.io/rubo4e/docs/serialization/#how-snake-case-keys-are-mapped).
 
 ### Parsing untrusted input
 
@@ -472,6 +573,11 @@ let malo = Marktlokation::from_json_german_hardened(
     &body,
     JsonParseLimits::untrusted_defaults(),   // 1 MB / depth 64 / 64 KB ext / 32 fields
 )?;
+
+// …or narrowed, where you know your own payloads:
+let strict = JsonParseLimits::untrusted_defaults()
+    .with_max_payload_bytes(Some(64 * 1024))
+    .with_max_extension_field_count(Some(0));  // reject any unknown field
 ```
 
 All four limits are enforced **during** parsing and at **every** nesting level —
@@ -480,6 +586,11 @@ data on the root — so an oversized payload is rejected while it is being read,
 not after the object tree has been allocated. Every limit that fires bumps a
 process-wide counter readable via `json_limit_hit_counters()`, exported to the
 `metrics` ecosystem when the `metrics` feature is on.
+
+These bound the parser, not the object graph it produces. `[{},{},{}…]` is three
+bytes per element on the wire and a full struct per element in memory, so size
+`max_payload_bytes` against the expanded cost and keep a concurrency limit in
+front of the endpoint.
 
 See [Serialization](https://hupe1980.github.io/rubo4e/docs/serialization/#hardened-deserialization-for-untrusted-inputs)
 for the exact scope of each limit.
@@ -502,9 +613,21 @@ let validated = Validated::new(malo)?;     // Err(garde::Report) if invalid
 let inner: &Marktlokation = &validated;    // Deref to inner type
 ```
 
-Cross-field rules (e.g. exactly one of `lokationsadresse` / `geoadresse` /
-`katasterinformation` must be set) run automatically via `#[garde(custom(...))]`
-attributes on the generated types.
+Cross-field rules run automatically via `#[garde(custom(...))]` attributes on the
+generated types:
+
+| Type | Rule |
+|---|---|
+| `Marktlokation`, `Messlokation` | exactly one of `lokationsadresse` / `geoadresse` / `katasterinformation` |
+| `Vertrag` | `vertragsbeginn` strictly before `vertragsende` |
+| `Bilanzierung` | `bilanzierungsbeginn` ≤ `bilanzierungsende` |
+| `Zeitraum` | at least one temporal field; `startdatum` strictly before `enddatum` |
+| `Rechnung` | one currency throughout; `gesamtnetto + gesamtsteuer == gesamtbrutto`; `steuerbetraege` sum to `gesamtsteuer` |
+| `Kostenposition` | `einzelpreis × menge` rounds to `betrag_kostenposition` at its own scale |
+
+Every rule traces to a sentence in the BO4E schema. `zuZahlen` is **not** checked:
+the equation its schema names references a `rabattBrutto` field v202607 does not
+ship. See [Validation](https://hupe1980.github.io/rubo4e/docs/validation/).
 
 ---
 
@@ -583,7 +706,7 @@ current floor is two stable releases behind, and a bump is a **minor** version
 change, never a patch.
 
 The floor is set by the dependency tree rather than by this crate's own source:
-`time`, `simd-json`, and `home` (via `sqlx`) all require 1.88. Because Cargo's
+`time` and `home` (via `sqlx`) both require 1.88. Because Cargo's
 default resolver picks the newest semver-compatible dependency without regard to
 `rust-version`, a toolchain below the floor fails at *resolution* time with
 `rustc 1.87.0 is not supported by the following packages` rather than at compile

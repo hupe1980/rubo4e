@@ -3,7 +3,7 @@ use super::{
     ZusatzAttribut,
 };
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(not(feature = "json"), derive(Hash))]
+#[cfg_attr(not(feature = "json"), derive(Eq, Hash))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "builder", derive(typed_builder::TypedBuilder))]
 #[cfg_attr(feature = "validate", derive(garde::Validate))]
@@ -17,7 +17,7 @@ use super::{
 /// Die jeweiligen Sätze von Merkmalen sind in der Grafik ergänzt worden und stellen jeweils eine Ausprägung für die
 /// verschiedenen Anwendungsfälle der Preisblätter dar.
 ///
-/// > **Note:** [Preisblatt JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/bo/Preisblatt.json)
+/// > **Note:** [Preisblatt JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.1.0/src/bo4e_schemas/bo/Preisblatt.json)
 pub struct Preisblatt {
     /// Eine Bezeichnung für das Preisblatt
     #[cfg_attr(feature = "serde", serde(rename = "bezeichnung"))]
@@ -55,7 +55,7 @@ pub struct Preisblatt {
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub sparte: Option<Sparte>,
-    /// BO type identifier — always `BoTyp::Preisblatt` for this struct.
+    /// BO4E type discriminant — always `BoTyp::Preisblatt` for this struct.
     #[cfg_attr(feature = "serde", serde(rename = "_typ"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(
@@ -68,7 +68,7 @@ pub struct Preisblatt {
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(
         feature = "builder",
-        builder(default = Some("v202607.0.0".to_owned()), setter(into))
+        builder(default = Some("202607.1.0".to_owned()), setter(into))
     )]
     pub version: Option<String>,
     #[cfg_attr(feature = "serde", serde(rename = "zusatzAttribute"))]
@@ -90,7 +90,6 @@ pub struct Preisblatt {
 impl Default for Preisblatt {
     fn default() -> Self {
         Self {
-            typ: Some(BoTyp::Preisblatt),
             bezeichnung: Default::default(),
             gueltigkeit: Default::default(),
             herausgeber: Default::default(),
@@ -98,7 +97,8 @@ impl Default for Preisblatt {
             preispositionen: Default::default(),
             preisstatus: Default::default(),
             sparte: Default::default(),
-            version: Some("v202607.0.0".to_owned()),
+            typ: Some(BoTyp::Preisblatt),
+            version: Some("202607.1.0".to_owned()),
             zusatz_attribute: Default::default(),
             _additional: Default::default(),
         }
@@ -110,7 +110,10 @@ impl Bo4eObject for Preisblatt {
         self.typ.unwrap_or(BoTyp::Preisblatt)
     }
     fn schema_version(&self) -> &'static str {
-        "v202607.0.0"
+        "202607.1.0"
+    }
+    fn schema_series(&self) -> &'static str {
+        "202607"
     }
 }
 #[cfg(feature = "json")]

@@ -24,9 +24,68 @@ use serde::Serialize;
 /// silently dropped every rewrite.
 pub(super) type KeyTransformFn = fn(&str) -> Option<&'static str>;
 
+/// A key transform, plus whether it still applies at this point in the tree.
+///
+/// # Why it switches off
+///
+/// Keys are renamed as the parser yields them, before serde knows which struct
+/// they belong to, so an unscoped transform renames every key at every depth.
+/// That is right for the schema's own nesting and wrong inside an extension
+/// value, where `{"a": 3}` would become `{"A": 3}` — `A` is a BO4E field name
+/// somewhere (`Sigmoidparameter.A`), but not here.
+///
+/// So it descends only under a key the schema defines ([`KNOWN_FIELD_KEYS`]);
+/// under anything else it switches off for that whole subtree.
+///
+///
+/// [`KNOWN_FIELD_KEYS`]: crate::generated::key_map::KNOWN_FIELD_KEYS
+#[derive(Clone, Copy)]
+pub(super) struct KeyTransform {
+    lookup: KeyTransformFn,
+    /// `false` once the walk has entered a value the schema does not describe.
+    active: bool,
+}
+
+impl KeyTransform {
+    /// A transform in force, for the root of a document.
+    #[inline]
+    pub(super) const fn new(lookup: KeyTransformFn) -> Self {
+        Self {
+            lookup,
+            active: true,
+        }
+    }
+
+    /// The replacement for `key`, or `None` to pass it through unchanged.
+    #[inline]
+    fn apply(self, key: &str) -> Option<&'static str> {
+        if self.active {
+            (self.lookup)(key)
+        } else {
+            None
+        }
+    }
+
+    /// The transform that applies to the *value* stored under `key`.
+    ///
+    /// Switches off — permanently, for that whole subtree — when `key` is not a
+    /// schema field, because then the value belongs to whoever wrote it.
+    #[inline]
+    fn descend(self, key: &str) -> Self {
+        if self.active && is_schema_key(key) {
+            self
+        } else {
+            Self {
+                active: false,
+                ..self
+            }
+        }
+    }
+}
+
 pub(super) fn serialize_with_key_transform<T>(
     value: &T,
-    transform: KeyTransformFn,
+    transform: KeyTransform,
 ) -> Result<String, serde_json::Error>
 where
     T: Serialize,
@@ -47,12 +106,12 @@ where
 
 struct KeyTransformSerializer<S> {
     inner: S,
-    transform: KeyTransformFn,
+    transform: KeyTransform,
 }
 
 struct KeyTransformValue<'a, T: ?Sized> {
     value: &'a T,
-    transform: KeyTransformFn,
+    transform: KeyTransform,
 }
 
 impl<T: ?Sized> Serialize for KeyTransformValue<'_, T>
@@ -222,7 +281,7 @@ fn json_key_to_string<K: ?Sized + Serialize>(key: &K) -> Result<String, serde_js
 /// whose only non-`end` method wraps each element/field value.
 macro_rules! impl_sequence_state {
     ($(($State:ident, $Trait:ident, $method:ident)),* $(,)?) => {$(
-        struct $State<S> { inner: S, transform: KeyTransformFn }
+        struct $State<S> { inner: S, transform: KeyTransform }
         impl<S: serde::ser::$Trait> serde::ser::$Trait for $State<S> {
             type Ok = S::Ok;
             type Error = S::Error;
@@ -246,7 +305,10 @@ impl_sequence_state! {
 
 struct KeyTransformSerializeMap<S> {
     inner: S,
-    transform: KeyTransformFn,
+    transform: KeyTransform,
+    /// The transform for the value of the key just written — computed there,
+    /// because `serialize_value` no longer has the key.
+    value_transform: KeyTransform,
 }
 
 impl<S> serde::ser::SerializeMap for KeyTransformSerializeMap<S>
@@ -261,8 +323,9 @@ where
         T: Serialize,
     {
         let key = json_key_to_string(key).map_err(<S::Error as serde::ser::Error>::custom)?;
+        self.value_transform = self.transform.descend(&key);
         self.inner
-            .serialize_key((self.transform)(&key).unwrap_or(&key))
+            .serialize_key(self.transform.apply(&key).unwrap_or(&key))
     }
 
     fn serialize_value<T: ?Sized>(&mut self, value: &T) -> Result<(), Self::Error>
@@ -271,7 +334,7 @@ where
     {
         self.inner.serialize_value(&KeyTransformValue {
             value,
-            transform: self.transform,
+            transform: self.value_transform,
         })
     }
 
@@ -286,10 +349,10 @@ where
     {
         let key = json_key_to_string(key).map_err(<S::Error as serde::ser::Error>::custom)?;
         self.inner.serialize_entry(
-            (self.transform)(&key).unwrap_or(&key),
+            self.transform.apply(&key).unwrap_or(&key),
             &KeyTransformValue {
                 value,
-                transform: self.transform,
+                transform: self.transform.descend(&key),
             },
         )
     }
@@ -301,7 +364,7 @@ where
 
 struct KeyTransformSerializeStruct<S> {
     inner: S,
-    transform: KeyTransformFn,
+    transform: KeyTransform,
 }
 
 impl<S> serde::ser::SerializeStruct for KeyTransformSerializeStruct<S>
@@ -320,10 +383,10 @@ where
         T: Serialize,
     {
         self.inner.serialize_entry(
-            (self.transform)(key).unwrap_or(key),
+            self.transform.apply(key).unwrap_or(key),
             &KeyTransformValue {
                 value,
-                transform: self.transform,
+                transform: self.transform.descend(key),
             },
         )
     }
@@ -335,7 +398,7 @@ where
 
 struct KeyTransformSerializeStructVariant<S> {
     inner: S,
-    transform: KeyTransformFn,
+    transform: KeyTransform,
 }
 
 impl<S> serde::ser::SerializeStructVariant for KeyTransformSerializeStructVariant<S>
@@ -359,10 +422,10 @@ where
         // for plain structs would make the wrapper's behaviour depend on which
         // serde shape a type happens to use.
         self.inner.serialize_field(
-            (self.transform)(key).unwrap_or(key),
+            self.transform.apply(key).unwrap_or(key),
             &KeyTransformValue {
                 value,
-                transform: self.transform,
+                transform: self.transform.descend(key),
             },
         )
     }
@@ -517,6 +580,9 @@ where
         Ok(KeyTransformSerializeMap {
             inner: self.inner.serialize_map(len)?,
             transform: self.transform,
+            // Overwritten by every `serialize_key`; serde never emits a value
+            // without one.
+            value_transform: self.transform,
         })
     }
 
@@ -558,55 +624,46 @@ where
     }
 }
 
-pub(super) fn deserialize_with_key_transform_from_str<T, F>(
+pub(super) fn deserialize_with_key_transform_from_str<T: DeserializeOwned>(
     input: &str,
-    transform: &F,
-) -> Result<T, serde_json::Error>
-where
-    T: DeserializeOwned,
-    F: Fn(&str) -> Option<&'static str>,
-{
+    transform: KeyTransform,
+) -> Result<T, serde_json::Error> {
     let mut de = serde_json::Deserializer::from_str(input);
     T::deserialize(KeyTransformDeserializer::new(&mut de, transform))
 }
 
-pub(super) fn deserialize_with_key_transform_from_slice<T, F>(
+pub(super) fn deserialize_with_key_transform_from_slice<T: DeserializeOwned>(
     input: &[u8],
-    transform: &F,
-) -> Result<T, serde_json::Error>
-where
-    T: DeserializeOwned,
-    F: Fn(&str) -> Option<&'static str>,
-{
+    transform: KeyTransform,
+) -> Result<T, serde_json::Error> {
     let mut de = serde_json::Deserializer::from_slice(input);
     T::deserialize(KeyTransformDeserializer::new(&mut de, transform))
 }
 
-pub(super) struct KeyTransformDeserializer<D, F> {
+pub(super) struct KeyTransformDeserializer<D> {
     inner: D,
-    transform: F,
+    transform: KeyTransform,
 }
 
-impl<D, F> KeyTransformDeserializer<D, F> {
-    pub(super) fn new(inner: D, transform: F) -> Self {
+impl<D> KeyTransformDeserializer<D> {
+    pub(super) fn new(inner: D, transform: KeyTransform) -> Self {
         Self { inner, transform }
     }
 }
 
-struct KeyTransformVisitor<V, F> {
+struct KeyTransformVisitor<V> {
     inner: V,
-    transform: F,
+    transform: KeyTransform,
 }
 
-struct KeyTransformSeed<S, F> {
+struct KeyTransformSeed<S> {
     inner: S,
-    transform: F,
+    transform: KeyTransform,
 }
 
-impl<'de, S, F> serde::de::DeserializeSeed<'de> for KeyTransformSeed<S, F>
+impl<'de, S> serde::de::DeserializeSeed<'de> for KeyTransformSeed<S>
 where
     S: serde::de::DeserializeSeed<'de>,
-    F: Copy + Fn(&str) -> Option<&'static str>,
 {
     type Value = S::Value;
 
@@ -619,15 +676,63 @@ where
     }
 }
 
-struct KeyTransformMapAccess<A, F> {
-    inner: A,
-    transform: F,
+/// A JSON object key, borrowed from the input where the parser allows it.
+///
+/// `next_key::<String>()` allocates for every key in every object, including the
+/// ones that are looked up in the static key map and then dropped. `serde_json`
+/// can borrow an escape-free key straight out of a `&str` payload; this takes
+/// that when offered and owns otherwise.
+enum RawKey<'de> {
+    Borrowed(&'de str),
+    Owned(String),
 }
 
-impl<'de, A, F> serde::de::MapAccess<'de> for KeyTransformMapAccess<A, F>
+impl RawKey<'_> {
+    #[inline]
+    fn as_str(&self) -> &str {
+        match self {
+            Self::Borrowed(s) => s,
+            Self::Owned(s) => s,
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for RawKey<'de> {
+    fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+        struct Visitor;
+        impl<'de> serde::de::Visitor<'de> for Visitor {
+            type Value = RawKey<'de>;
+            fn expecting(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                f.write_str("a JSON object key")
+            }
+            fn visit_borrowed_str<E: serde::de::Error>(
+                self,
+                v: &'de str,
+            ) -> Result<Self::Value, E> {
+                Ok(RawKey::Borrowed(v))
+            }
+            fn visit_str<E: serde::de::Error>(self, v: &str) -> Result<Self::Value, E> {
+                Ok(RawKey::Owned(v.to_owned()))
+            }
+            fn visit_string<E: serde::de::Error>(self, v: String) -> Result<Self::Value, E> {
+                Ok(RawKey::Owned(v))
+            }
+        }
+        d.deserialize_str(Visitor)
+    }
+}
+
+struct KeyTransformMapAccess<A> {
+    inner: A,
+    transform: KeyTransform,
+    /// The transform for the value of the key just read — computed there because
+    /// that is where the key is still in hand.
+    value_transform: KeyTransform,
+}
+
+impl<'de, A> serde::de::MapAccess<'de> for KeyTransformMapAccess<A>
 where
     A: serde::de::MapAccess<'de>,
-    F: Copy + Fn(&str) -> Option<&'static str>,
 {
     type Error = A::Error;
 
@@ -635,13 +740,22 @@ where
     where
         K: serde::de::DeserializeSeed<'de>,
     {
-        match self.inner.next_key::<String>()? {
-            // A mapped key is `&'static`, so the rename costs no allocation; an
-            // unmapped key reuses the `String` the parser already produced.
-            Some(key) => match (self.transform)(&key) {
-                Some(mapped) => seed.deserialize(mapped.into_deserializer()).map(Some),
-                None => seed.deserialize(key.into_deserializer()).map(Some),
-            },
+        // `RawKey` borrows out of the input when the parser offers it, so an
+        // escape-free key in a `&str` payload allocates nothing, mapped or not.
+        match self.inner.next_key::<RawKey<'de>>()? {
+            Some(key) => {
+                // Decide here whether the *value* is still schema-shaped: this is
+                // the last point at which the key is available.
+                self.value_transform = self.transform.descend(key.as_str());
+                match self.transform.apply(key.as_str()) {
+                    // A mapped key is `&'static`, so the rename costs no allocation.
+                    Some(mapped) => seed.deserialize(mapped.into_deserializer()).map(Some),
+                    None => match key {
+                        RawKey::Borrowed(k) => seed.deserialize(k.into_deserializer()).map(Some),
+                        RawKey::Owned(k) => seed.deserialize(k.into_deserializer()).map(Some),
+                    },
+                }
+            }
             None => Ok(None),
         }
     }
@@ -652,7 +766,7 @@ where
     {
         self.inner.next_value_seed(KeyTransformSeed {
             inner: seed,
-            transform: self.transform,
+            transform: self.value_transform,
         })
     }
 
@@ -661,15 +775,14 @@ where
     }
 }
 
-struct KeyTransformSeqAccess<A, F> {
+struct KeyTransformSeqAccess<A> {
     inner: A,
-    transform: F,
+    transform: KeyTransform,
 }
 
-impl<'de, A, F> serde::de::SeqAccess<'de> for KeyTransformSeqAccess<A, F>
+impl<'de, A> serde::de::SeqAccess<'de> for KeyTransformSeqAccess<A>
 where
     A: serde::de::SeqAccess<'de>,
-    F: Copy + Fn(&str) -> Option<&'static str>,
 {
     type Error = A::Error;
 
@@ -696,10 +809,9 @@ macro_rules! delegate_visit {
     };
 }
 
-impl<'de, V, F> serde::de::Visitor<'de> for KeyTransformVisitor<V, F>
+impl<'de, V> serde::de::Visitor<'de> for KeyTransformVisitor<V>
 where
     V: serde::de::Visitor<'de>,
-    F: Copy + Fn(&str) -> Option<&'static str>,
 {
     type Value = V::Value;
 
@@ -724,14 +836,17 @@ where
         self.inner.visit_map(KeyTransformMapAccess {
             inner: map,
             transform: self.transform,
+            // Overwritten by every `next_key_seed`; a `MapAccess` that yields a
+            // value without a key would be malformed.
+            value_transform: self.transform,
         })
     }
 
     // ── Scalar delegation ────────────────────────────────────────────────────
     delegate_visit! {
         visit_bool(bool),
-        visit_i8(i8), visit_i16(i16), visit_i32(i32), visit_i64(i64),
-        visit_u8(u8), visit_u16(u16), visit_u32(u32), visit_u64(u64),
+        visit_i8(i8), visit_i16(i16), visit_i32(i32), visit_i64(i64), visit_i128(i128),
+        visit_u8(u8), visit_u16(u16), visit_u32(u32), visit_u64(u64), visit_u128(u128),
         visit_f32(f32), visit_f64(f64),
         visit_char(char),
         visit_str(&str), visit_borrowed_str(&'de str), visit_string(String),
@@ -783,10 +898,9 @@ macro_rules! delegate_deser {
     };
 }
 
-impl<'de, D, F> serde::de::Deserializer<'de> for KeyTransformDeserializer<D, F>
+impl<'de, D> serde::de::Deserializer<'de> for KeyTransformDeserializer<D>
 where
     D: serde::de::Deserializer<'de>,
-    F: Copy + Fn(&str) -> Option<&'static str>,
 {
     type Error = D::Error;
 
@@ -929,7 +1043,21 @@ where
 // Keys outside the table — extension data, and BO4E metadata keys like `_typ` —
 // pass through untouched, which is also what keeps *those* lossless.
 
-use crate::generated::key_map::{SNAKE_TO_WIRE, WIRE_TO_SNAKE};
+use crate::generated::key_map::{KNOWN_FIELD_KEYS, SNAKE_TO_WIRE, WIRE_TO_SNAKE};
+
+/// Whether `key` names a field the BO4E schema defines, in either spelling.
+///
+/// The question [`KeyTransform::descend`] asks: a key that is *not* a schema
+/// field is extension data, and the value under it is the producer's own JSON —
+/// not something to rename.
+///
+/// Metadata keys (`_typ`, `_version`, `_id`) count as schema fields, so a
+/// payload cannot switch the transform off by nesting under one. Their values
+/// are scalars anyway, so it makes no practical difference.
+#[inline]
+fn is_schema_key(key: &str) -> bool {
+    KNOWN_FIELD_KEYS.binary_search(&key).is_ok()
+}
 
 /// Converts a BO4E wire key (German camelCase) to its Rust snake_case field name.
 ///
@@ -967,7 +1095,7 @@ pub(super) fn snake_to_camel(key: &str) -> Option<&'static str> {
 mod tests {
     use super::*;
 
-    use crate::generated::key_map::{SNAKE_TO_WIRE, WIRE_TO_SNAKE};
+    use crate::generated::key_map::{KNOWN_FIELD_KEYS, SNAKE_TO_WIRE, WIRE_TO_SNAKE};
 
     /// Both generated tables must be sorted — `binary_search_by_key` silently
     /// returns wrong answers on unsorted input, which would corrupt keys rather
@@ -982,6 +1110,36 @@ mod tests {
             SNAKE_TO_WIRE.windows(2).all(|w| w[0].0 < w[1].0),
             "SNAKE_TO_WIRE must be strictly sorted by snake name"
         );
+    }
+
+    /// `is_schema_key` binary-searches this one, so an unsorted table would send
+    /// it the wrong answer — silently switching the transform off under a real
+    /// field, or on under somebody else's JSON.
+    #[test]
+    fn the_known_field_key_table_is_sorted_and_covers_both_spellings() {
+        assert!(
+            KNOWN_FIELD_KEYS.windows(2).all(|w| w[0] < w[1]),
+            "KNOWN_FIELD_KEYS must be strictly sorted"
+        );
+        for (wire, snake) in WIRE_TO_SNAKE {
+            assert!(
+                is_schema_key(wire),
+                "{wire:?} missing from KNOWN_FIELD_KEYS"
+            );
+            assert!(
+                is_schema_key(snake),
+                "{snake:?} missing from KNOWN_FIELD_KEYS"
+            );
+        }
+        // Metadata keys are schema fields, so nesting under one cannot switch
+        // the transform off.
+        for meta in ["_typ", "_version", "_id"] {
+            assert!(is_schema_key(meta), "{meta:?} must count as a schema key");
+        }
+        // …and a key no schema defines must not.
+        for other in ["vendorBlob", "definitely_not_a_bo4e_field", ""] {
+            assert!(!is_schema_key(other), "{other:?} must not count");
+        }
     }
 
     /// The two tables must describe the same bijection, read in either direction.

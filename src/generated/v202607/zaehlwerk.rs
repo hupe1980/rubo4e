@@ -3,7 +3,7 @@ use super::{
     VerwendungszweckProMarktrolle, Waermenutzung, Zaehlzeitregister, ZusatzAttribut,
 };
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(not(feature = "json"), derive(Hash))]
+#[cfg_attr(not(feature = "json"), derive(Eq, Hash))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "builder", derive(typed_builder::TypedBuilder))]
 #[cfg_attr(feature = "validate", derive(garde::Validate))]
@@ -12,7 +12,7 @@ use super::{
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 /// Mit dieser Komponente werden Zählwerke modelliert.
 ///
-/// > **Note:** [Zaehlwerk JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/com/Zaehlwerk.json)
+/// > **Note:** [Zaehlwerk JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.1.0/src/bo4e_schemas/com/Zaehlwerk.json)
 pub struct Zaehlwerk {
     /// Anzahl Ablesungen pro Jahr
     #[cfg_attr(feature = "serde", serde(rename = "anzahlAblesungen"))]
@@ -77,10 +77,13 @@ pub struct Zaehlwerk {
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub richtung: Option<Energierichtung>,
-    /// COM type identifier for this struct.
+    /// BO4E type discriminant — always `ComTyp::Zaehlwerk` for this struct.
     #[cfg_attr(feature = "serde", serde(rename = "_typ"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(
+        feature = "builder",
+        builder(default = Some(ComTyp::Zaehlwerk), setter(skip))
+    )]
     pub typ: Option<ComTyp>,
     /// Stromverbrauchsart/Verbrauchsart Marktlokation
     #[cfg_attr(feature = "serde", serde(rename = "verbrauchsart"))]
@@ -92,7 +95,7 @@ pub struct Zaehlwerk {
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(
         feature = "builder",
-        builder(default = Some("v202607.0.0".to_owned()), setter(into))
+        builder(default = Some("202607.1.0".to_owned()), setter(into))
     )]
     pub version: Option<String>,
     /// Verwendungungszweck der Werte Marktlokation
@@ -115,13 +118,23 @@ pub struct Zaehlwerk {
     #[cfg_attr(feature = "serde", serde(rename = "wandlerfaktor"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "serde", serde(default))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(deserialize_with = "crate::decimal_serde::deserialize_opt")
+    )]
     #[cfg(feature = "decimal")]
     pub wandlerfaktor: Option<rust_decimal::Decimal>,
     /// Requires the `decimal` feature for the `rust_decimal::Decimal` representation.
-    /// Without `decimal`, stores the decimal string value unchanged.
+    /// Without `decimal`, stores the decimal's lexical form (a JSON string or number).
     #[cfg_attr(feature = "serde", serde(rename = "wandlerfaktor"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "serde", serde(default))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(deserialize_with = "crate::decimal_serde::deserialize_opt")
+    )]
     #[cfg(not(feature = "decimal"))]
     pub wandlerfaktor: Option<String>,
     /// Identifikation des Zählwerks (Registers) innerhalb des Zählers.
@@ -166,9 +179,9 @@ impl Default for Zaehlwerk {
             nachkommastelle: Default::default(),
             obis_kennzahl: Default::default(),
             richtung: Default::default(),
-            typ: Default::default(),
+            typ: Some(ComTyp::Zaehlwerk),
             verbrauchsart: Default::default(),
-            version: Some("v202607.0.0".to_owned()),
+            version: Some("202607.1.0".to_owned()),
             verwendungszwecke: Default::default(),
             vorkommastelle: Default::default(),
             waermenutzung: Default::default(),

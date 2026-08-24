@@ -1,4 +1,4 @@
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(
     feature = "strum",
@@ -23,7 +23,7 @@ pub enum ComTyp {
     Angebotsvariante,
     #[cfg_attr(feature = "serde", serde(rename = "AUFABSCHLAG"))]
     #[cfg_attr(feature = "strum", strum(serialize = "AUFABSCHLAG"))]
-    Aufabschlag,
+    AufAbschlag,
     #[cfg_attr(feature = "serde", serde(rename = "AUSSCHREIBUNGSDETAIL"))]
     #[cfg_attr(feature = "strum", strum(serialize = "AUSSCHREIBUNGSDETAIL"))]
     Ausschreibungsdetail,
@@ -38,7 +38,7 @@ pub enum ComTyp {
     Dienstleistung,
     #[cfg_attr(feature = "serde", serde(rename = "EINHEITSPREISPOSITION"))]
     #[cfg_attr(feature = "strum", strum(serialize = "EINHEITSPREISPOSITION"))]
-    Einheitspreisposition,
+    EinheitsPreisposition,
     #[cfg_attr(feature = "serde", serde(rename = "ENERGIEHERKUNFT"))]
     #[cfg_attr(feature = "strum", strum(serialize = "ENERGIEHERKUNFT"))]
     Energieherkunft,
@@ -77,10 +77,10 @@ pub enum ComTyp {
     Lastprofil,
     #[cfg_attr(feature = "serde", serde(rename = "LASTVARIABLEPREISPOSITION"))]
     #[cfg_attr(feature = "strum", strum(serialize = "LASTVARIABLEPREISPOSITION"))]
-    Lastvariablepreisposition,
+    LastvariablePreisposition,
     #[cfg_attr(feature = "serde", serde(rename = "MARKTGEBIETINFO"))]
     #[cfg_attr(feature = "strum", strum(serialize = "MARKTGEBIETINFO"))]
-    Marktgebietinfo,
+    MarktgebietInfo,
     #[cfg_attr(feature = "serde", serde(rename = "MENGE"))]
     #[cfg_attr(feature = "strum", strum(serialize = "MENGE"))]
     Menge,
@@ -113,16 +113,16 @@ pub enum ComTyp {
     Regionszeitscheibe,
     #[cfg_attr(feature = "serde", serde(rename = "RELATIVEPREISPOSITION"))]
     #[cfg_attr(feature = "strum", strum(serialize = "RELATIVEPREISPOSITION"))]
-    Relativepreisposition,
+    RelativePreisposition,
     #[cfg_attr(feature = "serde", serde(rename = "SIGMOIDPARAMETER"))]
     #[cfg_attr(feature = "strum", strum(serialize = "SIGMOIDPARAMETER"))]
     Sigmoidparameter,
     #[cfg_attr(feature = "serde", serde(rename = "STANDORTEIGENSCHAFTENGAS"))]
     #[cfg_attr(feature = "strum", strum(serialize = "STANDORTEIGENSCHAFTENGAS"))]
-    Standorteigenschaftengas,
+    StandorteigenschaftenGas,
     #[cfg_attr(feature = "serde", serde(rename = "STANDORTEIGENSCHAFTENSTROM"))]
     #[cfg_attr(feature = "strum", strum(serialize = "STANDORTEIGENSCHAFTENSTROM"))]
-    Standorteigenschaftenstrom,
+    StandorteigenschaftenStrom,
     #[cfg_attr(feature = "serde", serde(rename = "STEUERBETRAG"))]
     #[cfg_attr(feature = "strum", strum(serialize = "STEUERBETRAG"))]
     Steuerbetrag,
@@ -158,7 +158,7 @@ pub enum ComTyp {
     Vertragsteil,
     #[cfg_attr(feature = "serde", serde(rename = "VERWENDUNGSZWECKPROMARKTROLLE"))]
     #[cfg_attr(feature = "strum", strum(serialize = "VERWENDUNGSZWECKPROMARKTROLLE"))]
-    Verwendungszweckpromarktrolle,
+    VerwendungszweckProMarktrolle,
     #[cfg_attr(feature = "serde", serde(rename = "VORAUSZAHLUNG"))]
     #[cfg_attr(feature = "strum", strum(serialize = "VORAUSZAHLUNG"))]
     Vorauszahlung,
@@ -185,7 +185,7 @@ pub enum ComTyp {
     Zeitreihenwert,
     #[cfg_attr(feature = "serde", serde(rename = "ZEITVARIABLEPREISPOSITION"))]
     #[cfg_attr(feature = "strum", strum(serialize = "ZEITVARIABLEPREISPOSITION"))]
-    Zeitvariablepreisposition,
+    ZeitvariablePreisposition,
     #[cfg_attr(feature = "serde", serde(rename = "ZUSTAENDIGKEIT"))]
     #[cfg_attr(feature = "strum", strum(serialize = "ZUSTAENDIGKEIT"))]
     Zustaendigkeit,
@@ -206,12 +206,12 @@ impl ComTyp {
         Self::Angebotsposition,
         Self::Angebotsteil,
         Self::Angebotsvariante,
-        Self::Aufabschlag,
+        Self::AufAbschlag,
         Self::Ausschreibungsdetail,
         Self::Ausschreibungslos,
         Self::Betrag,
         Self::Dienstleistung,
-        Self::Einheitspreisposition,
+        Self::EinheitsPreisposition,
         Self::Energieherkunft,
         Self::Energiemix,
         Self::Fremdkostenblock,
@@ -224,8 +224,8 @@ impl ComTyp {
         Self::Kostenblock,
         Self::Kostenposition,
         Self::Lastprofil,
-        Self::Lastvariablepreisposition,
-        Self::Marktgebietinfo,
+        Self::LastvariablePreisposition,
+        Self::MarktgebietInfo,
         Self::Menge,
         Self::Messwert,
         Self::Preis,
@@ -236,10 +236,10 @@ impl ComTyp {
         Self::Regionsoperation,
         Self::Regionspreis,
         Self::Regionszeitscheibe,
-        Self::Relativepreisposition,
+        Self::RelativePreisposition,
         Self::Sigmoidparameter,
-        Self::Standorteigenschaftengas,
-        Self::Standorteigenschaftenstrom,
+        Self::StandorteigenschaftenGas,
+        Self::StandorteigenschaftenStrom,
         Self::Steuerbetrag,
         Self::Tagesparameter,
         Self::Tarifberechnungsparameter,
@@ -251,7 +251,7 @@ impl ComTyp {
         Self::Unterschrift,
         Self::Vertragskonditionen,
         Self::Vertragsteil,
-        Self::Verwendungszweckpromarktrolle,
+        Self::VerwendungszweckProMarktrolle,
         Self::Vorauszahlung,
         Self::Zaehlwerk,
         Self::Zaehlzeitregister,
@@ -260,7 +260,7 @@ impl ComTyp {
         Self::Zahlungsinformation,
         Self::Zeitraum,
         Self::Zeitreihenwert,
-        Self::Zeitvariablepreisposition,
+        Self::ZeitvariablePreisposition,
         Self::Zustaendigkeit,
     ];
     /// Number of schema-defined variants (equal to `VARIANTS.len()`), excluding the
@@ -291,12 +291,12 @@ impl ComTyp {
             Self::Angebotsposition => "ANGEBOTSPOSITION",
             Self::Angebotsteil => "ANGEBOTSTEIL",
             Self::Angebotsvariante => "ANGEBOTSVARIANTE",
-            Self::Aufabschlag => "AUFABSCHLAG",
+            Self::AufAbschlag => "AUFABSCHLAG",
             Self::Ausschreibungsdetail => "AUSSCHREIBUNGSDETAIL",
             Self::Ausschreibungslos => "AUSSCHREIBUNGSLOS",
             Self::Betrag => "BETRAG",
             Self::Dienstleistung => "DIENSTLEISTUNG",
-            Self::Einheitspreisposition => "EINHEITSPREISPOSITION",
+            Self::EinheitsPreisposition => "EINHEITSPREISPOSITION",
             Self::Energieherkunft => "ENERGIEHERKUNFT",
             Self::Energiemix => "ENERGIEMIX",
             Self::Fremdkostenblock => "FREMDKOSTENBLOCK",
@@ -309,8 +309,8 @@ impl ComTyp {
             Self::Kostenblock => "KOSTENBLOCK",
             Self::Kostenposition => "KOSTENPOSITION",
             Self::Lastprofil => "LASTPROFIL",
-            Self::Lastvariablepreisposition => "LASTVARIABLEPREISPOSITION",
-            Self::Marktgebietinfo => "MARKTGEBIETINFO",
+            Self::LastvariablePreisposition => "LASTVARIABLEPREISPOSITION",
+            Self::MarktgebietInfo => "MARKTGEBIETINFO",
             Self::Menge => "MENGE",
             Self::Messwert => "MESSWERT",
             Self::Preis => "PREIS",
@@ -321,10 +321,10 @@ impl ComTyp {
             Self::Regionsoperation => "REGIONSOPERATION",
             Self::Regionspreis => "REGIONSPREIS",
             Self::Regionszeitscheibe => "REGIONSZEITSCHEIBE",
-            Self::Relativepreisposition => "RELATIVEPREISPOSITION",
+            Self::RelativePreisposition => "RELATIVEPREISPOSITION",
             Self::Sigmoidparameter => "SIGMOIDPARAMETER",
-            Self::Standorteigenschaftengas => "STANDORTEIGENSCHAFTENGAS",
-            Self::Standorteigenschaftenstrom => "STANDORTEIGENSCHAFTENSTROM",
+            Self::StandorteigenschaftenGas => "STANDORTEIGENSCHAFTENGAS",
+            Self::StandorteigenschaftenStrom => "STANDORTEIGENSCHAFTENSTROM",
             Self::Steuerbetrag => "STEUERBETRAG",
             Self::Tagesparameter => "TAGESPARAMETER",
             Self::Tarifberechnungsparameter => "TARIFBERECHNUNGSPARAMETER",
@@ -336,7 +336,7 @@ impl ComTyp {
             Self::Unterschrift => "UNTERSCHRIFT",
             Self::Vertragskonditionen => "VERTRAGSKONDITIONEN",
             Self::Vertragsteil => "VERTRAGSTEIL",
-            Self::Verwendungszweckpromarktrolle => "VERWENDUNGSZWECKPROMARKTROLLE",
+            Self::VerwendungszweckProMarktrolle => "VERWENDUNGSZWECKPROMARKTROLLE",
             Self::Vorauszahlung => "VORAUSZAHLUNG",
             Self::Zaehlwerk => "ZAEHLWERK",
             Self::Zaehlzeitregister => "ZAEHLZEITREGISTER",
@@ -345,7 +345,7 @@ impl ComTyp {
             Self::Zahlungsinformation => "ZAHLUNGSINFORMATION",
             Self::Zeitraum => "ZEITRAUM",
             Self::Zeitreihenwert => "ZEITREIHENWERT",
-            Self::Zeitvariablepreisposition => "ZEITVARIABLEPREISPOSITION",
+            Self::ZeitvariablePreisposition => "ZEITVARIABLEPREISPOSITION",
             Self::Zustaendigkeit => "ZUSTAENDIGKEIT",
             Self::Unknown => "UNKNOWN",
         }
@@ -362,7 +362,8 @@ impl ComTyp {
     /// # Example
     /// ```
     /// # use rubo4e::current::ComTyp;
-    /// /// assert_eq!(ComTyp::from_wire("ADRESSE"), Ok(ComTyp::Adresse));
+    /// assert_eq!(ComTyp::from_wire("ADRESSE"), Ok(ComTyp::Adresse));
+    /// // Out-of-schema values are rejected rather than degraded:
     /// assert!(ComTyp::from_wire("NOT_A_REAL_VALUE").is_err());
     /// // …including the `Unknown` catch-all's own wire spelling:
     /// assert!(ComTyp::from_wire("UNKNOWN").is_err());
@@ -373,12 +374,12 @@ impl ComTyp {
             "ANGEBOTSPOSITION" => Ok(Self::Angebotsposition),
             "ANGEBOTSTEIL" => Ok(Self::Angebotsteil),
             "ANGEBOTSVARIANTE" => Ok(Self::Angebotsvariante),
-            "AUFABSCHLAG" => Ok(Self::Aufabschlag),
+            "AUFABSCHLAG" => Ok(Self::AufAbschlag),
             "AUSSCHREIBUNGSDETAIL" => Ok(Self::Ausschreibungsdetail),
             "AUSSCHREIBUNGSLOS" => Ok(Self::Ausschreibungslos),
             "BETRAG" => Ok(Self::Betrag),
             "DIENSTLEISTUNG" => Ok(Self::Dienstleistung),
-            "EINHEITSPREISPOSITION" => Ok(Self::Einheitspreisposition),
+            "EINHEITSPREISPOSITION" => Ok(Self::EinheitsPreisposition),
             "ENERGIEHERKUNFT" => Ok(Self::Energieherkunft),
             "ENERGIEMIX" => Ok(Self::Energiemix),
             "FREMDKOSTENBLOCK" => Ok(Self::Fremdkostenblock),
@@ -391,8 +392,8 @@ impl ComTyp {
             "KOSTENBLOCK" => Ok(Self::Kostenblock),
             "KOSTENPOSITION" => Ok(Self::Kostenposition),
             "LASTPROFIL" => Ok(Self::Lastprofil),
-            "LASTVARIABLEPREISPOSITION" => Ok(Self::Lastvariablepreisposition),
-            "MARKTGEBIETINFO" => Ok(Self::Marktgebietinfo),
+            "LASTVARIABLEPREISPOSITION" => Ok(Self::LastvariablePreisposition),
+            "MARKTGEBIETINFO" => Ok(Self::MarktgebietInfo),
             "MENGE" => Ok(Self::Menge),
             "MESSWERT" => Ok(Self::Messwert),
             "PREIS" => Ok(Self::Preis),
@@ -403,10 +404,10 @@ impl ComTyp {
             "REGIONSOPERATION" => Ok(Self::Regionsoperation),
             "REGIONSPREIS" => Ok(Self::Regionspreis),
             "REGIONSZEITSCHEIBE" => Ok(Self::Regionszeitscheibe),
-            "RELATIVEPREISPOSITION" => Ok(Self::Relativepreisposition),
+            "RELATIVEPREISPOSITION" => Ok(Self::RelativePreisposition),
             "SIGMOIDPARAMETER" => Ok(Self::Sigmoidparameter),
-            "STANDORTEIGENSCHAFTENGAS" => Ok(Self::Standorteigenschaftengas),
-            "STANDORTEIGENSCHAFTENSTROM" => Ok(Self::Standorteigenschaftenstrom),
+            "STANDORTEIGENSCHAFTENGAS" => Ok(Self::StandorteigenschaftenGas),
+            "STANDORTEIGENSCHAFTENSTROM" => Ok(Self::StandorteigenschaftenStrom),
             "STEUERBETRAG" => Ok(Self::Steuerbetrag),
             "TAGESPARAMETER" => Ok(Self::Tagesparameter),
             "TARIFBERECHNUNGSPARAMETER" => Ok(Self::Tarifberechnungsparameter),
@@ -418,7 +419,7 @@ impl ComTyp {
             "UNTERSCHRIFT" => Ok(Self::Unterschrift),
             "VERTRAGSKONDITIONEN" => Ok(Self::Vertragskonditionen),
             "VERTRAGSTEIL" => Ok(Self::Vertragsteil),
-            "VERWENDUNGSZWECKPROMARKTROLLE" => Ok(Self::Verwendungszweckpromarktrolle),
+            "VERWENDUNGSZWECKPROMARKTROLLE" => Ok(Self::VerwendungszweckProMarktrolle),
             "VORAUSZAHLUNG" => Ok(Self::Vorauszahlung),
             "ZAEHLWERK" => Ok(Self::Zaehlwerk),
             "ZAEHLZEITREGISTER" => Ok(Self::Zaehlzeitregister),
@@ -427,7 +428,7 @@ impl ComTyp {
             "ZAHLUNGSINFORMATION" => Ok(Self::Zahlungsinformation),
             "ZEITRAUM" => Ok(Self::Zeitraum),
             "ZEITREIHENWERT" => Ok(Self::Zeitreihenwert),
-            "ZEITVARIABLEPREISPOSITION" => Ok(Self::Zeitvariablepreisposition),
+            "ZEITVARIABLEPREISPOSITION" => Ok(Self::ZeitvariablePreisposition),
             "ZUSTAENDIGKEIT" => Ok(Self::Zustaendigkeit),
             other => Err(crate::error::UnknownVariant::new(other)),
         }
@@ -507,6 +508,15 @@ impl<'r> sqlx::Decode<'r, sqlx::Postgres> for ComTyp {
     ) -> Result<Self, sqlx::error::BoxDynError> {
         let s = <&str as sqlx::Decode<sqlx::Postgres>>::decode(value)?;
         Ok(Self::from_wire(s).unwrap_or(Self::Unknown))
+    }
+}
+/// Lets `Vec<ComTyp>` bind to a `TEXT[]` column.  Only this crate can
+/// provide it: the trait and the enum are both foreign to any consumer, so the
+/// orphan rule rules out a downstream impl.
+#[cfg(feature = "sqlx")]
+impl sqlx::postgres::PgHasArrayType for ComTyp {
+    fn array_type_info() -> sqlx::postgres::PgTypeInfo {
+        <String as sqlx::postgres::PgHasArrayType>::array_type_info()
     }
 }
 #[cfg(test)]

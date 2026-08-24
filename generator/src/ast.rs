@@ -1,6 +1,7 @@
 //! Abstract Syntax Tree produced by the JSON Schema parser.
 //!
 //! Each variant represents one top-level schema definition in a BO4E release.
+
 // ─── Field types ─────────────────────────────────────────────────────────────
 
 /// Primitive Rust scalar that a field maps to.
@@ -53,20 +54,55 @@ pub struct Field {
 
 // ─── Top-level nodes ──────────────────────────────────────────────────────────
 
-/// A BO4E Geschäftsobjekt (business object) — maps to a Rust `struct`.
-#[derive(Debug, Clone)]
-pub struct BoNode {
-    pub name: String,
-    pub fields: Vec<Field>,
-    pub description: Option<String>,
+/// Whether a struct schema is a Geschäftsobjekt (BO) or a component (COM).
+///
+/// The two differ only in which discriminant enum their `_typ` field draws from,
+/// and in whether they implement [`Bo4eObject`](../../rubo4e/trait.Bo4eObject.html).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StructKind {
+    /// A BO4E Geschäftsobjekt — `_typ` is a `BoTyp`.
+    Bo,
+    /// A BO4E component — `_typ` is a `ComTyp`.
+    Com,
 }
 
-/// A BO4E COM type (component) — maps to a Rust `struct`.
+impl StructKind {
+    /// Name of the discriminant enum this kind's `_typ` field holds.
+    pub const fn typ_enum(self) -> &'static str {
+        match self {
+            Self::Bo => "BoTyp",
+            Self::Com => "ComTyp",
+        }
+    }
+
+    /// Returns `true` for [`StructKind::Bo`].
+    pub const fn is_bo(self) -> bool {
+        matches!(self, Self::Bo)
+    }
+}
+
+/// A BO4E struct schema — a Geschäftsobjekt or a component.
+///
+/// BOs and COMs are structurally identical; [`StructNode::kind`] is the only
+/// thing that distinguishes them, so they share one node type.
 #[derive(Debug, Clone)]
-pub struct ComNode {
+pub struct StructNode {
     pub name: String,
+    pub kind: StructKind,
     pub fields: Vec<Field>,
     pub description: Option<String>,
+    /// The `_typ` discriminant this schema pins, as it appears **on the wire**
+    /// (e.g. `"MARKTLOKATION"`).  `None` for schemas without a `_typ` property.
+    ///
+    /// Read from the schema's `const` (or its `default`, which BO4E uses when
+    /// `_typ` is declared as a nullable `$ref` to `BoTyp`) rather than derived
+    /// from the type name, so a schema that ever disagrees with the convention
+    /// still generates the discriminant its own JSON declares.
+    pub typ_const: Option<String>,
+    /// The `_version` value this schema declares as its default, as it appears
+    /// **on the wire** (e.g. `"202607.0.0"` — note: no `v` prefix, unlike the
+    /// release tag).  `None` for schemas without a `_version` property.
+    pub version_default: Option<String>,
 }
 
 /// A BO4E enum — maps to a Rust `enum`.
@@ -81,17 +117,23 @@ pub struct EnumNode {
 /// Any top-level BO4E schema definition.
 #[derive(Debug, Clone)]
 pub enum SchemaNode {
-    Bo(BoNode),
-    Com(ComNode),
+    Struct(StructNode),
     Enum(EnumNode),
 }
 
 impl SchemaNode {
     pub fn name(&self) -> &str {
         match self {
-            Self::Bo(n) => &n.name,
-            Self::Com(n) => &n.name,
+            Self::Struct(n) => &n.name,
             Self::Enum(n) => &n.name,
+        }
+    }
+
+    /// Returns the struct node, or `None` for enums.
+    pub fn as_struct(&self) -> Option<&StructNode> {
+        match self {
+            Self::Struct(n) => Some(n),
+            Self::Enum(_) => None,
         }
     }
 }

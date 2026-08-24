@@ -19,7 +19,7 @@ Given the same `Vertrag` value, the three methods produce:
 ```json
 {
   "_typ": "VERTRAG",
-  "_version": "v202607.0.0",
+  "_version": "202607.1.0",
   "sparte": "STROM",
   "marktlokationsId": "51238696781"
 }
@@ -29,7 +29,7 @@ Given the same `Vertrag` value, the three methods produce:
 ```json
 {
   "_typ": "VERTRAG",
-  "_version": "v202607.0.0",
+  "_version": "202607.1.0",
   "sparte": "STROM",
   "marktlokations_id": "51238696781"
 }
@@ -39,7 +39,7 @@ Given the same `Vertrag` value, the three methods produce:
 ```json
 {
   "_typ": "VERTRAG",
-  "_version": "v202607.0.0",
+  "_version": "202607.1.0",
   "marktlokationsId": "51238696781",
   "sparte": "STROM"
 }
@@ -48,24 +48,81 @@ Given the same `Vertrag` value, the three methods produce:
 ### The `_typ` and `_version` metadata keys
 
 Both are populated for you when you construct a value — via `Default::default()`,
-the typed builder, or `..Default::default()` struct-update syntax:
+the typed builder, or `..Default::default()` struct-update syntax. Both are read
+from the schema, so neither can drift from what the standard declares:
 
-- **`_typ`** is set on BO types only (`BoTyp::Vertrag`, …). COM types leave it
-  unset, matching the Python and Go implementations.
-- **`_version`** is set on **every** BO *and* COM to the schema version the module
-  was generated from, again matching Python and Go — their nested `Betrag` and
-  `Adresse` objects carry `_version` too.
+- **`_typ`** is set on **every** BO *and* COM — each BO4E schema pins its
+  discriminant with a JSON Schema `const`, and every reference implementation
+  stamps it, nested `Betrag` and `Adresse` components included.
+- **`_version`** is set on every BO and COM to the release the schema declares.
 
-You never need to supply the version string yourself, and you should not
-hardcode it: a literal in your code silently goes stale when you upgrade to a new
-schema series, producing payloads that misreport their own version. If you do
-need it programmatically, read it from `Bo4eObject::schema_version()`.
+#### `_version` has no `v`
+
+BO4E tags its schema releases `v202607.1.0`, but the `_version` value **inside a
+payload** is `202607.1.0`. `Bo4eObject::schema_version()` returns the wire
+spelling, so it compares directly against a `_version` read off a message.
+
+Do not hardcode either string — a literal goes stale on the next schema series.
 
 **Deserialization never overwrites it.** `_version` records the provenance of the
-data, so a payload that arrives stamped `v202501.0.0` keeps that value through a
+data, so a payload that arrives stamped `202501.0.0` keeps that value through a
 round-trip, and a payload that arrives without `_version` stays without one. Only
 construction fills it in. The setter remains available if you need to re-stamp a
 value deliberately.
+
+### Decimal amounts are written as JSON strings
+
+`Betrag.wert`, `Preis.wert`, `Menge.wert` and every other `Decimal` field
+serializes as a **quoted string**:
+
+```json
+{ "_typ": "BETRAG", "wert": "119.00", "waehrung": "EUR" }
+```
+
+This matches the reference implementation: BO4E-python models these fields as
+`decimal.Decimal`, and pydantic v2 serializes `Decimal` to a string in JSON mode.
+It also avoids the precision loss an IEEE-754 double would introduce.
+
+Two consequences:
+
+- **The published BO4E JSON Schema says `"type": "number"`** here, because
+  pydantic generates it in *validation* mode. Output from BO4E-python and from
+  rubo4e therefore both fail strict validation against BO4E's own schema —
+  an upstream inconsistency, not one to work around.
+- **Deserialization accepts both spellings.** A producer writing `"wert": 119.00`
+  as a JSON number (go-bo4e does) is read fine; `tests/compat/` covers both.
+
+#### …but only the string spelling is exact
+
+Serde's data model has no arbitrary-precision number, so a JSON number is already
+an `f64` before any deserializer here is called:
+
+| Wire | Result |
+|---|---|
+| `"wert": "119.00"` | `119.00` — scale kept |
+| `"wert": 119.00` | `119` — **scale lost** |
+| `"wert": "12345678901234567890.12"` | exact — 28 significant digits fit |
+| `"wert": 12345678901234567890.12` | `12345678901234567000` — **rounded** |
+| `"wert": 9007199254740993` | exact — integers skip the `f64` path |
+
+No amount in the German energy market reaches 15 significant digits, so this is a
+fidelity question rather than a correctness one: a relayed go-bo4e payload comes
+out as `"119"` where the sender wrote `119.00`, and the two compare equal as
+`Decimal`.
+
+The loss is unrecoverable, so it is made visible instead:
+
+```rust
+use rubo4e::decimal_serde::decimal_from_json_number_count;
+
+// Process-wide and monotonic; also exported as
+// `bo4e_decimal_from_json_number_total` with the `metrics` feature.
+// Zero means every producer on this link spells decimals as strings.
+gauge("bo4e_decimal_from_json_number", decimal_from_json_number_count());
+```
+
+Without the `decimal` feature the field is a `String` holding the lexical form,
+so `"119.00"` survives as written — at the cost of having no arithmetic.
 
 ## When to Use Each Mode
 
@@ -76,7 +133,8 @@ value deliberately.
 | `to_json_canonical()` | Content-addressed signing, payload hashing, event sourcing, diffing, caching |
 
 > **Note on `to_json_canonical` and RFC 8785 (JCS):** This method sorts object keys
-> recursively and produces deterministic output, but is **not** a full RFC 8785
+> recursively — through every serde shape, including sequences, tuples, and enum
+> variants — and produces deterministic output, but it is **not** a full RFC 8785
 > implementation. Keys are sorted by UTF-8 byte order (not UTF-16 as JCS requires),
 > and numeric values use serde_json formatting (not IEEE 754 as JCS requires).
 > For BO4E data — ASCII-only field names and `Decimal`-as-string amounts — these
@@ -143,6 +201,39 @@ Two kinds of key are deliberately **not** rewritten, in either direction:
 Because every lookup resolves to a `&'static str`, renaming a key allocates on
 neither the serialize nor the deserialize path.
 
+#### The transform stops at the edge of the schema
+
+The second bullet holds for the whole subtree under an extension key, not just
+the key itself:
+
+```json
+{ "_typ": "MARKTLOKATION", "vendorBlob": { "a": 3, "marktlokations_id": "x" } }
+```
+
+`a` and `marktlokations_id` come back out spelled exactly that way, even though
+`A` is `Sigmoidparameter`'s field and `marktlokations_id` is `Marktlokation`'s.
+Keys are renamed as the parser yields them, before serde knows which struct they
+belong to, so an unscoped transform would rewrite the producer's own JSON into
+names it does not use. It therefore descends only under keys the schema defines,
+and switches off for the rest of that subtree.
+
+#### …with two ambiguities it cannot resolve
+
+Both follow from the same root — the transform runs before serde knows the type:
+
+1. **A top-level extension key that *is* a field's snake spelling.** A
+   `Marktlokation` carrying an unknown top-level `marktlokations_id` is
+   indistinguishable from the real field once written in snake form, so
+   `from_json_snake_case` reads it as the field — and rejects the payload if the
+   value is not a valid MaLo-ID.
+2. **`ZusatzAttribut.wert`.** Its value is free-form JSON, but `wert` is also
+   `Betrag`'s decimal and `Messwert`'s nested COM, so the name cannot be excluded
+   from the schema-key set without breaking the last of those. Object keys inside
+   a `ZusatzAttribut.wert` are renamed like schema keys.
+
+**Use `to_json_german` / `from_json_german` whenever extension data matters.**
+The German mode renames nothing, so neither ambiguity exists there.
+
 ### `AnyBo` goes through the same pipeline
 
 `AnyBo` cannot know its concrete type until it has read `"_typ"`, so it buffers
@@ -178,15 +269,16 @@ let vertrag = Vertrag::from_json_german_hardened(
     JsonParseLimits::untrusted_defaults(),
 )?;
 
-// Or tune individually. Start from `unlimited()` (or `..Default::default()`)
-// so the literal stays valid as new caps are added.
-let limits = JsonParseLimits {
-    max_payload_bytes: Some(1_000_000),
-    max_nesting_depth: Some(64),
-    max_extension_value_bytes: Some(64_000),
-    max_extension_field_count: Some(32),
-};
+// Or start from a profile and narrow it.  `JsonParseLimits` is
+// `#[non_exhaustive]`: new caps get added as new amplification paths are found,
+// and a struct literal would make every one of those a breaking change.
+let limits = JsonParseLimits::untrusted_defaults()
+    .with_max_payload_bytes(Some(64 * 1024))
+    .with_max_extension_field_count(Some(0));   // reject any unknown field
 let vertrag = Vertrag::from_json_german_hardened(&json_string, limits)?;
+
+// `unlimited()` turns every cap off — useful as a base when exactly one matters.
+let depth_only = JsonParseLimits::unlimited().with_max_nesting_depth(Some(16));
 ```
 
 Available hardened variants:
@@ -223,6 +315,17 @@ Counters for every limit that has fired are available process-wide via
 `json_limit_hit_counters()`, and are exported to the `metrics` ecosystem when
 the `metrics` feature is on.
 
+#### What these limits do *not* bound
+
+They bound the parser, not the object graph it produces. A payload well inside
+`max_payload_bytes` can still expand by a large factor: `[{},{},{}…]` is three
+bytes per element on the wire and one fully-sized struct per element in memory,
+so a 1 MB body can allocate on the order of a hundred megabytes of `Vec`.
+
+Size `max_payload_bytes` against the *expanded* cost rather than the wire cost,
+and put a concurrency limit in front of the endpoint — a per-request cap does
+not bound what a thousand concurrent requests hold at once.
+
 ## Round-Trip Safety (ExtensionData)
 
 Every BO and COM struct carries an `_additional` field that captures any JSON keys
@@ -244,7 +347,7 @@ extend the standard) survives a full round-trip:
 ```rust
 let json = r#"{
   "_typ": "VERTRAG",
-  "_version": "v202607.0.0",
+  "_version": "202607.1.0",
   "_customExtension": "some-value"
 }"#;
 
@@ -259,37 +362,42 @@ assert!(roundtripped.contains("_customExtension"));
 `indexmap::IndexMap` is used (not `std::collections::HashMap`) to preserve the
 original key insertion order.
 
-## SIMD-Accelerated Deserialization
+Everything nested under an extension key is preserved verbatim too — see
+[the transform's scoping rule](#the-transform-stops-at-the-edge-of-the-schema).
 
-**Feature flag:** `simd-json`
+### Two caps you cannot turn off
 
-For high-throughput scenarios, enable `simd-json` to use a SIMD parser backend for
-JSON parsing:
+Preserving unknown fields is a memory-growth surface, so the extension map
+enforces two hard limits on **every** deserialization path, hardened or not:
+`MAX_EXTENSION_FIELDS` (128) per struct, and `MAX_EXTENSION_KEY_LEN` (256 bytes)
+per key. `JsonParseLimits::max_extension_field_count` can tighten the first,
+never loosen it.
 
-```sh
-cargo add rubo4e --features simd-json
-```
+The same caps apply to programmatic writes: `LimitedExtensionMap::try_insert`
+returns `Err(ExtensionInsertError)` rather than growing past either, and no
+`&mut IndexMap` is exposed anywhere — handing one out would make both advisory.
+Replacing an existing key is always allowed, even at capacity, since it does not
+grow the map.
 
-| Platform | SIMD instruction set |
-|----------|---------------------|
-| x86_64   | SSE4.2 / AVX2       |
-| ARM64    | NEON                |
-| Other    | Falls back to `serde_json` |
+## Why there is no SIMD backend
 
-The feature gate ensures builds remain portable. Performance is workload-dependent;
-benchmark with your payload mix before adopting it globally.
+A SIMD JSON parser does not help this crate, and measurement says so at every
+payload size from 265 bytes to 166 KB:
 
-> **`simd-json` and hardened parsing.** Setting `max_nesting_depth` pins the call
-> to the `serde_json` backend, because depth is enforced by wrapping the visitor
-> and `simd-json` does not support that. `untrusted_defaults()` sets a depth cap,
-> so the recommended hardened configuration never takes the SIMD path — that is a
-> deliberate choice of correctness over throughput on untrusted input. The
-> non-hardened entry points still use SIMD above the size threshold and enforce
-> the default depth cap with a pre-scan.
+| Payload | `serde_json` | `simd-json` |
+|---|---|---|
+| 1.7 KB | 5.65 µs | 8.89 µs |
+| 16.7 KB | 55.7 µs | 75.6 µs |
+| 166 KB | 544 µs | 676 µs |
 
-Benchmark with your actual payload shapes before committing to `simd-json` in
-production. The `benches/` directory provides a comparison benchmark against
-`serde_json` and the Python reference implementation.
+The reason is structural. Every generated struct carries `#[serde(flatten)]` for
+its extension map, so deserialization is dominated by serde's `Content`
+buffering, not by the tokenizer SIMD accelerates. `simd-json`'s mutable-slice API
+then forces a `Vec<u8>` copy of every payload, and its parser cannot wrap a
+visitor, so the nesting-depth guard needs a second pass over the bytes.
+
+`benches/json_perf.rs` tracks the `serde_json` path; re-run it before assuming
+this conclusion still holds for your payload shapes.
 
 ## Scope Note
 

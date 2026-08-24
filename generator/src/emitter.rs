@@ -1,19 +1,27 @@
 use anyhow::Result;
 use heck::ToUpperCamelCase;
-use std::collections::{BTreeMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashSet};
 
-use crate::ast::{EnumNode, Field, FieldType, PrimitiveType, SchemaNode};
+use crate::ast::{EnumNode, Field, FieldType, PrimitiveType, SchemaNode, StructKind, StructNode};
+use crate::naming::{needs_non_camel_case_allow, screaming_to_camel};
 
 // ─── AnyBo emission ──────────────────────────────────────────────────────────
 
+/// One BO type as `AnyBo` needs it: the Rust struct name and the `_typ` wire
+/// string that selects it during dispatch.
+struct BoDispatch {
+    rust_name: String,
+    typ_wire: String,
+}
+
 /// Emits the `AnyBo` sum type for a given schema version.
 ///
-/// `bo_names` must be sorted and contain UpperCamelCase struct names for
-/// every BO type in the version (i.e. every `SchemaNode::Bo` name).
-fn emit_any_bo(bo_names: &[String]) -> String {
-    if bo_names.is_empty() {
+/// `bos` must be sorted by `rust_name` and contain every BO type in the version.
+fn emit_any_bo(bos: &[BoDispatch]) -> String {
+    if bos.is_empty() {
         return String::new();
     }
+    let bo_names: Vec<&String> = bos.iter().map(|b| &b.rust_name).collect();
 
     let mut s = String::new();
 
@@ -51,10 +59,12 @@ fn emit_any_bo(bo_names: &[String]) -> String {
     s.push_str("/// # }\n");
     s.push_str("/// ```\n");
     s.push_str("#[derive(Debug, Clone, PartialEq)]\n");
-    s.push_str("#[cfg_attr(not(feature = \"json\"), derive(Hash))]\n");
+    // Same rule as the generated structs: `Eq` and `Hash` together, and only when
+    // `json` is off — the `Unknown` variant carries a `serde_json::Value`.
+    s.push_str("#[cfg_attr(not(feature = \"json\"), derive(Eq, Hash))]\n");
     s.push_str("#[non_exhaustive]\n");
     s.push_str("pub enum AnyBo {\n");
-    for name in bo_names {
+    for name in &bo_names {
         s.push_str(&format!("    /// A [`{name}`] Geschäftsobjekt.\n"));
         s.push_str(&format!("    {name}(Box<{name}>),\n"));
     }
@@ -81,7 +91,7 @@ fn emit_any_bo(bo_names: &[String]) -> String {
     s.push_str("    /// variants; returns [`BoTyp::Unknown`] for the `Unknown` catch-all.\n");
     s.push_str("    pub fn bo_type(&self) -> BoTyp {\n");
     s.push_str("        match self {\n");
-    for name in bo_names {
+    for name in &bo_names {
         s.push_str(&format!("            AnyBo::{name}(v) => v.bo_type(),\n"));
     }
     s.push_str("            #[cfg(feature = \"json\")]\n");
@@ -91,7 +101,7 @@ fn emit_any_bo(bo_names: &[String]) -> String {
     s.push_str("}\n\n");
 
     // ── From<T> for AnyBo ─────────────────────────────────────────────────
-    for name in bo_names {
+    for name in &bo_names {
         s.push_str(&format!("impl From<{name}> for AnyBo {{\n"));
         s.push_str(&format!(
             "    fn from(v: {name}) -> Self {{ AnyBo::{name}(Box::new(v)) }}\n"
@@ -112,7 +122,7 @@ fn emit_any_bo(bo_names: &[String]) -> String {
         "    fn serialize<S: serde::Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {\n",
     );
     s.push_str("        match self {\n");
-    for name in bo_names {
+    for name in &bo_names {
         s.push_str(&format!(
             "            AnyBo::{name}(inner) => inner.serialize(s),\n"
         ));
@@ -153,8 +163,8 @@ fn emit_any_bo(bo_names: &[String]) -> String {
     s.push_str("            .and_then(serde_json::Value::as_str)\n");
     s.push_str("            .unwrap_or(\"\");\n");
     s.push_str("        match typ_str {\n");
-    for name in bo_names {
-        let typ_key = name.to_ascii_uppercase();
+    for bo in bos {
+        let (name, typ_key) = (&bo.rust_name, &bo.typ_wire);
         s.push_str(&format!(
             "            \"{typ_key}\" => serde_json::from_value::<{name}>(value)\n"
         ));
@@ -183,7 +193,7 @@ fn emit_any_bo(bo_names: &[String]) -> String {
     s.push_str("impl crate::Bo4eStrict for AnyBo {\n");
     s.push_str("    fn collect_unknown_enums(&self, path: &str, out: &mut Vec<String>) {\n");
     s.push_str("        match self {\n");
-    for name in bo_names {
+    for name in &bo_names {
         s.push_str(&format!(
             "            AnyBo::{name}(v) => crate::Bo4eStrict::collect_unknown_enums(&**v, path, out),\n"
         ));
@@ -199,37 +209,81 @@ fn emit_any_bo(bo_names: &[String]) -> String {
     s
 }
 
+// ─── Discriminant naming ─────────────────────────────────────────────────────
+
+/// Maps each `BoTyp` / `ComTyp` wire value to the Rust name of the struct it
+/// identifies.
+///
+/// Those two enums are the one place where a SCREAMING_SNAKE_CASE value has a
+/// *known* word split: `"PREISBLATTKONZESSIONSABGABE"` is the discriminant of the
+/// `PreisblattKonzessionsabgabe` schema in the same release, so the variant can
+/// take that name instead of the `Preisblattkonzessionsabgabe` a mechanical
+/// conversion gives.
+///
+/// Values with no corresponding schema (`GESCHAEFTSOBJEKT`,
+/// `NETZNUTZUNGSRECHNUNG`, `PREISBLATTUMLAGEN` — discriminants BO4E declares
+/// without shipping a type) fall back to [`screaming_to_camel`].
+#[derive(Debug, Default)]
+pub struct DiscriminantNames {
+    bo: BTreeMap<String, String>,
+    com: BTreeMap<String, String>,
+}
+
+impl DiscriminantNames {
+    /// Builds the registry from every struct node in a schema release.
+    pub fn from_nodes(nodes: &[SchemaNode]) -> Self {
+        let mut names = Self::default();
+        for node in nodes.iter().filter_map(SchemaNode::as_struct) {
+            let Some(wire) = &node.typ_const else {
+                continue;
+            };
+            let table = match node.kind {
+                StructKind::Bo => &mut names.bo,
+                StructKind::Com => &mut names.com,
+            };
+            table.insert(wire.clone(), node.name.to_upper_camel_case());
+        }
+        names
+    }
+
+    /// Returns the Rust variant name for `wire` in the enum called `enum_name`.
+    fn variant(&self, enum_name: &str, wire: &str) -> String {
+        let table = match enum_name {
+            "BoTyp" => Some(&self.bo),
+            "ComTyp" => Some(&self.com),
+            _ => None,
+        };
+        table
+            .and_then(|t| t.get(wire))
+            .cloned()
+            .unwrap_or_else(|| screaming_to_camel(wire))
+    }
+}
+
 // ─── Public API ───────────────────────────────────────────────────────────────
 
 /// Emits the Rust source file for a single schema node.
 /// Returns `(filename, source_code)`.
 ///
 /// `schema_version` is the full schema version tag, e.g. `"v202607.0.0"`, used to
-/// populate [`Bo4eObject::schema_version`] on generated BO types.
-pub fn emit_node(node: &SchemaNode, schema_version: &str) -> Result<(String, String)> {
+/// populate [`Bo4eObject::schema_version`] on generated BO types.  The `_typ` and
+/// `_version` values written into the JSON come from the schema itself, not from
+/// this tag.
+pub fn emit_node(
+    node: &SchemaNode,
+    schema_version: &str,
+    names: &DiscriminantNames,
+) -> Result<(String, String)> {
     // Normalize the type name to UpperCamelCase so it matches the type references
     // produced by the inference module (which also calls to_upper_camel_case() on
     // $ref-derived names like "BDEWArtikelnummer" → "BdewArtikelnummer").
     let rust_name = node.name().to_upper_camel_case();
     let source = match node {
-        SchemaNode::Bo(bo) => emit_struct(
-            &rust_name,
-            &bo.fields,
-            bo.description.as_deref(),
-            true,
-            schema_version,
-        ),
-        SchemaNode::Com(com) => emit_struct(
-            &rust_name,
-            &com.fields,
-            com.description.as_deref(),
-            false,
-            schema_version,
-        ),
+        SchemaNode::Struct(st) => emit_struct(&rust_name, st, schema_version, names),
         SchemaNode::Enum(en) => {
             let mut en2 = en.clone();
             en2.name = rust_name.clone();
-            emit_enum(&en2)
+            emit_enum(&en2, names)
         }
     }?;
     let filename = format!("{}.rs", heck::AsSnakeCase(&rust_name));
@@ -263,12 +317,22 @@ pub fn emit_mod_rs(nodes: &[SchemaNode], _schema_version: &str) -> Result<String
     s.push_str("// Re-export the crate-level Bo4eObject so struct files can call trait methods.\npub use crate::Bo4eObject;\n");
 
     // ── AnyBo: heterogeneous dispatch enum ───────────────────────────────────
-    let bo_names: Vec<String> = sorted_nodes
+    let bos: Vec<BoDispatch> = sorted_nodes
         .iter()
-        .filter(|n| matches!(n, SchemaNode::Bo(_)))
-        .map(|n| n.name().to_upper_camel_case())
+        .filter_map(|n| n.as_struct())
+        .filter(|st| st.kind.is_bo())
+        .map(|st| BoDispatch {
+            rust_name: st.name.to_upper_camel_case(),
+            // Dispatch on the discriminant the schema declares, not on an
+            // upper-cased struct name that only happens to agree with it.
+            typ_wire: st
+                .typ_const
+                .clone()
+                .unwrap_or_else(|| st.name.to_ascii_uppercase()),
+        })
         .collect();
-    s.push_str(&emit_any_bo(&bo_names));
+    let bo_names: Vec<String> = bos.iter().map(|b| b.rust_name.clone()).collect();
+    s.push_str(&emit_any_bo(&bos));
 
     // ── Bo4eObject sealed-trait impls ─────────────────────────────────────────
     // Implement the sealing supertrait for every BO type so they satisfy the
@@ -302,19 +366,11 @@ pub fn emit_mod_rs(nodes: &[SchemaNode], _schema_version: &str) -> Result<String
 /// BO4E wire property names (German camelCase) and the Rust snake_case field
 /// names the generator derives from them.
 ///
-/// # Why a table instead of a heuristic
-///
-/// `to_json_snake_case` / `from_json_snake_case` need to convert keys in both
-/// directions. Deriving the reverse direction with a heuristic is impossible to
-/// get right: `hoechstpreis_ht` could come from `hoechstpreisHt` or
-/// `hoechstpreisHT`, and `a` could come from `a` or `A`. BO4E uses all three
-/// forms (`Sigmoidparameter.A`, `Tarifberechnungsparameter.hoechstpreisHT`,
-/// `PreisblattKonzessionsabgabe.kundengruppeKA`), so a heuristic silently drops
-/// those fields into the extension-data bag on a snake_case round-trip.
-///
-/// The generator already knows both names for every field, so it emits the
-/// mapping directly. Lookups are exact, allocation-free, and cannot drift from
-/// the generated structs.
+/// A table rather than a heuristic, because the reverse direction has no
+/// algorithmic inverse: `hoechstpreis_ht` could come from `hoechstpreisHt` or
+/// `hoechstpreisHT`, and `a` from `a` or `A` — and BO4E uses all of those forms.
+/// The generator knows both names for every field, so it emits the mapping
+/// directly; lookups are exact and allocation-free.
 ///
 /// # What is excluded
 ///
@@ -328,10 +384,8 @@ pub fn emit_key_map(nodes: &[SchemaNode]) -> Result<String> {
     // relies on and which keeps codegen output stable across platforms.
     let mut wire_to_snake: BTreeMap<&str, &str> = BTreeMap::new();
     for node in nodes {
-        let fields = match node {
-            SchemaNode::Bo(n) => &n.fields,
-            SchemaNode::Com(n) => &n.fields,
-            SchemaNode::Enum(_) => continue,
+        let Some(fields) = node.as_struct().map(|n| &n.fields) else {
+            continue;
         };
         for f in fields {
             if f.name == f.rust_name || f.name.starts_with('_') {
@@ -354,19 +408,70 @@ pub fn emit_key_map(nodes: &[SchemaNode]) -> Result<String> {
         }
     }
 
+    // Every key the schema *defines*, in both spellings — not just the pairs that
+    // differ.  `key_transform` needs it to tell a schema field from extension
+    // data: the value under a key that is not in here is a free-form JSON blob
+    // whose own keys belong to whoever wrote them, and must not be renamed.
+    //
+    // The table is keyed on the name alone, because that is all a streaming key
+    // transform has: it renames keys as the parser yields them, long before serde
+    // decides which struct they belong to.
+    //
+    // That is enough to protect *extension* data, which is the round-trip promise
+    // — an unknown key is unknown under any struct.  It is not enough for a
+    // free-form field the schema *does* define: `ZusatzAttribut.wert` holds
+    // arbitrary JSON, but `wert` is also `Betrag`'s decimal and `Messwert`'s
+    // nested COM, so the name cannot be excluded without breaking the latter.
+    // `key_transform`'s module docs state that limitation; the check below fails
+    // generation if a release ever adds a free-form field whose name is *not*
+    // shared, at which point excluding it becomes both possible and worthwhile.
+    let mut known_keys: BTreeSet<&str> = BTreeSet::new();
+    let mut free_form: Vec<(&str, &str)> = Vec::new();
+    for node in nodes {
+        let Some(st) = node.as_struct() else { continue };
+        for f in &st.fields {
+            if f.field_type == FieldType::JsonValue {
+                free_form.push((&st.name, &f.name));
+            }
+            known_keys.insert(&f.name);
+            known_keys.insert(&f.rust_name);
+        }
+    }
+    for (owner, name) in &free_form {
+        let shared = nodes
+            .iter()
+            .filter_map(SchemaNode::as_struct)
+            .flat_map(|st| st.fields.iter().map(move |f| (st, f)))
+            .any(|(st, f)| {
+                f.name == *name && holds_nested_object(&f.field_type) && st.name != *owner
+            });
+        anyhow::ensure!(
+            shared,
+            "{owner}.{name} is free-form JSON and no other schema field of that name holds a \
+             nested object, so the key transform could now leave its contents alone. Drop \
+             {name:?} from KNOWN_FIELD_KEYS and update the limitation note in \
+             `src/json/key_transform.rs`."
+        );
+    }
+
     let mut s = String::from(
         "// @generated — do not edit by hand.\n\
          // This file is maintained by the code generator (`just generate`).\n\n\
          //! Exact BO4E wire-key ↔ Rust snake_case field-name mapping.\n\
          //!\n\
          //! Used by `crate::json::key_transform` to convert JSON keys for\n\
-         //! `to_json_snake_case` / `from_json_snake_case`. Both tables are sorted by\n\
-         //! their first element so lookups can binary-search, and every entry is\n\
+         //! `to_json_snake_case` / `from_json_snake_case`. Every table is sorted by\n\
+         //! its first element so lookups can binary-search, and every entry is\n\
          //! `&'static str`, so a hit never allocates.\n\
          //!\n\
-         //! Only pairs whose two sides differ are listed; any key that is absent maps\n\
-         //! to itself. Underscore-prefixed BO4E metadata keys (`_typ`, `_version`,\n\
-         //! `_id`) are deliberately absent so they survive verbatim in every mode.\n\n",
+         //! Only pairs whose two sides differ are listed in the two mapping tables;\n\
+         //! any key absent from them maps to itself. Underscore-prefixed BO4E\n\
+         //! metadata keys (`_typ`, `_version`, `_id`) are deliberately absent so they\n\
+         //! survive verbatim in every mode.\n\
+         //!\n\
+         //! `KNOWN_FIELD_KEYS` is the separate question of whether a key is a schema\n\
+         //! field *at all*, which is what stops the transform from descending into\n\
+         //! somebody else's JSON.\n\n",
     );
 
     s.push_str("/// BO4E wire (camelCase) → Rust snake_case, sorted by wire name.\n");
@@ -381,9 +486,33 @@ pub fn emit_key_map(nodes: &[SchemaNode]) -> Result<String> {
     for (snake, wire) in &snake_to_wire {
         s.push_str(&format!("    ({snake:?}, {wire:?}),\n"));
     }
+    s.push_str("];\n\n");
+
+    s.push_str("/// Every key the BO4E schema defines, in both spellings, sorted.\n");
+    s.push_str("///\n");
+    s.push_str("/// A key **absent** from this list is extension data (or a free-form\n");
+    s.push_str("/// `JsonValue` field), so its value is somebody else's JSON and the key\n");
+    s.push_str("/// transform must not descend into it.\n");
+    s.push_str("pub(crate) static KNOWN_FIELD_KEYS: &[&str] = &[\n");
+    for key in &known_keys {
+        s.push_str(&format!("    {key:?},\n"));
+    }
     s.push_str("];\n");
 
     format_source(s)
+}
+
+/// Whether a value of this type is a JSON object (or an array of them), i.e.
+/// whether it has keys the transform would rename.
+fn holds_nested_object(ft: &FieldType) -> bool {
+    match ft {
+        FieldType::Bo(_) | FieldType::Com(_) => true,
+        FieldType::Array(inner) => holds_nested_object(inner),
+        FieldType::Identifier(_)
+        | FieldType::BoEnum(_)
+        | FieldType::Primitive(_)
+        | FieldType::JsonValue => false,
+    }
 }
 
 // ─── Struct emission ──────────────────────────────────────────────────────────
@@ -393,23 +522,21 @@ pub fn emit_key_map(nodes: &[SchemaNode]) -> Result<String> {
 ///
 /// Returned names are sorted and deduplicated.  The struct's own name is never
 /// included — it is being *defined*, not imported.
-fn collect_sibling_imports(name: &str, fields: &[Field], is_bo: bool) -> Vec<String> {
+fn collect_sibling_imports(name: &str, node: &StructNode) -> Vec<String> {
     let mut set = HashSet::new();
 
     // BO types always need `BoTyp` (used in the field definition, in `impl Bo4eObject`,
     // and as the associated `type BoTyp = BoTyp` alias) and `Bo4eObject` (the trait).
-    if is_bo {
+    if node.kind.is_bo() {
         set.insert("BoTyp".to_string());
         set.insert("Bo4eObject".to_string());
-    }
-
-    // COM types need `ComTyp` only when the struct has a `_typ` field.
-    if !is_bo && fields.iter().any(|f| f.name == "_typ") {
+    } else if node.fields.iter().any(|f| f.name == "_typ") {
+        // COM types need `ComTyp` only when the struct has a `_typ` field.
         set.insert("ComTyp".to_string());
     }
 
     // Walk field types to discover referenced sibling BO/COM/enum names.
-    for field in fields {
+    for field in &node.fields {
         collect_field_type_names(&field.field_type, &mut set);
     }
 
@@ -435,44 +562,81 @@ fn collect_field_type_names(ft: &FieldType, out: &mut HashSet<String>) {
     }
 }
 
+/// Everything the emitter needs to know about a struct's BO4E metadata fields
+/// (`_typ` and `_version`), resolved once from the schema.
+struct Metadata<'a> {
+    /// Rust name of the discriminant enum (`BoTyp` / `ComTyp`), when this struct
+    /// has a `_typ` field.
+    typ_enum: Option<&'static str>,
+    /// The `BoTyp::X` / `ComTyp::X` path this struct's `_typ` is pinned to.
+    typ_path: Option<String>,
+    /// The `_version` wire value this schema declares, when it has that field.
+    version: Option<&'a str>,
+}
+
+impl<'a> Metadata<'a> {
+    fn resolve(node: &'a StructNode, names: &DiscriminantNames) -> Self {
+        let has_typ = node.fields.iter().any(|f| f.name == "_typ");
+        let typ_enum = has_typ.then(|| node.kind.typ_enum());
+        let typ_path = typ_enum.zip(node.typ_const.as_deref()).map(|(en, wire)| {
+            let variant = names.variant(en, wire);
+            format!("{en}::{variant}")
+        });
+        let version = node
+            .fields
+            .iter()
+            .any(|f| f.name == "_version")
+            .then_some(node.version_default.as_deref())
+            .flatten();
+        Self {
+            typ_enum,
+            typ_path,
+            version,
+        }
+    }
+
+    /// Whether the emitter writes a hand-rolled `Default` instead of deriving it.
+    ///
+    /// A generated `Default` pre-fills the two BO4E metadata fields the schema
+    /// pins statically, `_typ` and `_version`, which every implementation stamps
+    /// on every BO *and* COM.
+    ///
+    /// A struct carrying a required non-metadata field gets no `Default` at all:
+    /// the derive would not compile either, since a required field's type need
+    /// not implement `Default`.  Its builder still stamps the metadata.
+    fn emits_custom_default(&self, fields: &[Field]) -> bool {
+        if self.typ_path.is_none() && self.version.is_none() {
+            return false;
+        }
+        !fields
+            .iter()
+            .any(|f| !f.name.starts_with('_') && !f.is_optional)
+    }
+}
+
 fn emit_struct(
     name: &str,
-    fields: &[Field],
-    description: Option<&str>,
-    is_bo: bool,
+    node: &StructNode,
     schema_version: &str,
+    names: &DiscriminantNames,
 ) -> Result<String> {
+    let fields = &node.fields[..];
+    let is_bo = node.kind.is_bo();
+    let meta = Metadata::resolve(node, names);
+
     let mut s = String::from("// @generated — do not edit by hand\n\n");
     // Emit explicit imports of all sibling types actually referenced by this struct.
     // Avoids the wildcarded `use super::*` (with its suppressed unused-import warning)
     // and makes cross-references visible to tools (rustdoc, IDEs, cargo check).
-    let imports = collect_sibling_imports(name, fields, is_bo);
+    let imports = collect_sibling_imports(name, node);
     if !imports.is_empty() {
         s.push_str(&format!("use super::{{{}}};\n\n", imports.join(", ")));
     }
 
-    // BO types with a `_typ` field get a custom Default impl  so that
-    // `Default::default()` pre-fills `typ` with the correct `BoTyp` discriminant,
-    // producing structurally valid BO4E JSON without any manual field setting.
-    let has_typ_field = is_bo && fields.iter().any(|f| f.name == "_typ");
-    // BoTyp enum variants are generated from screaming-case schema values
-    // (e.g. `PREISBLATTDIENSTLEISTUNG`) via `.to_upper_camel_case()` → `Preisblattdienstleistung`.
-    // Internal word-boundary information is lost because the schema provides no separators.
-    // To match those variants from struct impls, apply the same normalization to the struct
-    // name: uppercase first (destroy acronym capitalisation), then re-camelise.
-    // This guarantees struct references always agree with the generated enum variants.
-    let bo_typ_variant = name.to_ascii_uppercase().to_upper_camel_case();
-
-    emit_struct_derives(
-        &mut s,
-        emits_custom_default(is_bo, fields),
-        has_typ_field,
-        name,
-        schema_version,
-    );
+    emit_struct_derives(&mut s, &meta, fields, name, schema_version);
 
     // Doc comment: strip RST directives (from BO4E Python docs) and convert to Markdown.
-    if let Some(doc) = description {
+    if let Some(doc) = node.description.as_deref() {
         for line in clean_description(doc).lines() {
             s.push_str(&format!("/// {}\n", line));
         }
@@ -481,86 +645,77 @@ fn emit_struct(
     s.push_str(&format!("pub struct {name} {{\n"));
 
     for field in fields {
-        // For BO structs, replace the raw `_typ: Option<String>` with the typed `BoTyp`.
-        if is_bo && field.name == "_typ" {
-            s.push_str("    /// BO type identifier — always `BoTyp::");
-            s.push_str(name);
-            s.push_str("` for this struct.\n");
+        // Replace the raw `_typ` property with the typed discriminant enum.
+        if field.name == "_typ" {
+            let Some(typ_enum) = meta.typ_enum else {
+                continue;
+            };
+            match &meta.typ_path {
+                Some(path) => s.push_str(&format!(
+                    "    /// BO4E type discriminant — always `{path}` for this struct.\n"
+                )),
+                None => s.push_str("    /// BO4E type discriminant for this struct.\n"),
+            }
             s.push_str("    #[cfg_attr(feature = \"serde\", serde(rename = \"_typ\"))]\n");
             s.push_str(
                 "    #[cfg_attr(feature = \"serde\", serde(skip_serializing_if = \"Option::is_none\"))]\n",
             );
-            s.push_str(&format!(
-                "    #[cfg_attr(feature = \"builder\", builder(default = Some(BoTyp::{bo_typ_variant}), setter(skip)))]\n"
-            ));
-            s.push_str("    pub typ: Option<BoTyp>,\n");
-        // For COM structs, replace the raw `_typ: Option<String>` with the typed `ComTyp`.
-        } else if !is_bo && field.name == "_typ" {
-            s.push_str("    /// COM type identifier for this struct.\n");
-            s.push_str("    #[cfg_attr(feature = \"serde\", serde(rename = \"_typ\"))]\n");
-            s.push_str(
-                "    #[cfg_attr(feature = \"serde\", serde(skip_serializing_if = \"Option::is_none\"))]\n",
-            );
-            s.push_str("    #[cfg_attr(feature = \"builder\", builder(default, setter(into)))]\n");
-            s.push_str("    pub typ: Option<ComTyp>,\n");
+            match &meta.typ_path {
+                // The discriminant is fixed by the schema, so the builder stamps
+                // it and offers no setter — a caller cannot make it disagree.
+                Some(path) => s.push_str(&format!(
+                    "    #[cfg_attr(feature = \"builder\", builder(default = Some({path}), setter(skip)))]\n"
+                )),
+                None => s.push_str(
+                    "    #[cfg_attr(feature = \"builder\", builder(default, setter(into)))]\n",
+                ),
+            }
+            s.push_str(&format!("    pub typ: Option<{typ_enum}>,\n"));
         } else {
-            emit_field(&mut s, field, schema_version);
+            emit_field(&mut s, field, &meta);
         }
     }
 
     emit_extension_field(&mut s);
     s.push_str("}\n");
 
-    if emits_custom_default(is_bo, fields) {
-        emit_default_impl(&mut s, name, &bo_typ_variant, fields, is_bo, schema_version);
+    if meta.emits_custom_default(fields) {
+        emit_default_impl(&mut s, name, fields, &meta);
     }
 
-    emit_struct_impls(&mut s, name, is_bo, &bo_typ_variant, schema_version, fields);
+    emit_struct_impls(&mut s, name, is_bo, &meta, schema_version, fields);
 
     format_source(s)
 }
 
 /// Emits the `#[derive(...)]` and `#[cfg_attr(...)]` attribute block for a struct.
-/// Whether this struct gets a hand-written `Default` instead of the derive.
-///
-/// A generated `Default` exists to pre-fill the two BO4E metadata fields the
-/// generator knows statically: `_typ` (BO types only) and `_version` (every BO
-/// and COM). Both reference implementations stamp them, so a value built in Rust
-/// must serialize the same way.
-///
-/// BO types carrying a required non-metadata field are the one exception: they
-/// have no valid empty state, so they get no `Default` at all — the derive would
-/// not compile either, since a required field's enum type need not implement
-/// `Default`. Their builder still stamps `_version`.
-fn emits_custom_default(is_bo: bool, fields: &[Field]) -> bool {
-    let has_typ_field = is_bo && fields.iter().any(|f| f.name == "_typ");
-    let has_version_field = fields.iter().any(|f| f.name == "_version");
-    if has_typ_field && fields.iter().any(|f| f.name != "_typ" && !f.is_optional) {
-        return false;
-    }
-    has_typ_field || has_version_field
-}
-
 fn emit_struct_derives(
     s: &mut String,
-    custom_default: bool,
-    has_typ_field: bool,
+    meta: &Metadata<'_>,
+    fields: &[Field],
     name: &str,
     schema_version: &str,
 ) {
-    // Types with generator-populated metadata omit `Default` here; a handwritten
-    // impl is emitted below.  BO types with a required field get neither: see
-    // `emits_custom_default`.
-    if custom_default || has_typ_field {
+    // Types with schema-pinned metadata omit `Default` here; a handwritten impl
+    // is emitted below.  Structs with a required field get neither: see
+    // `Metadata::emits_custom_default`.
+    let has_metadata = meta.typ_path.is_some() || meta.version.is_some();
+    if has_metadata {
         s.push_str("#[derive(Debug, Clone, PartialEq)]\n");
     } else {
         s.push_str("#[derive(Debug, Clone, PartialEq, Default)]\n");
     }
-    // Hash: serde_json::Value (inside LimitedExtensionMap) is not Hash, so we
-    // can only derive Hash when the `json` feature is off (the _additional field
-    // is a ZST stub that IS Hash).  This lets non-json builds use BO types as
-    // HashMap / HashSet keys, which is common for ID-keyed lookups.
-    s.push_str("#[cfg_attr(not(feature = \"json\"), derive(Hash))]\n");
+    // `Eq` + `Hash` together, or neither: a `Hash` impl is only useful on a type
+    // that is also `Eq`, because that is what `HashMap` / `HashSet` keys require.
+    //
+    // Both are blocked by the same thing — `serde_json::Value`, which reaches a
+    // generated struct twice when `json` is on: inside `LimitedExtensionMap`
+    // (`_additional`) and as `ZusatzAttribut::wert`.  `Value` is neither `Eq` nor
+    // `Hash` because it wraps `f64`.  With `json` off, both of those degrade to a
+    // ZST stub and a `String`, and every remaining field type (`String`, `bool`,
+    // `i64`, `Decimal`, `time::Date`, `time::OffsetDateTime`, the identifiers, and
+    // the generated enums) is `Eq + Hash` — so the whole tree is.
+    s.push_str("#[cfg_attr(not(feature = \"json\"), derive(Eq, Hash))]\n");
     s.push_str("#[cfg_attr(feature = \"serde\", derive(serde::Serialize, serde::Deserialize))]\n");
     s.push_str("#[cfg_attr(feature = \"builder\", derive(typed_builder::TypedBuilder))]\n");
     s.push_str("#[cfg_attr(feature = \"validate\", derive(garde::Validate))]\n");
@@ -577,6 +732,7 @@ fn emit_struct_derives(
             "#[cfg_attr(all(feature = \"validate\", feature = \"versioned\"), garde(custom({validator})))]\n"
         ));
     }
+    let _ = fields;
 }
 
 /// Emits the `_additional` extension-data field declaration.
@@ -601,49 +757,31 @@ fn emit_extension_field(s: &mut String) {
     s.push_str("    pub _additional: crate::LimitedExtensionMap,\n");
 }
 
-/// Emits a custom `Default` impl for a BO struct that pre-fills `typ` with the correct variant.
 /// Emits a `Default` impl that pre-fills the BO4E metadata fields.
 ///
-/// `Default::default()` must produce a value that serializes to the same JSON the
-/// Python and Go implementations emit for an equivalently empty object. Both
-/// stamp `_version` on every BO and COM, and `_typ` on BOs; leaving either unset
-/// makes a Rust-built payload distinguishable from every other implementation's.
+/// `Default::default()` has to serialize to the same JSON the Python, Go, and
+/// .NET implementations emit for an equivalently empty object, and all of them
+/// stamp `_typ` and `_version` on every BO **and** every COM.
 ///
 /// Every other field is `Default::default()`, exactly as the derive would have
 /// produced, so this impl compiles wherever the derive did.
-fn emit_default_impl(
-    s: &mut String,
-    name: &str,
-    bo_typ_variant: &str,
-    fields: &[Field],
-    is_bo: bool,
-    schema_version: &str,
-) {
-    let has_typ_field = is_bo && fields.iter().any(|f| f.name == "_typ");
-
+fn emit_default_impl(s: &mut String, name: &str, fields: &[Field], meta: &Metadata<'_>) {
     s.push_str(&format!(
         "\nimpl Default for {name} {{\n    fn default() -> Self {{\n        Self {{\n"
     ));
-    if has_typ_field {
-        s.push_str(&format!(
-            "            typ: Some(BoTyp::{bo_typ_variant}),\n"
-        ));
-    }
     for field in fields {
-        if has_typ_field && field.name == "_typ" {
-            continue; // already emitted as `typ` above
-        }
-        if field.name == "_version" {
-            s.push_str(&format!(
-                "            {}: Some(\"{schema_version}\".to_owned()),\n",
-                field.rust_name
-            ));
-            continue;
-        }
-        s.push_str(&format!(
-            "            {}: Default::default(),\n",
-            field.rust_name
-        ));
+        let value = match field.name.as_str() {
+            "_typ" => match &meta.typ_path {
+                Some(path) => format!("Some({path})"),
+                None => "Default::default()".to_owned(),
+            },
+            "_version" => match meta.version {
+                Some(v) => format!("Some({v:?}.to_owned())"),
+                None => "Default::default()".to_owned(),
+            },
+            _ => "Default::default()".to_owned(),
+        };
+        s.push_str(&format!("            {}: {value},\n", field.rust_name));
     }
     s.push_str("            _additional: Default::default(),\n");
     s.push_str("        }\n    }\n}\n");
@@ -751,7 +889,7 @@ fn emit_struct_impls(
     s: &mut String,
     name: &str,
     is_bo: bool,
-    bo_typ_variant: &str,
+    meta: &Metadata<'_>,
     schema_version: &str,
     fields: &[Field],
 ) {
@@ -764,7 +902,18 @@ fn emit_struct_impls(
         // see the actual discriminant from the payload (e.g. "BUENDELVERTRAG"), not the
         // hardcoded struct name.  `unwrap_or` falls back to the compile-time constant only
         // when the field was explicitly set to `None` after construction.
-        s.push_str(&format!("\nimpl Bo4eObject for {name} {{\n    type BoTyp = BoTyp;\n    fn bo_type(&self) -> BoTyp {{\n        self.typ.unwrap_or(BoTyp::{bo_typ_variant})\n    }}\n    fn schema_version(&self) -> &'static str {{\n        \"{schema_version}\"\n    }}\n}}\n"));
+        let fallback = meta.typ_path.as_deref().unwrap_or("BoTyp::Unknown");
+        // `schema_version()` reports the same string the `_version` field carries,
+        // so the accessor and the wire form can never disagree.  That is the BO4E
+        // release *without* the `v` the git tag prefixes it with.
+        let wire_version = meta
+            .version
+            .unwrap_or_else(|| schema_version.trim_start_matches('v'));
+        // The series is the `YYYYMM` prefix — the granularity at which this crate
+        // exposes a module, and the only part of the version a dispatcher can
+        // match on without breaking every time BO4E ships a patch inside a series.
+        let series = wire_version.split('.').next().unwrap_or(wire_version);
+        s.push_str(&format!("\nimpl Bo4eObject for {name} {{\n    type BoTyp = BoTyp;\n    fn bo_type(&self) -> BoTyp {{\n        self.typ.unwrap_or({fallback})\n    }}\n    fn schema_version(&self) -> &'static str {{\n        \"{wire_version}\"\n    }}\n    fn schema_series(&self) -> &'static str {{\n        \"{series}\"\n    }}\n}}\n"));
     }
 
     // Sealed marker + Bo4eJsonExt impl — restricts trait to BO4E types only.
@@ -810,7 +959,27 @@ fn emit_struct_impls(
     emit_strict_struct_impl(s, name, fields);
 }
 
-fn emit_field(s: &mut String, field: &Field, schema_version: &str) {
+/// Whether `ft` is a bare decimal — the shape `crate::decimal_serde` handles.
+///
+/// An *array* of decimals is deliberately excluded: the module's visitors read a
+/// scalar, and no BO4E v202607 field has that shape. [`emit_feature_gated_field`]
+/// still emits a correct `Vec<String>` fallback for one, so a future schema that
+/// introduces it compiles and round-trips — just without the number-spelling
+/// tolerance a scalar gets.
+fn is_decimal_scalar(ft: &FieldType) -> bool {
+    matches!(ft, FieldType::Primitive(PrimitiveType::Decimal))
+}
+
+/// The `crate::decimal_serde` entry point for a field of this optionality.
+fn decimal_serde_fn(is_optional: bool) -> &'static str {
+    if is_optional {
+        "crate::decimal_serde::deserialize_opt"
+    } else {
+        "crate::decimal_serde::deserialize"
+    }
+}
+
+fn emit_field(s: &mut String, field: &Field, meta: &Metadata<'_>) {
     if let Some(doc) = &field.description {
         for line in clean_description(doc).lines() {
             s.push_str(&format!("    /// {}\n", line));
@@ -837,12 +1006,13 @@ fn emit_field(s: &mut String, field: &Field, schema_version: &str) {
         // matching the Python and Go implementations, which stamp it on every BO and
         // COM.  The setter stays available so a caller re-emitting a payload received
         // under a different series can preserve its provenance.
-        if field.name == "_version" {
-            s.push_str(&format!(
-                "    #[cfg_attr(feature = \"builder\", builder(default = Some(\"{schema_version}\".to_owned()), setter(into)))]\n"
-            ));
-        } else {
-            s.push_str("    #[cfg_attr(feature = \"builder\", builder(default, setter(into)))]\n");
+        match (field.name.as_str(), meta.version) {
+            ("_version", Some(v)) => s.push_str(&format!(
+                "    #[cfg_attr(feature = \"builder\", builder(default = Some({v:?}.to_owned()), setter(into)))]\n"
+            )),
+            _ => s.push_str(
+                "    #[cfg_attr(feature = \"builder\", builder(default, setter(into)))]\n",
+            ),
         }
     }
 
@@ -918,6 +1088,27 @@ fn emit_field(s: &mut String, field: &Field, schema_version: &str) {
         ));
     }
 
+    // A decimal arrives as a JSON string (BO4E-python) or a JSON number
+    // (go-bo4e).  Neither serde's `String` impl nor `rust_decimal`'s own
+    // `Deserialize` covers both *and* reports which spelling it saw, so both
+    // builds route through `crate::decimal_serde` — whose return type flips with
+    // the feature, which is why the attribute is one string here rather than two
+    // cfg-split ones.  `deserialize_with`, not `with`: schemars resolves a
+    // `serde(with)` path as a *type*, and this is a function.  Serialization
+    // needs no adapter (`rust_decimal` already writes the BO4E string form, and
+    // serde already writes a `String` as one).
+    if is_decimal_scalar(&field.field_type) {
+        // `deserialize_with` makes a missing field an error unless `default` is
+        // also given, even for an `Option`.
+        if field.is_optional {
+            s.push_str("    #[cfg_attr(feature = \"serde\", serde(default))]\n");
+        }
+        s.push_str(&format!(
+            "    #[cfg_attr(feature = \"serde\", serde(deserialize_with = \"{}\"))]\n",
+            decimal_serde_fn(field.is_optional)
+        ));
+    }
+
     let type_str = field_type_to_rust(&field.field_type, field.is_optional);
     // `serde_json::Value` is only available when the `json` feature is active.
     // Emit a cfg-gated pair: primary type with feature, String fallback without.
@@ -969,7 +1160,7 @@ fn emit_field(s: &mut String, field: &Field, schema_version: &str) {
             field,
             "decimal",
             &type_str,
-            "    /// Requires the `decimal` feature for the `rust_decimal::Decimal` representation.\n    /// Without `decimal`, stores the decimal string value unchanged.\n",
+            "    /// Requires the `decimal` feature for the `rust_decimal::Decimal` representation.\n    /// Without `decimal`, stores the decimal's lexical form (a JSON string or number).\n",
             None,
         );
     } else {
@@ -995,10 +1186,18 @@ fn emit_feature_gated_field(
     fallback_doc: &str,
     fallback_schema_fns: Option<(&'static str, &'static str)>,
 ) {
+    // An array field falls back to `Vec<String>`, not `String`: the JSON is still
+    // an array, and a scalar fallback would fail to deserialize every payload
+    // that carries one.  No v202607 field has this shape; the branch is here so a
+    // future schema that adds one is generated correctly rather than silently.
+    let inner_fallback = match &field.field_type {
+        FieldType::Array(_) => "Vec<String>",
+        _ => "String",
+    };
     let fallback_type = if field.is_optional {
-        "Option<String>".to_owned()
+        format!("Option<{inner_fallback}>")
     } else {
-        "String".to_owned()
+        inner_fallback.to_owned()
     };
     s.push_str(&format!("    #[cfg(feature = \"{feature}\")]\n"));
     s.push_str(&format!("    pub {}: {primary_type},\n", field.rust_name));
@@ -1042,6 +1241,18 @@ fn emit_fallback_attrs(
         }
         // Builder: same `setter(into)` semantics as primary fields — accepts `T` or `Option<T>`.
         s.push_str("    #[cfg_attr(feature = \"builder\", builder(default, setter(into)))]\n");
+    }
+    // Same decimal adapter as the primary field: the fallback reads the two BO4E
+    // number spellings into the lexical `String` form.  See the block in
+    // `emit_field` for why one attribute serves both builds.
+    if is_decimal_scalar(&field.field_type) {
+        if field.is_optional {
+            s.push_str("    #[cfg_attr(feature = \"serde\", serde(default))]\n");
+        }
+        s.push_str(&format!(
+            "    #[cfg_attr(feature = \"serde\", serde(deserialize_with = \"{}\"))]\n",
+            decimal_serde_fn(field.is_optional)
+        ));
     }
     // Retain the JSON Schema format annotation on the fallback field so that schemars
     // produces the correct `"format"` annotation even when the native type is absent.
@@ -1088,10 +1299,35 @@ fn primitive_to_rust(p: &PrimitiveType) -> &'static str {
 
 // ─── Enum emission ────────────────────────────────────────────────────────────
 
-fn emit_enum(en: &EnumNode) -> Result<String> {
+fn emit_enum(en: &EnumNode, names: &DiscriminantNames) -> Result<String> {
+    // Resolve every variant name up front: `BoTyp` / `ComTyp` take theirs from the
+    // struct each discriminant names, everything else from `screaming_to_camel`.
+    let variant_pairs: Vec<(String, String)> = en
+        .variants
+        .iter()
+        .map(|(wire, _)| (names.variant(&en.name, wire), wire.clone()))
+        .collect();
+    // A `_` survives in a variant name only where dropping it would merge two
+    // distinct wire values (`MESSPREIS_G2_5` vs `MESSPREIS_G25`); that trips the
+    // `non_camel_case_types` lint, so silence it for exactly those enums.
+    let needs_allow = en
+        .variants
+        .iter()
+        .any(|(wire, _)| needs_non_camel_case_allow(wire));
+
     let mut s = String::from("// @generated — do not edit by hand\n\n");
 
-    s.push_str("#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]\n");
+    if needs_allow {
+        // Two BO4E values here differ only by a separator between digit runs
+        // (`MESSPREIS_G2_5` = meter size G 2.5 vs `MESSPREIS_G25` = G 25), so the
+        // underscore has to survive into the Rust identifier to keep them apart.
+        s.push_str("#[allow(non_camel_case_types)]\n");
+    }
+    // `PartialOrd`/`Ord` order by *declaration* position, which is BO4E's own
+    // order in the schema's `enum` array — arbitrary as a business ranking, but a
+    // total order, which is what `BTreeMap` / `BTreeSet` keys, `sort()`, and a
+    // derived `Ord` on a caller's struct need.  The doc comment below says so.
+    s.push_str("#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]\n");
     s.push_str("#[cfg_attr(feature = \"serde\", derive(serde::Serialize, serde::Deserialize))]\n");
     // `Display` and `AsRef<str>` are emitted as always-on hand-written impls below
     // (via `as_wire`), so they are NOT derived from strum here — deriving both would
@@ -1118,17 +1354,28 @@ fn emit_enum(en: &EnumNode) -> Result<String> {
             }
         }
     }
+    // What the derived `Ord` means is documented once on the `Bo4eEnum` trait,
+    // not here: schemars and utoipa lift a type's rustdoc verbatim into the
+    // generated JSON Schema / OpenAPI `description`, and a note about a Rust
+    // trait has no business in a wire-contract description every consumer reads.
+    //
     // Prevents downstream exhaustive match arms; complements the `Unknown` catch-all
     // by enforcing compile-time forward-compatibility for external crates.
     s.push_str("#[non_exhaustive]\n");
     s.push_str(&format!("pub enum {} {{\n", en.name));
 
-    let mut seen_variants: HashSet<String> = HashSet::new();
-    // Collected `(rust_variant_ident, wire_string)` pairs — drives the generated
-    // `VARIANTS`, `as_wire`, and `from_wire` members below.
-    let mut variant_pairs: Vec<(String, String)> = Vec::new();
-
-    for (variant, doc) in &en.variants {
+    // A collision would emit a duplicate variant and fail to compile pointing at
+    // generated code rather than at its cause.  Fail here instead, naming both
+    // offending values.
+    let mut seen_variants: HashSet<&str> = HashSet::new();
+    for ((rust, wire), (_, doc)) in variant_pairs.iter().zip(&en.variants) {
+        if !seen_variants.insert(rust.as_str()) {
+            anyhow::bail!(
+                "enum {}: wire value {wire:?} produces the Rust variant {rust:?}, which another \
+                 value already claims; extend `naming::screaming_to_camel` to keep them apart",
+                en.name,
+            );
+        }
         if let Some(d) = doc {
             for line in clean_description(d).lines() {
                 s.push_str(&format!("    /// {}\n", line));
@@ -1136,60 +1383,21 @@ fn emit_enum(en: &EnumNode) -> Result<String> {
         }
         // Curated per-variant interop note (e.g. the cross-BO "Messsystem" spelling
         // discrepancy) rendered right where a developer selecting the variant sees it.
-        if let Some(note) = enum_variant_note(&en.name, variant) {
+        if let Some(note) = enum_variant_note(&en.name, wire) {
             for line in note.lines() {
                 s.push_str(&format!("    /// {line}\n"));
             }
         }
-        let raw_rust = variant.to_upper_camel_case();
-        // Rust identifiers cannot start with a digit — prefix with 'V' (Variant).
-        let camel = if raw_rust.starts_with(|c: char| c.is_ascii_digit()) {
-            format!("V{raw_rust}")
-        } else {
-            raw_rust
-        };
-        // Deduplicate: when to_upper_camel_case() collapses two distinct JSON
-        // values to the same Rust identifier (e.g. "G2_5" and "G25" → "G25"),
-        // fall back to the JSON key sanitized as a valid Rust identifier.
-        let rust_variant = if seen_variants.contains(&camel) {
-            // Replace every non-alphanumeric character with underscore.
-            let sanitized: String = variant
-                .chars()
-                .map(|c| if c.is_alphanumeric() { c } else { '_' })
-                .collect();
-            // Capitalise first char so it still reads as a PascalCase variant.
-            let mut unique = String::new();
-            let mut first = true;
-            for part in sanitized.split('_').filter(|p| !p.is_empty()) {
-                if first {
-                    unique.push_str(&part[..1].to_uppercase());
-                    unique.push_str(&part[1..]);
-                    first = false;
-                } else {
-                    unique.push_str(&part[..1].to_uppercase());
-                    unique.push_str(&part[1..]);
-                }
-            }
-            if unique.starts_with(|c: char| c.is_ascii_digit()) {
-                format!("V{unique}")
-            } else {
-                unique
-            }
-        } else {
-            camel
-        };
-        seen_variants.insert(rust_variant.clone());
-        variant_pairs.push((rust_variant.clone(), variant.clone()));
         // Always emit serde(rename) so the serialized value is the canonical JSON string.
         // Also emit strum(serialize) so strum::Display / AsRef / EnumString
         // produce the same canonical string as serde — not the Rust variant name.
         s.push_str(&format!(
-            "    #[cfg_attr(feature = \"serde\", serde(rename = \"{variant}\"))]\n"
+            "    #[cfg_attr(feature = \"serde\", serde(rename = \"{wire}\"))]\n"
         ));
         s.push_str(&format!(
-            "    #[cfg_attr(feature = \"strum\", strum(serialize = \"{variant}\"))]\n"
+            "    #[cfg_attr(feature = \"strum\", strum(serialize = \"{wire}\"))]\n"
         ));
-        s.push_str(&format!("    {rust_variant},\n"));
+        s.push_str(&format!("    {rust},\n"));
     }
 
     // Catch-all variant for forward-compatibility: unknown values from future schema
@@ -1236,12 +1444,14 @@ fn emit_enum(en: &EnumNode) -> Result<String> {
     // actual wire→variant mapping rather than only the rejection path.  Every BO4E
     // enum has at least one schema variant, but fall back gracefully if that ever
     // stops holding.
+    // The template already opens the line with `/// `, so this contributes only
+    // the assertion plus the newline+indent that continues the doc block.  A
+    // second `/// ` here would comment the assertion out *inside* the code block,
+    // leaving a doctest that compiles and asserts nothing.
     let from_wire_positive = variant_pairs
         .first()
         .map(|(rust, wire)| {
-            format!(
-                "/// assert_eq!({enum_name}::from_wire(\"{wire}\"), Ok({enum_name}::{rust}));\n    "
-            )
+            format!("assert_eq!({enum_name}::from_wire(\"{wire}\"), Ok({enum_name}::{rust}));\n    /// ")
         })
         .unwrap_or_default();
     s.push_str(&format!(
@@ -1408,11 +1618,21 @@ impl<'r> sqlx::Decode<'r, sqlx::Postgres> for {enum_name} {{
         Ok(Self::from_wire(s).unwrap_or(Self::Unknown))
     }}
 }}
+
+/// Lets `Vec<{enum_name}>` bind to a `TEXT[]` column.  Only this crate can
+/// provide it: the trait and the enum are both foreign to any consumer, so the
+/// orphan rule rules out a downstream impl.
+#[cfg(feature = "sqlx")]
+impl sqlx::postgres::PgHasArrayType for {enum_name} {{
+    fn array_type_info() -> sqlx::postgres::PgTypeInfo {{
+        <String as sqlx::postgres::PgHasArrayType>::array_type_info()
+    }}
+}}
 "#
     ));
 
-    // Proptest Arbitrary impl — samples from the known-variant table.  No longer
-    // requires `strum`, since `VARIANTS` is now feature-independent.
+    // Proptest Arbitrary impl — samples from the feature-independent
+    // known-variant table, so it needs no `strum`.
     s.push_str(&format!(
         r#"
 #[cfg(test)]

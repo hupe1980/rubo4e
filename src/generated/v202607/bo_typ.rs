@@ -1,4 +1,4 @@
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(
     feature = "strum",
@@ -59,10 +59,10 @@ pub enum BoTyp {
     Netznutzungsrechnung,
     #[cfg_attr(feature = "serde", serde(rename = "TECHNISCHERESSOURCE"))]
     #[cfg_attr(feature = "strum", strum(serialize = "TECHNISCHERESSOURCE"))]
-    Technischeressource,
+    TechnischeRessource,
     #[cfg_attr(feature = "serde", serde(rename = "STEUERBARERESSOURCE"))]
     #[cfg_attr(feature = "strum", strum(serialize = "STEUERBARERESSOURCE"))]
-    Steuerbareressource,
+    SteuerbareRessource,
     #[cfg_attr(feature = "serde", serde(rename = "PERSON"))]
     #[cfg_attr(feature = "strum", strum(serialize = "PERSON"))]
     Person,
@@ -71,19 +71,19 @@ pub enum BoTyp {
     Preisblatt,
     #[cfg_attr(feature = "serde", serde(rename = "PREISBLATTDIENSTLEISTUNG"))]
     #[cfg_attr(feature = "strum", strum(serialize = "PREISBLATTDIENSTLEISTUNG"))]
-    Preisblattdienstleistung,
+    PreisblattDienstleistung,
     #[cfg_attr(feature = "serde", serde(rename = "PREISBLATTHARDWARE"))]
     #[cfg_attr(feature = "strum", strum(serialize = "PREISBLATTHARDWARE"))]
-    Preisblatthardware,
+    PreisblattHardware,
     #[cfg_attr(feature = "serde", serde(rename = "PREISBLATTKONZESSIONSABGABE"))]
     #[cfg_attr(feature = "strum", strum(serialize = "PREISBLATTKONZESSIONSABGABE"))]
-    Preisblattkonzessionsabgabe,
+    PreisblattKonzessionsabgabe,
     #[cfg_attr(feature = "serde", serde(rename = "PREISBLATTMESSUNG"))]
     #[cfg_attr(feature = "strum", strum(serialize = "PREISBLATTMESSUNG"))]
-    Preisblattmessung,
+    PreisblattMessung,
     #[cfg_attr(feature = "serde", serde(rename = "PREISBLATTNETZNUTZUNG"))]
     #[cfg_attr(feature = "strum", strum(serialize = "PREISBLATTNETZNUTZUNG"))]
-    Preisblattnetznutzung,
+    PreisblattNetznutzung,
     #[cfg_attr(feature = "serde", serde(rename = "PREISBLATTUMLAGEN"))]
     #[cfg_attr(feature = "strum", strum(serialize = "PREISBLATTUMLAGEN"))]
     Preisblattumlagen,
@@ -152,15 +152,15 @@ impl BoTyp {
         Self::Netzlokation,
         Self::Marktteilnehmer,
         Self::Netznutzungsrechnung,
-        Self::Technischeressource,
-        Self::Steuerbareressource,
+        Self::TechnischeRessource,
+        Self::SteuerbareRessource,
         Self::Person,
         Self::Preisblatt,
-        Self::Preisblattdienstleistung,
-        Self::Preisblatthardware,
-        Self::Preisblattkonzessionsabgabe,
-        Self::Preisblattmessung,
-        Self::Preisblattnetznutzung,
+        Self::PreisblattDienstleistung,
+        Self::PreisblattHardware,
+        Self::PreisblattKonzessionsabgabe,
+        Self::PreisblattMessung,
+        Self::PreisblattNetznutzung,
         Self::Preisblattumlagen,
         Self::Rechnung,
         Self::Region,
@@ -215,15 +215,15 @@ impl BoTyp {
             Self::Netzlokation => "NETZLOKATION",
             Self::Marktteilnehmer => "MARKTTEILNEHMER",
             Self::Netznutzungsrechnung => "NETZNUTZUNGSRECHNUNG",
-            Self::Technischeressource => "TECHNISCHERESSOURCE",
-            Self::Steuerbareressource => "STEUERBARERESSOURCE",
+            Self::TechnischeRessource => "TECHNISCHERESSOURCE",
+            Self::SteuerbareRessource => "STEUERBARERESSOURCE",
             Self::Person => "PERSON",
             Self::Preisblatt => "PREISBLATT",
-            Self::Preisblattdienstleistung => "PREISBLATTDIENSTLEISTUNG",
-            Self::Preisblatthardware => "PREISBLATTHARDWARE",
-            Self::Preisblattkonzessionsabgabe => "PREISBLATTKONZESSIONSABGABE",
-            Self::Preisblattmessung => "PREISBLATTMESSUNG",
-            Self::Preisblattnetznutzung => "PREISBLATTNETZNUTZUNG",
+            Self::PreisblattDienstleistung => "PREISBLATTDIENSTLEISTUNG",
+            Self::PreisblattHardware => "PREISBLATTHARDWARE",
+            Self::PreisblattKonzessionsabgabe => "PREISBLATTKONZESSIONSABGABE",
+            Self::PreisblattMessung => "PREISBLATTMESSUNG",
+            Self::PreisblattNetznutzung => "PREISBLATTNETZNUTZUNG",
             Self::Preisblattumlagen => "PREISBLATTUMLAGEN",
             Self::Rechnung => "RECHNUNG",
             Self::Region => "REGION",
@@ -252,7 +252,8 @@ impl BoTyp {
     /// # Example
     /// ```
     /// # use rubo4e::current::BoTyp;
-    /// /// assert_eq!(BoTyp::from_wire("ANGEBOT"), Ok(BoTyp::Angebot));
+    /// assert_eq!(BoTyp::from_wire("ANGEBOT"), Ok(BoTyp::Angebot));
+    /// // Out-of-schema values are rejected rather than degraded:
     /// assert!(BoTyp::from_wire("NOT_A_REAL_VALUE").is_err());
     /// // …including the `Unknown` catch-all's own wire spelling:
     /// assert!(BoTyp::from_wire("UNKNOWN").is_err());
@@ -275,15 +276,15 @@ impl BoTyp {
             "NETZLOKATION" => Ok(Self::Netzlokation),
             "MARKTTEILNEHMER" => Ok(Self::Marktteilnehmer),
             "NETZNUTZUNGSRECHNUNG" => Ok(Self::Netznutzungsrechnung),
-            "TECHNISCHERESSOURCE" => Ok(Self::Technischeressource),
-            "STEUERBARERESSOURCE" => Ok(Self::Steuerbareressource),
+            "TECHNISCHERESSOURCE" => Ok(Self::TechnischeRessource),
+            "STEUERBARERESSOURCE" => Ok(Self::SteuerbareRessource),
             "PERSON" => Ok(Self::Person),
             "PREISBLATT" => Ok(Self::Preisblatt),
-            "PREISBLATTDIENSTLEISTUNG" => Ok(Self::Preisblattdienstleistung),
-            "PREISBLATTHARDWARE" => Ok(Self::Preisblatthardware),
-            "PREISBLATTKONZESSIONSABGABE" => Ok(Self::Preisblattkonzessionsabgabe),
-            "PREISBLATTMESSUNG" => Ok(Self::Preisblattmessung),
-            "PREISBLATTNETZNUTZUNG" => Ok(Self::Preisblattnetznutzung),
+            "PREISBLATTDIENSTLEISTUNG" => Ok(Self::PreisblattDienstleistung),
+            "PREISBLATTHARDWARE" => Ok(Self::PreisblattHardware),
+            "PREISBLATTKONZESSIONSABGABE" => Ok(Self::PreisblattKonzessionsabgabe),
+            "PREISBLATTMESSUNG" => Ok(Self::PreisblattMessung),
+            "PREISBLATTNETZNUTZUNG" => Ok(Self::PreisblattNetznutzung),
             "PREISBLATTUMLAGEN" => Ok(Self::Preisblattumlagen),
             "RECHNUNG" => Ok(Self::Rechnung),
             "REGION" => Ok(Self::Region),
@@ -375,6 +376,15 @@ impl<'r> sqlx::Decode<'r, sqlx::Postgres> for BoTyp {
     ) -> Result<Self, sqlx::error::BoxDynError> {
         let s = <&str as sqlx::Decode<sqlx::Postgres>>::decode(value)?;
         Ok(Self::from_wire(s).unwrap_or(Self::Unknown))
+    }
+}
+/// Lets `Vec<BoTyp>` bind to a `TEXT[]` column.  Only this crate can
+/// provide it: the trait and the enum are both foreign to any consumer, so the
+/// orphan rule rules out a downstream impl.
+#[cfg(feature = "sqlx")]
+impl sqlx::postgres::PgHasArrayType for BoTyp {
+    fn array_type_info() -> sqlx::postgres::PgTypeInfo {
+        <String as sqlx::postgres::PgHasArrayType>::array_type_info()
     }
 }
 #[cfg(test)]

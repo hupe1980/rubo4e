@@ -10,7 +10,561 @@ also carries a **Schema deltas** section (see [Versioning](https://hupe1980.gith
 so downstream guards (SQL `CHECK` lists, variant-count assertions, coverage
 tests) can be updated deliberately instead of discovering drift at runtime.
 
-## [0.9.0] — unreleased
+## [0.10.0] — unreleased
+
+This release is a wire-format correction. Every payload rubo4e produced carried
+an invalid `_version`, COMs never stamped `_typ`, and `Rechnung` could not read
+what the reference implementation emits. If you exchange JSON with any other
+BO4E implementation, this is not an optional upgrade.
+
+It also advances the schema snapshot to **v202607.1.0** and makes the versioning
+contract say what BO4E actually does inside a series — see **Schema deltas** and
+**Changed** below.
+
+### Fixed *(breaking)*
+
+- **Every payload rubo4e produced carried an invalid `_version`.** The generator
+  filled the field in from the schema *release tag*, which BO4E spells
+  `v202607.0.0`. The value the standard puts inside a payload has no `v`:
+  `202607.0.0`. Every BO and every COM this crate serialized therefore claimed a
+  version string that no BO4E schema accepts and no other implementation writes,
+  breaking the byte-compatibility the README promises.
+
+  `_version` is now read out of the schema's own `default`, and
+  `Bo4eObject::schema_version()` returns the same wire spelling so the accessor
+  and the field cannot disagree. `tests/generated_contract.rs` pins both against
+  the committed schemas.
+
+  **Action required:** code matching on `schema_version()` or on a stored
+  `bo4e_version` column must match the wire spelling, not the tag. Match the
+  **series** — `version.split('.').next() == Some("202607")` — rather than the
+  full triple, or the next BO4E patch release breaks the match again; the new
+  `Bo4eObject::schema_series()` returns exactly that value. Rows written by an
+  earlier release carry the invalid `v`-prefixed value and need a one-time
+  `UPDATE … SET _version = '202607.1.0'`.
+
+- **COMs never stamped `_typ`.** Every BO4E COM schema pins its discriminant with
+  a JSON Schema `const`, so pydantic emits it on every component the reference
+  implementation produces — `Adresse`, `Betrag`, `Zeitraum`, all of them. rubo4e
+  left the field `None`, making a Rust-built component distinguishable from one
+  produced anywhere else in the ecosystem. `Default` and the builder now stamp it
+  for COMs exactly as they always did for BOs.
+
+  The test that should have caught this asserted the opposite — that a COM *must
+  not* carry `_typ` — so it pinned the defect in place. It has been replaced by a
+  schema-driven guard over all ~96 struct types.
+
+- **`Zeitraum` read `enddatum` as exclusive; BO4E says it is inclusive.** The
+  schema states it on the field — *"Enddatum des betrachteten Zeitraums ist
+  **inklusiv**"* — and gives `'2025-01-01'` as the example for `startdatum`
+  *and* `enddatum`, so `start == end` is a one-day period. The crate modelled the
+  interval half-open, which dropped a day from every period:
+
+  - `Zeitraum::contains(enddatum)` returned `false`, so the last day of a billing
+    month fell outside its own `rechnungsperiode`, and
+    `PreisblattNetznutzung::is_valid_at` reported a price sheet invalid on its
+    final day of validity.
+  - `validate_zeitraum` required a strict `startdatum < enddatum` and therefore
+    **rejected every single-day Zeitraum** — the most common shape in a
+    daily-granularity payload.
+
+  Both are fixed. The accessors changed shape to make the convention
+  unmisreadable:
+
+  | Before | After |
+  |---|---|
+  | `as_closed_range() -> Option<(Date, Date)>` | `as_inclusive_range() -> Option<RangeInclusive<Date>>` |
+  | `as_half_open_range() -> Option<(Date, Option<Date>)>` | `bounds() -> (Option<Date>, Option<Date>)` |
+  | `Rechnung::billing_period() -> Option<(Date, Date)>` | `-> Option<RangeInclusive<Date>>` |
+  | `PreisblattNetznutzung::validity() -> Option<(Date, Option<Date>)>` | `-> (Option<Date>, Option<Date>)` |
+
+  Returning a `RangeInclusive` rather than a tuple puts the convention in the
+  type: `range.contains(&d)` is correct by construction, and there is no
+  `start..end` / `start..=end` decision left to get wrong.
+
+  **This is not a uniform rule across BO4E** — the same release uses three
+  interval conventions, and the crate had generalised the wrong one:
+
+  | Kind | Interval |
+  |---|---|
+  | `date-time` pairs (`vertragsbeginn`/`vertragsende`, `von`/`bis`) | `[start, end)` |
+  | `Zeitraum`'s **date** pair | `[start, end]` |
+  | `Zeitraum`'s **time** pair (`startuhrzeit`/`enduhrzeit`) | `[start, end)` |
+  | price-tier bounds (`staffelgrenzeVon`/`Bis`) | `[von, bis]` |
+
+  `tests/interval_conventions.rs` now reads each statement out of the committed
+  schema and checks it against the code, so a release that flips one fails CI.
+  The `Vertrag` rule was already right and is unchanged.
+
+- **The snake_case key transform rewrote keys inside extension data.** An
+  extension field holding `{"a": 3, "marktlokations_id": "x"}` came back out of a
+  `to_json_snake_case` → `from_json_snake_case` round-trip spelled
+  `{"A": 3, "marktlokationsId": "x"}`, because `A` (from `Sigmoidparameter`) and
+  `marktlokationsId` are real BO4E field names *somewhere*. A producer's own
+  payload was silently rewritten into names it does not use, and the round-trip
+  identity the `json` module documents for extension data did not hold.
+
+  The transform renames keys as the parser yields them, long before serde knows
+  which struct they belong to, so on its own it renamed *every* key at *every*
+  depth. It now switches itself off — for the whole subtree — the moment it
+  descends into a value under a key the schema does not define. The generator
+  emits the key set it consults (`KNOWN_FIELD_KEYS`), so it is exact rather than
+  heuristic. `tests/extension_round_trip.rs` pins both halves: extension subtrees
+  pass through byte-for-byte, and schema keys are still renamed at every depth.
+
+  Two ambiguities remain, and are now documented and pinned rather than silent: a
+  *top-level* extension key that is a field's snake spelling is
+  indistinguishable from the field, and `ZusatzAttribut.wert` — free-form JSON
+  under a name that is also `Betrag`'s decimal and `Messwert`'s nested COM — is
+  still descended into. Use `to_json_german` where extension data matters.
+
+- **`Rechnung` could not read the reference implementation's own output.**
+  `rechnungsdatum` and `faelligkeitsdatum` were forced to `time::Date` by a
+  per-field override table, on the grounds that BDEW INVOIC transmits them as DTM
+  qualifier 102. The BO4E schema declares both `format: date-time`, so a
+  `Rechnung` produced by BO4E-python or the .NET implementation **failed to
+  deserialize outright**. No fixture set either field, so nothing caught it.
+
+  Both are now `time::OffsetDateTime`, following the schema. The override
+  mechanism that allowed inference to beat an explicit schema annotation is
+  removed: a `$ref` and a `"format"` are now always authoritative. The date-only
+  reading is still one call away via `Rechnung::rechnungsdatum_date()` and
+  `faelligkeitsdatum_date()`, which now return the calendar date of the timestamp.
+
+  **Action required:** if you were reading these fields as `time::Date`, either
+  switch to the `*_date()` accessors or take `.date()` yourself.
+
+- **Two different gas meter sizes shared one enum variant.** `MESSPREIS_G2_5`
+  (meter size **G 2.5**) and `MESSPREIS_G25` (**G 25**) both converted to
+  `Messpreistyp::MesspreisG25`. The collision "resolver" then renamed the second
+  to `MESSPREISG25` — a SCREAMING identifier that reads as a typo and gives no
+  hint which size it means, so half of every call site that picked
+  `MesspreisG25` meant the other meter. `SMART_METER_MESSPREIS_G2_5` /
+  `_G25` collided the same way.
+
+  Enum variant naming now preserves the separator between two digit runs:
+  `MesspreisG2_5` and `MesspreisG25` are distinct and self-describing. Generation
+  now **fails** if two wire values ever collapse onto one identifier, instead of
+  papering over it.
+
+  **Action required:** `Messpreistyp::MESSPREISG25` → `Messpreistyp::MesspreisG25`;
+  the old `MesspreisG25` (which meant G 2.5) → `MesspreisG2_5`. Same for the
+  `SmartMeter…` pair.
+
+- **`Rechnung`'s `zuZahlen` rule rejected correctly discounted invoices.** The
+  validator enforced `zu_zahlen == gesamtbrutto − rabatt_netto − Σ vorauszahlungen`.
+  `rabattNetto` is a **net** discount; subtracting it from a gross total is short
+  by the VAT on the discount. The equation the schema's own text names references
+  a `rabattBrutto` field v202607 does not ship, so it is not reconstructible from
+  the payload at all — the rule was invented rather than derived.
+
+  The `zuZahlen` check is **removed**. In its place the validator gained a rule
+  BO4E does state outright: `steuerbetraege` must sum to `gesamtsteuer`. The
+  currency-agreement guard and `gesamtnetto + gesamtsteuer == gesamtbrutto` are
+  unchanged.
+
+- **`Kostenposition` line-total arithmetic rejected ordinary invoices.** It
+  compared `einzelpreis × menge` against the stated amount at ten decimal places.
+  A unit price of `0.2843 €/kWh` over `3333 kWh` is `947.5719`, which every
+  invoice writes as `947.57` — so the rule failed on essentially all real data.
+  It also applied to time-proportional positions, which the schema computes with
+  a different formula entirely.
+
+  The comparison now allows half a unit in the amount's own last decimal place
+  (accepting either rounding mode), and positions carrying a `zeitmenge` are
+  skipped rather than measured against the wrong formula.
+
+- **Three fields took a Rust type from their *name* instead of their schema, and
+  every object containing one failed to deserialize.** Field typing was keyed on
+  bare names and on name suffixes, so:
+
+  | Field | Schema says | Was typed as |
+  |---|---|---|
+  | `Kontaktweg.kontaktwert` | `"string"` — *"Die Nummer oder E-Mail-Adresse"* | `Decimal` (suffix `wert`) |
+  | `MarktgebietInfo.marktgebiet` | `"string"` — *"Der Name des Marktgebietes"* | `EicCode` |
+  | `StandorteigenschaftenStrom.regelzone` | `"string"` — *"Der Name der Regelzone"* | `EicCode` |
+
+  The failure was never local to the field: a `Geschaeftspartner` carrying **any**
+  contact method failed to deserialize whole — organisation name, address, and
+  VAT ID with it. `Marktteilnehmer` was exposed the same way, since a market
+  partner's contact details are exactly what it stores. The `schemars` / `utoipa`
+  output was wrong too, advertising `pattern: ^-?\d+(\.\d+)?([eE]\d+)?$` for an
+  e-mail field.
+
+  All three are now `String`. The two `EicCode` cases were homonyms of fields
+  that genuinely do carry a code — `Marktlokation.marktgebiet` and
+  `Marktlokation.regelzone` are documented *"Code vom EIC"* and keep their
+  validated type.
+
+  **Action required:** `Kontaktweg.kontaktwert`,
+  `MarktgebietInfo.marktgebiet`, and `StandorteigenschaftenStrom.regelzone` are
+  now `Option<String>`. Any workaround that lifted `kontaktwege` out of a payload
+  before a typed read can be dropped.
+
+- **Without `decimal`, a JSON *number* would not deserialize at all.** The
+  `String` fallback used serde's own `String` impl, which rejects a number — so a
+  `versioned`-only build could read BO4E-python output (which writes decimals as
+  strings) but not go-bo4e's (which writes numbers), despite the docs promising
+  the fallback preserves the value. The fallback now accepts either spelling and
+  keeps the lexical form.
+
+- **`to_json_canonical()` did not sort everywhere it claimed to.** Sequences,
+  tuples, tuple structs, and both enum-variant shapes delegated straight to the
+  inner serializer, so an object nested inside any of them came out unsorted while
+  the method still advertised canonical output. All five shapes now route through
+  the sorting serializer; the enum variants keep their external tag.
+
+### Changed *(breaking)*
+
+- **`BoTyp` and `ComTyp` variants are named after the types they discriminate.**
+  Those two enums are the one place where BO4E's SCREAMING_SNAKE_CASE values have
+  a *known* word split — `"PREISBLATTKONZESSIONSABGABE"` names the
+  `PreisblattKonzessionsabgabe` schema sitting beside it in the same release — and
+  the generator was throwing that away. Renames:
+
+  | Before | After |
+  |---|---|
+  | `BoTyp::Preisblattdienstleistung` | `BoTyp::PreisblattDienstleistung` |
+  | `BoTyp::Preisblatthardware` | `BoTyp::PreisblattHardware` |
+  | `BoTyp::Preisblattkonzessionsabgabe` | `BoTyp::PreisblattKonzessionsabgabe` |
+  | `BoTyp::Preisblattmessung` | `BoTyp::PreisblattMessung` |
+  | `BoTyp::Preisblattnetznutzung` | `BoTyp::PreisblattNetznutzung` |
+  | `BoTyp::Technischeressource` | `BoTyp::TechnischeRessource` |
+  | `BoTyp::Steuerbareressource` | `BoTyp::SteuerbareRessource` |
+  | `ComTyp::Aufabschlag` | `ComTyp::AufAbschlag` |
+  | `ComTyp::Einheitspreisposition` | `ComTyp::EinheitsPreisposition` |
+  | `ComTyp::Lastvariablepreisposition` | `ComTyp::LastvariablePreisposition` |
+  | `ComTyp::Relativepreisposition` | `ComTyp::RelativePreisposition` |
+  | `ComTyp::Zeitvariablepreisposition` | `ComTyp::ZeitvariablePreisposition` |
+  | `ComTyp::Marktgebietinfo` | `ComTyp::MarktgebietInfo` |
+  | `ComTyp::Standorteigenschaftengas` | `ComTyp::StandorteigenschaftenGas` |
+  | `ComTyp::Standorteigenschaftenstrom` | `ComTyp::StandorteigenschaftenStrom` |
+  | `ComTyp::Verwendungszweckpromarktrolle` | `ComTyp::VerwendungszweckProMarktrolle` |
+
+  Wire values are unchanged; only the Rust identifiers moved.
+
+- **Word boundaries inside all-caps enum values are now recovered.**
+  `Zaehlergroesse::G2komma5` → `G2Komma5`,
+  `Rechnungstyp::Integrierte13teRechnung` → `Integrierte13TeRechnung` (likewise
+  `Zusaetzliche13teRechnung` and `NetznutzungRechnungstyp`'s pair), and
+  `Dienstleistungstyp::Auslesung2xTaeglichFernauslesung` →
+  `Auslesung2XTaeglichFernauslesung`. Wire values unchanged.
+
+- **The schema snapshot advanced to v202607.1.0**, and with it the documented
+  versioning contract. The old wording said minor bumps inside a series are
+  "additive" and that a version module's enum membership is "fixed for the
+  series". BO4E's own `v202607.0.0` → `v202607.1.0` removed a value and two whole
+  enums, so neither was true. The contract now reads:
+
+  > The Rust module path pins the **series**. The `rubo4e` version pins the
+  > **values**.
+
+  Pin the crate version in `Cargo.toml` for a frozen variant set; guard the rest
+  structurally with `T::VARIANTS` / `T::COUNT`.
+
+- **`Zeitraum::as_closed_range` → `as_bounded_range`.** The name promised an
+  inclusive end that no other method in the crate delivers: `contains` has always
+  read `[startdatum, enddatum)`, and `validate_zeitraum` has always required
+  `startdatum < enddatum`. A caller who read "closed" and wrote `start..=end`
+  billed one day too many on every period. The behaviour is unchanged; the name
+  and the docs now say what it is, and the exclusive-end convention is stated
+  once, with its provenance, on the `Zeitraum` impl block.
+
+- **`JsonParseLimits` is `#[non_exhaustive]`.** Build one from
+  `untrusted_defaults()` or `unlimited()` plus the new `with_*` methods rather
+  than a struct literal. A hardening knob set grows as new amplification paths
+  are found, and a struct literal made each of those a breaking change — exactly
+  the pressure that keeps such an API from gaining the cap it needs. It now also
+  derives `PartialEq` / `Eq`.
+
+  ```rust
+  // Before
+  let limits = JsonParseLimits { max_nesting_depth: Some(16), ..Default::default() };
+  // After
+  let limits = JsonParseLimits::unlimited().with_max_nesting_depth(Some(16));
+  ```
+
+- **`LimitedExtensionMap::try_insert` returns a `Result`, not a `bool`.** It now
+  yields the displaced value the way `HashMap::insert` does, or an
+  `ExtensionInsertError` naming which cap stopped it. It also **fixes a defect**:
+  a map at `MAX_EXTENSION_FIELDS` refused to *overwrite* an existing key, which
+  does not grow the map and had no reason to fail — a full extension map's
+  contents were unwritable.
+
+- **Decimal fields deserialize through `crate::decimal_serde` in both builds.**
+  Previously only the `decimal`-off (`String`) path had a custom deserializer.
+  Behaviour for well-formed input is unchanged; see *Added* for what this buys.
+
+### Added
+
+- **Three more code-bearing fields are now validated newtypes.** Auditing the
+  name/code pairs above turned up code halves left untyped while their name half
+  was over-typed:
+
+  | Field | Schema says | Now |
+  |---|---|---|
+  | `StandorteigenschaftenStrom.regelzoneEic` | *"De EIC-Nummer der Regelzone"* | `EicCode` |
+  | `Fremdkostenposition.gebietcodeEic` | *"EIC-Code … Z.B. '10YDE-EON------1'"* | `EicCode` |
+  | `Netzlokation.obiskennzahl` | *"Die OBIS-Kennzahl für die Netzlokation"* | `ObisCode` |
+
+  The last one was skipped only because BO4E spells it `obiskennzahl` where the
+  other three OBIS fields use `obisKennzahl`; a name-keyed table could not see
+  past the casing.
+
+- **`sqlx::postgres::PgHasArrayType` for every generated enum**, so `Vec<Sparte>`
+  binds to a `TEXT[]` column the way `Vec<MaloId>` already did. The README and
+  the ecosystem guide had claimed this for several releases while only
+  identifiers carried the impl; `tests/sqlx_compile.rs` now asserts both.
+- **`Rechnung` validates that `steuerbetraege` sum to `gesamtsteuer`** — a rule
+  the BO4E schema states outright and the crate was not checking.
+- **The fuzz targets build with `time` and `decimal`.** Those two features
+  replace `String` fields with `time::OffsetDateTime`, `time::Date`, and
+  `rust_decimal::Decimal` — three real parsers over attacker-controlled text.
+  Fuzzing ran in the one configuration where none of them is compiled in.
+  `fuzz_parse_identifiers` now covers all sixteen identifier types (it covered
+  eight), asserts each accepts its own `Display` output, and exercises the
+  accessors that do arithmetic and slicing on a parsed value.
+- **`tests/generated_contract.rs`** — schema-driven drift guards over the whole
+  committed codegen: schema ↔ module coverage, `_typ` and `_version` stamping for
+  all ~96 struct types, discriminant variant naming, and injectivity of the wire
+  value → Rust variant mapping. It replaces `tests/module_coverage.rs`, whose
+  generated-file assertions silently never ran (they looked for
+  `src/generated/v202607/bo/`, a directory the generator does not create).
+- **`tests/sqlx_compile.rs`** — compile-time assertions that every identifier and
+  every enum carries the `Type` / `Encode` / `Decode` / `PgHasArrayType` surface
+  the docs promise.
+
+- **`Bo4eObject::schema_series()`** — the `YYYYMM` prefix of the release
+  (`"202607"`), which is the granularity a module actually covers and therefore
+  the only sane key for version dispatch. `schema_version()` keeps returning the
+  full wire triple; matching on *that* rejects a payload from a sender one BO4E
+  patch ahead, for types that read it perfectly. The docs' dispatch example was
+  written the wrong way round and is corrected.
+
+- **`Eq` and `Hash` on generated structs and `AnyBo`** (without the `json`
+  feature), so a BO can key a `HashMap` or a `HashSet`. `Hash` alone shipped
+  before — with a comment claiming it enabled exactly that — and a `HashMap` key
+  requires `Eq`, so it never did. `tests/hash_keys.rs` uses the types as keys, in
+  both feature modes.
+
+- **`PartialOrd` and `Ord` on every generated enum**, so one can key a `BTreeMap`,
+  be sorted, or let a caller's struct derive `Ord`. The order is BO4E's own
+  declaration order with `Unknown` last: total, deterministic, and explicitly not
+  a business ranking — documented once on `Bo4eEnum`, deliberately *not* in each
+  enum's rustdoc, which schemars and utoipa lift verbatim into the wire-contract
+  `description`.
+
+- **`decimal_serde::decimal_from_json_number_count()`** — a process-wide counter
+  of decimals read from a JSON *number* rather than a JSON string, exported as
+  `bo4e_decimal_from_json_number_total` with the `metrics` feature.
+
+  BO4E spells a decimal both ways: BO4E-python writes `"wert": "119.00"`, go-bo4e
+  writes `"wert": 119.00`. Both were already read, but only the string spelling
+  is exact — a JSON number has passed through `f64` before any Rust deserializer
+  sees it, so `119.00` arrives as `119` and anything past ~15 significant digits
+  is rounded. That is unrecoverable in serde's data model, so it is instead made
+  visible and documented in full, with the boundary pinned by a test. Integers
+  now take an exact path rather than going through `f64`.
+
+- **`LimitedExtensionMap::get` / `len` / `is_empty` / `iter`**, and
+  `ExtensionInsertError`. The extension map had a public mutator and no way to
+  read back what it held without going through a generated type's
+  `Bo4eExtensionData`. Its `PartialEq` is now hand-written so an allocated-empty
+  map compares equal to one that never allocated.
+
+- **`JsonParseLimits::with_*` builders** — see *Changed*.
+
+- **`Zeitraum::whole_days()` and `Zeitraum::duration()`.** `whole_days` counts
+  both inclusive bounds, so a one-day period is 1 and January is 31.
+  `duration()` parses `dauer`, which BO4E stores as an ISO 8601 string
+  (`"P1DT30H4S"`) that neither serde nor `time` reads.
+
+- **`Iban` and `Bic`** (ISO 13616 / ISO 9362) — the two fields on a BO4E invoice
+  that money moves against, and the one obvious hole left in the identifier
+  family. `Iban` verifies the ISO 7064 MOD-97-10 check digits, which catch every
+  single-character error and every adjacent transposition, and enforces the
+  registered per-country length (a 21-character German IBAN is rejected here
+  rather than by the bank). Grouping spaces and lowercase normalise away, so a
+  value pasted from a statement parses; `to_grouped_string()` renders the print
+  form back. Accessors split a German IBAN into Bankleitzahl and Kontonummer, and
+  a BIC into institution, country, location and branch, with `is_head_office()`
+  and `is_passive()`.
+
+  A country the crate's length table does not list is **not** rejected on length
+  — the ISO registry grows, and a stale table refusing a valid IBAN would be
+  worse than one the checksum alone vetted.
+
+  **`Zahlungsinformation.iban` / `.bic` stay `String` on the generated struct.**
+  That COM hangs off `Rechnung` and nothing else, so typing them would mean a
+  masked IBAN (`DE89 **** **** 3000` — routine on an invoice) destroys the entire
+  invoice: line items, amounts, periods and all. `iban_checked()` and
+  `bic_checked()` run the check on demand and return an error instead. The
+  generator's typing rules gained a fourth rule recording this trade-off, and
+  `Bilanzierung.bilanzkreis` is now documented as the same kind of exception.
+
+- **`rubo4e::iso8601_duration`** — the parser behind `duration()`, public because
+  `dauer` is not the only place BO4E spells a duration this way. `P1Y` and `P1M`
+  are **refused**, not approximated: a year is 365 or 366 days and a month 28 to
+  31, so converting either without a start date is a guess. Weeks and below are
+  exact and parse fine. The error names which unit was ambiguous and why.
+
+- **`rubo4e::offset_time`, and the accessors that use it** —
+  `Zeitraum::startuhrzeit_parsed` / `enduhrzeit_parsed` and
+  `Umschaltzeit::umschaltzeit_parsed`. BO4E annotates those three properties
+  `format: "time"` and gives `"18:00:00+01:00"` as the example: a time of day
+  **with a UTC offset**, which no `time` type holds — `Time` carries no zone and
+  `OffsetDateTime` demands a date. The fields therefore stay `String` rather than
+  silently dropping the offset, and this reads them into
+  `(Time, Option<UtcOffset>)`.
+
+  The offset is returned as `Option` rather than defaulted to UTC: BO4E does not
+  require one, and "local time, zone not stated" is a different claim. It is also
+  load-bearing — a Doppeltarif switch written `06:00:00+01:00` is a different
+  wall-clock moment in summer than in winter, so discarding it moves the tariff
+  boundary by an hour.
+
+- **`Preisstaffel::contains` and `PreisstaffelSliceExt::select_for`** — price-tier
+  lookup, including BO4E's gap rule. The schema states tiers as
+  `0 – 1000, 1001 – 2000` and rules that a value *between* two tiers
+  (`1000.6`) *"rutscht in die obere Zone"* — a naive `von <= x <= bis` scan finds
+  no tier for it and bills nothing. `select_for` picks the tier with the smallest
+  `staffelgrenzeBis` still ≥ the value, which satisfies the in-tier and in-gap
+  cases together and does not depend on slice order.
+
+  Note that BO4E's own wording for `staffelgrenzeBis` contradicts itself —
+  *"**Exklusiver** oberer Wert, bis zu dem die Staffel gilt (**inklusiv**)"* —
+  and it is the worked example in the same sentence that settles it. Both the
+  contradiction and the resolution are pinned by tests.
+
+- **`tests/prelude_surface.rs`** — a drift guard proving `rubo4e::prelude`
+  re-exports *every* identifier type. It did not: `CrId`, `NebeId`, `SgId`, and
+  `PaketId` were reachable only through `rubo4e::identifiers::`, so the BDEW
+  Ressourcen-ID family was half in and half out with nothing marking the line.
+  All four, plus `MaloVergabestelle`, `MpIdAuthority`, and `LengthExpectation`,
+  are now in the prelude.
+
+- **A guard over the schema's `format` annotations.** `resolve_field_type` ends
+  in a catch-all that maps an unrecognised `format` to `String` — the right
+  default, but a silent one: a release that starts annotating a field
+  `"format": "uri"` would map it to `String` with nobody deciding it should.
+  `generator/tests/round_trip.rs` now pins the set, so a new format fails there
+  and the decision gets made. `"time"` is recorded as a deliberate passthrough
+  rather than an oversight.
+
+- **The generator deletes generated files a schema release retired.** BO4E
+  dropping `Lokationstyp` and `Mengenoperator` would otherwise have left two
+  orphan modules in `src/generated/`, unreferenced by `mod.rs`, compiling
+  nowhere, and passing every drift check — indistinguishable from a live type.
+
+### Removed
+
+- **The `simd-json` feature.** It was measured, and on this crate's own types it
+  was **slower than `serde_json` at every payload size tested** — 265 bytes to
+  166 KB, 1.2× to 1.6× slower throughout.
+
+  | Payload | `serde_json` | `simd-json` |
+  |---|---|---|
+  | 1.7 KB | 5.65 µs | 8.89 µs |
+  | 16.7 KB | 55.7 µs | 75.6 µs |
+  | 166 KB | 544 µs | 676 µs |
+
+  The reason is structural rather than a tuning miss: every generated struct
+  carries `#[serde(flatten)]` for its extension map, so deserialization is
+  dominated by serde's `Content` buffering, not by the JSON tokenizer that SIMD
+  accelerates. `simd-json`'s mutable-slice API then forces a `Vec<u8>` copy of
+  every payload, and the depth guard needed a *second* full pass over the bytes
+  because `simd-json` cannot wrap a visitor.
+
+  The perf gate that should have caught this only asserted that `simd-json` was
+  not more than 1.1–1.8× *slower* — it never asserted a speedup — and it had
+  rotted into a broken state: it invoked the benchmark without the `time` and
+  `decimal` features the target requires, so it failed before measuring
+  anything. It is deleted along with the feature.
+
+  Removing it also removes a second, weaker nesting-depth mechanism (a byte-scan
+  pre-pass that existed only for the SIMD path), two magic size thresholds, a
+  heavy optional dependency tree, two `cargo-deny` duplicate-version skips, a CI
+  matrix entry, and a documented claim that was not true.
+
+  **Action required:** drop `simd-json` from your feature list. Nothing else
+  changes — the entry points, their signatures, and their behaviour are the same.
+
+
+- **Name-based and suffix-based field typing.** `generator/src/inference.rs` had
+  three tables: a suffix map, a bare-name map, and a per-struct override map. The
+  suffix map's only *effective* action across the whole BO4E schema set was to
+  mistype `Kontaktweg.kontaktwert` — every other suffix either never matched or
+  matched a field the schema already typed the same way. The bare-name map caught
+  homonyms in unrelated structs. The override map let a name beat an explicit
+  `"format"`, and two of its four entries named fields v202607 does not have.
+
+  All three are replaced by one exhaustive `(struct, field)` table, consulted only
+  for properties the schema declares as a plain, unannotated `"string"`. A `$ref`,
+  a `"format"`, and `"type": "number"` are now always authoritative.
+- **`tests/module_coverage.rs`** — its live assertions were schema-file counts
+  with a floor, and its generated-code assertions never executed. Replaced by
+  `tests/generated_contract.rs`. The `no_v202402_*` tests, which guarded against a
+  schema version that has never existed in this repository, are dropped outright.
+
+### Documentation
+
+- **The generated `from_wire` doctest never ran.** Its positive assertion was
+  emitted with a doubled `/// `, which made it a Rust line comment *inside* the
+  code block — so every one of ~190 generated enums shipped an example that
+  compiled and asserted nothing. Fixed; the assertions now execute.
+- **`docs/generator.md` rewritten.** It documented an AST (`BoTypeDef`,
+  `ComTypeDef`), an inference API (`infer_type` / `RustType`), a `_version`
+  constant to hand-edit, and a `src/migration/` module — none of which exist. It
+  now describes the real pipeline, the schema-driven metadata, the identifier
+  naming rules, and the drift guards.
+- **`docs/validation.md` corrected.** It described an "Avis Sum Constraint" over
+  a type BO4E does not define, a `rabatt_brutto` field that does not exist, and a
+  `#[garde(transparent)]` derive pattern the crate does not use. Every rule listed
+  is now traceable to a sentence in the BO4E schema, with the reasoning for the
+  one rule that is deliberately absent.
+- **`docs/versioning.md` rewritten** around the contract above, with a
+  within-series upgrade procedure — the common case, previously undocumented —
+  alongside the format-version-cutover one.
+- **`docs/architecture.md`** gained a "what a generated type gives you" table:
+  the full derive and trait surface for structs and enums, and which feature each
+  entry needs.
+- **`docs/serialization.md`** documents the decimal string-vs-number asymmetry
+  with a worked table, and what the hardening limits do *not* bound — a payload
+  inside `max_payload_bytes` can still expand by two orders of magnitude, because
+  `[{},{}…]` is three wire bytes and one struct per element.
+- The pinned schema tag is no longer written out in the test suite: the helpers
+  read it off the committed snapshot directory, so a within-series bump does not
+  turn into a scavenger hunt through `tests/`.
+
+### Schema deltas   (v202607.0.0 → v202607.1.0)
+
+```
+- Messgroesse    +3 (PHASENWINKEL, LEISTUNGSFAKTOR, FREQUENZ)   -1 (PREISE)
+- Mengeneinheit  +2 (HZ, DIMENSIONSLOS)
+- removed enums: Lokationstyp, Mengenoperator
+```
+
+`Messgroesse::Preise` and the two enums are **gone**, not deprecated. Both enums
+were already unreferenced by every BO and COM in v202607.0.0, so the practical
+impact is limited to code that named them directly. A SQL `CHECK` list or an
+exhaustive mapping that still carries `PREISE` needs updating; `Messgroesse::COUNT`
+and `Messgroesse::VARIANTS` turn that into a test failure rather than a runtime
+surprise. `_version` now reads `202607.1.0`.
+
+Library-side changes in the same release that behave like schema deltas:
+
+- Several Rust **identifiers** for existing values changed — see *Changed
+  (breaking)* above. Wire values are untouched, so stored JSON and SQL `CHECK`
+  lists need no migration; only Rust source that names those variants does.
+- Three fields changed Rust type from a domain newtype to `String`
+  (`Kontaktweg.kontaktwert`, `MarktgebietInfo.marktgebiet`,
+  `StandorteigenschaftenStrom.regelzone`). The schema always declared them as
+  strings, so no stored payload changes; JSON Schema / OpenAPI output for them
+  loses a numeric `pattern` it should never have carried.
+- One stored value **does** need migration: `_version` written by 0.9.0 and
+  earlier is `"v202607.0.0"`, which is not a valid BO4E version string.
+
+## [0.9.0] — 2026-08-17
 
 ### Fixed *(breaking)*
 

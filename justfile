@@ -5,14 +5,14 @@
 default:
     @just --list
 
-# Generate Rust code from a BO4E JSON Schema release tag (e.g. v202607.0.0)
-generate version="v202607.0.0":
+# Generate Rust code from a BO4E JSON Schema release tag (e.g. v202607.1.0)
+generate version="v202607.1.0":
     cargo run -p bo4e-generator -- --schema-version {{ version }}
     @echo "Generation complete. Review changes below:"
     git diff src/generated/
 
 # Download a BO4E JSON Schema release snapshot into generator/schemas/<TAG>/
-# Usage: just download-schemas v202607.0.0
+# Usage: just download-schemas v202607.1.0
 download-schemas version:
     bash scripts/download_schemas.sh "{{ version }}"
 
@@ -39,7 +39,7 @@ lint:
 # Lint the feature combinations that `--all-features` cannot reach.
 #
 # `--all-features` hides two whole classes of defect: code that is dead unless an
-# optional dependency is enabled (e.g. the simd-json-only depth pre-scan), and
+# optional dependency is enabled (e.g. a `metrics`-only counter emit), and
 # bindings that go unread when a feature compiles a function body away (e.g. the
 # `time`/`decimal` validators).  Both shipped undetected before this recipe existed.
 lint-features:
@@ -55,7 +55,6 @@ lint-features:
         "versioned,validate"
         "versioned,builder,validate"
         "versioned,json,schemars,utoipa"
-        "versioned,json,simd-json"
         "versioned,sqlx"
         "versioned,json,sqlx"
         "versioned,strum,tracing,metrics"
@@ -114,7 +113,7 @@ fmt:
 # run alone leaves most of the crate uncompiled.  `check-msrv` is deliberately
 # omitted — it installs a second toolchain, which is CI's job, not a local
 # pre-push gate; run it explicitly before a release.
-ci: fmt-check lint lint-features check-strict check-docs test-all test-minimal test-minimal-versioned check-docs-examples check-codegen-size check-docs-drift site-build deny-check
+ci: fmt-check lint lint-features check-strict check-fuzz check-docs test-all test-minimal test-minimal-versioned check-docs-examples check-codegen-size check-docs-drift site-build deny-check
     @echo "All CI checks passed."
 
 # Fail only if regenerating changes the generated output (true drift), regardless
@@ -128,7 +127,7 @@ check-docs-drift:
     snapshot="$(mktemp -d)"
     trap 'rm -rf "$snapshot"' EXIT
     cp -R src/generated "$snapshot/before"
-    cargo run -p bo4e-generator -- --schema-version v202607.0.0
+    cargo run -p bo4e-generator -- --schema-version v202607.1.0
     cargo fmt --all
     if diff -rq "$snapshot/before" src/generated >/dev/null; then
         echo "src/generated/ is in sync with the generator."
@@ -142,10 +141,20 @@ check-docs-drift:
 #
 # `--all-features` because that is what `cargo-deny-action` defaults to in CI.
 # Without it this recipe checks only the default feature set, which leaves the
-# optional dependencies (sqlx, simd-json, utoipa, …) out of the graph entirely —
+# optional dependencies (sqlx, utoipa, schemars, …) out of the graph entirely —
 # a duplicate-version ban that CI rejected passed here for exactly that reason.
 deny-check:
     cargo deny --all-features check
+
+# Type-check the fuzz targets.
+#
+# `fuzz/` declares its own `[workspace]`, so `cargo check --workspace` never sees
+# it and the targets rot silently — one had been calling an associated function
+# as a method for long enough that nothing noticed. This does not need nightly:
+# `cargo check` compiles the targets without the sanitizer instrumentation
+# `cargo fuzz run` adds.
+check-fuzz:
+    cd fuzz && cargo check --all-targets
 
 # Check with RUSTFLAGS=-D warnings (catches broken examples / cfg-gated items)
 check-strict:
@@ -157,6 +166,3 @@ check-docs-examples:
     cargo run --example serialize --features versioned,json,decimal
     cargo run --example builder --features versioned,builder,json,decimal
 
-# Lightweight JSON perf regression gate for simd-json
-check-perf-simd:
-    bash scripts/check_json_perf_regression.sh

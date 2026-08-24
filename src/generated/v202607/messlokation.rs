@@ -3,7 +3,7 @@ use super::{
     Lokationszuordnung, Netzebene, Sparte, Zaehler, ZusatzAttribut,
 };
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(not(feature = "json"), derive(Hash))]
+#[cfg_attr(not(feature = "json"), derive(Eq, Hash))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "builder", derive(typed_builder::TypedBuilder))]
 #[cfg_attr(feature = "validate", derive(garde::Validate))]
@@ -16,7 +16,7 @@ use super::{
 )]
 /// Object containing information about a Messlokation
 ///
-/// > **Note:** [Messlokation JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/bo/Messlokation.json)
+/// > **Note:** [Messlokation JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.1.0/src/bo4e_schemas/bo/Messlokation.json)
 pub struct Messlokation {
     /// Alternativ zu einer postalischen Adresse kann hier ein Ort mittels Geokoordinaten angegeben werden
     /// (z.B. zur Identifikation von Sendemasten).
@@ -103,7 +103,7 @@ pub struct Messlokation {
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub sparte: Option<Sparte>,
-    /// BO type identifier — always `BoTyp::Messlokation` for this struct.
+    /// BO4E type discriminant — always `BoTyp::Messlokation` for this struct.
     #[cfg_attr(feature = "serde", serde(rename = "_typ"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(
@@ -116,7 +116,7 @@ pub struct Messlokation {
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(
         feature = "builder",
-        builder(default = Some("v202607.0.0".to_owned()), setter(into))
+        builder(default = Some("202607.1.0".to_owned()), setter(into))
     )]
     pub version: Option<String>,
     #[cfg_attr(feature = "serde", serde(rename = "zusatzAttribute"))]
@@ -138,7 +138,6 @@ pub struct Messlokation {
 impl Default for Messlokation {
     fn default() -> Self {
         Self {
-            typ: Some(BoTyp::Messlokation),
             geoadresse: Default::default(),
             geraete: Default::default(),
             grundzustaendiger_msb_codenr: Default::default(),
@@ -154,7 +153,8 @@ impl Default for Messlokation {
             messlokationszaehler: Default::default(),
             netzebene_messung: Default::default(),
             sparte: Default::default(),
-            version: Some("v202607.0.0".to_owned()),
+            typ: Some(BoTyp::Messlokation),
+            version: Some("202607.1.0".to_owned()),
             zusatz_attribute: Default::default(),
             _additional: Default::default(),
         }
@@ -166,7 +166,10 @@ impl Bo4eObject for Messlokation {
         self.typ.unwrap_or(BoTyp::Messlokation)
     }
     fn schema_version(&self) -> &'static str {
-        "v202607.0.0"
+        "202607.1.0"
+    }
+    fn schema_series(&self) -> &'static str {
+        "202607"
     }
 }
 #[cfg(feature = "json")]

@@ -28,13 +28,27 @@
 //! all render to a snake form that an algorithm would map back to a different
 //! camelCase name, silently diverting the value into `_additional`.
 //!
-//! Two kinds of key are deliberately left alone in both directions:
+//! Two kinds of key are left alone in both directions:
 //!
 //! - **BO4E metadata keys** (`_typ`, `_version`, `_id`) keep their leading
 //!   underscore in every mode; they are wire metadata, not Rust field names.
 //! - **Extension keys** — anything the schema does not define — pass through
-//!   byte-for-byte, so unknown fields round-trip exactly as they arrived instead
-//!   of being rewritten into a name their producer would not recognize.
+//!   byte-for-byte, and so does everything nested under them. The transform
+//!   switches off where the schema stops, so a vendor blob holding
+//!   `{"a": 3}` is not rewritten to `{"A": 3}`.
+//!
+//! # Where snake_case stays ambiguous
+//!
+//! Keys are renamed as the parser yields them, before serde knows the struct,
+//! which leaves two cases it cannot resolve. **Prefer
+//! [`to_json_german`] whenever extension data is in play** — it renames nothing,
+//! so neither case exists there.
+//!
+//! 1. A top-level extension key that *is* a field's snake spelling is
+//!    indistinguishable from the field, and is read as it.
+//! 2. `ZusatzAttribut.wert` holds free-form JSON, but `wert` is also `Betrag`'s
+//!    decimal and `Messwert`'s nested COM, so the name cannot be excluded
+//!    without breaking the last of those. Keys inside it are renamed.
 //!
 //! [`to_json_german`]: crate::json::Bo4eJsonExt::to_json_german
 //! [`to_json_snake_case`]: crate::json::Bo4eJsonExt::to_json_snake_case
@@ -47,8 +61,8 @@ pub(crate) mod limits;
 
 // ── Public re-exports ──────────────────────────────────────────────────
 pub use extension::{
-    ext_map_is_empty, Bo4eExtensionData, LimitedExtensionMap, MAX_EXTENSION_FIELDS,
-    MAX_EXTENSION_KEY_LEN,
+    ext_map_is_empty, Bo4eExtensionData, ExtensionInsertError, LimitedExtensionMap,
+    MAX_EXTENSION_FIELDS, MAX_EXTENSION_KEY_LEN,
 };
 pub use limits::{json_limit_hit_counters, JsonLimitHitCounters, JsonParseLimits};
 
@@ -57,7 +71,7 @@ use depth::{DepthLimitedDeserializer, DepthState};
 use key_transform::{
     camel_to_snake, deserialize_with_key_transform_from_slice,
     deserialize_with_key_transform_from_str, serialize_with_key_transform, snake_to_camel,
-    KeyTransformDeserializer,
+    KeyTransform, KeyTransformDeserializer,
 };
 #[cfg(feature = "tracing")]
 use limits::trace_json_outcome;
@@ -238,7 +252,7 @@ pub trait Bo4eJsonExt: sealed::Sealed + Serialize + DeserializeOwned + Sized {
     /// [`from_json_snake_case`]: Bo4eJsonExt::from_json_snake_case
     fn to_json_snake_case(&self) -> Result<String, serde_json::Error> {
         traced_serialize::<Self>("snake_case", || {
-            serialize_with_key_transform(self, camel_to_snake)
+            serialize_with_key_transform(self, KeyTransform::new(camel_to_snake))
         })
     }
 
@@ -266,7 +280,12 @@ pub trait Bo4eJsonExt: sealed::Sealed + Serialize + DeserializeOwned + Sized {
             "snake_case_str",
             s.len(),
             "BO4E deserialization failed in from_json_snake_case",
-            || deserialize_with_key_transform_from_str::<Self, _>(s, &snake_to_camel),
+            || {
+                deserialize_with_key_transform_from_str::<Self>(
+                    s,
+                    KeyTransform::new(snake_to_camel),
+                )
+            },
         )
     }
 
@@ -288,22 +307,21 @@ pub trait Bo4eJsonExt: sealed::Sealed + Serialize + DeserializeOwned + Sized {
             bytes.len(),
             "BO4E deserialization failed in from_json_snake_case_bytes",
             // Streamed key transformation avoids building an intermediate Value tree.
-            || deserialize_with_key_transform_from_slice::<Self, _>(bytes, &snake_to_camel),
+            || {
+                deserialize_with_key_transform_from_slice::<Self>(
+                    bytes,
+                    KeyTransform::new(snake_to_camel),
+                )
+            },
         )
     }
 
     /// Deserializes from a JSON string produced by [`to_json_german`] or any other
     /// BO4E-compatible JSON serializer.
     ///
-    /// With `simd-json` enabled this method uses an adaptive strategy:
-    ///
-    /// - **small payloads**: deserialize via `serde_json::from_str` to avoid the
-    ///   temporary `Vec<u8>` copy needed by simd-json's mutable-slice API.
-    /// - **larger payloads**: copy once into `Vec<u8>` and delegate to
-    ///   [`from_json_german_bytes`] (SIMD parser).
-    ///
-    /// If you already own or can borrow a mutable buffer, call
-    /// [`from_json_german_bytes`] directly to avoid this heuristic path.
+    /// A single `serde_json` pass, with the default nesting-depth cap enforced
+    /// inline. Use [`from_json_german_hardened`] for input from outside your
+    /// trust boundary.
     ///
     /// # Errors
     /// Returns [`serde_json::Error`] if the value cannot be deserialized.
@@ -315,7 +333,7 @@ pub trait Bo4eJsonExt: sealed::Sealed + Serialize + DeserializeOwned + Sized {
     /// is emitted by this crate.
     ///
     /// [`to_json_german`]: Bo4eJsonExt::to_json_german
-    /// [`from_json_german_bytes`]: Bo4eJsonExt::from_json_german_bytes
+    /// [`from_json_german_hardened`]: Bo4eJsonExt::from_json_german_hardened
     fn from_json_german(s: &str) -> Result<Self, serde_json::Error> {
         traced_deserialize::<Self, _>(
             "deserialize",
@@ -328,12 +346,6 @@ pub trait Bo4eJsonExt: sealed::Sealed + Serialize + DeserializeOwned + Sized {
 
     /// Byte-slice variant of [`from_json_german`] for callers that already hold
     /// JSON data in memory as a byte slice.
-    ///
-    /// Accepts an immutable `&[u8]` reference.  When the `simd-json` feature is
-    /// enabled and the payload exceeds the SIMD activation threshold (≥ 1,536 bytes
-    /// by default), the slice is cloned into a temporary `Vec<u8>` buffer internally
-    /// so that `simd_json` can mutate it in-place.  The cost of that copy is small
-    /// relative to the parse speedup on larger payloads.
     ///
     /// # When to prefer this over [`from_json_german`]
     ///
@@ -388,9 +400,7 @@ pub trait Bo4eJsonExt: sealed::Sealed + Serialize + DeserializeOwned + Sized {
             || {
                 let _budget = install_extension_budget(limits);
                 match limits.max_nesting_depth {
-                    // Depth is tracked inline by DepthLimitedDeserializer.  When
-                    // simd-json is enabled this path still uses serde_json, because
-                    // simd-json cannot wrap visitors; correctness takes priority.
+                    // Depth is tracked inline by DepthLimitedDeserializer.
                     Some(max_depth) => {
                         let state = DepthState::new(max_depth);
                         let mut de = serde_json::Deserializer::from_str(s);
@@ -431,10 +441,13 @@ pub trait Bo4eJsonExt: sealed::Sealed + Serialize + DeserializeOwned + Sized {
                         let mut de = serde_json::Deserializer::from_str(s);
                         Self::deserialize(KeyTransformDeserializer::new(
                             DepthLimitedDeserializer::new(&mut de, &state),
-                            &snake_to_camel,
+                            KeyTransform::new(snake_to_camel),
                         ))
                     }
-                    None => deserialize_with_key_transform_from_str::<Self, _>(s, &snake_to_camel),
+                    None => deserialize_with_key_transform_from_str::<Self>(
+                        s,
+                        KeyTransform::new(snake_to_camel),
+                    ),
                 }
             },
         )
@@ -447,15 +460,6 @@ pub trait Bo4eJsonExt: sealed::Sealed + Serialize + DeserializeOwned + Sized {
     /// when processing input from untrusted callers.
     ///
     /// Accepts an immutable `&[u8]` reference.
-    ///
-    /// Setting `max_nesting_depth` pins this call to the `serde_json` backend even
-    /// when `simd-json` is enabled, because depth is enforced by wrapping the
-    /// visitor and `simd-json` does not support that. Since
-    /// [`JsonParseLimits::untrusted_defaults`] sets a depth cap, the recommended
-    /// hardened configuration never takes the SIMD path — correctness over
-    /// throughput on untrusted input. Leave `max_nesting_depth` at `None` to keep
-    /// the adaptive `simd-json` behaviour of [`from_json_german_bytes`], which
-    /// still enforces the default depth cap via a pre-scan.
     ///
     /// # Errors
     /// Returns [`serde_json::Error`] on malformed JSON, type mismatch, or when
@@ -509,12 +513,13 @@ pub trait Bo4eJsonExt: sealed::Sealed + Serialize + DeserializeOwned + Sized {
                         let mut de = serde_json::Deserializer::from_slice(bytes);
                         Self::deserialize(KeyTransformDeserializer::new(
                             DepthLimitedDeserializer::new(&mut de, &state),
-                            &snake_to_camel,
+                            KeyTransform::new(snake_to_camel),
                         ))
                     }
-                    None => {
-                        deserialize_with_key_transform_from_slice::<Self, _>(bytes, &snake_to_camel)
-                    }
+                    None => deserialize_with_key_transform_from_slice::<Self>(
+                        bytes,
+                        KeyTransform::new(snake_to_camel),
+                    ),
                 }
             },
         )
@@ -629,34 +634,104 @@ struct SortedSeq<S> {
     buf: Vec<Vec<u8>>,
 }
 
-impl<S: serde::ser::Serializer> serde::ser::SerializeSeq for SortedSeq<S> {
-    type Ok = S::Ok;
-    type Error = S::Error;
-
-    fn serialize_element<T: ?Sized + Serialize>(&mut self, value: &T) -> Result<(), Self::Error> {
+impl<S> SortedSeq<S> {
+    /// Buffers one element, recursing through [`SortedSerializer`] so objects
+    /// nested inside the sequence are sorted too.
+    fn push<T, E>(&mut self, value: &T) -> Result<(), E>
+    where
+        T: ?Sized + Serialize,
+        E: serde::ser::Error,
+    {
         let mut vbuf = Vec::new();
         {
             let mut vser = serde_json::Serializer::new(&mut vbuf);
             value
                 .serialize(SortedSerializer { inner: &mut vser })
-                .map_err(|e| serde::ser::Error::custom(e.to_string()))?;
+                .map_err(|e| E::custom(e.to_string()))?;
         }
         self.buf.push(vbuf);
         Ok(())
     }
+}
+
+impl<S> SortedSeq<S> {
+    /// Turns the buffered element bytes into raw JSON fragments ready to write.
+    ///
+    /// `SerializeSeq` and `SerializeTuple` are separate serde traits with no
+    /// common supertrait, so each `end` below opens its own serializer and
+    /// pushes these; only the buffering is shared.
+    fn take_raw<E: serde::ser::Error>(
+        &mut self,
+    ) -> Result<Vec<Box<serde_json::value::RawValue>>, E> {
+        self.buf
+            .drain(..)
+            .map(|vbuf| {
+                // serde_json::Serializer always produces valid UTF-8 and valid JSON.
+                serde_json::value::RawValue::from_string(
+                    String::from_utf8(vbuf).expect("serde_json always produces valid UTF-8"),
+                )
+                .map_err(E::custom)
+            })
+            .collect()
+    }
+}
+
+impl<S: serde::ser::Serializer> serde::ser::SerializeSeq for SortedSeq<S> {
+    type Ok = S::Ok;
+    type Error = S::Error;
+
+    fn serialize_element<T: ?Sized + Serialize>(&mut self, value: &T) -> Result<(), Self::Error> {
+        self.push(value)
+    }
 
     fn end(mut self) -> Result<Self::Ok, Self::Error> {
-        let mut seq = self.inner.serialize_seq(Some(self.buf.len()))?;
-        // Drain buffers so vbuf is moved out rather than cloned.
-        for vbuf in self.buf.drain(..) {
-            // serde_json::Serializer always produces valid UTF-8 and valid JSON.
-            let raw_value = serde_json::value::RawValue::from_string(
-                String::from_utf8(vbuf).expect("serde_json always produces valid UTF-8"),
-            )
-            .map_err(serde::ser::Error::custom)?;
-            seq.serialize_element(&raw_value)?;
+        let items = self.take_raw()?;
+        let mut seq = self.inner.serialize_seq(Some(items.len()))?;
+        for raw in &items {
+            seq.serialize_element(raw)?;
         }
         seq.end()
+    }
+}
+
+// Tuples and tuple structs are sequences on the wire, so they buffer through the
+// same path.  Delegating straight to the inner serializer would leave an object
+// nested inside one unsorted.  No BO4E type is a tuple today; the guarantee does
+// not depend on that staying true.
+impl<S: serde::ser::Serializer> serde::ser::SerializeTuple for SortedSeq<S> {
+    type Ok = S::Ok;
+    type Error = S::Error;
+
+    fn serialize_element<T: ?Sized + Serialize>(&mut self, value: &T) -> Result<(), Self::Error> {
+        self.push(value)
+    }
+
+    fn end(mut self) -> Result<Self::Ok, Self::Error> {
+        let items = self.take_raw()?;
+        let mut tuple = self.inner.serialize_tuple(items.len())?;
+        for raw in &items {
+            tuple.serialize_element(raw)?;
+        }
+        tuple.end()
+    }
+}
+
+impl<S: serde::ser::Serializer> serde::ser::SerializeTupleStruct for SortedSeq<S> {
+    type Ok = S::Ok;
+    type Error = S::Error;
+
+    fn serialize_field<T: ?Sized + Serialize>(&mut self, value: &T) -> Result<(), Self::Error> {
+        self.push(value)
+    }
+
+    fn end(mut self) -> Result<Self::Ok, Self::Error> {
+        use serde::ser::SerializeTuple as _;
+        let items = self.take_raw()?;
+        let mut tuple = self.inner.serialize_tuple(items.len())?;
+        for raw in &items {
+            tuple.serialize_element(raw)?;
+        }
+        tuple.end()
     }
 }
 
@@ -664,12 +739,12 @@ impl<S: serde::ser::Serializer> serde::ser::Serializer for SortedSerializer<S> {
     type Ok = S::Ok;
     type Error = S::Error;
     type SerializeSeq = SortedSeq<S>;
-    type SerializeTuple = S::SerializeTuple;
-    type SerializeTupleStruct = S::SerializeTupleStruct;
-    type SerializeTupleVariant = S::SerializeTupleVariant;
+    type SerializeTuple = SortedSeq<S>;
+    type SerializeTupleStruct = SortedSeq<S>;
+    type SerializeTupleVariant = SortedVariant<S>;
     type SerializeMap = SortedMap<S>;
     type SerializeStruct = SortedMap<S>;
-    type SerializeStructVariant = S::SerializeStructVariant;
+    type SerializeStructVariant = SortedVariant<S>;
 
     fn serialize_bool(self, v: bool) -> Result<S::Ok, S::Error> {
         self.inner.serialize_bool(v)
@@ -757,24 +832,30 @@ impl<S: serde::ser::Serializer> serde::ser::Serializer for SortedSerializer<S> {
             buf: Vec::new(),
         })
     }
-    fn serialize_tuple(self, len: usize) -> Result<Self::SerializeTuple, S::Error> {
-        self.inner.serialize_tuple(len)
+    fn serialize_tuple(self, _len: usize) -> Result<Self::SerializeTuple, S::Error> {
+        Ok(SortedSeq {
+            inner: self.inner,
+            buf: Vec::new(),
+        })
     }
     fn serialize_tuple_struct(
         self,
-        name: &'static str,
-        len: usize,
+        _name: &'static str,
+        _len: usize,
     ) -> Result<Self::SerializeTupleStruct, S::Error> {
-        self.inner.serialize_tuple_struct(name, len)
+        Ok(SortedSeq {
+            inner: self.inner,
+            buf: Vec::new(),
+        })
     }
     fn serialize_tuple_variant(
         self,
         name: &'static str,
         vi: u32,
         v: &'static str,
-        len: usize,
+        _len: usize,
     ) -> Result<Self::SerializeTupleVariant, S::Error> {
-        self.inner.serialize_tuple_variant(name, vi, v, len)
+        Ok(SortedVariant::new(self.inner, name, vi, v, Shape::Seq))
     }
     fn serialize_map(self, _len: Option<usize>) -> Result<Self::SerializeMap, S::Error> {
         Ok(SortedMap {
@@ -797,15 +878,145 @@ impl<S: serde::ser::Serializer> serde::ser::Serializer for SortedSerializer<S> {
         name: &'static str,
         vi: u32,
         v: &'static str,
-        len: usize,
+        _len: usize,
     ) -> Result<Self::SerializeStructVariant, S::Error> {
-        self.inner.serialize_struct_variant(name, vi, v, len)
+        Ok(SortedVariant::new(self.inner, name, vi, v, Shape::Map))
     }
     fn is_human_readable(&self) -> bool {
         self.inner.is_human_readable()
     }
     fn collect_str<T: ?Sized + std::fmt::Display>(self, value: &T) -> Result<S::Ok, S::Error> {
         self.inner.collect_str(value)
+    }
+}
+
+/// Whether an externally-tagged variant carries a sequence or an object.
+#[derive(Clone, Copy)]
+enum Shape {
+    Seq,
+    Map,
+}
+
+/// Buffers an externally-tagged enum variant's payload, sorts it, then re-emits
+/// it through `serialize_newtype_variant`.
+///
+/// serde has no hook for wrapping the *inside* of a tuple or struct variant, so
+/// sorting one means rebuilding it: buffer the payload as a sorted JSON
+/// fragment, then hand it back to the inner serializer as a newtype variant —
+/// which is byte-identical for a self-describing format and keeps the tag.
+///
+/// No BO4E type is an enum with data, so this never runs on generated types — it
+/// is here because `to_json_canonical` promises canonical output for whatever it
+/// is handed, including a BO4E value nested inside a caller's own enum.
+struct SortedVariant<S> {
+    inner: S,
+    name: &'static str,
+    index: u32,
+    variant: &'static str,
+    shape: Shape,
+    /// Sequence elements, for `Shape::Seq`.
+    items: Vec<Vec<u8>>,
+    /// Object entries, for `Shape::Map`.
+    entries: Vec<(String, Vec<u8>)>,
+}
+
+impl<S> SortedVariant<S> {
+    fn new(inner: S, name: &'static str, index: u32, variant: &'static str, shape: Shape) -> Self {
+        Self {
+            inner,
+            name,
+            index,
+            variant,
+            shape,
+            items: Vec::new(),
+            entries: Vec::new(),
+        }
+    }
+
+    /// Serializes `value` through [`SortedSerializer`] into a fresh buffer.
+    fn buffer<T, E>(value: &T) -> Result<Vec<u8>, E>
+    where
+        T: ?Sized + Serialize,
+        E: serde::ser::Error,
+    {
+        let mut buf = Vec::new();
+        {
+            let mut ser = serde_json::Serializer::new(&mut buf);
+            value
+                .serialize(SortedSerializer { inner: &mut ser })
+                .map_err(|e| E::custom(e.to_string()))?;
+        }
+        Ok(buf)
+    }
+}
+
+impl<S: serde::ser::Serializer> SortedVariant<S> {
+    fn finish(mut self) -> Result<S::Ok, S::Error> {
+        let mut payload = Vec::new();
+        match self.shape {
+            Shape::Seq => {
+                payload.push(b'[');
+                for (i, item) in self.items.drain(..).enumerate() {
+                    if i > 0 {
+                        payload.push(b',');
+                    }
+                    payload.extend_from_slice(&item);
+                }
+                payload.push(b']');
+            }
+            Shape::Map => {
+                self.entries.sort_unstable_by(|(a, _), (b, _)| a.cmp(b));
+                payload.push(b'{');
+                for (i, (key, value)) in self.entries.drain(..).enumerate() {
+                    if i > 0 {
+                        payload.push(b',');
+                    }
+                    serde_json::to_writer(&mut payload, &key).map_err(serde::ser::Error::custom)?;
+                    payload.push(b':');
+                    payload.extend_from_slice(&value);
+                }
+                payload.push(b'}');
+            }
+        }
+        let raw = serde_json::value::RawValue::from_string(
+            String::from_utf8(payload).expect("serde_json always produces valid UTF-8"),
+        )
+        .map_err(serde::ser::Error::custom)?;
+        self.inner
+            .serialize_newtype_variant(self.name, self.index, self.variant, &raw)
+    }
+}
+
+impl<S: serde::ser::Serializer> serde::ser::SerializeTupleVariant for SortedVariant<S> {
+    type Ok = S::Ok;
+    type Error = S::Error;
+
+    fn serialize_field<T: ?Sized + Serialize>(&mut self, value: &T) -> Result<(), Self::Error> {
+        self.items.push(Self::buffer(value)?);
+        Ok(())
+    }
+
+    fn end(self) -> Result<Self::Ok, Self::Error> {
+        self.finish()
+    }
+}
+
+impl<S: serde::ser::Serializer> serde::ser::SerializeStructVariant for SortedVariant<S> {
+    type Ok = S::Ok;
+    type Error = S::Error;
+
+    fn serialize_field<T: ?Sized + Serialize>(
+        &mut self,
+        key: &'static str,
+        value: &T,
+    ) -> Result<(), Self::Error> {
+        let buf = Self::buffer(value)?;
+        self.entries.push((key.to_owned(), buf));
+        Ok(())
+    }
+
+    fn end(self) -> Result<Self::Ok, Self::Error> {
+        self.finish()
     }
 }
 
@@ -1104,6 +1315,82 @@ mod tests {
         assert!(inner_a < inner_z, "inner keys not sorted: {canonical}");
     }
 
+    /// `to_json_canonical` must sort objects wherever they sit, including inside
+    /// the shapes serde models separately from plain structs and maps.
+    #[test]
+    fn to_json_canonical_sorts_inside_every_serde_shape() {
+        #[derive(Serialize, Deserialize)]
+        struct Inner {
+            #[serde(rename = "zInner")]
+            z: u32,
+            #[serde(rename = "aInner")]
+            a: u32,
+        }
+
+        #[derive(Serialize, Deserialize)]
+        struct Tup(Inner, Inner);
+
+        #[derive(Serialize, Deserialize)]
+        enum Shaped {
+            Tuple(Inner, u32),
+            Struct {
+                #[serde(rename = "zField")]
+                z: Inner,
+                #[serde(rename = "aField")]
+                a: u32,
+            },
+        }
+
+        #[derive(Serialize, Deserialize)]
+        struct Wrapper {
+            plain_tuple: (Inner, u32),
+            tuple_struct: Tup,
+            tuple_variant: Shaped,
+            struct_variant: Shaped,
+            seq: Vec<Inner>,
+        }
+        impl sealed::Sealed for Wrapper {}
+        impl Bo4eJsonExt for Wrapper {}
+
+        let inner = || Inner { z: 1, a: 2 };
+        let v = Wrapper {
+            plain_tuple: (inner(), 7),
+            tuple_struct: Tup(inner(), inner()),
+            tuple_variant: Shaped::Tuple(inner(), 7),
+            struct_variant: Shaped::Struct { z: inner(), a: 9 },
+            seq: vec![inner()],
+        };
+        let canonical = v.to_json_canonical().unwrap();
+
+        // Not one `zInner` may precede its sibling `aInner`, anywhere.
+        assert!(
+            !canonical.contains(r#""zInner":1,"aInner""#),
+            "an inner object came out unsorted: {canonical}"
+        );
+        assert_eq!(
+            canonical.matches(r#""aInner":2,"zInner":1"#).count(),
+            6,
+            "expected all six nested objects sorted: {canonical}"
+        );
+        // The struct variant sorts its own fields and keeps its external tag.
+        assert!(
+            canonical.contains(r#""Struct":{"aField":9,"zField""#),
+            "struct variant lost its tag or its ordering: {canonical}"
+        );
+        assert!(
+            canonical.contains(r#""Tuple":["#),
+            "tuple variant lost its tag: {canonical}"
+        );
+        // Sorting must not disturb sequence order.
+        assert!(
+            canonical.contains(r#""Tuple":[{"aInner":2,"zInner":1},7]"#),
+            "tuple variant element order changed: {canonical}"
+        );
+
+        // And it stays valid, parseable JSON.
+        let _: serde_json::Value = serde_json::from_str(&canonical).expect("valid JSON");
+    }
+
     #[test]
     fn to_json_canonical_is_deterministic() {
         let v = Sample {
@@ -1122,10 +1409,7 @@ mod tests {
         let json = r#"{"name":"abc"}"#;
         let err = HardenedSample::from_json_german_hardened(
             json,
-            JsonParseLimits {
-                max_payload_bytes: Some(5),
-                ..JsonParseLimits::default()
-            },
+            JsonParseLimits::unlimited().with_max_payload_bytes(Some(5)),
         )
         .unwrap_err();
         assert!(
@@ -1139,10 +1423,7 @@ mod tests {
         let json = r#"{"name":"ok","nested":{"a":{"b":1}}}"#;
         let err = HardenedSample::from_json_german_hardened(
             json,
-            JsonParseLimits {
-                max_nesting_depth: Some(2),
-                ..JsonParseLimits::default()
-            },
+            JsonParseLimits::unlimited().with_max_nesting_depth(Some(2)),
         )
         .unwrap_err();
         assert!(
@@ -1156,10 +1437,7 @@ mod tests {
         let json = r#"{"name":"ok","x":{"very":"large extension payload"}}"#;
         let err = HardenedSample::from_json_german_hardened(
             json,
-            JsonParseLimits {
-                max_extension_value_bytes: Some(4),
-                ..JsonParseLimits::default()
-            },
+            JsonParseLimits::unlimited().with_max_extension_value_bytes(Some(4)),
         )
         .unwrap_err();
         assert!(
@@ -1173,12 +1451,11 @@ mod tests {
         let json = r#"{"name":"ok","custom_field":"x"}"#;
         let parsed = HardenedSample::from_json_snake_case_hardened(
             json,
-            JsonParseLimits {
-                max_payload_bytes: Some(1024),
-                max_nesting_depth: Some(8),
-                max_extension_value_bytes: Some(64),
-                max_extension_field_count: Some(16),
-            },
+            JsonParseLimits::unlimited()
+                .with_max_payload_bytes(Some(1024))
+                .with_max_nesting_depth(Some(8))
+                .with_max_extension_value_bytes(Some(64))
+                .with_max_extension_field_count(Some(16)),
         )
         .unwrap();
         assert_eq!(parsed.name, "ok");
@@ -1211,10 +1488,7 @@ mod tests {
         let json = r#"{"name":"abc"}"#;
         let _ = HardenedSample::from_json_german_hardened(
             json,
-            JsonParseLimits {
-                max_payload_bytes: Some(1),
-                ..JsonParseLimits::default()
-            },
+            JsonParseLimits::unlimited().with_max_payload_bytes(Some(1)),
         );
 
         let after = json_limit_hit_counters();

@@ -3,7 +3,7 @@ use super::{
     Zeitraum, ZusatzAttribut,
 };
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(not(feature = "json"), derive(Hash))]
+#[cfg_attr(not(feature = "json"), derive(Eq, Hash))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "builder", derive(typed_builder::TypedBuilder))]
 #[cfg_attr(feature = "validate", derive(garde::Validate))]
@@ -12,7 +12,7 @@ use super::{
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 /// Die Variante des Preisblattmodells zur Abbildung von allgemeinen Abgaben
 ///
-/// > **Note:** [PreisblattKonzessionsabgabe JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/bo/PreisblattKonzessionsabgabe.json)
+/// > **Note:** [PreisblattKonzessionsabgabe JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.1.0/src/bo4e_schemas/bo/PreisblattKonzessionsabgabe.json)
 pub struct PreisblattKonzessionsabgabe {
     /// Eine Bezeichnung für das Preisblatt
     #[cfg_attr(feature = "serde", serde(rename = "bezeichnung"))]
@@ -55,12 +55,12 @@ pub struct PreisblattKonzessionsabgabe {
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub sparte: Option<Sparte>,
-    /// BO type identifier — always `BoTyp::PreisblattKonzessionsabgabe` for this struct.
+    /// BO4E type discriminant — always `BoTyp::PreisblattKonzessionsabgabe` for this struct.
     #[cfg_attr(feature = "serde", serde(rename = "_typ"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(
         feature = "builder",
-        builder(default = Some(BoTyp::Preisblattkonzessionsabgabe), setter(skip))
+        builder(default = Some(BoTyp::PreisblattKonzessionsabgabe), setter(skip))
     )]
     pub typ: Option<BoTyp>,
     /// Version der BO-Struktur aka "fachliche Versionierung"
@@ -68,7 +68,7 @@ pub struct PreisblattKonzessionsabgabe {
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(
         feature = "builder",
-        builder(default = Some("v202607.0.0".to_owned()), setter(into))
+        builder(default = Some("202607.1.0".to_owned()), setter(into))
     )]
     pub version: Option<String>,
     #[cfg_attr(feature = "serde", serde(rename = "zusatzAttribute"))]
@@ -90,7 +90,6 @@ pub struct PreisblattKonzessionsabgabe {
 impl Default for PreisblattKonzessionsabgabe {
     fn default() -> Self {
         Self {
-            typ: Some(BoTyp::Preisblattkonzessionsabgabe),
             bezeichnung: Default::default(),
             gueltigkeit: Default::default(),
             herausgeber: Default::default(),
@@ -99,7 +98,8 @@ impl Default for PreisblattKonzessionsabgabe {
             preispositionen: Default::default(),
             preisstatus: Default::default(),
             sparte: Default::default(),
-            version: Some("v202607.0.0".to_owned()),
+            typ: Some(BoTyp::PreisblattKonzessionsabgabe),
+            version: Some("202607.1.0".to_owned()),
             zusatz_attribute: Default::default(),
             _additional: Default::default(),
         }
@@ -108,10 +108,13 @@ impl Default for PreisblattKonzessionsabgabe {
 impl Bo4eObject for PreisblattKonzessionsabgabe {
     type BoTyp = BoTyp;
     fn bo_type(&self) -> BoTyp {
-        self.typ.unwrap_or(BoTyp::Preisblattkonzessionsabgabe)
+        self.typ.unwrap_or(BoTyp::PreisblattKonzessionsabgabe)
     }
     fn schema_version(&self) -> &'static str {
-        "v202607.0.0"
+        "202607.1.0"
+    }
+    fn schema_series(&self) -> &'static str {
+        "202607"
     }
 }
 #[cfg(feature = "json")]

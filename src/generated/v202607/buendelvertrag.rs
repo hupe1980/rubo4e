@@ -3,7 +3,7 @@ use super::{
     Vertragskonditionen, Vertragsstatus, ZusatzAttribut,
 };
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(not(feature = "json"), derive(Hash))]
+#[cfg_attr(not(feature = "json"), derive(Eq, Hash))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "builder", derive(typed_builder::TypedBuilder))]
 #[cfg_attr(feature = "validate", derive(garde::Validate))]
@@ -13,7 +13,7 @@ use super::{
 /// Abbildung eines Bündelvertrags.
 /// Es handelt sich hierbei um eine Liste von Einzelverträgen, die in einem Vertragsobjekt gebündelt sind.
 ///
-/// > **Note:** [Buendelvertrag JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/bo/Buendelvertrag.json)
+/// > **Note:** [Buendelvertrag JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.1.0/src/bo4e_schemas/bo/Buendelvertrag.json)
 pub struct Buendelvertrag {
     /// Beschreibung zum Vertrag
     #[cfg_attr(feature = "serde", serde(rename = "beschreibung"))]
@@ -36,7 +36,7 @@ pub struct Buendelvertrag {
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub sparte: Option<Sparte>,
-    /// BO type identifier — always `BoTyp::Buendelvertrag` for this struct.
+    /// BO4E type discriminant — always `BoTyp::Buendelvertrag` for this struct.
     #[cfg_attr(feature = "serde", serde(rename = "_typ"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(
@@ -59,7 +59,7 @@ pub struct Buendelvertrag {
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(
         feature = "builder",
-        builder(default = Some("v202607.0.0".to_owned()), setter(into))
+        builder(default = Some("202607.1.0".to_owned()), setter(into))
     )]
     pub version: Option<String>,
     /// Hier ist festgelegt, um welche Art von Vertrag es sich handelt. Z.B. Netznutzungvertrag
@@ -167,14 +167,14 @@ pub struct Buendelvertrag {
 impl Default for Buendelvertrag {
     fn default() -> Self {
         Self {
-            typ: Some(BoTyp::Buendelvertrag),
             beschreibung: Default::default(),
             einzelvertraege: Default::default(),
             id: Default::default(),
             sparte: Default::default(),
+            typ: Some(BoTyp::Buendelvertrag),
             unterzeichnervp1: Default::default(),
             unterzeichnervp2: Default::default(),
-            version: Some("v202607.0.0".to_owned()),
+            version: Some("202607.1.0".to_owned()),
             vertragsart: Default::default(),
             vertragsbeginn: Default::default(),
             vertragsende: Default::default(),
@@ -194,7 +194,10 @@ impl Bo4eObject for Buendelvertrag {
         self.typ.unwrap_or(BoTyp::Buendelvertrag)
     }
     fn schema_version(&self) -> &'static str {
-        "v202607.0.0"
+        "202607.1.0"
+    }
+    fn schema_series(&self) -> &'static str {
+        "202607"
     }
 }
 #[cfg(feature = "json")]

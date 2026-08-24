@@ -1,6 +1,6 @@
 use super::{Bo4eObject, BoTyp, Regionsoperation, ZusatzAttribut};
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(not(feature = "json"), derive(Hash))]
+#[cfg_attr(not(feature = "json"), derive(Eq, Hash))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "builder", derive(typed_builder::TypedBuilder))]
 #[cfg_attr(feature = "validate", derive(garde::Validate))]
@@ -15,7 +15,7 @@ use super::{Bo4eObject, BoTyp, Regionsoperation, ZusatzAttribut};
 /// spezifischen Umsetzungen vorzubeugen und Klarheit zu schaffen.
 /// Bei einer Implementierung sollte darauf geachtet werden, dass sich "prioritaeten" nicht doppeln können.
 ///
-/// > **Note:** [Region JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/bo/Region.json)
+/// > **Note:** [Region JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.1.0/src/bo4e_schemas/bo/Region.json)
 pub struct Region {
     /// Beschreibung der Region
     #[cfg_attr(feature = "serde", serde(rename = "beschreibung"))]
@@ -39,7 +39,7 @@ pub struct Region {
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub regionsoperationen: Option<Vec<Regionsoperation>>,
-    /// BO type identifier — always `BoTyp::Region` for this struct.
+    /// BO4E type discriminant — always `BoTyp::Region` for this struct.
     #[cfg_attr(feature = "serde", serde(rename = "_typ"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(
@@ -52,7 +52,7 @@ pub struct Region {
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(
         feature = "builder",
-        builder(default = Some("v202607.0.0".to_owned()), setter(into))
+        builder(default = Some("202607.1.0".to_owned()), setter(into))
     )]
     pub version: Option<String>,
     #[cfg_attr(feature = "serde", serde(rename = "zusatzAttribute"))]
@@ -74,12 +74,12 @@ pub struct Region {
 impl Default for Region {
     fn default() -> Self {
         Self {
-            typ: Some(BoTyp::Region),
             beschreibung: Default::default(),
             bezeichnung: Default::default(),
             id: Default::default(),
             regionsoperationen: Default::default(),
-            version: Some("v202607.0.0".to_owned()),
+            typ: Some(BoTyp::Region),
+            version: Some("202607.1.0".to_owned()),
             zusatz_attribute: Default::default(),
             _additional: Default::default(),
         }
@@ -91,7 +91,10 @@ impl Bo4eObject for Region {
         self.typ.unwrap_or(BoTyp::Region)
     }
     fn schema_version(&self) -> &'static str {
-        "v202607.0.0"
+        "202607.1.0"
+    }
+    fn schema_series(&self) -> &'static str {
+        "202607"
     }
 }
 #[cfg(feature = "json")]

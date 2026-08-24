@@ -1,13 +1,12 @@
 //! Integration tests for the `strum` feature (E15-S52, E15-S53).
 //!
-//! Note: `Display` and `AsRef<str>` are now always-on (hand-written via
-//! `as_wire`), not `strum`-derived — these tests still exercise them here to
-//! confirm behaviour is unchanged when `strum` is also enabled. The `strum`
-//! feature itself now contributes `FromStr` (`EnumString`), `EnumIter`, and
-//! `IntoStaticStr`.
+//! `Display` and `AsRef<str>` are always-on (hand-written via `as_wire`), not
+//! `strum`-derived; they are exercised here to confirm they behave the same when
+//! `strum` is also enabled. The `strum` feature itself contributes `FromStr`
+//! (`EnumString`), `EnumIter`, and `IntoStaticStr`.
 //!
 //! Verifies:
-//! - `Display` produces the canonical wire value (now always-on)
+//! - `Display` produces the canonical wire value
 //! - `FromStr` accepts wire values; unknown strings → `Err(VariantNotFound)`
 //! - `IntoStaticStr` and `AsRef<str>` are available
 //! - `EnumIter` iterates all variants (including `Unknown`)

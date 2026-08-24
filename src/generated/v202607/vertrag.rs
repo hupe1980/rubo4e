@@ -3,7 +3,7 @@ use super::{
     Vertragsstatus, Vertragsteil, ZusatzAttribut,
 };
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(not(feature = "json"), derive(Hash))]
+#[cfg_attr(not(feature = "json"), derive(Eq, Hash))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "builder", derive(typed_builder::TypedBuilder))]
 #[cfg_attr(feature = "validate", derive(garde::Validate))]
@@ -17,7 +17,7 @@ use super::{
 /// Modell für die Abbildung von Vertragsbeziehungen;
 /// Das Objekt dient dazu, alle Arten von Verträgen, die in der Energiewirtschaft Verwendung finden, abzubilden.
 ///
-/// > **Note:** [Vertrag JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/bo/Vertrag.json)
+/// > **Note:** [Vertrag JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.1.0/src/bo4e_schemas/bo/Vertrag.json)
 pub struct Vertrag {
     /// Beschreibung zum Vertrag
     #[cfg_attr(feature = "serde", serde(rename = "beschreibung"))]
@@ -35,7 +35,7 @@ pub struct Vertrag {
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub sparte: Option<Sparte>,
-    /// BO type identifier — always `BoTyp::Vertrag` for this struct.
+    /// BO4E type discriminant — always `BoTyp::Vertrag` for this struct.
     #[cfg_attr(feature = "serde", serde(rename = "_typ"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(
@@ -58,7 +58,7 @@ pub struct Vertrag {
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(
         feature = "builder",
-        builder(default = Some("v202607.0.0".to_owned()), setter(into))
+        builder(default = Some("202607.1.0".to_owned()), setter(into))
     )]
     pub version: Option<String>,
     /// Hier ist festgelegt, um welche Art von Vertrag es sich handelt.
@@ -174,13 +174,13 @@ pub struct Vertrag {
 impl Default for Vertrag {
     fn default() -> Self {
         Self {
-            typ: Some(BoTyp::Vertrag),
             beschreibung: Default::default(),
             id: Default::default(),
             sparte: Default::default(),
+            typ: Some(BoTyp::Vertrag),
             unterzeichnervp1: Default::default(),
             unterzeichnervp2: Default::default(),
-            version: Some("v202607.0.0".to_owned()),
+            version: Some("202607.1.0".to_owned()),
             vertragsart: Default::default(),
             vertragsbeginn: Default::default(),
             vertragsende: Default::default(),
@@ -201,7 +201,10 @@ impl Bo4eObject for Vertrag {
         self.typ.unwrap_or(BoTyp::Vertrag)
     }
     fn schema_version(&self) -> &'static str {
-        "v202607.0.0"
+        "202607.1.0"
+    }
+    fn schema_series(&self) -> &'static str {
+        "202607"
     }
 }
 #[cfg(feature = "json")]

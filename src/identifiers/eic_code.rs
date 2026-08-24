@@ -573,9 +573,8 @@ mod tests {
 
     /// The seven ENTSO-E object types, pinned against the reference manual.
     ///
-    /// This is the table that was previously wrong: `X` is the **party** type
-    /// (market participants, and every German Bilanzkreis), not an area type,
-    /// and `T`/`V` are Tieline/Location rather than party types.
+    /// `X` is the **party** type (market participants, and every German
+    /// Bilanzkreis); `T`/`V` are Tieline/Location.
     #[test]
     fn eic_type_char_mapping_matches_entso_e() {
         for (c, want, desc) in [
@@ -615,8 +614,7 @@ mod tests {
 
     /// Real published codes, classified by object type.
     ///
-    /// `11X…` codes are BDEW-issued Bilanzkreise — market parties. Reporting
-    /// them as areas (the previous behaviour) is wrong.
+    /// `11X…` codes are BDEW-issued Bilanzkreise — market parties, not areas.
     #[test]
     fn real_codes_classify_correctly() {
         for (code, want) in [

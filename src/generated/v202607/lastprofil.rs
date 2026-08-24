@@ -1,6 +1,6 @@
 use super::{ComTyp, Profilart, Profilverfahren, Tagesparameter, ZusatzAttribut};
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(not(feature = "json"), derive(Hash))]
+#[cfg_attr(not(feature = "json"), derive(Eq, Hash))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "builder", derive(typed_builder::TypedBuilder))]
 #[cfg_attr(feature = "validate", derive(garde::Validate))]
@@ -41,10 +41,13 @@ pub struct Lastprofil {
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub tagesparameter: Option<Tagesparameter>,
-    /// COM type identifier for this struct.
+    /// BO4E type discriminant — always `ComTyp::Lastprofil` for this struct.
     #[cfg_attr(feature = "serde", serde(rename = "_typ"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(
+        feature = "builder",
+        builder(default = Some(ComTyp::Lastprofil), setter(skip))
+    )]
     pub typ: Option<ComTyp>,
     #[cfg_attr(feature = "serde", serde(rename = "verfahren"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
@@ -55,7 +58,7 @@ pub struct Lastprofil {
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(
         feature = "builder",
-        builder(default = Some("v202607.0.0".to_owned()), setter(into))
+        builder(default = Some("202607.1.0".to_owned()), setter(into))
     )]
     pub version: Option<String>,
     #[cfg_attr(feature = "serde", serde(rename = "zusatzAttribute"))]
@@ -84,9 +87,9 @@ impl Default for Lastprofil {
             profilart: Default::default(),
             profilschar: Default::default(),
             tagesparameter: Default::default(),
-            typ: Default::default(),
+            typ: Some(ComTyp::Lastprofil),
             verfahren: Default::default(),
-            version: Some("v202607.0.0".to_owned()),
+            version: Some("202607.1.0".to_owned()),
             zusatz_attribute: Default::default(),
             _additional: Default::default(),
         }

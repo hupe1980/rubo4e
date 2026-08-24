@@ -226,6 +226,30 @@ pub fn tranchennummer_id_schema(_gen: &mut schemars::SchemaGenerator) -> schemar
     })
 }
 
+/// JSON Schema for [`Iban`](crate::identifiers::Iban): International Bank Account
+/// Number nach ISO 13616, mit ISO 7064 MOD-97-10 Prüfziffern.
+pub fn iban_schema(_gen: &mut schemars::SchemaGenerator) -> schemars::Schema {
+    schemars::json_schema!({
+        "type": "string",
+        "minLength": 15,
+        "maxLength": 34,
+        "pattern": "^[A-Z]{2}[0-9]{2}[A-Z0-9]{11,30}$",
+        "description": "IBAN nach ISO 13616 mit gültigen MOD-97-10-Prüfziffern (ISO 7064); Länge und Aufbau sind länderspezifisch, für DE 22 Zeichen",
+        "examples": ["DE89370400440532013000"]
+    })
+}
+
+/// JSON Schema for [`Bic`](crate::identifiers::Bic): Business Identifier Code
+/// nach ISO 9362.
+pub fn bic_schema(_gen: &mut schemars::SchemaGenerator) -> schemars::Schema {
+    schemars::json_schema!({
+        "type": "string",
+        "pattern": "^[A-Z]{4}[A-Z]{2}[A-Z0-9]{2}([A-Z0-9]{3})?$",
+        "description": "BIC nach ISO 9362: 8 oder 11 Zeichen (Institut, Land, Ort, optional Filiale). Kein Prüfzeichen definiert",
+        "examples": ["COBADEFFXXX", "MARKDEFF"]
+    })
+}
+
 /// JSON Schema for [`ObisCode`](crate::identifiers::ObisCode): OBIS-Kennzahl
 /// nach IEC 62056-61 / BDEW.
 ///

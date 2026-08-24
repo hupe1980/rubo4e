@@ -3,7 +3,7 @@ use super::{
     Tarifmerkmal, Tariftyp, Vertragskonditionen, Zeitraum, ZusatzAttribut,
 };
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(not(feature = "json"), derive(Hash))]
+#[cfg_attr(not(feature = "json"), derive(Eq, Hash))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "builder", derive(typed_builder::TypedBuilder))]
 #[cfg_attr(feature = "validate", derive(garde::Validate))]
@@ -13,7 +13,7 @@ use super::{
 /// Das BO Tarifinfo liefert die Merkmale, die einen Endkundentarif identifizierbar machen.
 /// Dieses BO dient als Basis für weitere BOs mit erweiterten Anwendungsmöglichkeiten.
 ///
-/// > **Note:** [Tarifinfo JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/bo/Tarifinfo.json)
+/// > **Note:** [Tarifinfo JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.1.0/src/bo4e_schemas/bo/Tarifinfo.json)
 pub struct Tarifinfo {
     /// Der Marktteilnehmer (Lieferant), der diesen Tarif anbietet
     #[cfg_attr(feature = "serde", serde(rename = "anbieter"))]
@@ -99,7 +99,7 @@ pub struct Tarifinfo {
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub tariftyp: Option<Tariftyp>,
-    /// BO type identifier — always `BoTyp::Tarifinfo` for this struct.
+    /// BO4E type discriminant — always `BoTyp::Tarifinfo` for this struct.
     #[cfg_attr(feature = "serde", serde(rename = "_typ"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(
@@ -112,7 +112,7 @@ pub struct Tarifinfo {
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(
         feature = "builder",
-        builder(default = Some("v202607.0.0".to_owned()), setter(into))
+        builder(default = Some("202607.1.0".to_owned()), setter(into))
     )]
     pub version: Option<String>,
     /// Mindestlaufzeiten und Kündigungsfristen zusammengefasst
@@ -149,7 +149,6 @@ pub struct Tarifinfo {
 impl Default for Tarifinfo {
     fn default() -> Self {
         Self {
-            typ: Some(BoTyp::Tarifinfo),
             anbieter: Default::default(),
             anbietername: Default::default(),
             anwendung_von: Default::default(),
@@ -162,7 +161,8 @@ impl Default for Tarifinfo {
             sparte: Default::default(),
             tarifmerkmale: Default::default(),
             tariftyp: Default::default(),
-            version: Some("v202607.0.0".to_owned()),
+            typ: Some(BoTyp::Tarifinfo),
+            version: Some("202607.1.0".to_owned()),
             vertragskonditionen: Default::default(),
             website: Default::default(),
             zeitliche_gueltigkeit: Default::default(),
@@ -177,7 +177,10 @@ impl Bo4eObject for Tarifinfo {
         self.typ.unwrap_or(BoTyp::Tarifinfo)
     }
     fn schema_version(&self) -> &'static str {
-        "v202607.0.0"
+        "202607.1.0"
+    }
+    fn schema_series(&self) -> &'static str {
+        "202607"
     }
 }
 #[cfg(feature = "json")]

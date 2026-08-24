@@ -108,78 +108,282 @@ impl PreisExt for Option<crate::generated::v202607::Preis> {
     }
 }
 
+/// What the `format: "time"` accessors return: a time of day plus the UTC offset
+/// it was written with, or the reason it did not parse.
+///
+/// The offset is `Option` because BO4E does not require one — see
+/// [`offset_time`](crate::offset_time).
+#[cfg(all(feature = "versioned", feature = "time"))]
+#[cfg_attr(docsrs, doc(cfg(all(feature = "versioned", feature = "time"))))]
+pub type OffsetTimeResult =
+    Result<(time::Time, Option<time::UtcOffset>), crate::offset_time::OffsetTimeError>;
+
 // ── Zeitraum ─────────────────────────────────────────────────────────────────
 
 #[cfg(all(feature = "versioned", feature = "time"))]
 mod zeitraum_impl {
+    use super::OffsetTimeResult;
     use crate::generated::v202607::Zeitraum;
+    use std::ops::RangeInclusive;
     use time::Date;
 
+    /// # Boundary conventions
+    ///
+    /// BO4E states these on the fields themselves, and they are not the same for
+    /// all three pairs:
+    ///
+    /// | Pair | Type | Interval | Read by |
+    /// |---|---|---|---|
+    /// | `startdatum` / `enddatum` | `time::Date` | `[start, end]` — **closed** | the methods below |
+    /// | `startuhrzeit` / `enduhrzeit` | time of day + offset | `[start, end)` | [`startuhrzeit_parsed`](Zeitraum::startuhrzeit_parsed) |
+    /// | `dauer` | ISO 8601 duration | — | [`duration`](Zeitraum::duration) |
+    ///
+    /// So `2026-01-01 … 2026-01-31` is the whole of January, 31 days, and
+    /// `startdatum == enddatum` is a valid one-day period — the schema gives
+    /// `'2025-01-01'` as the example for *both* date fields. Reading `enddatum`
+    /// exclusively drops a day from every period.
+    ///
+    /// [`as_inclusive_range`](Zeitraum::as_inclusive_range) returns a
+    /// [`RangeInclusive`] rather than a tuple so the convention travels with the
+    /// value. The time pair keeps its wire `String`: it carries a UTC offset
+    /// (`"18:00:00+01:00"`) and no `time` type holds both.
+    ///
     impl Zeitraum {
-        /// Returns the closed date range `(start, end)` if **both** boundary dates
-        /// are present.
+        /// Returns the period as an inclusive range, when **both** dates are present.
         ///
-        /// Useful for iterating over billing or validity periods where an open-ended
-        /// interval should be treated as "not yet determined" and filtered out:
+        /// `start..=end`, matching BO4E's *"Enddatum … ist **inklusiv**"*. The
+        /// return type is a [`RangeInclusive`] so the convention travels with the
+        /// value: `range.contains(&d)` is correct by construction.
         ///
-        /// ```no_run
-        /// # #[cfg(all(feature = "versioned", feature = "time"))] {
-        /// # use rubo4e::v202607::Zeitraum;
-        /// let z: Zeitraum = todo!();
-        /// if let Some((start, end)) = z.as_closed_range() {
-        ///     println!("from {start} to {end}");
-        /// }
-        /// # }
+        /// Use this where an open-ended interval means "not yet determined" and
+        /// should be filtered out; [`bounds`](Self::bounds) keeps it instead.
+        ///
         /// ```
-        ///
-        /// To handle open-ended ranges use [`as_half_open_range`](Self::as_half_open_range).
-        #[must_use]
-        pub fn as_closed_range(&self) -> Option<(Date, Date)> {
-            Some((self.startdatum?, self.enddatum?))
-        }
-
-        /// Returns `(start, optional_end)` if `startdatum` is present.
-        ///
-        /// Unlike [`as_closed_range`](Self::as_closed_range), this method succeeds
-        /// even when `enddatum` is absent — representing an open-ended (ongoing)
-        /// period such as an indefinitely-valid price list:
-        ///
-        /// ```no_run
         /// # #[cfg(all(feature = "versioned", feature = "time"))] {
-        /// # use rubo4e::v202607::Zeitraum;
-        /// let z: Zeitraum = todo!();
-        /// if let Some((start, end)) = z.as_half_open_range() {
-        ///     println!("starts {start}, ends {:?}", end);
-        /// }
+        /// use rubo4e::v202607::Zeitraum;
+        /// use time::macros::date;
+        ///
+        /// let january = Zeitraum {
+        ///     startdatum: Some(date!(2026-01-01)),
+        ///     enddatum: Some(date!(2026-01-31)),
+        ///     ..Default::default()
+        /// };
+        /// let range = january.as_inclusive_range().expect("both dates present");
+        /// assert!(range.contains(&date!(2026-01-31)), "the end date is inside");
         /// # }
         /// ```
         #[must_use]
-        pub fn as_half_open_range(&self) -> Option<(Date, Option<Date>)> {
-            Some((self.startdatum?, self.enddatum))
+        pub fn as_inclusive_range(&self) -> Option<RangeInclusive<Date>> {
+            Some(self.startdatum?..=self.enddatum?)
         }
 
-        /// Returns `true` if `date` falls within `[startdatum, enddatum)`.
+        /// Returns both boundary dates as they stand, either of which may be absent.
         ///
-        /// Absent boundaries are treated as **unbounded**: a missing `startdatum`
-        /// means "valid since forever"; a missing `enddatum` means "valid until
-        /// further notice".  An entirely empty `Zeitraum` (both absent) returns
-        /// `true` for any date.
+        /// An absent boundary is an **open end**, not a missing value: no
+        /// `startdatum` means "since forever", no `enddatum` means "until further
+        /// notice". [`contains`](Self::contains) reads them the same way.
         ///
-        /// ```no_run
+        /// ```
         /// # #[cfg(all(feature = "versioned", feature = "time"))] {
-        /// # use rubo4e::v202607::Zeitraum;
-        /// # use time::macros::date;
-        /// let z: Zeitraum = todo!();
-        /// if z.contains(date!(2026-01-15)) {
-        ///     println!("active on 2026-01-15");
+        /// use rubo4e::v202607::Zeitraum;
+        /// use time::macros::date;
+        ///
+        /// let ongoing = Zeitraum {
+        ///     startdatum: Some(date!(2026-01-01)),
+        ///     ..Default::default()
+        /// };
+        /// match ongoing.bounds() {
+        ///     (Some(start), Some(end)) => println!("{start} through {end} inclusive"),
+        ///     (Some(start), None)      => println!("{start} onwards"),
+        ///     (None, Some(end))        => println!("until {end} inclusive"),
+        ///     (None, None)             => println!("unbounded"),
         /// }
+        /// # }
+        /// ```
+        #[must_use]
+        pub fn bounds(&self) -> (Option<Date>, Option<Date>) {
+            (self.startdatum, self.enddatum)
+        }
+
+        /// Returns `true` if `date` falls in `[startdatum, enddatum]` — **both
+        /// boundaries included**.
+        ///
+        /// An absent boundary is unbounded on that side, so a
+        /// default-constructed `Zeitraum` answers `true` to everything. Filter on
+        /// [`as_inclusive_range`](Self::as_inclusive_range) where a period must
+        /// actually be stated.
+        ///
+        /// ```
+        /// # #[cfg(all(feature = "versioned", feature = "time"))] {
+        /// use rubo4e::v202607::Zeitraum;
+        /// use time::macros::date;
+        ///
+        /// let january = Zeitraum {
+        ///     startdatum: Some(date!(2026-01-01)),
+        ///     enddatum: Some(date!(2026-01-31)),
+        ///     ..Default::default()
+        /// };
+        /// assert!(january.contains(date!(2026-01-01)));   // start: inside
+        /// assert!(january.contains(date!(2026-01-31)));   // end:   inside
+        /// assert!(!january.contains(date!(2026-02-01)));
+        ///
+        /// // A single-day period is `start == end`, exactly as BO4E's own
+        /// // examples show.
+        /// let one_day = Zeitraum {
+        ///     startdatum: Some(date!(2026-03-15)),
+        ///     enddatum: Some(date!(2026-03-15)),
+        ///     ..Default::default()
+        /// };
+        /// assert!(one_day.contains(date!(2026-03-15)));
+        /// assert_eq!(one_day.whole_days(), Some(1));
         /// # }
         /// ```
         #[must_use]
         pub fn contains(&self, date: Date) -> bool {
             let start_ok = self.startdatum.is_none_or(|d| date >= d);
-            let end_ok = self.enddatum.is_none_or(|d| date < d);
+            let end_ok = self.enddatum.is_none_or(|d| date <= d);
             start_ok && end_ok
+        }
+
+        /// Returns the number of days the period covers, when both dates are present.
+        ///
+        /// Both boundaries count, so January 2026 (`2026-01-01` … `2026-01-31`)
+        /// is 31 days and a one-day period is 1 — the count a day-proportional
+        /// network charge or an abrechnungsrelevante Zeitmenge is computed from.
+        ///
+        /// Returns `None` if either bound is absent, and `0` for a reversed pair
+        /// (which [`validate_zeitraum`] rejects).
+        ///
+        /// [`validate_zeitraum`]: crate::validation::v202607::validate_zeitraum
+        ///
+        /// ```
+        /// # #[cfg(all(feature = "versioned", feature = "time"))] {
+        /// use rubo4e::v202607::Zeitraum;
+        /// use time::macros::date;
+        ///
+        /// let january = Zeitraum {
+        ///     startdatum: Some(date!(2026-01-01)),
+        ///     enddatum: Some(date!(2026-01-31)),
+        ///     ..Default::default()
+        /// };
+        /// assert_eq!(january.whole_days(), Some(31));
+        /// # }
+        /// ```
+        #[must_use]
+        pub fn whole_days(&self) -> Option<i64> {
+            let (start, end) = (self.startdatum?, self.enddatum?);
+            Some(((end - start).whole_days() + 1).max(0))
+        }
+
+        /// Parses `dauer` as an exact [`time::Duration`].
+        ///
+        /// BO4E stores it as an ISO 8601 duration string (`"P1DT30H4S"`), which
+        /// neither `serde` nor `time` parses.
+        ///
+        /// Returns `None` when `dauer` is absent, so a missing value and an
+        /// unparsable one stay distinguishable.
+        ///
+        /// # Errors
+        ///
+        /// [`Iso8601DurationError`](crate::iso8601_duration::Iso8601DurationError)
+        /// — including for a `P1Y` / `P1M` whose length depends on when it
+        /// starts, which is refused rather than approximated. See the
+        /// [module docs](crate::iso8601_duration).
+        ///
+        /// ```
+        /// # #[cfg(all(feature = "versioned", feature = "time"))] {
+        /// use rubo4e::v202607::Zeitraum;
+        ///
+        /// use time::Duration;
+        ///
+        /// let z = Zeitraum { dauer: Some("P1DT30H4S".into()), ..Default::default() };
+        /// assert_eq!(
+        ///     z.duration(),
+        ///     Some(Ok(Duration::days(1) + Duration::hours(30) + Duration::seconds(4))),
+        /// );
+        ///
+        /// assert_eq!(Zeitraum::default().duration(), None);
+        /// # }
+        /// ```
+        #[must_use]
+        pub fn duration(
+            &self,
+        ) -> Option<Result<time::Duration, crate::iso8601_duration::Iso8601DurationError>> {
+            Some(crate::iso8601_duration::parse(self.dauer.as_deref()?))
+        }
+
+        /// Parses `startuhrzeit` into a time of day and its UTC offset.
+        ///
+        /// Returns `None` when the field is absent. The offset is itself
+        /// optional — BO4E does not require one, and a missing offset means
+        /// "local time, zone not stated", which is not the same claim as UTC.
+        ///
+        /// Unlike the date pair, `startuhrzeit` is inclusive and `enduhrzeit`
+        /// **exclusive**: the window is `[start, end)`. See the
+        /// [boundary convention](#boundary-convention-the-date-pair-is-closed).
+        ///
+        /// # Errors
+        ///
+        /// [`OffsetTimeError`](crate::offset_time::OffsetTimeError).
+        ///
+        /// ```
+        /// # #[cfg(all(feature = "versioned", feature = "time"))] {
+        /// use rubo4e::v202607::Zeitraum;
+        /// use time::macros::{offset, time};
+        ///
+        /// let z = Zeitraum {
+        ///     startuhrzeit: Some("18:00:00+01:00".into()),
+        ///     enduhrzeit: Some("19:00:00+01:00".into()),
+        ///     ..Default::default()
+        /// };
+        /// assert_eq!(z.startuhrzeit_parsed(), Some(Ok((time!(18:00:00), Some(offset!(+1))))));
+        /// assert_eq!(z.enduhrzeit_parsed(),   Some(Ok((time!(19:00:00), Some(offset!(+1))))));
+        /// # }
+        /// ```
+        #[must_use]
+        pub fn startuhrzeit_parsed(&self) -> Option<OffsetTimeResult> {
+            Some(crate::offset_time::parse(self.startuhrzeit.as_deref()?))
+        }
+
+        /// Parses `enduhrzeit` into a time of day and its UTC offset.
+        ///
+        /// The end of a time window is **exclusive**, the opposite of
+        /// `enddatum` on the same type. See
+        /// [`startuhrzeit_parsed`](Self::startuhrzeit_parsed).
+        ///
+        /// # Errors
+        ///
+        /// [`OffsetTimeError`](crate::offset_time::OffsetTimeError).
+        #[must_use]
+        pub fn enduhrzeit_parsed(&self) -> Option<OffsetTimeResult> {
+            Some(crate::offset_time::parse(self.enduhrzeit.as_deref()?))
+        }
+    }
+}
+
+// ── Umschaltzeit — the HT/NT switching time ──────────────────────────────────
+
+#[cfg(all(feature = "versioned", feature = "time"))]
+mod umschaltzeit_impl {
+    use super::OffsetTimeResult;
+    use crate::generated::v202607::Umschaltzeit;
+
+    impl Umschaltzeit {
+        /// Parses `umschaltzeit` into a time of day and its UTC offset.
+        ///
+        /// This is the instant a Doppeltarifzähler switches between
+        /// Hoch- and Niedertarif, so the offset is load-bearing: `06:00:00+01:00`
+        /// is a different wall-clock moment in summer than in winter, and
+        /// dropping it moves the tariff boundary by an hour.
+        ///
+        /// Returns `None` when the field is absent.
+        ///
+        /// # Errors
+        ///
+        /// [`OffsetTimeError`](crate::offset_time::OffsetTimeError).
+        #[must_use]
+        pub fn umschaltzeit_parsed(&self) -> Option<OffsetTimeResult> {
+            Some(crate::offset_time::parse(self.umschaltzeit.as_deref()?))
         }
     }
 }
@@ -198,18 +402,26 @@ mod rechnung_impl {
         /// Returns `None` when `rechnungsperiode` is absent or either boundary
         /// date is missing.
         ///
+        /// Both boundaries are **inclusive** — see the [boundary convention] on
+        /// `Zeitraum`. The last day of the month a monthly invoice covers is
+        /// inside its own billing period.
+        ///
+        /// [boundary convention]: crate::v202607::Zeitraum#boundary-convention-the-date-pair-is-closed
+        ///
         /// ```no_run
         /// # #[cfg(all(feature = "versioned", feature = "time"))] {
         /// # use rubo4e::v202607::Rechnung;
+        /// # use time::macros::date;
         /// let r: Rechnung = todo!();
-        /// if let Some((from, to)) = r.billing_period() {
-        ///     println!("invoice period: {from} – {to}");
+        /// if let Some(period) = r.billing_period() {
+        ///     println!("invoice period: {} – {} inclusive", period.start(), period.end());
+        ///     let billed = period.contains(&date!(2026-01-31));
         /// }
         /// # }
         /// ```
         #[must_use]
-        pub fn billing_period(&self) -> Option<(Date, Date)> {
-            self.rechnungsperiode.as_ref()?.as_closed_range()
+        pub fn billing_period(&self) -> Option<std::ops::RangeInclusive<Date>> {
+            self.rechnungsperiode.as_ref()?.as_inclusive_range()
         }
 
         /// Billing period start date (shorthand for `billing_period().map(|(s,_)| s)`).
@@ -228,22 +440,27 @@ mod rechnung_impl {
             self.rechnungsperiode.as_ref()?.enddatum
         }
 
-        /// Invoice issue date (`rechnungsdatum`).
+        /// Invoice issue date — the calendar date of `rechnungsdatum`.
         ///
-        /// Convenience alias for the `rechnungsdatum` field.  BDEW INVOIC DTM+137
-        /// is a date-only value (qualifier 102), so this returns `time::Date`.
+        /// BO4E types the field as a timestamp (`format: date-time`), but BDEW
+        /// INVOIC transmits it as DTM+137 qualifier 102, a bare `YYYYMMDD`, so
+        /// senders pin it to midnight in their own offset. Dropping the
+        /// time-of-day keeps date comparisons from comparing offsets.
+        ///
+        /// The date is taken **in the offset the payload carries**; use
+        /// [`Rechnung::rechnungsdatum`] to normalise first.
         #[must_use]
         pub fn rechnungsdatum_date(&self) -> Option<Date> {
-            self.rechnungsdatum
+            self.rechnungsdatum.map(|dt| dt.date())
         }
 
-        /// Payment due date (`faelligkeitsdatum`).
+        /// Payment due date — the calendar date of `faelligkeitsdatum`.
         ///
-        /// Convenience alias for the `faelligkeitsdatum` field.  BDEW INVOIC DTM+92
-        /// is a date-only value (qualifier 102), so this returns `time::Date`.
+        /// Same date-only reading as [`rechnungsdatum_date`](Self::rechnungsdatum_date);
+        /// BDEW INVOIC carries this as DTM+92 with qualifier 102.
         #[must_use]
         pub fn faelligkeitsdatum_date(&self) -> Option<Date> {
-            self.faelligkeitsdatum
+            self.faelligkeitsdatum.map(|dt| dt.date())
         }
     }
 }
@@ -291,10 +508,12 @@ mod rechnung_decimal_impl {
 
         /// Amount to pay (`zu_zahlen.wert`) as `Decimal`.
         ///
-        /// In v202607 this is `gesamtbrutto - rabatt_netto - sum(vorauszahlungen)`.  The
-        /// convenience method simply reads the pre-computed field; use
-        /// [`vorauszahlungen_summe`](Self::vorauszahlungen_summe) to reconstruct the sum
-        /// of advance payments independently.
+        /// This reads the value the sender computed; the crate does not re-derive
+        /// it. BO4E describes it as `gesamtbrutto - vorausbezahlt - rabattBrutto`,
+        /// but v202607 ships no `rabattBrutto` field, so the equation cannot be
+        /// reconstructed from the payload. Use
+        /// [`vorauszahlungen_summe`](Self::vorauszahlungen_summe) if you need the
+        /// advance-payment total on its own.
         #[must_use]
         pub fn zu_zahlen_decimal(&self) -> Option<rust_decimal::Decimal> {
             self.zu_zahlen.as_ref()?.wert
@@ -317,22 +536,24 @@ mod rechnung_decimal_impl {
 
         /// Sum of all advance-payment amounts (`vorauszahlungen[*].betrag.wert`).
         ///
-        /// Returns `None` when `vorauszahlungen` is absent or empty.  Returns
-        /// `Some(Decimal::ZERO)` only when payments are present but all `betrag`
-        /// values are `None`.  Saturates at `Decimal::MAX` — overflow is not
-        /// expected for real-world invoice amounts.
+        /// Returns `None` when `vorauszahlungen` is absent, empty, or when the
+        /// amounts overflow `Decimal`'s range. Returns `Some(Decimal::ZERO)`
+        /// when payments are present but every `betrag` is `None`.
+        ///
+        /// Summed with [`checked_add`] rather than `+`, which would panic: the
+        /// values come straight off a deserialization boundary.
+        ///
+        /// [`checked_add`]: rust_decimal::Decimal::checked_add
         #[must_use]
         pub fn vorauszahlungen_summe(&self) -> Option<rust_decimal::Decimal> {
             let payments = self.vorauszahlungen.as_deref()?;
             if payments.is_empty() {
                 return None;
             }
-            Some(
-                payments
-                    .iter()
-                    .filter_map(|p| p.betrag.as_ref().and_then(|b| b.wert))
-                    .fold(rust_decimal::Decimal::ZERO, |acc, v| acc + v),
-            )
+            payments
+                .iter()
+                .filter_map(|p| p.betrag.as_ref().and_then(|b| b.wert))
+                .try_fold(rust_decimal::Decimal::ZERO, |acc, v| acc.checked_add(v))
         }
     }
 }
@@ -415,6 +636,191 @@ mod rechnungsposition_time_impl {
     }
 }
 
+// ── Zahlungsinformation — checked bank identifiers on demand ─────────────────
+
+#[cfg(feature = "versioned")]
+mod zahlungsinformation_impl {
+    use crate::error::IdentifierError;
+    use crate::generated::v202607::Zahlungsinformation;
+    use crate::identifiers::{Bic, Iban};
+
+    /// # Why `iban` is a `String` and not an [`Iban`]
+    ///
+    /// `Zahlungsinformation` hangs off `Rechnung` and nothing else, so a
+    /// newtype that refuses a masked IBAN (`DE89 **** **** 3000`, routine on an
+    /// invoice) would take the whole invoice down with it. The check is one call
+    /// away instead, and returns an error rather than the invoice.
+    impl Zahlungsinformation {
+        /// Parses `iban` as a checksum-verified [`Iban`].
+        ///
+        /// Returns `None` when the field is absent, so "not stated" and "stated
+        /// but invalid" stay distinguishable. Grouping spaces and lowercase are
+        /// normalised, so a value copied from a bank statement parses.
+        ///
+        /// # Errors
+        ///
+        /// [`IdentifierError`], typically
+        /// [`InvalidChecksum`](IdentifierError::InvalidChecksum) for a mistyped
+        /// or masked value.
+        ///
+        /// ```
+        /// # #[cfg(feature = "versioned")] {
+        /// use rubo4e::current::Zahlungsinformation;
+        ///
+        /// let stated = |iban: &str| Zahlungsinformation {
+        ///     iban: Some(iban.into()),
+        ///     ..Default::default()
+        /// };
+        ///
+        /// let z = stated("DE89 3704 0044 0532 0130 00");
+        /// assert_eq!(z.iban_checked().unwrap().unwrap().bankleitzahl(), Some("37040044"));
+        ///
+        /// assert!(stated("DE89 **** **** **** 3000").iban_checked().unwrap().is_err());
+        /// assert!(Zahlungsinformation::default().iban_checked().is_none());
+        /// # }
+        /// ```
+        #[must_use]
+        pub fn iban_checked(&self) -> Option<Result<Iban, IdentifierError>> {
+            Some(Iban::new(self.iban.as_deref()?))
+        }
+
+        /// Parses `bic` as a [`Bic`], verifying the ISO 9362 grammar.
+        ///
+        /// Returns `None` when the field is absent. ISO 9362 defines no
+        /// checksum, so this verifies the shape and nothing more.
+        ///
+        /// # Errors
+        ///
+        /// [`IdentifierError`] if the value is neither 8 nor 11 characters, or
+        /// carries a digit where the standard requires a letter.
+        #[must_use]
+        pub fn bic_checked(&self) -> Option<Result<Bic, IdentifierError>> {
+            Some(Bic::new(self.bic.as_deref()?))
+        }
+    }
+}
+
+// ── Preisstaffel — tier bounds and tier selection ────────────────────────────
+
+#[cfg(all(feature = "versioned", feature = "decimal"))]
+pub use preisstaffel_impl::PreisstaffelSliceExt;
+
+#[cfg(all(feature = "versioned", feature = "decimal"))]
+mod preisstaffel_impl {
+    use crate::generated::v202607::Preisstaffel;
+    use rust_decimal::Decimal;
+
+    impl Preisstaffel {
+        /// Returns `true` if `value` lies within this tier's own stated bounds,
+        /// `staffelgrenzeVon ..= staffelgrenzeBis`. An absent bound is unbounded
+        /// on that side.
+        ///
+        /// # This is *not* how a tier is selected
+        ///
+        /// BO4E's tiers can leave gaps — the schema's own example is
+        /// `0 – 1000, 1001 – 2000` — and it rules that a value in a gap
+        /// (`1000.6`) *"rutscht in die obere Zone"*. No single tier can honour
+        /// that; the decision needs the whole list. Use
+        /// [`select_for`](PreisstaffelSliceExt::select_for) to pick a tier, and
+        /// this only to ask about one tier in isolation.
+        ///
+        /// ```
+        /// # #[cfg(all(feature = "versioned", feature = "decimal"))] {
+        /// use rubo4e::current::Preisstaffel;
+        /// use rust_decimal::Decimal;
+        ///
+        /// let tier = Preisstaffel {
+        ///     staffelgrenze_von: Some(Decimal::ZERO),
+        ///     staffelgrenze_bis: Some(Decimal::from(1000)),
+        ///     ..Default::default()
+        /// };
+        /// assert!(tier.contains(Decimal::from(1000)), "both bounds are inclusive");
+        /// assert!(!tier.contains(Decimal::from(1001)));
+        /// # }
+        /// ```
+        #[must_use]
+        pub fn contains(&self, value: Decimal) -> bool {
+            self.staffelgrenze_von.is_none_or(|von| value >= von)
+                && self.staffelgrenze_bis.is_none_or(|bis| value <= bis)
+        }
+    }
+
+    /// Picking the price tier that applies to a quantity.
+    ///
+    /// Implemented for `[Preisstaffel]`, so it works on the `preisstaffeln` /
+    /// `staffeln` field of every type that carries one — `Preisposition`,
+    /// `LastvariablePreisposition`, `TarifPreisposition`, and `AufAbschlag`.
+    #[cfg_attr(docsrs, doc(cfg(all(feature = "versioned", feature = "decimal"))))]
+    pub trait PreisstaffelSliceExt {
+        /// Returns the tier that applies to `value`, or `None` if it falls below
+        /// every tier or above all of them.
+        ///
+        /// # The gap rule
+        ///
+        /// BO4E states tier bounds like `0 – 1000, 1001 – 2000` and rules that a
+        /// value *between* two tiers *"rutscht in die obere Zone / Staffel"*, so
+        /// `1000.6` bills at the `1001 – 2000` rate. A `von <= x <= bis` scan
+        /// finds no tier for it at all.
+        ///
+        /// What satisfies both cases: **the tier with the smallest
+        /// `staffelgrenzeBis` still ≥ `value`**, provided `value` reaches the
+        /// lowest `staffelgrenzeVon`. Slice order is irrelevant. An absent bound
+        /// is unbounded on that side, so an open-topped final tier catches
+        /// everything above the last stated one.
+        ///
+        /// ```
+        /// # #[cfg(all(feature = "versioned", feature = "decimal"))] {
+        /// use rubo4e::convenience::PreisstaffelSliceExt;
+        /// use rubo4e::current::Preisstaffel;
+        /// use rust_decimal::Decimal;
+        ///
+        /// fn tier(von: i64, bis: i64, preis: i64) -> Preisstaffel {
+        ///     Preisstaffel {
+        ///         staffelgrenze_von: Some(Decimal::from(von)),
+        ///         staffelgrenze_bis: Some(Decimal::from(bis)),
+        ///         preis: Some(Decimal::from(preis)),
+        ///         ..Default::default()
+        ///     }
+        /// }
+        /// let staffeln = [tier(0, 1000, 30), tier(1001, 2000, 25)];
+        ///
+        /// let price = |v| staffeln.select_for(v).and_then(|s| s.preis);
+        ///
+        /// assert_eq!(price(Decimal::from(1000)), Some(Decimal::from(30)));  // upper bound: inside
+        /// assert_eq!(price(Decimal::new(10006, 1)), Some(Decimal::from(25))); // in the gap: upward
+        /// assert!(price(Decimal::from(5000)).is_none());                    // above every tier
+        /// assert!(price(Decimal::from(-1)).is_none());                      // below every tier
+        /// # }
+        /// ```
+        fn select_for(&self, value: Decimal) -> Option<&Preisstaffel>;
+    }
+
+    impl PreisstaffelSliceExt for [Preisstaffel] {
+        fn select_for(&self, value: Decimal) -> Option<&Preisstaffel> {
+            // Below the lowest stated floor there is no tier at all. A tier with
+            // no `von` is unbounded below, so its presence removes the floor.
+            let below_floor = self
+                .iter()
+                .all(|s| s.staffelgrenze_von.is_some_and(|von| value < von));
+            if self.is_empty() || below_floor {
+                return None;
+            }
+
+            // The tier whose ceiling is the tightest one still at or above the
+            // value. An absent ceiling is +∞ and therefore always a candidate,
+            // but loses to any stated ceiling that also fits.
+            self.iter()
+                .filter(|s| s.staffelgrenze_bis.is_none_or(|bis| value <= bis))
+                .min_by(|a, b| match (a.staffelgrenze_bis, b.staffelgrenze_bis) {
+                    (Some(x), Some(y)) => x.cmp(&y),
+                    (Some(_), None) => std::cmp::Ordering::Less,
+                    (None, Some(_)) => std::cmp::Ordering::Greater,
+                    (None, None) => std::cmp::Ordering::Equal,
+                })
+        }
+    }
+}
+
 // ── Rechnungsposition — decimal accessors ────────────────────────────────────
 
 #[cfg(all(feature = "versioned", feature = "decimal"))]
@@ -471,30 +877,38 @@ mod rechnungsposition_decimal_impl {
 
 #[cfg(all(feature = "versioned", feature = "time"))]
 mod preisblatt_netznutzung_impl {
-    use crate::generated::v202607::PreisblattNetznutzung;
+    use crate::generated::v202607::{PreisblattNetznutzung, Zeitraum};
     use time::Date;
 
     impl PreisblattNetznutzung {
-        /// Returns the price-list validity period as `(start, optional_end)`.
+        /// Returns the price sheet's validity bounds, either of which may be absent.
         ///
-        /// Reads from `gueltigkeit.startdatum` / `gueltigkeit.enddatum`.
-        /// Returns `None` when `gueltigkeit` is absent or `startdatum` is missing.
-        /// The end date may be absent for open-ended (ongoing) price lists.
+        /// Reads `gueltigkeit.startdatum` / `gueltigkeit.enddatum`. Both are
+        /// **inclusive**: the sheet is still valid on its `enddatum`. An absent
+        /// bound is an open end — an indefinitely-valid sheet has no `enddatum`.
+        ///
+        /// Returns `(None, None)` when `gueltigkeit` itself is absent, which is
+        /// indistinguishable from an unbounded validity; use
+        /// [`is_valid_at`](Self::is_valid_at) if you need the "no validity stated"
+        /// case to read as *not valid*.
         ///
         /// ```no_run
         /// # #[cfg(all(feature = "versioned", feature = "time"))] {
         /// # use rubo4e::v202607::PreisblattNetznutzung;
         /// let p: PreisblattNetznutzung = todo!();
         /// match p.validity() {
-        ///     Some((start, Some(end))) => println!("valid {start} – {end}"),
-        ///     Some((start, None))      => println!("valid from {start} (open-ended)"),
-        ///     None                     => println!("validity unknown"),
+        ///     (Some(start), Some(end)) => println!("valid {start} – {end} inclusive"),
+        ///     (Some(start), None)      => println!("valid from {start} (open-ended)"),
+        ///     (None, Some(end))        => println!("valid until {end} inclusive"),
+        ///     (None, None)             => println!("no validity stated"),
         /// }
         /// # }
         /// ```
         #[must_use]
-        pub fn validity(&self) -> Option<(Date, Option<Date>)> {
-            self.gueltigkeit.as_ref()?.as_half_open_range()
+        pub fn validity(&self) -> (Option<Date>, Option<Date>) {
+            self.gueltigkeit
+                .as_ref()
+                .map_or((None, None), Zeitraum::bounds)
         }
 
         /// Returns `true` if this price sheet's validity period contains `date`.

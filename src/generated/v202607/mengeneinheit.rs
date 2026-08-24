@@ -1,4 +1,4 @@
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(
     feature = "strum",
@@ -81,6 +81,12 @@ pub enum Mengeneinheit {
     #[cfg_attr(feature = "serde", serde(rename = "VARH"))]
     #[cfg_attr(feature = "strum", strum(serialize = "VARH"))]
     Varh,
+    #[cfg_attr(feature = "serde", serde(rename = "HZ"))]
+    #[cfg_attr(feature = "strum", strum(serialize = "HZ"))]
+    Hz,
+    #[cfg_attr(feature = "serde", serde(rename = "DIMENSIONSLOS"))]
+    #[cfg_attr(feature = "strum", strum(serialize = "DIMENSIONSLOS"))]
+    Dimensionslos,
     /// Unknown or future variant — produced when deserializing a value
     /// that is not yet known to this version of the library.
     #[cfg_attr(feature = "serde", serde(other, rename = "UNKNOWN"))]
@@ -118,6 +124,8 @@ impl Mengeneinheit {
         Self::Kwhk,
         Self::Var,
         Self::Varh,
+        Self::Hz,
+        Self::Dimensionslos,
     ];
     /// Number of schema-defined variants (equal to `VARIANTS.len()`), excluding the
     /// [`Mengeneinheit::Unknown`] catch-all.  Stable for this schema version.
@@ -167,6 +175,8 @@ impl Mengeneinheit {
             Self::Kwhk => "KWHK",
             Self::Var => "VAR",
             Self::Varh => "VARH",
+            Self::Hz => "HZ",
+            Self::Dimensionslos => "DIMENSIONSLOS",
             Self::Unknown => "UNKNOWN",
         }
     }
@@ -182,7 +192,8 @@ impl Mengeneinheit {
     /// # Example
     /// ```
     /// # use rubo4e::current::Mengeneinheit;
-    /// /// assert_eq!(Mengeneinheit::from_wire("W"), Ok(Mengeneinheit::W));
+    /// assert_eq!(Mengeneinheit::from_wire("W"), Ok(Mengeneinheit::W));
+    /// // Out-of-schema values are rejected rather than degraded:
     /// assert!(Mengeneinheit::from_wire("NOT_A_REAL_VALUE").is_err());
     /// // …including the `Unknown` catch-all's own wire spelling:
     /// assert!(Mengeneinheit::from_wire("UNKNOWN").is_err());
@@ -213,6 +224,8 @@ impl Mengeneinheit {
             "KWHK" => Ok(Self::Kwhk),
             "VAR" => Ok(Self::Var),
             "VARH" => Ok(Self::Varh),
+            "HZ" => Ok(Self::Hz),
+            "DIMENSIONSLOS" => Ok(Self::Dimensionslos),
             other => Err(crate::error::UnknownVariant::new(other)),
         }
     }
@@ -291,6 +304,15 @@ impl<'r> sqlx::Decode<'r, sqlx::Postgres> for Mengeneinheit {
     ) -> Result<Self, sqlx::error::BoxDynError> {
         let s = <&str as sqlx::Decode<sqlx::Postgres>>::decode(value)?;
         Ok(Self::from_wire(s).unwrap_or(Self::Unknown))
+    }
+}
+/// Lets `Vec<Mengeneinheit>` bind to a `TEXT[]` column.  Only this crate can
+/// provide it: the trait and the enum are both foreign to any consumer, so the
+/// orphan rule rules out a downstream impl.
+#[cfg(feature = "sqlx")]
+impl sqlx::postgres::PgHasArrayType for Mengeneinheit {
+    fn array_type_info() -> sqlx::postgres::PgTypeInfo {
+        <String as sqlx::postgres::PgHasArrayType>::array_type_info()
     }
 }
 #[cfg(test)]

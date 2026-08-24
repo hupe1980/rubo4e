@@ -1,6 +1,6 @@
 use super::{Bo4eObject, BoTyp, Geraeteklasse, Geraetetyp, ZusatzAttribut};
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(not(feature = "json"), derive(Hash))]
+#[cfg_attr(not(feature = "json"), derive(Eq, Hash))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "builder", derive(typed_builder::TypedBuilder))]
 #[cfg_attr(feature = "validate", derive(garde::Validate))]
@@ -9,7 +9,7 @@ use super::{Bo4eObject, BoTyp, Geraeteklasse, Geraetetyp, ZusatzAttribut};
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 /// Mit diesem BO werden alle Geräte modelliert, die keine Zähler sind.
 ///
-/// > **Note:** [Geraet JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.0.0/src/bo4e_schemas/bo/Geraet.json)
+/// > **Note:** [Geraet JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.1.0/src/bo4e_schemas/bo/Geraet.json)
 pub struct Geraet {
     /// Bezeichnung des Geräts
     #[cfg_attr(feature = "serde", serde(rename = "bezeichnung"))]
@@ -37,7 +37,7 @@ pub struct Geraet {
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     pub id: Option<String>,
-    /// BO type identifier — always `BoTyp::Geraet` for this struct.
+    /// BO4E type discriminant — always `BoTyp::Geraet` for this struct.
     #[cfg_attr(feature = "serde", serde(rename = "_typ"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(
@@ -50,7 +50,7 @@ pub struct Geraet {
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(
         feature = "builder",
-        builder(default = Some("v202607.0.0".to_owned()), setter(into))
+        builder(default = Some("202607.1.0".to_owned()), setter(into))
     )]
     pub version: Option<String>,
     #[cfg_attr(feature = "serde", serde(rename = "zusatzAttribute"))]
@@ -72,13 +72,13 @@ pub struct Geraet {
 impl Default for Geraet {
     fn default() -> Self {
         Self {
-            typ: Some(BoTyp::Geraet),
             bezeichnung: Default::default(),
             geraeteklasse: Default::default(),
             geraetenummer: Default::default(),
             geraetetyp: Default::default(),
             id: Default::default(),
-            version: Some("v202607.0.0".to_owned()),
+            typ: Some(BoTyp::Geraet),
+            version: Some("202607.1.0".to_owned()),
             zusatz_attribute: Default::default(),
             _additional: Default::default(),
         }
@@ -90,7 +90,10 @@ impl Bo4eObject for Geraet {
         self.typ.unwrap_or(BoTyp::Geraet)
     }
     fn schema_version(&self) -> &'static str {
-        "v202607.0.0"
+        "202607.1.0"
+    }
+    fn schema_series(&self) -> &'static str {
+        "202607"
     }
 }
 #[cfg(feature = "json")]
