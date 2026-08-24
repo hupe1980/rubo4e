@@ -443,6 +443,17 @@ contract say what BO4E actually does inside a series — see **Schema deltas** a
   All four, plus `MaloVergabestelle`, `MpIdAuthority`, and `LengthExpectation`,
   are now in the prelude.
 
+- **`tests/pinned_tag.rs`** — the schema tag and the MSRV each have one source of
+  truth, and nothing may write either out again. The tag is the single directory
+  name under `generator/schemas/`; the MSRV is `rust-version` in `Cargo.toml`.
+  The justfile (`just pinned-tag`), the CI workflow's regenerate-and-diff step,
+  the test helpers, and the site config all derive them.
+
+  Without this the values drift silently in the places least likely to be read:
+  a workflow step fails on a directory that no longer exists, and the site's
+  landing page and footer advertise a schema release the crate is not generated
+  from.
+
 - **A guard over the schema's `format` annotations.** `resolve_field_type` ends
   in a catch-all that maps an unrecognised `format` to `String` — the right
   default, but a silent one: a release that starts annotating a field

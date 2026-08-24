@@ -40,11 +40,12 @@ cargo test --features versioned --test generated_contract
 `just check-docs-drift` complements this by regenerating into a scratch copy and
 diffing, which catches changes these assertions do not name.
 
-None of these — nor the justfile, nor the other test binaries — spells the pinned
-schema tag out in a constant. Each reads it off the single committed snapshot
-directory under `generator/schemas/`, and fails if it finds none or more than
-one. A within-series bump (`v202607.0.0` → `v202607.1.0`) therefore touches the
-snapshot, the codegen, and the changelog — not a scattering of string literals.
+The pinned schema tag is not written out anywhere: every test, recipe, workflow
+step, and the site config derive it from the single committed snapshot directory
+under `generator/schemas/`. `pinned_tag.rs` fails the build if one starts pinning
+a literal, and checks the same for the MSRV. A within-series bump therefore
+touches the snapshot, the codegen, and the changelog — not a scattering of
+strings.
 
 Two more guards sit alongside them, in `tests/`:
 
@@ -53,6 +54,7 @@ Two more guards sit alongside them, in `tests/`:
 | `prelude_surface.rs` | an identifier type reachable via `rubo4e::identifiers::` but missing from the prelude |
 | `extension_round_trip.rs` | the snake_case key transform renaming keys inside extension data |
 | `hash_keys.rs` | generated types deriving `Hash` without `Eq`, which no `HashMap` key can use |
+| `pinned_tag.rs` | a schema tag or MSRV written out in a workflow, recipe, or the site config instead of derived |
 
 ## Layer 1 — Golden Schema Tests
 

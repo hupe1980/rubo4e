@@ -5,10 +5,32 @@
 default:
     @just --list
 
-# Generate Rust code from a BO4E JSON Schema release tag (e.g. v202607.1.0)
-generate version="v202607.1.0":
-    cargo run -p bo4e-generator -- --schema-version {{ version }}
-    @echo "Generation complete. Review changes below:"
+# Print the committed schema snapshot's tag.
+#
+# The tag lives in exactly one place — the directory name under
+# `generator/schemas/` — and everything else discovers it here. A literal spelled
+# out in a recipe, a workflow, or a test goes stale the next time BO4E ships a
+# patch, and `tests/pinned_tag.rs` fails the build when one does.
+[private]
+pinned-tag:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    tags="$(cd generator/schemas && ls -d v*/ 2>/dev/null | tr -d / | tr '\n' ' ')"
+    count="$(echo $tags | wc -w | tr -d ' ')"
+    if [ "$count" -ne 1 ]; then
+        echo "expected exactly one snapshot under generator/schemas/, found: ${tags:-none}" >&2
+        exit 1
+    fi
+    printf '%s' "$(echo $tags)"
+
+# Generate Rust code from the committed schema snapshot, or from an explicit tag.
+generate version="":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    tag="{{ version }}"
+    [[ -n "$tag" ]] || tag="$(just pinned-tag)"
+    cargo run -p bo4e-generator -- --schema-version "$tag"
+    echo "Generation complete. Review changes below:"
     git diff src/generated/
 
 # Download a BO4E JSON Schema release snapshot into generator/schemas/<TAG>/
@@ -127,7 +149,7 @@ check-docs-drift:
     snapshot="$(mktemp -d)"
     trap 'rm -rf "$snapshot"' EXIT
     cp -R src/generated "$snapshot/before"
-    cargo run -p bo4e-generator -- --schema-version v202607.1.0
+    cargo run -p bo4e-generator -- --schema-version "$(just pinned-tag)"
     cargo fmt --all
     if diff -rq "$snapshot/before" src/generated >/dev/null; then
         echo "src/generated/ is in sync with the generator."

@@ -152,7 +152,11 @@ jobs:
       # never re-run, either of which makes the committed code a lie.
       - name: Regenerate and diff
         run: |
-          cargo run -p bo4e-generator -- --schema-version v202607.0.0
+          # The tag lives in exactly one place: the snapshot directory name.
+          # Spelling it out here goes stale the next time BO4E ships a patch.
+          tag="$(cd generator/schemas && ls -d v*/ | tr -d /)"
+          [ "$(echo "$tag" | wc -l)" -eq 1 ] || { echo "::error::expected one snapshot, found: $tag"; exit 1; }
+          cargo run -p bo4e-generator -- --schema-version "$tag"
           cargo fmt --all
           if ! git diff --quiet -- src/generated; then
             echo "::error::src/generated/ is out of sync with the generator. Run 'just generate'."

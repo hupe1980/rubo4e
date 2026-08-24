@@ -200,17 +200,19 @@ BO4E ships a new patch inside the series the crate is already on. The module pat
 does not change, so this is three commands and a changelog entry.
 
 ```bash
-just download-schemas v202607.1.0     # vendors the snapshot under generator/schemas/
-git rm -r generator/schemas/v202607.0.0   # exactly one snapshot per series
-just generate v202607.1.0
+just download-schemas <new tag>          # vendors the snapshot under generator/schemas/
+git rm -r generator/schemas/<old tag>    # exactly one snapshot per series
+just generate                            # discovers the tag from the directory
 just ci
 ```
 
 The generator rewrites every file in `src/generated/v202607/` **and deletes the
-ones the release retired** — a type BO4E drops leaves no orphan module behind
-pretending to be live. Nothing in the tree hard-codes the tag: the justfile
-default and the test helpers read it off the snapshot directory, so the only
-manual edits are the table above and the changelog.
+ones the release retired**, so a type BO4E drops leaves no orphan module behind.
+
+Nothing in the tree writes the tag out: the justfile, the CI workflow, the test
+helpers, and the site config all derive it from that one directory name, and
+`tests/pinned_tag.rs` fails the build if anything starts pinning a literal. The
+only manual edits are the table above and the changelog.
 
 Then read the diff. `git diff src/generated/` shows every membership change, and
 the ones that matter are the removals — those are what break a downstream build,

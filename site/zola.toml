@@ -29,5 +29,5 @@ repo = "https://github.com/hupe1980/rubo4e"
 crate = "https://crates.io/crates/rubo4e"
 api_docs = "https://docs.rs/rubo4e"
 # Schema release the generated types are pinned to.
-schema_version = "v202607.0.0"
-msrv = "1.87"
+schema_version = "v202607.1.0"
+msrv = "1.88"
