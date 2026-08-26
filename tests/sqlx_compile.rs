@@ -32,10 +32,12 @@ fn identifiers_bind_as_columns_and_arrays() {
     }
     check!(
         AkivId,
+        Bic,
         BilanzierungsgebietId,
         BilanzkreisId,
         CrId,
         EicCode,
+        Iban,
         MaloId,
         MarktpartnerId,
         MeloId,

@@ -1,11 +1,28 @@
 //! Cross-field business-rule validators for BO4E types, plus the [`Validated`](crate::validation::Validated) wrapper.
 //!
+//! ## Validation is recursive
+//!
+//! Calling `.validate()` on a BO checks that BO's own cross-field rules **and
+//! descends into every nested BO, COM, and identifier below it**. A failure is
+//! reported at its path — `rechnungsperiode`,
+//! `kostenbloecke[0].kostenpositionen[0]` — so a report names where the problem
+//! is, not just that there is one.
+//!
+//! What is *not* checked is presence: BO4E declares almost every field optional,
+//! so `garde` cannot enforce "required" for you. The rules below are the
+//! invariants BO4E states in prose, and they only fire on values that are there.
+//!
 //! ## `Validated<T>`
 //!
 //! [`Validated<T>`](crate::validation::Validated) is a zero-cost newtype wrapper that can only be
 //! constructed by running the garde validation rules on `T`.  It implements
 //! `Deref<Target = T>` and `AsRef<T>` for transparent field access, and
 //! [`into_inner`](crate::validation::Validated::into_inner) to unwrap.
+//!
+//! With `serde` it is also `Serialize` and `Deserialize`, and the `Deserialize`
+//! impl **validates**: decoding a `Validated<T>` and getting a value back is the
+//! proof, so a handler can take one as its request body and never have a
+//! forgotten `.validate()` call.
 //!
 //! A blanket `impl From<Validated<T>> for T` is deliberately absent: `T` is a type
 //! parameter, so such an impl is uncovered and rejected by the orphan rule.
@@ -16,20 +33,28 @@
 //! ```
 //! # #[cfg(feature = "versioned")] {
 //! use rubo4e::validation::Validated;
-//! use rubo4e::current::{Marktlokation, Adresse};
+//! use rubo4e::current::{Adresse, Geokoordinaten, Marktlokation};
 //!
-//! // A Marktlokation must carry exactly one of the three address fields.
+//! // A Marktlokation may carry at most one of the three Ortsangaben.
 //! let malo = Marktlokation {
 //!     lokationsadresse: Some(Adresse { ort: Some("Bremen".into()), ..Default::default() }),
 //!     ..Default::default()
 //! };
 //!
-//! let validated = Validated::new(malo).expect("exactly one address field is set");
+//! let validated = Validated::new(malo).expect("one Ortsangabe is fine");
 //! assert!(validated.lokationsadresse.is_some());  // Deref to &Marktlokation
 //! let inner: Marktlokation = validated.into_inner();
 //!
-//! // A Marktlokation with no address at all is rejected.
-//! assert!(Validated::new(Marktlokation::default()).is_err());
+//! // None at all is fine too — a referenced location often carries only its ID.
+//! assert!(Validated::new(Marktlokation::default()).is_ok());
+//!
+//! // Two is not: they would disagree about where the location is.
+//! let conflicting = Marktlokation {
+//!     lokationsadresse: Some(Adresse::default()),
+//!     geoadresse: Some(Geokoordinaten::default()),
+//!     ..Default::default()
+//! };
+//! assert!(Validated::new(conflicting).is_err());
 //! # }
 //! ```
 //!
@@ -45,18 +70,23 @@
 //!
 //! ## Allocation behaviour
 //!
-//! Static error messages (e.g. "exactly one address field must be set") are stored
-//! as `Cow::Borrowed(&'static str)` inside `garde::Error` — zero allocation on the
-//! failure path.  Error messages that include runtime values (timestamps, decimal
-//! amounts) use a single `format!` call on the failure path — unavoidable for
-//! meaningful diagnostics.  The **happy path is always zero-allocation** for all
-//! validators in this module.
+//! Static error messages (e.g. "Zeitraum must have at least one of: …") are
+//! stored as `Cow::Borrowed(&'static str)` inside `garde::Error` — zero
+//! allocation on the failure path.  Messages that name the offending values
+//! (which fields conflicted, which timestamps, which amounts) use a single
+//! `format!` on the failure path — unavoidable for a diagnosis worth reading.
+//! The **happy path is always zero-allocation** for every validator here.
 
 /// A zero-cost wrapper around a value that has been checked against all garde validation
 /// rules.
 ///
-/// `Validated<T>` is the only way to get a value that is guaranteed to satisfy all
-/// business-rule invariants declared on `T` via `#[derive(garde::Validate)]`.
+/// `Validated<T>` is the only way to get a value that is guaranteed to satisfy
+/// every business-rule invariant declared on `T` — and, because validation
+/// descends into nested BOs, COMs, and identifiers, on everything `T` contains.
+///
+/// It is a proof about the *rules*, not about completeness: BO4E declares almost
+/// every field optional, so a `Validated<Rechnung>` may still be missing fields
+/// your AHB requires. Enforce those at your ingest boundary.
 ///
 /// # Construction
 ///
@@ -68,10 +98,15 @@
 /// ```
 /// # #[cfg(feature = "versioned")] {
 /// use rubo4e::validation::Validated;
-/// use rubo4e::current::Marktlokation;
+/// use rubo4e::current::{Adresse, Geokoordinaten, Marktlokation};
 ///
-/// // No address field set — violates the "exactly one" rule.
-/// match Validated::new(Marktlokation::default()) {
+/// // Two Ortsangaben — they would disagree about where the location is.
+/// let conflicting = Marktlokation {
+///     lokationsadresse: Some(Adresse::default()),
+///     geoadresse: Some(Geokoordinaten::default()),
+///     ..Default::default()
+/// };
+/// match Validated::new(conflicting) {
 ///     Ok(v)  => panic!("unexpectedly valid: {:?}", v.marktlokations_id),
 ///     Err(r) => assert!(r.iter().count() > 0),
 /// }
@@ -128,6 +163,42 @@ impl<T: serde::Serialize> serde::Serialize for Validated<T> {
     }
 }
 
+#[cfg(feature = "serde")]
+impl<'de, T> serde::Deserialize<'de> for Validated<T>
+where
+    T: serde::Deserialize<'de> + garde::Validate,
+    T::Context: Default,
+{
+    /// Deserializes `T`, then runs its rules — the same recursive check
+    /// [`Validated::new`] runs. This is what makes the wrapper usable as a
+    /// request body:
+    ///
+    /// ```
+    /// # #[cfg(all(feature = "versioned", feature = "json"))] {
+    /// use rubo4e::current::Marktlokation;
+    /// use rubo4e::validation::Validated;
+    ///
+    /// // A Marktlokation may carry at most one of the three Ortsangaben.
+    /// let ok = r#"{"marktlokationsId":"51238696781","lokationsadresse":{"ort":"Bremen"}}"#;
+    /// let malo: Validated<Marktlokation> = serde_json::from_str(ok).unwrap();
+    /// assert_eq!(malo.lokationsadresse.as_ref().unwrap().ort.as_deref(), Some("Bremen"));
+    ///
+    /// // …and one that carries two does not decode at all.
+    /// let bad = r#"{"lokationsadresse":{"ort":"Bremen"},"geoadresse":{"breitengrad":"53.1"}}"#;
+    /// let err = serde_json::from_str::<Validated<Marktlokation>>(bad).unwrap_err();
+    /// assert!(err.to_string().contains("Ortsangabe"), "{err}");
+    /// # }
+    /// ```
+    ///
+    /// The failure arrives as the deserializer's error type, which renders the
+    /// whole `garde::Report` into its message. Decode a plain `T` and call
+    /// [`Validated::new`] where you need the structured report back.
+    fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+        let value = T::deserialize(d)?;
+        Self::new(value).map_err(serde::de::Error::custom)
+    }
+}
+
 /// Stamps out a validation sub-module for a given schema version (e.g. `v202607`).
 ///
 /// Each version gets its own `pub mod $ver { … }` so that future schema changes
@@ -140,42 +211,65 @@ macro_rules! impl_validators {
         pub mod $ver {
             use crate::generated::$ver::*;
 
-            /// Exactly one of `lokationsadresse`, `geoadresse`, or
-            /// `katasterinformation` must be `Some`.
+            /// Reports the Ortsangabe fields that are set, when more than one is.
             ///
-            /// BO4E states this rule but enforces it nowhere — BO4E-python
-            /// carries it only as a source comment. Checked here only when you
-            /// call `.validate()`; a violating payload still deserializes.
+            /// `None` when the value conforms — nought or one of them present.
+            fn conflicting_ortsangaben(present: [(&'static str, bool); 3]) -> Option<String> {
+                let set: Vec<&str> = present
+                    .iter()
+                    .filter(|(_, is_set)| *is_set)
+                    .map(|(name, _)| *name)
+                    .collect();
+                (set.len() > 1).then(|| set.join(", "))
+            }
+
+            /// **At most one** of `lokationsadresse`, `geoadresse`, or
+            /// `katasterinformation` may be `Some`.
+            ///
+            /// BO4E states mutual exclusivity, not presence: *"Es darf immer nur
+            /// eine Art der Ortsangabe vorhanden sein."* The schema declares no
+            /// `required` array and no `oneOf`, and all three properties default
+            /// to `null`.
+            ///
+            /// **No** Ortsangabe therefore conforms, and is common: BO4E has no
+            /// reference type, so a location referenced from a `Rechnung`, a
+            /// `Vertrag`, or an `Angebot` is a full `Marktlokation` carrying
+            /// little more than its ID.
+            ///
+            /// Checked only when you call `.validate()`; a violating payload
+            /// still deserializes.
             pub fn validate_marktlokation(v: &Marktlokation, _: &()) -> Result<(), garde::Error> {
-                let count = v.lokationsadresse.is_some() as usize
-                    + v.geoadresse.is_some() as usize
-                    + v.katasterinformation.is_some() as usize;
-                if count == 1 {
-                    Ok(())
-                } else {
-                    Err(garde::Error::new(
-                        "exactly one address field must be set: \
-                         lokationsadresse, geoadresse, or katasterinformation",
-                    ))
+                match conflicting_ortsangaben([
+                    ("lokationsadresse", v.lokationsadresse.is_some()),
+                    ("geoadresse", v.geoadresse.is_some()),
+                    ("katasterinformation", v.katasterinformation.is_some()),
+                ]) {
+                    None => Ok(()),
+                    Some(set) => Err(garde::Error::new(format!(
+                        "at most one Ortsangabe may be set, but {set} are — BO4E allows \
+                         either an Adresse, a Geokoordinate, or a Katasteradresse"
+                    ))),
                 }
             }
 
-            /// Exactly one of `messadresse`, `geoadresse`, or
-            /// `katasterinformation` must be `Some`.
+            /// **At most one** of `messadresse`, `geoadresse`, or
+            /// `katasterinformation` may be `Some`.
             ///
-            /// Same provenance as [`validate_marktlokation`]: stated by BO4E,
-            /// enforced by no reference implementation, opt-in here.
+            /// Same provenance as [`validate_marktlokation`]. The empty case is
+            /// explicit here: `messadresse` is documented *"Nur angeben, wenn
+            /// diese von der Adresse der Marktlokation abweicht"*, so a
+            /// Messlokation matching its Marktlokation carries none by design.
             pub fn validate_messlokation(v: &Messlokation, _: &()) -> Result<(), garde::Error> {
-                let count = v.messadresse.is_some() as usize
-                    + v.geoadresse.is_some() as usize
-                    + v.katasterinformation.is_some() as usize;
-                if count == 1 {
-                    Ok(())
-                } else {
-                    Err(garde::Error::new(
-                        "exactly one address field must be set: \
-                         messadresse, geoadresse, or katasterinformation",
-                    ))
+                match conflicting_ortsangaben([
+                    ("messadresse", v.messadresse.is_some()),
+                    ("geoadresse", v.geoadresse.is_some()),
+                    ("katasterinformation", v.katasterinformation.is_some()),
+                ]) {
+                    None => Ok(()),
+                    Some(set) => Err(garde::Error::new(format!(
+                        "at most one Ortsangabe may be set, but {set} are — BO4E allows \
+                         either an Adresse, a Geokoordinate, or a Katasteradresse"
+                    ))),
                 }
             }
 
@@ -229,11 +323,13 @@ macro_rules! impl_validators {
             /// 2. `gesamtbrutto` is *"Die Summe aus Netto- und Steuerbetrag"* —
             ///    so `gesamtnetto + gesamtsteuer == gesamtbrutto` when all three
             ///    are present.
-            /// 3. If exactly two of the three totals are present, the third is
-            ///    derivable and its absence is a data-quality defect.
-            /// 4. `steuerbetraege` is *"eine Liste mit Steuerbeträgen … die Summe
+            /// 3. `steuerbetraege` is *"eine Liste mit Steuerbeträgen … die Summe
             ///    dieser Beträge ergibt den Wert für gesamtsteuer"* — so the
             ///    line-level tax amounts must sum to `gesamtsteuer`.
+            ///
+            /// "If two totals are stated the third must be too" is a house rule
+            /// BO4E does not state, so it lives in
+            /// [`quality::rechnung_totals_are_complete`] instead.
             ///
             /// # Not checked: `zuZahlen`
             ///
@@ -289,17 +385,6 @@ macro_rules! impl_validators {
                     let steuer = wert(&v.gesamtsteuer);
                     let brutto = wert(&v.gesamtbrutto);
 
-                    // 3. Two of three present means the third was simply omitted.
-                    let present_count = netto.is_some() as usize
-                        + steuer.is_some() as usize
-                        + brutto.is_some() as usize;
-                    if present_count == 2 {
-                        return Err(garde::Error::new(
-                            "if any two invoice totals (gesamtnetto, gesamtsteuer, \
-                             gesamtbrutto) are set, all three must be present",
-                        ));
-                    }
-
                     // 2. gesamtbrutto = gesamtnetto + gesamtsteuer.
                     if let (Some(n), Some(s), Some(b)) = (netto, steuer, brutto) {
                         if n + s != b {
@@ -310,7 +395,7 @@ macro_rules! impl_validators {
                         }
                     }
 
-                    // 4. sum(steuerbetraege[*].steuerwert) = gesamtsteuer.
+                    // 3. sum(steuerbetraege[*].steuerwert) = gesamtsteuer.
                     //
                     // Only checked when every entry states a `steuerwert`: a list
                     // that omits one is incomplete rather than wrong, and summing
@@ -407,8 +492,8 @@ macro_rules! impl_validators {
             /// # Rounding
             ///
             /// The product is compared at the **scale of the stated amount**.
-            /// A unit price of `0.2843 €/kWh` over `3333 kWh` is `947.5119`,
-            /// which every invoice in circulation writes as `947.51`; demanding
+            /// A unit price of `0.2843 €/kWh` over `3333 kWh` is `947.5719`,
+            /// which every invoice in circulation writes as `947.57`; demanding
             /// exact equality (or equality at ten decimal places, as an earlier
             /// revision did) rejects the entire real-world corpus.
             ///
@@ -443,8 +528,19 @@ macro_rules! impl_validators {
                         // the last stated place.  Comparing against one rounding
                         // mode would reject the other: invoices round halves up,
                         // `Decimal::round_dp` rounds them to even.
+                        //
+                        // `try_new`, not `new`: an amount already at `Decimal`'s
+                        // maximum scale of 28 would ask for a scale of 29, and
+                        // `Decimal::new` *panics* on that.  A payload can carry
+                        // one, and a validator handed untrusted input must not be
+                        // a way to bring the process down.  At that scale there
+                        // is no room left for a tolerance anyway, so the
+                        // comparison falls back to exact equality.
                         let scale = b.scale();
-                        let half_ulp = Decimal::new(5, scale.saturating_add(1));
+                        let half_ulp = scale
+                            .checked_add(1)
+                            .and_then(|s| Decimal::try_new(5, s).ok())
+                            .unwrap_or(Decimal::ZERO);
                         if (product - b).abs() > half_ulp {
                             return Err(garde::Error::new(format!(
                                 "einzelpreis.wert ({ep}) * menge.wert ({m}) = {product}, \
@@ -456,12 +552,113 @@ macro_rules! impl_validators {
                 } // end #[cfg(feature = "decimal")]
                 Ok(())
             }
+
+            /// Data-quality rules this crate considers sensible, which **BO4E
+            /// does not state**.
+            ///
+            /// Nothing here is wired into `#[derive(garde::Validate)]`, so
+            /// `.validate()` and [`Validated<T>`](crate::validation::Validated)
+            /// never run it. That keeps `.validate()` answering *"does this
+            /// conform to BO4E"* — a claim you can make about a document a
+            /// counterparty sent.
+            ///
+            /// Call these by name: typically on documents you produce, or as a
+            /// warning rather than a rejection on documents you receive.
+            ///
+            /// ```
+            /// # #[cfg(all(feature = "versioned", feature = "decimal"))] {
+            /// use rubo4e::current::{Betrag, Rechnung};
+            /// use rubo4e::validation::current::quality;
+            /// use garde::Validate as _;
+            /// use rust_decimal::Decimal;
+            ///
+            /// let netto = Betrag { wert: Some(Decimal::from(100)), ..Default::default() };
+            /// let partial = Rechnung {
+            ///     gesamtnetto: Some(netto.clone()),
+            ///     gesamtsteuer: Some(netto),
+            ///     ..Default::default()   // gesamtbrutto omitted
+            /// };
+            ///
+            /// // Conformance is unaffected — BO4E requires none of the three.
+            /// assert!(partial.validate().is_ok());
+            /// // The house rule is available separately.
+            /// assert!(quality::rechnung_totals_are_complete(&partial).is_err());
+            /// # }
+            /// ```
+            pub mod quality {
+                use super::Rechnung;
+
+                /// All three invoice totals must be present, or none of them.
+                ///
+                /// `gesamtbrutto = gesamtnetto + gesamtsteuer`, so any two
+                /// determine the third, and stating exactly two makes the reader
+                /// do arithmetic the sender could have. BO4E marks none of the
+                /// three `required`, which is why this is not a conformance rule.
+                ///
+                /// Fewer than two stated is not reported: an invoice may
+                /// legitimately carry only a gross total.
+                ///
+                /// # Errors
+                /// A [`garde::Error`] naming the missing total, so this composes
+                /// into a `garde` pipeline of your own.
+                // Without `decimal` the amounts are `String` and the body
+                // compiles away, so `v` goes unread.
+                #[cfg_attr(not(feature = "decimal"), allow(unused_variables))]
+                pub fn rechnung_totals_are_complete(v: &Rechnung) -> Result<(), garde::Error> {
+                    #[cfg(feature = "decimal")]
+                    {
+                        let stated = [
+                            ("gesamtnetto", v.gesamtnetto.as_ref().and_then(|b| b.wert)),
+                            ("gesamtsteuer", v.gesamtsteuer.as_ref().and_then(|b| b.wert)),
+                            ("gesamtbrutto", v.gesamtbrutto.as_ref().and_then(|b| b.wert)),
+                        ];
+                        let missing: Vec<&str> = stated
+                            .iter()
+                            .filter(|(_, amount)| amount.is_none())
+                            .map(|(name, _)| *name)
+                            .collect();
+                        if missing.len() == 1 {
+                            return Err(garde::Error::new(format!(
+                                "two of the three invoice totals are stated, so {} is \
+                                 derivable and should be stated too",
+                                missing[0],
+                            )));
+                        }
+                    }
+                    Ok(())
+                }
+            }
         }
     };
 }
 
 #[cfg(feature = "versioned")]
 impl_validators!(v202607);
+
+/// The validators for the current stable BO4E schema series — the counterpart
+/// of [`rubo4e::current`](crate::current).
+///
+/// Import from here for the same reason you import types from `crate::current`:
+/// so that no downstream file has to name a schema version, and a CI guard that
+/// greps for `rubo4e::v202607` stays clean. It resolves to the same functions as
+/// [`v202607`], which `tests/validation.rs` pins.
+///
+/// ```
+/// # #[cfg(all(feature = "versioned", feature = "validate"))] {
+/// use rubo4e::current::Zeitraum;
+/// use rubo4e::validation::current::validate_zeitraum;
+///
+/// // An empty Zeitraum carries no information, whichever path you call it by.
+/// assert!(validate_zeitraum(&Zeitraum::default(), &()).is_err());
+/// # }
+/// ```
+///
+/// The [`quality`](current::quality) submodule comes along with it.
+#[cfg(feature = "versioned")]
+#[cfg_attr(docsrs, doc(cfg(feature = "versioned")))]
+pub mod current {
+    pub use super::v202607::*;
+}
 
 /// A single structured validation failure, extracted from a [`garde::Report`].
 ///
@@ -489,9 +686,14 @@ pub struct ValidationFailure {
 /// ```
 /// # #[cfg(feature = "versioned")] {
 /// use rubo4e::validation::{report_errors, Validated};
-/// use rubo4e::current::Marktlokation;
+/// use rubo4e::current::{Adresse, Geokoordinaten, Marktlokation};
 ///
-/// let report = Validated::new(Marktlokation::default()).unwrap_err();
+/// let conflicting = Marktlokation {
+///     lokationsadresse: Some(Adresse::default()),
+///     geoadresse: Some(Geokoordinaten::default()),
+///     ..Default::default()
+/// };
+/// let report = Validated::new(conflicting).unwrap_err();
 /// let failures = report_errors(&report);
 /// assert!(!failures.is_empty());
 /// for failure in &failures {

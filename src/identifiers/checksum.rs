@@ -32,6 +32,7 @@
 //! - §8.1, MaLo-ID base `4137355924` → check digit `1` (full ID `41373559241`)
 //! - §8.2, base `A113735592` → check digit `5` (full ID `A1137355925`)
 
+use super::char_at;
 use crate::error::{IdentifierError, LengthExpectation};
 
 // ─── Core algorithm ──────────────────────────────────────────────────────────
@@ -236,20 +237,6 @@ pub(super) fn compute_ascii_id_from_base(
     out.push_str(base);
     out.push(char::from(b'0' + bdew_check_digit(base.as_bytes())));
     Ok(out)
-}
-
-/// Returns the character starting at byte index `i`, or U+FFFD when `i` is out of
-/// range or falls inside a multi-byte sequence.
-///
-/// Used only on error paths. Slicing is guarded by [`str::is_char_boundary`] so
-/// this can never panic on non-ASCII input.
-#[inline]
-fn char_at(s: &str, i: usize) -> char {
-    if s.is_char_boundary(i) {
-        s[i..].chars().next().unwrap_or('\u{FFFD}')
-    } else {
-        '\u{FFFD}'
-    }
 }
 
 // ─── Tests ───────────────────────────────────────────────────────────────────

@@ -36,6 +36,7 @@ pub struct Tarif {
     #[cfg_attr(feature = "serde", serde(rename = "anbieter"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub anbieter: Option<Box<Marktteilnehmer>>,
     /// Der Name des Marktpartners, der den Tarif anbietet
     #[cfg_attr(feature = "serde", serde(rename = "anbietername"))]
@@ -77,6 +78,7 @@ pub struct Tarif {
     pub bemerkung: Option<String>,
     /// Für die Berechnung der Kosten sind die hier abgebildeten Parameter heranzuziehen
     #[cfg_attr(feature = "serde", serde(rename = "berechnungsparameter"))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub berechnungsparameter: Tarifberechnungsparameter,
     /// Eine (beliebige) Beschreibung für den Tarif.
     #[cfg_attr(feature = "serde", serde(rename = "beschreibung"))]
@@ -96,6 +98,7 @@ pub struct Tarif {
     pub dynamische_preisposition_quelle: Option<String>,
     /// Der Energiemix mit einem Eintrag pro Gültigkeitsjahr (siehe `Energiemix.gueltigkeitsjahr`).
     #[cfg_attr(feature = "serde", serde(rename = "energiemix"))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub energiemix: Vec<Energiemix>,
     /// Eine generische ID, die für eigene Zwecke genutzt werden kann.
     /// Z.B. könnten hier UUIDs aus einer Datenbank stehen oder URLs zu einem Backend-System.
@@ -108,6 +111,7 @@ pub struct Tarif {
     pub kundentypen: Vec<Kundentyp>,
     /// Preisgarantie für diesen Tarif
     #[cfg_attr(feature = "serde", serde(rename = "preisgarantie"))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub preisgarantie: Preisgarantie,
     /// Enthält alle regions- und zeitaufgelösten Tarifpreise.
     /// Ausschließlich die `COM DynamischePreisposition` wird unter einem anderen Feld namens `dynamischePreisposition`
@@ -115,6 +119,7 @@ pub struct Tarif {
     #[cfg_attr(feature = "serde", serde(rename = "regionspreise"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub regionspreise: Option<Vec<Regionspreis>>,
     /// Hinweis zu den Registern bzw. Zählwerken.
     /// Bspw. benötigt ein HT-/NT-Tarif auch eine entsprechende Registeranzahl.
@@ -127,6 +132,7 @@ pub struct Tarif {
     #[cfg_attr(feature = "serde", serde(rename = "tarifeinschraenkung"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub tarifeinschraenkung: Option<Tarifeinschraenkung>,
     /// Eine Liste von Produktmerkmalen im Zusammenhang mit diesem Tarif.
     #[cfg_attr(feature = "serde", serde(rename = "tarifmerkmale"))]
@@ -149,6 +155,7 @@ pub struct Tarif {
     pub version: Option<String>,
     /// Vertragskonditionen für diesen Tarif.
     #[cfg_attr(feature = "serde", serde(rename = "vertragskonditionen"))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub vertragskonditionen: Vertragskonditionen,
     /// Internetseite, auf der der Tarif veröffentlicht ist.
     #[cfg_attr(feature = "serde", serde(rename = "website"))]
@@ -157,20 +164,24 @@ pub struct Tarif {
     #[cfg_attr(feature = "serde", serde(rename = "zeitlicheGueltigkeit"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub zeitliche_gueltigkeit: Option<Zeitraum>,
     /// Der Zeitraum, in dem eine Belieferung (für diesen Tarif) möglich ist.
     #[cfg_attr(feature = "serde", serde(rename = "zeitraumBelieferbarkeit"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub zeitraum_belieferbarkeit: Option<Zeitraum>,
     /// Der Zeitraum, in dem der Tarif beim Anbieter vertraglich abschließbar ist.
     #[cfg_attr(feature = "serde", serde(rename = "zeitraumVermarktung"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub zeitraum_vermarktung: Option<Zeitraum>,
     #[cfg_attr(feature = "serde", serde(rename = "zusatzAttribute"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub zusatz_attribute: Option<Vec<ZusatzAttribut>>,
     /// Unknown JSON fields captured during deserialization for round-trip preservation.
     /// `None` when no unknown fields were present (zero heap allocation).
@@ -184,17 +195,68 @@ pub struct Tarif {
     #[doc(hidden)]
     pub _additional: crate::LimitedExtensionMap,
 }
+impl Tarif {
+    /// Creates a `Tarif` from the 10 fields the BO4E schema marks `required`,
+    /// defaulting every other field.
+    ///
+    /// `Tarif` has no [`Default`]: `berechnungsparameter`, `energiemix`, `kundentypen`, `preisgarantie`, `registeranzahl`, `sparte`, `tarifmerkmale`, `tariftyp`, `vertragskonditionen`, `website` are required, and their
+    /// types need not implement `Default` — so this is the
+    /// `..Default::default()` stand-in.
+    /// `_typ` and `_version` are stamped exactly as elsewhere.
+    ///
+    /// With this many parameters the `builder` feature reads better at a
+    /// call site; this exists so the type is constructible without it.
+    #[must_use]
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        berechnungsparameter: Tarifberechnungsparameter,
+        energiemix: Vec<Energiemix>,
+        kundentypen: Vec<Kundentyp>,
+        preisgarantie: Preisgarantie,
+        registeranzahl: Registeranzahl,
+        sparte: Sparte,
+        tarifmerkmale: Vec<Tarifmerkmal>,
+        tariftyp: Tariftyp,
+        vertragskonditionen: Vertragskonditionen,
+        website: String,
+    ) -> Self {
+        Self {
+            anbieter: Default::default(),
+            anbietername: Default::default(),
+            anwendung_von: Default::default(),
+            bemerkung: Default::default(),
+            berechnungsparameter,
+            beschreibung: Default::default(),
+            bezeichnung: Default::default(),
+            dynamische_preisposition_quelle: Default::default(),
+            energiemix,
+            id: Default::default(),
+            kundentypen,
+            preisgarantie,
+            regionspreise: Default::default(),
+            registeranzahl,
+            sparte,
+            tarifeinschraenkung: Default::default(),
+            tarifmerkmale,
+            tariftyp,
+            typ: Some(BoTyp::Tarif),
+            version: Some("202607.1.0".to_owned()),
+            vertragskonditionen,
+            website,
+            zeitliche_gueltigkeit: Default::default(),
+            zeitraum_belieferbarkeit: Default::default(),
+            zeitraum_vermarktung: Default::default(),
+            zusatz_attribute: Default::default(),
+            _additional: Default::default(),
+        }
+    }
+}
 impl Bo4eObject for Tarif {
     type BoTyp = BoTyp;
-    fn bo_type(&self) -> BoTyp {
-        self.typ.unwrap_or(BoTyp::Tarif)
-    }
-    fn schema_version(&self) -> &'static str {
-        "202607.1.0"
-    }
-    fn schema_series(&self) -> &'static str {
-        "202607"
-    }
+    const BO_TYP: BoTyp = BoTyp::Tarif;
+    const TYP_WIRE: &'static str = "TARIF";
+    const SCHEMA_VERSION: &'static str = "202607.1.0";
+    const SCHEMA_SERIES: &'static str = "202607";
 }
 #[cfg(feature = "json")]
 impl crate::json::sealed::Sealed for Tarif {}

@@ -424,17 +424,22 @@ mod rechnung_impl {
             self.rechnungsperiode.as_ref()?.as_inclusive_range()
         }
 
-        /// Billing period start date (shorthand for `billing_period().map(|(s,_)| s)`).
+        /// Billing period start date — `rechnungsperiode.startdatum`.
         ///
-        /// Returns `None` when `rechnungsperiode` is absent or `startdatum` is missing.
+        /// Returns `None` when `rechnungsperiode` is absent or `startdatum` is
+        /// missing. Unlike [`billing_period`](Self::billing_period) this does
+        /// **not** require the other bound: an invoice whose period is open at
+        /// the top still answers here, and `billing_period()` returns `None`.
         #[must_use]
         pub fn period_start(&self) -> Option<Date> {
             self.rechnungsperiode.as_ref()?.startdatum
         }
 
-        /// Billing period end date (shorthand for `billing_period().map(|(_,e)| e)`).
+        /// Billing period end date — `rechnungsperiode.enddatum`, **inclusive**.
         ///
-        /// Returns `None` when `rechnungsperiode` is absent or `enddatum` is missing.
+        /// Returns `None` when `rechnungsperiode` is absent or `enddatum` is
+        /// missing. As with [`period_start`](Self::period_start), the other
+        /// bound need not be present.
         #[must_use]
         pub fn period_end(&self) -> Option<Date> {
             self.rechnungsperiode.as_ref()?.enddatum

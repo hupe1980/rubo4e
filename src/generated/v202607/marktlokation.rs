@@ -33,6 +33,7 @@ pub struct Marktlokation {
     #[cfg_attr(feature = "serde", serde(rename = "endkunde"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub endkunde: Option<Box<Geschaeftspartner>>,
     /// Kennzeichnung, ob Energie eingespeist oder entnommen (ausgespeist) wird
     #[cfg_attr(feature = "serde", serde(rename = "energierichtung"))]
@@ -54,6 +55,7 @@ pub struct Marktlokation {
     #[cfg_attr(feature = "serde", serde(rename = "geoadresse"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub geoadresse: Option<Geokoordinaten>,
     /// Codenummer des Grundversorgers, der für diese Marktlokation zuständig ist
     #[cfg_attr(feature = "serde", serde(rename = "grundversorgercodenr"))]
@@ -72,6 +74,7 @@ pub struct Marktlokation {
     #[cfg_attr(feature = "serde", serde(rename = "katasterinformation"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub katasterinformation: Option<Katasteradresse>,
     /// Kundengruppen der Marktlokation
     #[cfg_attr(feature = "serde", serde(rename = "kundengruppen"))]
@@ -82,6 +85,7 @@ pub struct Marktlokation {
     #[cfg_attr(feature = "serde", serde(rename = "lokationsadresse"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub lokationsadresse: Option<Adresse>,
     /// Lokationsbuendel Code, der die Funktion dieses BOs an der Lokationsbuendelstruktur beschreibt.
     #[cfg_attr(feature = "serde", serde(rename = "lokationsbuendelObjektcode"))]
@@ -92,6 +96,7 @@ pub struct Marktlokation {
     #[cfg_attr(feature = "serde", serde(rename = "lokationszuordnungen"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub lokationszuordnungen: Option<Vec<Box<Lokationszuordnung>>>,
     /// für Gas. Code vom EIC, <https://www.entsog.eu/data/data-portal/codes-list>
     #[cfg_attr(feature = "serde", serde(rename = "marktgebiet"))]
@@ -150,6 +155,7 @@ pub struct Marktlokation {
     #[cfg_attr(feature = "serde", serde(rename = "verbrauchsmengen"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub verbrauchsmengen: Option<Vec<Box<Energiemenge>>>,
     /// Version der BO-Struktur aka "fachliche Versionierung"
     #[cfg_attr(feature = "serde", serde(rename = "_version"))]
@@ -162,6 +168,7 @@ pub struct Marktlokation {
     #[cfg_attr(feature = "serde", serde(rename = "zaehlwerke"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub zaehlwerke: Option<Vec<Zaehlwerk>>,
     #[cfg_attr(
         feature = "serde",
@@ -169,10 +176,12 @@ pub struct Marktlokation {
     )]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub zaehlwerke_der_beteiligten_marktrolle: Option<Vec<Zaehlwerk>>,
     #[cfg_attr(feature = "serde", serde(rename = "zusatzAttribute"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub zusatz_attribute: Option<Vec<ZusatzAttribut>>,
     /// Unknown JSON fields captured during deserialization for round-trip preservation.
     /// `None` when no unknown fields were present (zero heap allocation).
@@ -223,15 +232,10 @@ impl Default for Marktlokation {
 }
 impl Bo4eObject for Marktlokation {
     type BoTyp = BoTyp;
-    fn bo_type(&self) -> BoTyp {
-        self.typ.unwrap_or(BoTyp::Marktlokation)
-    }
-    fn schema_version(&self) -> &'static str {
-        "202607.1.0"
-    }
-    fn schema_series(&self) -> &'static str {
-        "202607"
-    }
+    const BO_TYP: BoTyp = BoTyp::Marktlokation;
+    const TYP_WIRE: &'static str = "MARKTLOKATION";
+    const SCHEMA_VERSION: &'static str = "202607.1.0";
+    const SCHEMA_SERIES: &'static str = "202607";
 }
 #[cfg(feature = "json")]
 impl crate::json::sealed::Sealed for Marktlokation {}

@@ -24,11 +24,13 @@ pub struct Angebotsteil {
     #[cfg_attr(feature = "serde", serde(rename = "gesamtkostenangebotsteil"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub gesamtkostenangebotsteil: Option<Betrag>,
     /// Summe der Verbräuche aller in diesem Angebotsteil eingeschlossenen Lieferstellen
     #[cfg_attr(feature = "serde", serde(rename = "gesamtmengeangebotsteil"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub gesamtmengeangebotsteil: Option<Menge>,
     /// Eine generische ID, die für eigene Zwecke genutzt werden kann.
     /// Z.B. könnten hier UUIDs aus einer Datenbank stehen oder URLs zu einem Backend-System.
@@ -41,16 +43,19 @@ pub struct Angebotsteil {
     #[cfg_attr(feature = "serde", serde(rename = "lieferstellenangebotsteil"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub lieferstellenangebotsteil: Option<Vec<Box<Marktlokation>>>,
     /// Hier kann der Belieferungszeitraum angegeben werden, für den dieser Angebotsteil gilt
     #[cfg_attr(feature = "serde", serde(rename = "lieferzeitraum"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub lieferzeitraum: Option<Zeitraum>,
     /// Einzelne Positionen, die zu diesem Angebotsteil gehören
     #[cfg_attr(feature = "serde", serde(rename = "positionen"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub positionen: Option<Vec<Angebotsposition>>,
     /// BO4E type discriminant — always `ComTyp::Angebotsteil` for this struct.
     #[cfg_attr(feature = "serde", serde(rename = "_typ"))]
@@ -71,6 +76,7 @@ pub struct Angebotsteil {
     #[cfg_attr(feature = "serde", serde(rename = "zusatzAttribute"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub zusatz_attribute: Option<Vec<ZusatzAttribut>>,
     /// Unknown JSON fields captured during deserialization for round-trip preservation.
     /// `None` when no unknown fields were present (zero heap allocation).

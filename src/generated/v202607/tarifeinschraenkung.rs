@@ -16,12 +16,14 @@ pub struct Tarifeinschraenkung {
     #[cfg_attr(feature = "serde", serde(rename = "einschraenkungleistung"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub einschraenkungleistung: Option<Vec<Menge>>,
     /// Liste der Zähler/Geräte, die erforderlich sind, damit dieser Tarif zur Anwendung gelangen kann.
     /// (Falls keine Zähler angegeben sind, ist der Tarif nicht an das Vorhandensein bestimmter Zähler gebunden.)
     #[cfg_attr(feature = "serde", serde(rename = "einschraenkungzaehler"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub einschraenkungzaehler: Option<Vec<Box<Geraet>>>,
     /// Eine generische ID, die für eigene Zwecke genutzt werden kann.
     /// Z.B. könnten hier UUIDs aus einer Datenbank stehen oder URLs zu einem Backend-System.
@@ -53,6 +55,7 @@ pub struct Tarifeinschraenkung {
     #[cfg_attr(feature = "serde", serde(rename = "zusatzAttribute"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub zusatz_attribute: Option<Vec<ZusatzAttribut>>,
     /// Weitere Produkte, die gemeinsam mit diesem Tarif bestellt werden können
     #[cfg_attr(feature = "serde", serde(rename = "zusatzprodukte"))]

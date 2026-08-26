@@ -181,7 +181,8 @@ pub fn paket_id_schema(_gen: &mut schemars::SchemaGenerator) -> schemars::Schema
 }
 
 /// JSON Schema for [`BilanzkreisId`](crate::identifiers::BilanzkreisId): 16-character EIC
-/// code restricted to type character `'Z'` (Bilanzierungszone).
+/// code restricted to object type `'X'` (Party) — a Bilanzkreis is a market
+/// party, not an area.
 pub fn bilanzkreis_id_schema(_gen: &mut schemars::SchemaGenerator) -> schemars::Schema {
     schemars::json_schema!({
         "type": "string",

@@ -3,9 +3,12 @@
 //! Every identifier:
 //! - validates its input at construction time (never panics)
 //! - stores the validated string as a `Box<str>` (compact, immutable)
-//! - implements `Display`, `FromStr`, `TryFrom<&str>`, `TryFrom<String>`, `AsRef<str>`,
-//!   `Debug`, `Clone`, `Hash`, `Eq`, `PartialEq`, `Ord`, `PartialOrd`
-//! - conditionally derives `Serialize` / `Deserialize` via the `serde` feature gate
+//! - implements `Display`, `FromStr`, `TryFrom<&str>`, `TryFrom<String>`,
+//!   `Into<String>`, `AsRef<str>`, `Borrow<str>`, `Deref<Target = str>`, and
+//!   `Debug`, `Clone`, `Hash`, `Eq`, `Ord` — none of them behind a feature flag,
+//!   because they are the minimum an EDIFACT encoder or decoder needs
+//! - adds `Serialize` / `Deserialize` with the `serde` feature, routed through
+//!   the same constructor
 //!
 //! ## Validation at construction vs. `validate` feature
 //!
@@ -73,20 +76,11 @@
 //! ### The two bank identifiers, and where they are *not* used
 //!
 //! [`Iban`] and [`Bic`] exist for `Zahlungsinformation.iban` / `.bic`, but the
-//! generated struct keeps both fields as `String`. `Zahlungsinformation` hangs
-//! off `Rechnung` and nothing else, so a newtype that refuses a **masked** IBAN
-//! — `DE89 **** **** 3000`, routine on an invoice — would take the whole invoice
-//! down with it. `Zahlungsinformation::iban_checked()` runs the check on demand
-//! and returns an error instead, which costs the caller the field rather than
-//! the invoice. `Iban::new` normalises grouping spaces and case, so a value
-//! copied off a statement parses.
-//!
-//! ### Wire-format traits without feature flags
-//!
-//! All identifier types unconditionally implement `Display`, `FromStr`,
-//! `TryFrom<&str>`, `TryFrom<String>`, and `AsRef<str>` regardless of which
-//! features are enabled.  These are the minimum needed for EDIFACT wire-format
-//! encoding/decoding and are **not** gated on `serde` or any other feature.
+//! generated struct keeps both fields as `String`: `Zahlungsinformation` hangs
+//! off `Rechnung` and nothing else, so a newtype refusing a **masked** IBAN —
+//! `DE89 **** **** 3000`, routine on an invoice — would take the whole invoice
+//! with it. `Zahlungsinformation::iban_checked()` runs the check on demand and
+//! costs the caller the field rather than the invoice.
 //!
 //! ### `validate` feature and `garde`
 //!
@@ -139,6 +133,21 @@ pub use tranchennummer_id::{TranchennummerId, TRANCHENNUMMER_MAX};
 #[cfg_attr(docsrs, doc(cfg(feature = "serde")))]
 pub use marktpartner_id::serde_as_i64 as marktpartner_id_as_i64;
 
+/// Returns the character starting at byte index `i`, for an error report.
+///
+/// Every validator here walks `as_bytes()` and reports the byte offset it
+/// stopped at, so the index handed back can land inside a multi-byte character —
+/// `&s[i..]` would panic there. Guarded by [`str::is_char_boundary`], and
+/// U+FFFD stands in for the cases it cannot name.
+#[inline]
+pub(crate) fn char_at(s: &str, i: usize) -> char {
+    if s.is_char_boundary(i) {
+        s[i..].chars().next().unwrap_or('\u{FFFD}')
+    } else {
+        '\u{FFFD}'
+    }
+}
+
 #[cfg(feature = "serde")]
 static IDENTIFIER_DESER_FAILURES: AtomicU64 = AtomicU64::new(0);
 
@@ -165,6 +174,15 @@ pub fn identifier_deser_failure_count() -> u64 {
     IDENTIFIER_DESER_FAILURES.load(Ordering::Relaxed)
 }
 
+/// Records one identifier that failed validation on the way in.
+///
+/// The rejected value is **not** logged: these types carry metering points,
+/// market partners, and bank accounts, and emitting one at `warn!` copies
+/// personal and payment data into whatever the log sink happens to be. The event
+/// carries the type, the byte length, and the error — and
+/// [`IdentifierError`](crate::error::IdentifierError) already names the
+/// offending position and the expected shape. Capture the value yourself, at a
+/// boundary allowed to hold it.
 #[cfg(feature = "serde")]
 pub(crate) fn trace_identifier_deser_error(
     identifier: &'static str,
@@ -183,13 +201,11 @@ pub(crate) fn trace_identifier_deser_error(
     #[cfg(feature = "tracing")]
     tracing::warn!(
         identifier,
-        input,
+        input_len = input.len(),
         error = %error,
         "identifier validation failed during deserialization"
     );
 
     #[cfg(not(feature = "tracing"))]
-    {
-        let _ = (identifier, input, error);
-    }
+    let _ = (identifier, input, error);
 }

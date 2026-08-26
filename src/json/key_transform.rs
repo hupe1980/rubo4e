@@ -11,6 +11,8 @@ use serde::de::Error as _;
 use serde::de::IntoDeserializer;
 use serde::Serialize;
 
+use super::depth::{DepthLimitedDeserializer, DepthState};
+
 /// Maps a JSON key to its counterpart in the other naming mode.
 ///
 /// `None` means "no mapping — pass this key through byte-for-byte", which is the
@@ -627,17 +629,32 @@ where
 pub(super) fn deserialize_with_key_transform_from_str<T: DeserializeOwned>(
     input: &str,
     transform: KeyTransform,
+    max_depth: usize,
 ) -> Result<T, serde_json::Error> {
+    let state = DepthState::new(max_depth);
     let mut de = serde_json::Deserializer::from_str(input);
-    T::deserialize(KeyTransformDeserializer::new(&mut de, transform))
+    let value = T::deserialize(KeyTransformDeserializer::new(
+        DepthLimitedDeserializer::new(&mut de, &state),
+        transform,
+    ))?;
+    // See `limits::deserialize_german_from_str`.
+    de.end()?;
+    Ok(value)
 }
 
 pub(super) fn deserialize_with_key_transform_from_slice<T: DeserializeOwned>(
     input: &[u8],
     transform: KeyTransform,
+    max_depth: usize,
 ) -> Result<T, serde_json::Error> {
+    let state = DepthState::new(max_depth);
     let mut de = serde_json::Deserializer::from_slice(input);
-    T::deserialize(KeyTransformDeserializer::new(&mut de, transform))
+    let value = T::deserialize(KeyTransformDeserializer::new(
+        DepthLimitedDeserializer::new(&mut de, &state),
+        transform,
+    ))?;
+    de.end()?;
+    Ok(value)
 }
 
 pub(super) struct KeyTransformDeserializer<D> {

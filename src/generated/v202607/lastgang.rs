@@ -24,6 +24,7 @@ pub struct Lastgang {
     #[cfg_attr(feature = "serde", serde(rename = "marktlokation"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub marktlokation: Option<Box<Marktlokation>>,
     /// Definition der gemessenen Größe anhand ihrer Einheit
     #[cfg_attr(feature = "serde", serde(rename = "messgroesse"))]
@@ -33,6 +34,7 @@ pub struct Lastgang {
     #[cfg_attr(feature = "serde", serde(rename = "messlokation"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub messlokation: Option<Box<Messlokation>>,
     /// Die OBIS-Kennzahl für den Wert, die festlegt, welche Größe mit dem Stand gemeldet wird, z.B. '1-0:1.8.1'
     #[cfg_attr(feature = "serde", serde(rename = "obisKennzahl"))]
@@ -62,12 +64,15 @@ pub struct Lastgang {
     #[cfg_attr(feature = "serde", serde(rename = "werte"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub werte: Option<Vec<Zeitreihenwert>>,
     #[cfg_attr(feature = "serde", serde(rename = "zeitIntervallLaenge"))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub zeit_intervall_laenge: Menge,
     #[cfg_attr(feature = "serde", serde(rename = "zusatzAttribute"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub zusatz_attribute: Option<Vec<ZusatzAttribut>>,
     /// Unknown JSON fields captured during deserialization for round-trip preservation.
     /// `None` when no unknown fields were present (zero heap allocation).
@@ -81,17 +86,38 @@ pub struct Lastgang {
     #[doc(hidden)]
     pub _additional: crate::LimitedExtensionMap,
 }
+impl Lastgang {
+    /// Creates a `Lastgang` from the one field the BO4E schema marks `required`,
+    /// defaulting every other field.
+    ///
+    /// `Lastgang` has no [`Default`]: `zeit_intervall_laenge` is required, and its
+    /// type need not implement `Default` — so this is the
+    /// `..Default::default()` stand-in.
+    /// `_typ` is stamped exactly as elsewhere.
+    #[must_use]
+    pub fn new(zeit_intervall_laenge: Menge) -> Self {
+        Self {
+            id: Default::default(),
+            marktlokation: Default::default(),
+            messgroesse: Default::default(),
+            messlokation: Default::default(),
+            obis_kennzahl: Default::default(),
+            sparte: Default::default(),
+            typ: Some(BoTyp::Lastgang),
+            version: Default::default(),
+            werte: Default::default(),
+            zeit_intervall_laenge,
+            zusatz_attribute: Default::default(),
+            _additional: Default::default(),
+        }
+    }
+}
 impl Bo4eObject for Lastgang {
     type BoTyp = BoTyp;
-    fn bo_type(&self) -> BoTyp {
-        self.typ.unwrap_or(BoTyp::Lastgang)
-    }
-    fn schema_version(&self) -> &'static str {
-        "202607.1.0"
-    }
-    fn schema_series(&self) -> &'static str {
-        "202607"
-    }
+    const BO_TYP: BoTyp = BoTyp::Lastgang;
+    const TYP_WIRE: &'static str = "LASTGANG";
+    const SCHEMA_VERSION: &'static str = "202607.1.0";
+    const SCHEMA_SERIES: &'static str = "202607";
 }
 #[cfg(feature = "json")]
 impl crate::json::sealed::Sealed for Lastgang {}

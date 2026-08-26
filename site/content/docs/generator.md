@@ -291,6 +291,8 @@ Because `src/generated/` is committed, it can go stale. What is checked:
 | Known-field-key table | `src/json/key_transform.rs` tests | an unsorted or incomplete `KNOWN_FIELD_KEYS`, which would scope the key transform wrongly |
 | Extension round-trip | `tests/extension_round_trip.rs` | the key transform renaming keys inside somebody else's JSON |
 | Prelude completeness | `tests/prelude_surface.rs` | an identifier type the prelude forgot to re-export |
+| `sqlx` impl coverage | `tests/prelude_surface.rs` | an identifier missing from `impl_sqlx_text!`, which compiles fine and simply cannot be a column |
+| `Borrow<str>` contract | `tests/prelude_surface.rs` | an identifier whose `Hash` / `Ord` disagrees with the string it borrows as, so a map lookup by `&str` silently misses |
 | Field-typing table | `generator/tests/round_trip.rs` | a dead entry, or one overriding a type the schema states |
 | Emitter snapshot | `generator/tests/round_trip.rs` | any change to emitted shape, as a reviewable diff |
 

@@ -59,7 +59,7 @@ from the schema, so neither can drift from what the standard declares:
 #### `_version` has no `v`
 
 BO4E tags its schema releases `v202607.1.0`, but the `_version` value **inside a
-payload** is `202607.1.0`. `Bo4eObject::schema_version()` returns the wire
+payload** is `202607.1.0`. `Bo4eObject::SCHEMA_VERSION` is the wire
 spelling, so it compares directly against a `_version` read off a message.
 
 Do not hardcode either string — a literal goes stale on the next schema series.
@@ -194,9 +194,9 @@ Two kinds of key are deliberately **not** rewritten, in either direction:
 
 - **BO4E metadata keys** — `_typ`, `_version`, `_id` keep their leading
   underscore in every output mode. They are wire metadata, not Rust field names.
-- **Extension keys** — anything the schema does not define passes through
-  byte-for-byte, so unknown fields round-trip exactly as they arrived rather than
-  being renamed into something their producer would not recognise.
+- **Extension keys** — anything the schema does not define is never renamed, so
+  unknown fields round-trip under the names their producer chose rather than
+  under something it would not recognise.
 
 Because every lookup resolves to a `&'static str`, renaming a key allocates on
 neither the serialize nor the deserialize path.
@@ -299,9 +299,15 @@ Available hardened variants:
 The two extension limits apply at **every nesting level**, not just the root
 object. Extension data hidden inside a nested COM — say
 `marktlokation.lokationsadresse` — is charged to the same budget as extension
-data on the root. Enforcement happens *during* parsing, so an oversized payload
-is rejected while it is being read rather than after the whole object tree has
-been allocated.
+data on the root, and both are checked as that struct's extension fields are
+read rather than after the whole object tree has been built.
+
+They bound what a payload leaves **retained**, not what parsing it allocates:
+`#[serde(flatten)]` routes unknown keys into the extension map by buffering a
+struct's unrecognised entries into an intermediate `Content` first, so those
+fields exist in memory before the count cap fires. `max_payload_bytes` is the
+only cap applied before any parsing, which makes it the one that bounds peak
+memory — set it first.
 
 Independently of these opt-in limits, two hard caps always apply, on every
 deserialization path including the non-hardened ones:
@@ -359,11 +365,16 @@ let roundtripped = vertrag.to_json_german()?;
 assert!(roundtripped.contains("_customExtension"));
 ```
 
-`indexmap::IndexMap` is used (not `std::collections::HashMap`) to preserve the
-original key insertion order.
+`indexmap::IndexMap` is used (not `std::collections::HashMap`) so the
+**top-level** extension keys keep the order they arrived in.
 
-Everything nested under an extension key is preserved verbatim too — see
-[the transform's scoping rule](#the-transform-stops-at-the-edge-of-the-schema).
+Everything nested under an extension key keeps its names and values, and is
+never renamed — see [the transform's scoping
+rule](#the-transform-stops-at-the-edge-of-the-schema). Key **order inside** a
+nested object is not kept: below the top level a value is a `serde_json::Value`,
+whose objects are a sorted map, so `{"b":1,"a":2}` comes back as `{"a":2,"b":1}`.
+Enable `serde_json`'s `preserve_order` in your own `Cargo.toml` if that ordering
+matters; feature unification applies it here too.
 
 ### Two caps you cannot turn off
 

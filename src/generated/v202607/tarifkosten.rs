@@ -18,6 +18,7 @@ pub struct Tarifkosten {
     #[cfg_attr(feature = "serde", serde(rename = "anbieter"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub anbieter: Option<Box<Marktteilnehmer>>,
     /// Der Name des Marktpartners, der den Tarif anbietet
     #[cfg_attr(feature = "serde", serde(rename = "anbietername"))]
@@ -66,6 +67,7 @@ pub struct Tarifkosten {
     #[cfg_attr(feature = "serde", serde(rename = "energiemix"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub energiemix: Option<Energiemix>,
     /// Eine generische ID, die für eigene Zwecke genutzt werden kann.
     /// Z.B. könnten hier UUIDs aus einer Datenbank stehen oder URLs zu einem Backend-System.
@@ -78,6 +80,7 @@ pub struct Tarifkosten {
     #[cfg_attr(feature = "serde", serde(rename = "kosten"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub kosten: Option<Box<Kosten>>,
     /// Kundentypen für den der Tarif gilt, z.B. Privatkunden
     #[cfg_attr(feature = "serde", serde(rename = "kundentypen"))]
@@ -124,6 +127,7 @@ pub struct Tarifkosten {
     #[cfg_attr(feature = "serde", serde(rename = "vertragskonditionen"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub vertragskonditionen: Option<Vertragskonditionen>,
     /// Internetseite auf dem der Tarif zu finden ist
     #[cfg_attr(feature = "serde", serde(rename = "website"))]
@@ -134,10 +138,12 @@ pub struct Tarifkosten {
     #[cfg_attr(feature = "serde", serde(rename = "zeitlicheGueltigkeit"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub zeitliche_gueltigkeit: Option<Zeitraum>,
     #[cfg_attr(feature = "serde", serde(rename = "zusatzAttribute"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub zusatz_attribute: Option<Vec<ZusatzAttribut>>,
     /// Unknown JSON fields captured during deserialization for round-trip preservation.
     /// `None` when no unknown fields were present (zero heap allocation).
@@ -179,15 +185,10 @@ impl Default for Tarifkosten {
 }
 impl Bo4eObject for Tarifkosten {
     type BoTyp = BoTyp;
-    fn bo_type(&self) -> BoTyp {
-        self.typ.unwrap_or(BoTyp::Tarifkosten)
-    }
-    fn schema_version(&self) -> &'static str {
-        "202607.1.0"
-    }
-    fn schema_series(&self) -> &'static str {
-        "202607"
-    }
+    const BO_TYP: BoTyp = BoTyp::Tarifkosten;
+    const TYP_WIRE: &'static str = "TARIFKOSTEN";
+    const SCHEMA_VERSION: &'static str = "202607.1.0";
+    const SCHEMA_SERIES: &'static str = "202607";
 }
 #[cfg(feature = "json")]
 impl crate::json::sealed::Sealed for Tarifkosten {}

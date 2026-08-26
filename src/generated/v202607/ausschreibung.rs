@@ -19,12 +19,14 @@ pub struct Ausschreibung {
     #[cfg_attr(feature = "serde", serde(rename = "abgabefrist"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub abgabefrist: Option<Zeitraum>,
     /// Mit diesem Objekt können Geschäftspartner übertragen werden.
     /// Sowohl Unternehmen, als auch Privatpersonen können Geschäftspartner sein
     #[cfg_attr(feature = "serde", serde(rename = "ausschreibender"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub ausschreibender: Option<Box<Geschaeftspartner>>,
     /// Aufzählung der unterstützten Ausschreibungsportale
     #[cfg_attr(feature = "serde", serde(rename = "ausschreibungportal"))]
@@ -51,6 +53,7 @@ pub struct Ausschreibung {
     #[cfg_attr(feature = "serde", serde(rename = "bindefrist"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub bindefrist: Option<Zeitraum>,
     /// Eine generische ID, die für eigene Zwecke genutzt werden kann.
     /// Z.B. könnten hier UUIDs aus einer Datenbank stehen oder URLs zu einem Backend-System.
@@ -67,6 +70,7 @@ pub struct Ausschreibung {
     #[cfg_attr(feature = "serde", serde(rename = "lose"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub lose: Option<Vec<Ausschreibungslos>>,
     /// BO4E type discriminant — always `BoTyp::Ausschreibung` for this struct.
     #[cfg_attr(feature = "serde", serde(rename = "_typ"))]
@@ -119,6 +123,7 @@ pub struct Ausschreibung {
     #[cfg_attr(feature = "serde", serde(rename = "zusatzAttribute"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub zusatz_attribute: Option<Vec<ZusatzAttribut>>,
     /// Unknown JSON fields captured during deserialization for round-trip preservation.
     /// `None` when no unknown fields were present (zero heap allocation).
@@ -156,15 +161,10 @@ impl Default for Ausschreibung {
 }
 impl Bo4eObject for Ausschreibung {
     type BoTyp = BoTyp;
-    fn bo_type(&self) -> BoTyp {
-        self.typ.unwrap_or(BoTyp::Ausschreibung)
-    }
-    fn schema_version(&self) -> &'static str {
-        "202607.1.0"
-    }
-    fn schema_series(&self) -> &'static str {
-        "202607"
-    }
+    const BO_TYP: BoTyp = BoTyp::Ausschreibung;
+    const TYP_WIRE: &'static str = "AUSSCHREIBUNG";
+    const SCHEMA_VERSION: &'static str = "202607.1.0";
+    const SCHEMA_SERIES: &'static str = "202607";
 }
 #[cfg(feature = "json")]
 impl crate::json::sealed::Sealed for Ausschreibung {}

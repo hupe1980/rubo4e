@@ -19,6 +19,7 @@ pub struct Lokationszuordnung {
     #[cfg_attr(feature = "serde", serde(rename = "gueltigkeit"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub gueltigkeit: Option<Zeitraum>,
     /// Eine generische ID, die für eigene Zwecke genutzt werden kann.
     /// Z.B. könnten hier UUIDs aus einer Datenbank stehen oder URLs zu einem Backend-System.
@@ -35,26 +36,31 @@ pub struct Lokationszuordnung {
     #[cfg_attr(feature = "serde", serde(rename = "marktlokationen"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub marktlokationen: Option<Vec<Box<Marktlokation>>>,
     /// Liste mit referenzierten Messlokationen
     #[cfg_attr(feature = "serde", serde(rename = "messlokationen"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub messlokationen: Option<Vec<Box<Messlokation>>>,
     /// Liste mit referenzierten Netzlokationen
     #[cfg_attr(feature = "serde", serde(rename = "netzlokationen"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub netzlokationen: Option<Vec<Box<Netzlokation>>>,
     /// Liste mit referenzierten steuerbaren Ressourcen
     #[cfg_attr(feature = "serde", serde(rename = "steuerbareRessourcen"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub steuerbare_ressourcen: Option<Vec<Box<SteuerbareRessource>>>,
     /// Liste mit referenzierten technischen Ressourcen
     #[cfg_attr(feature = "serde", serde(rename = "technischeRessourcen"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub technische_ressourcen: Option<Vec<Box<TechnischeRessource>>>,
     /// BO4E type discriminant — always `BoTyp::Lokationszuordnung` for this struct.
     #[cfg_attr(feature = "serde", serde(rename = "_typ"))]
@@ -80,6 +86,7 @@ pub struct Lokationszuordnung {
     #[cfg_attr(feature = "serde", serde(rename = "zusatzAttribute"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub zusatz_attribute: Option<Vec<ZusatzAttribut>>,
     /// Unknown JSON fields captured during deserialization for round-trip preservation.
     /// `None` when no unknown fields were present (zero heap allocation).
@@ -114,15 +121,10 @@ impl Default for Lokationszuordnung {
 }
 impl Bo4eObject for Lokationszuordnung {
     type BoTyp = BoTyp;
-    fn bo_type(&self) -> BoTyp {
-        self.typ.unwrap_or(BoTyp::Lokationszuordnung)
-    }
-    fn schema_version(&self) -> &'static str {
-        "202607.1.0"
-    }
-    fn schema_series(&self) -> &'static str {
-        "202607"
-    }
+    const BO_TYP: BoTyp = BoTyp::Lokationszuordnung;
+    const TYP_WIRE: &'static str = "LOKATIONSZUORDNUNG";
+    const SCHEMA_VERSION: &'static str = "202607.1.0";
+    const SCHEMA_SERIES: &'static str = "202607";
 }
 #[cfg(feature = "json")]
 impl crate::json::sealed::Sealed for Lokationszuordnung {}

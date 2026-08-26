@@ -10,12 +10,18 @@ passing an invalid ID where a valid one is required — at compile time, not at 
 All identifier types implement:
 
 ```
-Display, FromStr, TryFrom<&str>, AsRef<str>,
+Display, FromStr, TryFrom<&str>, TryFrom<String>, Into<String>,
+AsRef<str>, Borrow<str>, Deref<Target = str>,
 Debug, Clone, Hash, Eq, PartialEq, Ord, PartialOrd,
 Serialize, Deserialize (behind `serde` feature)
 ```
 
-Construction is always fallible. There are no panicking constructors.
+Construction is always fallible. There are no panicking constructors, and
+`Deserialize` routes through the same `new`, so a value that exists has been
+validated.
+
+Everything up to `Deref` is unconditional — no feature flag turns it off — because
+that is the minimum an EDIFACT encoder or decoder needs.
 
 ## IdentifierError
 
@@ -593,9 +599,26 @@ serialized form.
 
 ## Using Identifiers as Map Keys
 
-All identifiers implement `Hash + Eq`, so they work as `HashMap` and `BTreeMap` keys:
+All identifiers implement `Hash + Eq + Ord`, so they key a `HashMap` and a
+`BTreeMap` alike:
 
 ```rust
 use std::collections::HashMap;
 let mut map: HashMap<MaloId, Vertrag> = HashMap::new();
 ```
+
+They also implement `Borrow<str>`, so a lookup does not have to construct — and
+re-validate — an identifier just to ask whether one is in the map:
+
+```rust
+map.insert(MaloId::new("41373559241")?, vertrag);
+assert!(map.contains_key("41373559241"));   // no MaloId built, no checksum re-run
+```
+
+`Borrow` carries a contract — the borrowed form must hash and compare exactly as
+the owned one does, or that lookup returns `None` for a key that is present.
+`tests/prelude_surface.rs` checks it for every identifier.
+
+For `ObisCode` the key is the **canonical** spelling: look up `"1-0:1.8.0"`, not
+`"01-00:01.08.00"`. Both build the same value, but only the canonical form is the
+string it borrows as.

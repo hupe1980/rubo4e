@@ -19,6 +19,7 @@ pub struct Tarifpreiszeitscheibe {
     #[cfg_attr(feature = "serde", serde(rename = "einheitsPreispositionen"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub einheits_preispositionen: Option<Vec<EinheitsPreisposition>>,
     /// Eine generische ID, die für eigene Zwecke genutzt werden kann.
     /// Z.B. könnten hier UUIDs aus einer Datenbank stehen oder URLs zu einem Backend-System.
@@ -31,6 +32,7 @@ pub struct Tarifpreiszeitscheibe {
     #[cfg_attr(feature = "serde", serde(rename = "lastvariablePreispositionen"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub lastvariable_preispositionen: Option<Vec<LastvariablePreisposition>>,
     /// Eine Liste von relativen Preispositionen.
     /// Diese Preispositionen modellieren prozentuale Modifikationen auf bestehende Preispositionen.
@@ -41,6 +43,7 @@ pub struct Tarifpreiszeitscheibe {
     #[cfg_attr(feature = "serde", serde(rename = "relativePreispositionen"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub relative_preispositionen: Option<Vec<RelativePreisposition>>,
     /// BO4E type discriminant — always `ComTyp::Tarifpreiszeitscheibe` for this struct.
     #[cfg_attr(feature = "serde", serde(rename = "_typ"))]
@@ -62,16 +65,19 @@ pub struct Tarifpreiszeitscheibe {
     #[cfg_attr(feature = "serde", serde(rename = "zeitscheibengueltigkeit"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub zeitscheibengueltigkeit: Option<Zeitraum>,
     /// Eine Liste von zeitvariablen Preispositionen.
     /// Dies können z.B. Preispositionen mit Zählzeitdefinitionen sein, um ein klassisches HT/NT Modell abzubilden.
     #[cfg_attr(feature = "serde", serde(rename = "zeitvariablePreispositionen"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub zeitvariable_preispositionen: Option<Vec<ZeitvariablePreisposition>>,
     #[cfg_attr(feature = "serde", serde(rename = "zusatzAttribute"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub zusatz_attribute: Option<Vec<ZusatzAttribut>>,
     /// Unknown JSON fields captured during deserialization for round-trip preservation.
     /// `None` when no unknown fields were present (zero heap allocation).

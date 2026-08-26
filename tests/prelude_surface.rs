@@ -123,3 +123,117 @@ fn every_identifier_is_reachable_through_the_prelude() {
     let _: fn(&EicCode) -> EicType = EicCode::eic_type;
     let _: fn(&ObisCode) -> ObisComponents = ObisCode::components;
 }
+
+/// `sqlx_impls.rs` names its types in a hand-maintained macro invocation, so a
+/// new identifier gets its `Type` / `Encode` / `Decode` / `PgHasArrayType` impls
+/// only if someone remembers to add it there.
+///
+/// Nothing fails to compile when they do not — the identifier just quietly
+/// cannot be a column. This compares the list against the module's own exports,
+/// the same way the prelude guard above does.
+/// The types `src/identifiers/` exports that are **not** identifier newtypes.
+///
+/// Each is a plain helper enum or struct an accessor returns — they wrap no
+/// string and cannot be a database column. Listed rather than inferred, so a new
+/// export lands in one of the two categories deliberately: an addition here is a
+/// statement that the type is not an identifier.
+const NON_IDENTIFIER_HELPERS: &[&str] = &[
+    "EicType",           // EicCode::eic_type
+    "MaloVergabestelle", // MaloId::vergabestelle
+    "MpIdAuthority",     // MarktpartnerId::authority
+    "ObisComponents",    // ObisCode::components
+];
+
+#[test]
+fn every_identifier_has_sqlx_impls() {
+    let module = read("src/identifiers/mod.rs");
+    let public: BTreeSet<String> = exported_names(&module, "pub use ")
+        .into_iter()
+        .filter(|n| is_type_name(n))
+        .filter(|n| !NON_IDENTIFIER_HELPERS.contains(&n.as_str()))
+        .collect();
+
+    // The macro call lists one type per line inside `impl_sqlx_text!( … );`.
+    let impls = read("src/identifiers/sqlx_impls.rs");
+    let body = impls
+        .split_once("impl_sqlx_text!(")
+        .and_then(|(_, rest)| rest.split_once(");"))
+        .map(|(list, _)| list)
+        .expect("sqlx_impls.rs must contain an impl_sqlx_text! invocation");
+    let covered: BTreeSet<String> = body
+        .split(',')
+        .map(str::trim)
+        .filter(|n| !n.is_empty())
+        .map(str::to_owned)
+        .collect();
+
+    let missing: Vec<&String> = public.difference(&covered).collect();
+    assert!(
+        missing.is_empty(),
+        "the sqlx docs promise these impls for *every* identifier, but {missing:?} \
+         are not in `impl_sqlx_text!` — add them, or change what the docs promise"
+    );
+
+    let unknown: Vec<&String> = covered.difference(&public).collect();
+    assert!(
+        unknown.is_empty(),
+        "impl_sqlx_text! names {unknown:?}, which src/identifiers/mod.rs does not export"
+    );
+}
+
+/// Every identifier is a string newtype that implements `Borrow<str>`, and
+/// `Borrow` carries a contract: the borrowed form must hash and compare exactly
+/// as the owned one does. Break it and a `HashMap<Id, _>::get(&str)` lookup
+/// silently misses keys that are present — no error, no panic, just a `None`.
+///
+/// So every identifier must be findable by the string it renders as, in a
+/// `HashMap` and a `BTreeMap` alike. `ObisCode` is the one that needs care: it
+/// caches its parsed components alongside its string.
+#[test]
+fn every_identifier_can_be_looked_up_by_its_string() {
+    use rubo4e::prelude::*;
+    use std::collections::{BTreeMap, HashMap};
+
+    /// Inserts `id` under itself, then looks it up by `&str`.
+    fn round_trip<T>(id: T)
+    where
+        T: std::hash::Hash + Ord + Clone + AsRef<str> + std::borrow::Borrow<str>,
+    {
+        let key = id.as_ref().to_owned();
+
+        let mut by_hash: HashMap<T, u32> = HashMap::new();
+        by_hash.insert(id.clone(), 1);
+        assert_eq!(
+            by_hash.get(key.as_str()),
+            Some(&1),
+            "HashMap lookup by &str missed {key:?} — Borrow<str> and Hash disagree"
+        );
+
+        let mut by_order: BTreeMap<T, u32> = BTreeMap::new();
+        by_order.insert(id, 1);
+        assert_eq!(
+            by_order.get(key.as_str()),
+            Some(&1),
+            "BTreeMap lookup by &str missed {key:?} — Borrow<str> and Ord disagree"
+        );
+    }
+
+    round_trip(AkivId::new("AKIV-2026-00001").unwrap());
+    round_trip(Bic::new("COBADEFFXXX").unwrap());
+    round_trip(BilanzierungsgebietId::new("11YN-0000-0001-Q").unwrap());
+    round_trip(BilanzkreisId::new("11XSUEDWESTSTRO8").unwrap());
+    round_trip(CrId::from_base("A000000001").unwrap());
+    round_trip(EicCode::new("10YDE-EON------1").unwrap());
+    round_trip(Iban::new("DE89370400440532013000").unwrap());
+    round_trip(MaloId::new("41373559241").unwrap());
+    round_trip(MarktpartnerId::new("9900357000003").unwrap());
+    round_trip(MeloId::new("DE0000000000000000000000000000001").unwrap());
+    round_trip(NebeId::from_base("F000000001").unwrap());
+    round_trip(NeloId::from_base("E000000001").unwrap());
+    round_trip(ObisCode::new("1-0:1.8.0*255").unwrap());
+    round_trip(PaketId::from_base("P900000001").unwrap());
+    round_trip(SgId::from_base("B000000001").unwrap());
+    round_trip(SrId::from_base("C000000001").unwrap());
+    round_trip(TrId::from_base("D000000001").unwrap());
+    round_trip(TranchennummerId::new("42").unwrap());
+}

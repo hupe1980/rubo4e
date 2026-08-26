@@ -49,16 +49,19 @@ pub struct TechnischeRessource {
     #[cfg_attr(feature = "serde", serde(rename = "lokationszuordnungen"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub lokationszuordnungen: Option<Vec<Box<Lokationszuordnung>>>,
     /// Nennleistung (Abgabe)
     #[cfg_attr(feature = "serde", serde(rename = "nennleistungabgabe"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub nennleistungabgabe: Option<Menge>,
     /// Nennleistung (Aufnahme)
     #[cfg_attr(feature = "serde", serde(rename = "nennleistungaufnahme"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub nennleistungaufnahme: Option<Menge>,
     /// Art des Speichers
     #[cfg_attr(feature = "serde", serde(rename = "speicherart"))]
@@ -69,6 +72,7 @@ pub struct TechnischeRessource {
     #[cfg_attr(feature = "serde", serde(rename = "speicherkapazitaet"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub speicherkapazitaet: Option<Menge>,
     /// Identifikationsnummer einer technischen Ressource
     #[cfg_attr(feature = "serde", serde(rename = "technischeRessourceId"))]
@@ -125,6 +129,7 @@ pub struct TechnischeRessource {
     #[cfg_attr(feature = "serde", serde(rename = "zusatzAttribute"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub zusatz_attribute: Option<Vec<ZusatzAttribut>>,
     /// Unknown JSON fields captured during deserialization for round-trip preservation.
     /// `None` when no unknown fields were present (zero heap allocation).
@@ -168,15 +173,10 @@ impl Default for TechnischeRessource {
 }
 impl Bo4eObject for TechnischeRessource {
     type BoTyp = BoTyp;
-    fn bo_type(&self) -> BoTyp {
-        self.typ.unwrap_or(BoTyp::TechnischeRessource)
-    }
-    fn schema_version(&self) -> &'static str {
-        "202607.1.0"
-    }
-    fn schema_series(&self) -> &'static str {
-        "202607"
-    }
+    const BO_TYP: BoTyp = BoTyp::TechnischeRessource;
+    const TYP_WIRE: &'static str = "TECHNISCHERESSOURCE";
+    const SCHEMA_VERSION: &'static str = "202607.1.0";
+    const SCHEMA_SERIES: &'static str = "202607";
 }
 #[cfg(feature = "json")]
 impl crate::json::sealed::Sealed for TechnischeRessource {}

@@ -344,3 +344,140 @@ fn docs_price_tier_gap_rule() {
     assert_eq!(price(Decimal::new(10006, 1)), Some(Decimal::from(25)));
     assert!(staffeln.select_for(Decimal::from(9999)).is_none());
 }
+
+/// `README.md` § Convenience API and the site's ecosystem page: the `Rechnung`
+/// and `PreisblattNetznutzung` accessor walkthroughs.
+///
+/// `billing_period()` returns a `RangeInclusive<Date>` and `validity()` a pair;
+/// the snippets show both, and nothing else type-checks them.
+#[test]
+#[cfg(all(feature = "time", feature = "decimal"))]
+fn docs_rechnung_and_validity_accessors() {
+    use rubo4e::current::{
+        Betrag, PreisblattNetznutzung, Rechnung, Rechnungsposition, Waehrungscode, Zeitraum,
+    };
+    use rust_decimal::Decimal;
+    use time::macros::date;
+
+    let betrag = |cents: i64| Betrag {
+        wert: Some(Decimal::new(cents, 2)),
+        waehrung: Some(Waehrungscode::Eur),
+        ..Default::default()
+    };
+    let januar = Zeitraum {
+        startdatum: Some(date!(2026 - 01 - 01)),
+        enddatum: Some(date!(2026 - 01 - 31)),
+        ..Default::default()
+    };
+
+    let rechnung = Rechnung {
+        rechnungsperiode: Some(januar.clone()),
+        gesamtnetto: Some(betrag(10_000)),
+        gesamtsteuer: Some(betrag(1_900)),
+        gesamtbrutto: Some(betrag(11_900)),
+        ist_storno: Some(true),
+        faelligkeitsdatum: Some(date!(2026 - 02 - 15).midnight().assume_utc()),
+        rechnungspositionen: Some(vec![Rechnungsposition {
+            gesamtpreis: Some(betrag(11_900)),
+            lieferungszeitraum: Some(januar),
+            ..Default::default()
+        }]),
+        ..Default::default()
+    };
+
+    // A `RangeInclusive<Date>`, so the convention travels with the value.
+    let period = rechnung.billing_period().expect("both dates present");
+    assert_eq!(
+        (*period.start(), *period.end()),
+        (date!(2026 - 01 - 01), date!(2026 - 01 - 31),)
+    );
+    assert!(period.contains(&date!(2026 - 01 - 31)), "the end is inside");
+
+    assert_eq!(rechnung.period_start(), Some(date!(2026 - 01 - 01)));
+    assert_eq!(rechnung.period_end(), Some(date!(2026 - 01 - 31)));
+    assert_eq!(
+        rechnung.faelligkeitsdatum_date(),
+        Some(date!(2026 - 02 - 15))
+    );
+
+    assert_eq!(
+        rechnung.gesamtnetto_decimal(),
+        Some(Decimal::new(10_000, 2))
+    );
+    assert_eq!(
+        rechnung.gesamtsteuer_decimal(),
+        Some(Decimal::new(1_900, 2))
+    );
+    assert_eq!(
+        rechnung.gesamtbrutto_decimal(),
+        Some(Decimal::new(11_900, 2))
+    );
+    assert!(rechnung.zu_zahlen_decimal().is_none());
+    assert!(rechnung.vorauszahlungen_summe().is_none(), "none stated");
+    assert!(rechnung.is_storno());
+    assert!(!rechnung.is_original());
+
+    let pos = rechnung.positions().next().expect("one line item");
+    assert_eq!(pos.gesamtpreis_decimal(), Some(Decimal::new(11_900, 2)));
+    assert_eq!(pos.lieferung_von_date(), Some(date!(2026 - 01 - 01)));
+    assert_eq!(pos.lieferung_bis_date(), Some(date!(2026 - 01 - 31)));
+    assert!(pos.lieferungszeitraum_contains(date!(2026 - 01 - 31)));
+    assert!(!pos.lieferungszeitraum_contains(date!(2026 - 02 - 01)));
+
+    // `validity()` is the pair, and a missing `gueltigkeit` reads as (None, None).
+    let sheet = PreisblattNetznutzung {
+        gueltigkeit: Some(Zeitraum {
+            startdatum: Some(date!(2026 - 01 - 01)),
+            ..Default::default()
+        }),
+        ..Default::default()
+    };
+    assert_eq!(sheet.validity(), (Some(date!(2026 - 01 - 01)), None));
+    assert!(sheet.is_valid_at(date!(2026 - 10 - 01)));
+    assert_eq!(PreisblattNetznutzung::default().validity(), (None, None));
+    assert!(
+        !PreisblattNetznutzung::default().is_valid_at(date!(2026 - 10 - 01)),
+        "no validity stated must read as *not* valid"
+    );
+}
+
+/// `README.md` § Convenience API and the site's ecosystem page: the three
+/// `Zeitraum` fields that stay `String` and are parsed on demand.
+#[test]
+#[cfg(feature = "time")]
+fn docs_zeitraum_string_fields_parse_on_demand() {
+    use rubo4e::current::Zeitraum;
+    use time::macros::{offset, time};
+    use time::Duration;
+
+    let z = Zeitraum {
+        dauer: Some("P1DT30H4S".into()),
+        startuhrzeit: Some("18:00:00+01:00".into()),
+        enduhrzeit: Some("19:00:00+01:00".into()),
+        ..Default::default()
+    };
+
+    assert_eq!(
+        z.duration(),
+        Some(Ok(Duration::days(1)
+            + Duration::hours(30)
+            + Duration::seconds(4)))
+    );
+    assert_eq!(
+        z.startuhrzeit_parsed(),
+        Some(Ok((time!(18:00:00), Some(offset!(+1)))))
+    );
+    assert_eq!(
+        z.enduhrzeit_parsed(),
+        Some(Ok((time!(19:00:00), Some(offset!(+1)))))
+    );
+
+    // Absent stays distinguishable from unparsable.
+    assert!(Zeitraum::default().duration().is_none());
+    // A calendar component has no fixed length and is refused, not guessed.
+    let calendar = Zeitraum {
+        dauer: Some("P1M".into()),
+        ..Default::default()
+    };
+    assert!(calendar.duration().expect("stated").is_err());
+}

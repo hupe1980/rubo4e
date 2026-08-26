@@ -35,6 +35,7 @@ pub struct Netzlokation {
     #[cfg_attr(feature = "serde", serde(rename = "konfigurationsprodukte"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub konfigurationsprodukte: Option<Vec<Konfigurationsprodukt>>,
     /// Lokationsbuendel Code, der die Funktion dieses BOs an der Lokationsbuendelstruktur beschreibt.
     #[cfg_attr(feature = "serde", serde(rename = "lokationsbuendelObjektcode"))]
@@ -45,11 +46,13 @@ pub struct Netzlokation {
     #[cfg_attr(feature = "serde", serde(rename = "lokationszuordnungen"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub lokationszuordnungen: Option<Vec<Box<Lokationszuordnung>>>,
     /// Netzanschlussleistungsmenge der Netzlokation
     #[cfg_attr(feature = "serde", serde(rename = "netzanschlussleistung"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub netzanschlussleistung: Option<Menge>,
     /// Identifikationsnummer einer Netzlokation, an der Energie entweder verbraucht, oder erzeugt wird
     #[cfg_attr(feature = "serde", serde(rename = "netzlokationsId"))]
@@ -93,10 +96,12 @@ pub struct Netzlokation {
     #[cfg_attr(feature = "serde", serde(rename = "verwendungszweck"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub verwendungszweck: Option<VerwendungszweckProMarktrolle>,
     #[cfg_attr(feature = "serde", serde(rename = "zusatzAttribute"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub zusatz_attribute: Option<Vec<ZusatzAttribut>>,
     /// Unknown JSON fields captured during deserialization for round-trip preservation.
     /// `None` when no unknown fields were present (zero heap allocation).
@@ -134,15 +139,10 @@ impl Default for Netzlokation {
 }
 impl Bo4eObject for Netzlokation {
     type BoTyp = BoTyp;
-    fn bo_type(&self) -> BoTyp {
-        self.typ.unwrap_or(BoTyp::Netzlokation)
-    }
-    fn schema_version(&self) -> &'static str {
-        "202607.1.0"
-    }
-    fn schema_series(&self) -> &'static str {
-        "202607"
-    }
+    const BO_TYP: BoTyp = BoTyp::Netzlokation;
+    const TYP_WIRE: &'static str = "NETZLOKATION";
+    const SCHEMA_VERSION: &'static str = "202607.1.0";
+    const SCHEMA_SERIES: &'static str = "202607";
 }
 #[cfg(feature = "json")]
 impl crate::json::sealed::Sealed for Netzlokation {}

@@ -273,3 +273,81 @@ fn any_bo_enforces_hardened_nesting_depth() {
         "AnyBo must not escape the configured nesting-depth limit"
     );
 }
+
+/// `bo_type()` on a concrete BO describes the **Rust type**, not the `_typ` the
+/// payload carried — otherwise a `match` on it takes the branch the sender
+/// named. `AnyBo` is the type that dispatches on a payload's claim.
+#[test]
+#[cfg(all(feature = "json", feature = "versioned"))]
+fn a_concrete_bo_reports_its_own_type_not_the_payloads_claim() {
+    use rubo4e::current::{BoTyp, Marktlokation, Vertrag};
+    use rubo4e::Bo4eObject as _;
+
+    let malo: Marktlokation =
+        serde_json::from_str(r#"{"_typ":"VERTRAG","marktlokationsId":"51238696781"}"#)
+            .expect("the lenient decode succeeds — that is the point");
+
+    assert_eq!(malo.bo_type(), BoTyp::Marktlokation);
+    // The payload's own claim is preserved, so the mismatch stays detectable.
+    assert_eq!(malo.typ, Some(BoTyp::Vertrag));
+    assert_ne!(malo.typ, Some(malo.bo_type()));
+
+    // A `_typ` the schema does not define decodes to the catch-all, and still
+    // does not change what the value is.
+    let v: Vertrag = serde_json::from_str(r#"{"_typ":"NOT_A_BO"}"#).expect("lenient");
+    assert_eq!(v.bo_type(), BoTyp::Vertrag);
+    assert_eq!(v.typ, Some(BoTyp::Unknown));
+
+    // …and a payload with no `_typ` at all reports the type just the same.
+    let bare: Vertrag = serde_json::from_str("{}").expect("valid");
+    assert_eq!(bare.bo_type(), BoTyp::Vertrag);
+    assert_eq!(bare.typ, None);
+}
+
+/// `AnyBo` carries every `Bo4eObject` fact, since it is what a heterogeneous
+/// collection uses in place of a trait object — plus the `Clone`, `PartialEq`,
+/// and serde impls a trait object cannot have.
+#[test]
+#[cfg(all(feature = "json", feature = "versioned"))]
+fn any_bo_carries_every_bo4e_object_fact() {
+    use rubo4e::current::{AnyBo, BoTyp, Marktlokation, Vertrag};
+    use rubo4e::Bo4eObject;
+
+    // The heterogeneous collection the `dyn` doctest used to build.
+    let objects: Vec<AnyBo> = vec![Vertrag::default().into(), Marktlokation::default().into()];
+
+    assert_eq!(
+        objects.iter().map(AnyBo::bo_type).collect::<Vec<_>>(),
+        [BoTyp::Vertrag, BoTyp::Marktlokation]
+    );
+    assert_eq!(
+        objects.iter().map(AnyBo::typ_wire).collect::<Vec<_>>(),
+        ["VERTRAG", "MARKTLOKATION"]
+    );
+    for bo in &objects {
+        assert_eq!(bo.schema_version(), Some(Vertrag::SCHEMA_VERSION));
+        assert_eq!(bo.schema_series(), Some(Vertrag::SCHEMA_SERIES));
+    }
+
+    // …and the things a trait object could not do.
+    assert_eq!(objects.clone(), objects);
+    let json = serde_json::to_string(&objects[0]).expect("serializes");
+    assert!(json.contains(r#""_typ":"VERTRAG""#), "{json}");
+}
+
+/// For the `Unknown` catch-all there is no generated type, so there is no
+/// release to report — but the wire discriminant the payload carried is still
+/// there, which is the whole reason that variant keeps it.
+#[test]
+#[cfg(all(feature = "json", feature = "versioned"))]
+fn any_bo_facts_are_honest_about_the_unknown_variant() {
+    use rubo4e::current::{AnyBo, BoTyp};
+
+    let bo: AnyBo = serde_json::from_str(r#"{"_typ":"MARKTROLLENWECHSEL","x":1}"#)
+        .expect("an unknown _typ decodes to the catch-all");
+
+    assert_eq!(bo.bo_type(), BoTyp::Unknown);
+    assert_eq!(bo.typ_wire(), "MARKTROLLENWECHSEL");
+    assert_eq!(bo.schema_version(), None);
+    assert_eq!(bo.schema_series(), None);
+}

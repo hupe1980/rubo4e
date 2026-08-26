@@ -1,4 +1,7 @@
-//! Extension data must survive a snake_case round-trip byte-for-byte.
+//! Extension data must survive a snake_case round-trip unrenamed.
+//!
+//! Names and values, that is — not the key order inside a nested extension
+//! object, which `serde_json::Value` sorts. See the `json` module docs.
 //!
 //! Keys are renamed as the parser yields them, before serde knows the struct, so
 //! an unscoped transform renames every key at every depth — including inside a

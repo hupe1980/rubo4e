@@ -59,6 +59,24 @@ use rubo4e::validation::Validated;
 let validated: Validated<Vertrag> = Validated::new(vertrag)?;
 ```
 
+### Validation is recursive
+
+`.validate()` on a BO checks that BO's own cross-field rules **and descends into
+every nested BO, COM, and identifier below it**. One call covers the tree:
+
+```rust
+let kosten: Kosten = todo!();
+
+// Reports, at its path, a line total two levels down that does not add up:
+//   kostenbloecke[0].kostenpositionen[0]: einzelpreis.wert (2) * menge.wert (3)
+//   = 6, which does not round to betrag_kostenposition.wert (999) …
+kosten.validate()?;
+```
+
+Paths use the Rust field names with bracketed indices, so a report locates the
+offending value rather than only naming the root type. `report_errors()` (below)
+turns that into one `ValidationFailure` per field.
+
 ### How the derives are wired
 
 Identifier newtypes wrap a `Box<str>` and re-run the *same* validator garde saw
@@ -75,8 +93,9 @@ fn check_malo_id(value: &str, _: &()) -> Result<(), garde::Error> {
 ```
 
 Generated BO/COM structs use `#[garde(allow_unvalidated)]` too — a field with no
-explicit attribute is simply accepted — and mark identifier-typed fields
-`#[garde(dive)]` so the newtype's validator runs on the way through:
+explicit attribute is simply accepted — and the generator marks every field
+whose type carries rules of its own `#[garde(dive)]`: the identifier newtypes,
+and every nested BO and COM. That is what makes the recursion above happen.
 
 ```rust
 #[derive(garde::Validate)]
@@ -84,39 +103,60 @@ explicit attribute is simply accepted — and mark identifier-typed fields
 #[garde(custom(crate::validation::v202607::validate_marktlokation))]
 pub struct Marktlokation {
     #[garde(dive)]
-    pub marktlokations_id: Option<crate::identifiers::MaloId>,
-    // … every other field: unvalidated
+    pub marktlokations_id: Option<crate::identifiers::MaloId>,   // identifier
+    #[garde(dive)]
+    pub lokationsadresse: Option<Adresse>,                       // nested COM
+    #[garde(dive)]
+    pub lokationszuordnungen: Option<Vec<Box<Lokationszuordnung>>>,
+    pub sparte: Option<Sparte>,                                  // enum: no rules
+    // … scalars: unvalidated
 }
 ```
 
+`garde` supplies the `Validate` impls for `Option`, `Vec`, and `Box`, so one
+`dive` covers `Option<Vec<Box<T>>>`. Enums and scalars carry no rules and are
+left alone. A self-referential type recurses over the *data*, which terminates
+because the indirection is a `Box` and the payload is a finite tree.
+
 Note that BO4E declares almost every field optional, so `garde` cannot enforce
 "required" for you. The cross-field validators below are where the invariants
-BO4E states in prose become checkable.
+BO4E states in prose become checkable — and they only fire on values that are
+actually present.
 
 ## Validation Rules Reference
 
-### XOR Address Constraints
+### Ortsangabe exclusivity
 
 **Applies to:** `Marktlokation`, `Messlokation`
 
-Exactly **one** of the following address fields must be `Some`:
+**At most one** of the following may be `Some`:
 
-| Field               | Type                 |
-|---------------------|----------------------|
-| `lokationsadresse`  | `Option<Adresse>`    |
-| `geoadresse`        | `Option<Geokoordinaten>` |
-| `katasterinformation` | `Option<Katasteradresse>` |
+| Field                                    | Type                      |
+|------------------------------------------|---------------------------|
+| `lokationsadresse` / `messadresse`       | `Option<Adresse>`         |
+| `geoadresse`                             | `Option<Geokoordinaten>`  |
+| `katasterinformation`                    | `Option<Katasteradresse>` |
 
 ```
 ✓  lokationsadresse = Some, geoadresse = None, katasterinformation = None
-✗  all three = None  →  "exactly one address field must be set"
-✗  two fields = Some →  "exactly one address field must be set"
+✓  all three = None
+✗  two fields = Some →  "at most one Ortsangabe may be set, but
+                         lokationsadresse, geoadresse are — …"
 ```
 
-BO4E states this rule without enforcing it — BO4E-python carries it as a source
-comment (*"only one of the following three optional attributes can be set"*) with
-no validator behind it. rubo4e checks it only when you call `.validate()`; a
-violating payload still deserializes, as it does everywhere else.
+BO4E states **mutual exclusivity, not presence**: *"Es darf immer nur eine Art
+der Ortsangabe vorhanden sein."* The schema backs that exactly — no `required`
+array, no `oneOf`, all three properties `"default": null` — and BO4E-python
+carries the rule as a comment over three `Optional[…] = None` fields.
+
+The empty case has to be legal because BO4E has no reference type: a location
+referenced from a `Rechnung`, a `Vertrag`, or an `Angebot` is a full
+`Marktlokation` carrying little more than its ID. For `Messlokation` the schema
+says so outright — `messadresse` is documented *"Nur angeben, wenn diese von der
+Adresse der Marktlokation abweicht"*.
+
+Checked only when you call `.validate()`; a violating payload still deserializes,
+as everywhere else.
 
 ### Date Range Constraints
 
@@ -173,8 +213,10 @@ Steuerbetrag"*:
 gesamtnetto + gesamtsteuer == gesamtbrutto      (when all three are Some)
 ```
 
-If exactly **two** of the three are `Some`, validation fails — the third is
-derivable, so its absence is a defect. Fewer than two present means no check.
+All three present, or fewer than two, is all `.validate()` has to say about
+them: BO4E marks none of the three `required`. The "if two are stated the third
+should be too" rule is a *quality* judgement and lives in
+[`quality`](#opt-in-quality-rules) instead.
 
 **Tax lines.** The schema describes `steuerbetraege` as *"eine Liste mit
 Steuerbeträgen … die Summe dieser Beträge ergibt den Wert für gesamtsteuer"*:
@@ -207,6 +249,59 @@ einzelpreis.wert * menge.wert  ≈  betrag_kostenposition.wert
 The comparison allows **half a unit in the last stated decimal place** of the
 amount, which accepts either rounding mode: `0.2843 €/kWh × 3333 kWh` is
 `947.5719`, written on the invoice as `947.57`.
+
+An amount at `Decimal`'s maximum scale of 28 leaves no room for a tolerance, so
+the comparison there is exact.
+
+## Conformance rules vs. quality rules
+
+`.validate()` runs **only rules traceable to a sentence of the BO4E schema**, so
+it answers *"does this conform to BO4E"* — a claim you can make about a document
+a **counterparty** sent. A rule this crate merely thought sensible would turn
+that into *"…and satisfies `rubo4e`"*, and `Validated::new` is all-or-nothing, so
+there would be no way to opt out.
+
+The crate's own judgements therefore live in a separate module.
+
+### Opt-in quality rules
+
+**Module:** `rubo4e::validation::current::quality`
+
+Nothing here is wired into `#[derive(garde::Validate)]`, so `.validate()` and
+`Validated<T>` never run it.
+
+| Function | Rule | Why it is not conformance |
+|---|---|---|
+| `rechnung_totals_are_complete` | all three of `gesamtnetto` / `gesamtsteuer` / `gesamtbrutto`, or none | BO4E marks none of them `required` and says nothing about stating them together |
+
+```rust
+use rubo4e::validation::current::quality;
+use garde::Validate as _;
+
+rechnung.validate()?;   // conformance
+
+// Typically on documents you produce, or as a warning on ones you receive.
+if let Err(e) = quality::rechnung_totals_are_complete(&rechnung) {
+    tracing::warn!(%e, "invoice states two of three totals");
+}
+```
+
+Each returns a `garde::Error`, so it composes into a `garde` pipeline of your own.
+
+## Version-agnostic imports
+
+`rubo4e::validation::current` mirrors `rubo4e::current`, so no downstream file
+has to name a schema version — and a CI guard that greps for `rubo4e::v202607`
+stays clean:
+
+```rust
+use rubo4e::validation::current::{validate_zeitraum, quality};
+```
+
+It resolves to the same functions as `rubo4e::validation::v202607`. Reach for the
+versioned path only to stay on one series across a format-version cutover — the
+same trade-off as [`current` vs `v202607`](@/docs/versioning.md#rubo4e-current-moving-alias)
+for the types.
 
 ## Layer 3 — Schema Validation
 
@@ -270,6 +365,31 @@ let valid: Validated<Vertrag> = Validated::new(vertrag)?;
 // fn persist(v: &Validated<Vertrag>) { ... }
 let inner: Vertrag = valid.into_inner();
 ```
+
+#### It validates on the way in
+
+With `serde`, `Validated<T>` is `Deserialize` — and the impl **runs the rules**.
+Decoding one and getting a value back *is* the proof, so a handler can take one
+as its request body and there is no `.validate()` call left to forget:
+
+```rust
+// In your own HTTP layer — rubo4e ships no extractors of its own.
+async fn create(
+    axum::Json(body): axum::Json<Validated<Marktlokation>>,
+) -> Result<StatusCode, AppError> {
+    // `body` cannot exist unless every rule held, nested ones included.
+    persist(body.into_inner()).await?;
+    Ok(StatusCode::CREATED)
+}
+```
+
+An invalid payload fails at deserialization, with the whole `garde::Report`
+rendered into the deserializer's error message. Where you want the *structured*
+report back — one entry per failing field, for a 422 body — decode the plain `T`
+and call `Validated::new` on it, or `.validate()` plus `report_errors()`.
+
+`Serialize` is transparent, so a `Validated<T>` re-encodes to exactly the bytes
+`T` would.
 
 ## When `validate` Feature Is Inactive
 

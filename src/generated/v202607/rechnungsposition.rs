@@ -29,12 +29,14 @@ pub struct Rechnungsposition {
     #[cfg_attr(feature = "serde", serde(rename = "einzelpreis"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub einzelpreis: Option<Preis>,
     /// Das Ergebnis der Multiplikation aus einzelpreis * positionsMenge * (Faktor aus zeitbezogeneMenge).
     /// Z.B. 12,60€ * 120 kW * 3/12 (für 3 Monate).
     #[cfg_attr(feature = "serde", serde(rename = "gesamtpreis"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub gesamtpreis: Option<Betrag>,
     /// Eine generische ID, die für eigene Zwecke genutzt werden kann.
     /// Z.B. könnten hier UUIDs aus einer Datenbank stehen oder URLs zu einem Backend-System.
@@ -46,11 +48,13 @@ pub struct Rechnungsposition {
     #[cfg_attr(feature = "serde", serde(rename = "lieferungszeitraum"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub lieferungszeitraum: Option<Zeitraum>,
     /// Die abgerechnete Menge mit Einheit
     #[cfg_attr(feature = "serde", serde(rename = "positionsMenge"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub positions_menge: Option<Menge>,
     /// Fortlaufende Nummer für die Rechnungsposition
     #[cfg_attr(feature = "serde", serde(rename = "positionsnummer"))]
@@ -66,6 +70,7 @@ pub struct Rechnungsposition {
     #[cfg_attr(feature = "serde", serde(rename = "steuerbetrag"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub steuerbetrag: Option<Steuerbetrag>,
     /// BO4E type discriminant — always `ComTyp::Rechnungsposition` for this struct.
     #[cfg_attr(feature = "serde", serde(rename = "_typ"))]
@@ -89,6 +94,7 @@ pub struct Rechnungsposition {
     #[cfg_attr(feature = "serde", serde(rename = "zeitbezogeneMenge"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub zeitbezogene_menge: Option<Menge>,
     /// Falls sich der Preis auf eine Zeit bezieht, steht hier die Einheit
     #[cfg_attr(feature = "serde", serde(rename = "zeiteinheit"))]
@@ -98,6 +104,7 @@ pub struct Rechnungsposition {
     #[cfg_attr(feature = "serde", serde(rename = "zusatzAttribute"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub zusatz_attribute: Option<Vec<ZusatzAttribut>>,
     /// Unknown JSON fields captured during deserialization for round-trip preservation.
     /// `None` when no unknown fields were present (zero heap allocation).

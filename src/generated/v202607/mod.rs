@@ -537,6 +537,177 @@ impl AnyBo {
             AnyBo::Unknown { .. } => BoTyp::Unknown,
         }
     }
+    /// Returns the `_typ` wire string for this BO object.
+    ///
+    /// Total: for the `Unknown` catch-all it is the value the payload
+    /// carried, which is the whole reason that variant keeps it.
+    pub fn typ_wire(&self) -> &str {
+        match self {
+            AnyBo::Angebot(_) => <Angebot as Bo4eObject>::TYP_WIRE,
+            AnyBo::Ausschreibung(_) => <Ausschreibung as Bo4eObject>::TYP_WIRE,
+            AnyBo::Bilanzierung(_) => <Bilanzierung as Bo4eObject>::TYP_WIRE,
+            AnyBo::Buendelvertrag(_) => <Buendelvertrag as Bo4eObject>::TYP_WIRE,
+            AnyBo::Energiemenge(_) => <Energiemenge as Bo4eObject>::TYP_WIRE,
+            AnyBo::Fremdkosten(_) => <Fremdkosten as Bo4eObject>::TYP_WIRE,
+            AnyBo::Geraet(_) => <Geraet as Bo4eObject>::TYP_WIRE,
+            AnyBo::Geschaeftspartner(_) => <Geschaeftspartner as Bo4eObject>::TYP_WIRE,
+            AnyBo::Kosten(_) => <Kosten as Bo4eObject>::TYP_WIRE,
+            AnyBo::Lastgang(_) => <Lastgang as Bo4eObject>::TYP_WIRE,
+            AnyBo::Lokationszuordnung(_) => <Lokationszuordnung as Bo4eObject>::TYP_WIRE,
+            AnyBo::Marktlokation(_) => <Marktlokation as Bo4eObject>::TYP_WIRE,
+            AnyBo::Marktteilnehmer(_) => <Marktteilnehmer as Bo4eObject>::TYP_WIRE,
+            AnyBo::Messlokation(_) => <Messlokation as Bo4eObject>::TYP_WIRE,
+            AnyBo::Netzlokation(_) => <Netzlokation as Bo4eObject>::TYP_WIRE,
+            AnyBo::Person(_) => <Person as Bo4eObject>::TYP_WIRE,
+            AnyBo::Preisblatt(_) => <Preisblatt as Bo4eObject>::TYP_WIRE,
+            AnyBo::PreisblattDienstleistung(_) => {
+                <PreisblattDienstleistung as Bo4eObject>::TYP_WIRE
+            }
+            AnyBo::PreisblattHardware(_) => <PreisblattHardware as Bo4eObject>::TYP_WIRE,
+            AnyBo::PreisblattKonzessionsabgabe(_) => {
+                <PreisblattKonzessionsabgabe as Bo4eObject>::TYP_WIRE
+            }
+            AnyBo::PreisblattMessung(_) => <PreisblattMessung as Bo4eObject>::TYP_WIRE,
+            AnyBo::PreisblattNetznutzung(_) => <PreisblattNetznutzung as Bo4eObject>::TYP_WIRE,
+            AnyBo::Rechnung(_) => <Rechnung as Bo4eObject>::TYP_WIRE,
+            AnyBo::Region(_) => <Region as Bo4eObject>::TYP_WIRE,
+            AnyBo::Standorteigenschaften(_) => <Standorteigenschaften as Bo4eObject>::TYP_WIRE,
+            AnyBo::SteuerbareRessource(_) => <SteuerbareRessource as Bo4eObject>::TYP_WIRE,
+            AnyBo::Tarif(_) => <Tarif as Bo4eObject>::TYP_WIRE,
+            AnyBo::Tarifinfo(_) => <Tarifinfo as Bo4eObject>::TYP_WIRE,
+            AnyBo::Tarifkosten(_) => <Tarifkosten as Bo4eObject>::TYP_WIRE,
+            AnyBo::Tarifpreisblatt(_) => <Tarifpreisblatt as Bo4eObject>::TYP_WIRE,
+            AnyBo::TechnischeRessource(_) => <TechnischeRessource as Bo4eObject>::TYP_WIRE,
+            AnyBo::Vertrag(_) => <Vertrag as Bo4eObject>::TYP_WIRE,
+            AnyBo::Zaehler(_) => <Zaehler as Bo4eObject>::TYP_WIRE,
+            AnyBo::Zaehlzeitdefinition(_) => <Zaehlzeitdefinition as Bo4eObject>::TYP_WIRE,
+            AnyBo::Zeitreihe(_) => <Zeitreihe as Bo4eObject>::TYP_WIRE,
+            #[cfg(feature = "json")]
+            AnyBo::Unknown { typ, .. } => typ,
+        }
+    }
+    /// Returns the exact BO4E release these types were generated from (e.g. `"202607.1.0"`).
+    ///
+    /// `None` for the `Unknown` catch-all: this crate generated no type for
+    /// it, so it has no release to report.
+    pub fn schema_version(&self) -> Option<&'static str> {
+        match self {
+            AnyBo::Angebot(_) => Some(<Angebot as Bo4eObject>::SCHEMA_VERSION),
+            AnyBo::Ausschreibung(_) => Some(<Ausschreibung as Bo4eObject>::SCHEMA_VERSION),
+            AnyBo::Bilanzierung(_) => Some(<Bilanzierung as Bo4eObject>::SCHEMA_VERSION),
+            AnyBo::Buendelvertrag(_) => Some(<Buendelvertrag as Bo4eObject>::SCHEMA_VERSION),
+            AnyBo::Energiemenge(_) => Some(<Energiemenge as Bo4eObject>::SCHEMA_VERSION),
+            AnyBo::Fremdkosten(_) => Some(<Fremdkosten as Bo4eObject>::SCHEMA_VERSION),
+            AnyBo::Geraet(_) => Some(<Geraet as Bo4eObject>::SCHEMA_VERSION),
+            AnyBo::Geschaeftspartner(_) => Some(<Geschaeftspartner as Bo4eObject>::SCHEMA_VERSION),
+            AnyBo::Kosten(_) => Some(<Kosten as Bo4eObject>::SCHEMA_VERSION),
+            AnyBo::Lastgang(_) => Some(<Lastgang as Bo4eObject>::SCHEMA_VERSION),
+            AnyBo::Lokationszuordnung(_) => {
+                Some(<Lokationszuordnung as Bo4eObject>::SCHEMA_VERSION)
+            }
+            AnyBo::Marktlokation(_) => Some(<Marktlokation as Bo4eObject>::SCHEMA_VERSION),
+            AnyBo::Marktteilnehmer(_) => Some(<Marktteilnehmer as Bo4eObject>::SCHEMA_VERSION),
+            AnyBo::Messlokation(_) => Some(<Messlokation as Bo4eObject>::SCHEMA_VERSION),
+            AnyBo::Netzlokation(_) => Some(<Netzlokation as Bo4eObject>::SCHEMA_VERSION),
+            AnyBo::Person(_) => Some(<Person as Bo4eObject>::SCHEMA_VERSION),
+            AnyBo::Preisblatt(_) => Some(<Preisblatt as Bo4eObject>::SCHEMA_VERSION),
+            AnyBo::PreisblattDienstleistung(_) => {
+                Some(<PreisblattDienstleistung as Bo4eObject>::SCHEMA_VERSION)
+            }
+            AnyBo::PreisblattHardware(_) => {
+                Some(<PreisblattHardware as Bo4eObject>::SCHEMA_VERSION)
+            }
+            AnyBo::PreisblattKonzessionsabgabe(_) => {
+                Some(<PreisblattKonzessionsabgabe as Bo4eObject>::SCHEMA_VERSION)
+            }
+            AnyBo::PreisblattMessung(_) => Some(<PreisblattMessung as Bo4eObject>::SCHEMA_VERSION),
+            AnyBo::PreisblattNetznutzung(_) => {
+                Some(<PreisblattNetznutzung as Bo4eObject>::SCHEMA_VERSION)
+            }
+            AnyBo::Rechnung(_) => Some(<Rechnung as Bo4eObject>::SCHEMA_VERSION),
+            AnyBo::Region(_) => Some(<Region as Bo4eObject>::SCHEMA_VERSION),
+            AnyBo::Standorteigenschaften(_) => {
+                Some(<Standorteigenschaften as Bo4eObject>::SCHEMA_VERSION)
+            }
+            AnyBo::SteuerbareRessource(_) => {
+                Some(<SteuerbareRessource as Bo4eObject>::SCHEMA_VERSION)
+            }
+            AnyBo::Tarif(_) => Some(<Tarif as Bo4eObject>::SCHEMA_VERSION),
+            AnyBo::Tarifinfo(_) => Some(<Tarifinfo as Bo4eObject>::SCHEMA_VERSION),
+            AnyBo::Tarifkosten(_) => Some(<Tarifkosten as Bo4eObject>::SCHEMA_VERSION),
+            AnyBo::Tarifpreisblatt(_) => Some(<Tarifpreisblatt as Bo4eObject>::SCHEMA_VERSION),
+            AnyBo::TechnischeRessource(_) => {
+                Some(<TechnischeRessource as Bo4eObject>::SCHEMA_VERSION)
+            }
+            AnyBo::Vertrag(_) => Some(<Vertrag as Bo4eObject>::SCHEMA_VERSION),
+            AnyBo::Zaehler(_) => Some(<Zaehler as Bo4eObject>::SCHEMA_VERSION),
+            AnyBo::Zaehlzeitdefinition(_) => {
+                Some(<Zaehlzeitdefinition as Bo4eObject>::SCHEMA_VERSION)
+            }
+            AnyBo::Zeitreihe(_) => Some(<Zeitreihe as Bo4eObject>::SCHEMA_VERSION),
+            #[cfg(feature = "json")]
+            AnyBo::Unknown { .. } => None,
+        }
+    }
+    /// Returns the schema series (e.g. `"202607"`) — the right key for version dispatch.
+    ///
+    /// `None` for the `Unknown` catch-all: this crate generated no type for
+    /// it, so it has no release to report.
+    pub fn schema_series(&self) -> Option<&'static str> {
+        match self {
+            AnyBo::Angebot(_) => Some(<Angebot as Bo4eObject>::SCHEMA_SERIES),
+            AnyBo::Ausschreibung(_) => Some(<Ausschreibung as Bo4eObject>::SCHEMA_SERIES),
+            AnyBo::Bilanzierung(_) => Some(<Bilanzierung as Bo4eObject>::SCHEMA_SERIES),
+            AnyBo::Buendelvertrag(_) => Some(<Buendelvertrag as Bo4eObject>::SCHEMA_SERIES),
+            AnyBo::Energiemenge(_) => Some(<Energiemenge as Bo4eObject>::SCHEMA_SERIES),
+            AnyBo::Fremdkosten(_) => Some(<Fremdkosten as Bo4eObject>::SCHEMA_SERIES),
+            AnyBo::Geraet(_) => Some(<Geraet as Bo4eObject>::SCHEMA_SERIES),
+            AnyBo::Geschaeftspartner(_) => Some(<Geschaeftspartner as Bo4eObject>::SCHEMA_SERIES),
+            AnyBo::Kosten(_) => Some(<Kosten as Bo4eObject>::SCHEMA_SERIES),
+            AnyBo::Lastgang(_) => Some(<Lastgang as Bo4eObject>::SCHEMA_SERIES),
+            AnyBo::Lokationszuordnung(_) => Some(<Lokationszuordnung as Bo4eObject>::SCHEMA_SERIES),
+            AnyBo::Marktlokation(_) => Some(<Marktlokation as Bo4eObject>::SCHEMA_SERIES),
+            AnyBo::Marktteilnehmer(_) => Some(<Marktteilnehmer as Bo4eObject>::SCHEMA_SERIES),
+            AnyBo::Messlokation(_) => Some(<Messlokation as Bo4eObject>::SCHEMA_SERIES),
+            AnyBo::Netzlokation(_) => Some(<Netzlokation as Bo4eObject>::SCHEMA_SERIES),
+            AnyBo::Person(_) => Some(<Person as Bo4eObject>::SCHEMA_SERIES),
+            AnyBo::Preisblatt(_) => Some(<Preisblatt as Bo4eObject>::SCHEMA_SERIES),
+            AnyBo::PreisblattDienstleistung(_) => {
+                Some(<PreisblattDienstleistung as Bo4eObject>::SCHEMA_SERIES)
+            }
+            AnyBo::PreisblattHardware(_) => Some(<PreisblattHardware as Bo4eObject>::SCHEMA_SERIES),
+            AnyBo::PreisblattKonzessionsabgabe(_) => {
+                Some(<PreisblattKonzessionsabgabe as Bo4eObject>::SCHEMA_SERIES)
+            }
+            AnyBo::PreisblattMessung(_) => Some(<PreisblattMessung as Bo4eObject>::SCHEMA_SERIES),
+            AnyBo::PreisblattNetznutzung(_) => {
+                Some(<PreisblattNetznutzung as Bo4eObject>::SCHEMA_SERIES)
+            }
+            AnyBo::Rechnung(_) => Some(<Rechnung as Bo4eObject>::SCHEMA_SERIES),
+            AnyBo::Region(_) => Some(<Region as Bo4eObject>::SCHEMA_SERIES),
+            AnyBo::Standorteigenschaften(_) => {
+                Some(<Standorteigenschaften as Bo4eObject>::SCHEMA_SERIES)
+            }
+            AnyBo::SteuerbareRessource(_) => {
+                Some(<SteuerbareRessource as Bo4eObject>::SCHEMA_SERIES)
+            }
+            AnyBo::Tarif(_) => Some(<Tarif as Bo4eObject>::SCHEMA_SERIES),
+            AnyBo::Tarifinfo(_) => Some(<Tarifinfo as Bo4eObject>::SCHEMA_SERIES),
+            AnyBo::Tarifkosten(_) => Some(<Tarifkosten as Bo4eObject>::SCHEMA_SERIES),
+            AnyBo::Tarifpreisblatt(_) => Some(<Tarifpreisblatt as Bo4eObject>::SCHEMA_SERIES),
+            AnyBo::TechnischeRessource(_) => {
+                Some(<TechnischeRessource as Bo4eObject>::SCHEMA_SERIES)
+            }
+            AnyBo::Vertrag(_) => Some(<Vertrag as Bo4eObject>::SCHEMA_SERIES),
+            AnyBo::Zaehler(_) => Some(<Zaehler as Bo4eObject>::SCHEMA_SERIES),
+            AnyBo::Zaehlzeitdefinition(_) => {
+                Some(<Zaehlzeitdefinition as Bo4eObject>::SCHEMA_SERIES)
+            }
+            AnyBo::Zeitreihe(_) => Some(<Zeitreihe as Bo4eObject>::SCHEMA_SERIES),
+            #[cfg(feature = "json")]
+            AnyBo::Unknown { .. } => None,
+        }
+    }
 }
 impl From<Angebot> for AnyBo {
     fn from(v: Angebot) -> Self {

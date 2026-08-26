@@ -28,11 +28,13 @@ pub struct Fremdkostenblock {
     #[cfg_attr(feature = "serde", serde(rename = "kostenpositionen"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub kostenpositionen: Option<Vec<Fremdkostenposition>>,
     /// Die Summe aller Kostenpositionen dieses Blocks
     #[cfg_attr(feature = "serde", serde(rename = "summeKostenblock"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub summe_kostenblock: Option<Betrag>,
     /// BO4E type discriminant — always `ComTyp::Fremdkostenblock` for this struct.
     #[cfg_attr(feature = "serde", serde(rename = "_typ"))]
@@ -53,6 +55,7 @@ pub struct Fremdkostenblock {
     #[cfg_attr(feature = "serde", serde(rename = "zusatzAttribute"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub zusatz_attribute: Option<Vec<ZusatzAttribut>>,
     /// Unknown JSON fields captured during deserialization for round-trip preservation.
     /// `None` when no unknown fields were present (zero heap allocation).

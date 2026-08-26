@@ -54,6 +54,7 @@ pub struct Preisstaffel {
     #[cfg_attr(feature = "serde", serde(rename = "sigmoidparameter"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub sigmoidparameter: Option<Sigmoidparameter>,
     /// Exklusiver oberer Wert, bis zu dem die Staffel gilt (inklusiv).
     /// Grenzen werden bspw. wie folgt angegeben: `0 - 1000, 1001 - 2000, etc.`
@@ -124,6 +125,7 @@ pub struct Preisstaffel {
     #[cfg_attr(feature = "serde", serde(rename = "zusatzAttribute"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub zusatz_attribute: Option<Vec<ZusatzAttribut>>,
     /// Unknown JSON fields captured during deserialization for round-trip preservation.
     /// `None` when no unknown fields were present (zero heap allocation).

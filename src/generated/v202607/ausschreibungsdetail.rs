@@ -33,6 +33,7 @@ pub struct Ausschreibungsdetail {
     #[cfg_attr(feature = "serde", serde(rename = "lieferzeitraum"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub lieferzeitraum: Option<Zeitraum>,
     /// Identifikation einer ausgeschriebenen Marktlokation
     #[cfg_attr(feature = "serde", serde(rename = "marktlokationsId"))]
@@ -44,6 +45,7 @@ pub struct Ausschreibungsdetail {
     #[cfg_attr(feature = "serde", serde(rename = "marktlokationsadresse"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub marktlokationsadresse: Option<Adresse>,
     /// Bezeichnung für die Lokation, z.B. 'Zentraler Einkauf, Hamburg'
     #[cfg_attr(feature = "serde", serde(rename = "marktlokationsbezeichnung"))]
@@ -69,21 +71,25 @@ pub struct Ausschreibungsdetail {
     #[cfg_attr(feature = "serde", serde(rename = "prognoseArbeitLieferzeitraum"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub prognose_arbeit_lieferzeitraum: Option<Menge>,
     /// Prognosewert für die Jahresarbeit der ausgeschriebenen Lokation
     #[cfg_attr(feature = "serde", serde(rename = "prognoseJahresarbeit"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub prognose_jahresarbeit: Option<Menge>,
     /// Prognosewert für die abgenommene maximale Leistung der ausgeschriebenen Lokation
     #[cfg_attr(feature = "serde", serde(rename = "prognoseLeistung"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub prognose_leistung: Option<Menge>,
     /// Die (evtl. abweichende) Rechnungsadresse
     #[cfg_attr(feature = "serde", serde(rename = "rechnungsadresse"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub rechnungsadresse: Option<Adresse>,
     /// BO4E type discriminant — always `ComTyp::Ausschreibungsdetail` for this struct.
     #[cfg_attr(feature = "serde", serde(rename = "_typ"))]
@@ -114,6 +120,7 @@ pub struct Ausschreibungsdetail {
     #[cfg_attr(feature = "serde", serde(rename = "zusatzAttribute"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub zusatz_attribute: Option<Vec<ZusatzAttribut>>,
     /// Unknown JSON fields captured during deserialization for round-trip preservation.
     /// `None` when no unknown fields were present (zero heap allocation).

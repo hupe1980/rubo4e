@@ -60,10 +60,10 @@ lint:
 
 # Lint the feature combinations that `--all-features` cannot reach.
 #
-# `--all-features` hides two whole classes of defect: code that is dead unless an
-# optional dependency is enabled (e.g. a `metrics`-only counter emit), and
-# bindings that go unread when a feature compiles a function body away (e.g. the
-# `time`/`decimal` validators).  Both shipped undetected before this recipe existed.
+# `--all-features` cannot see code that is dead unless an optional dependency is
+# enabled (a `metrics`-only counter emit), bindings left unread when a feature
+# compiles a body away (the `time`/`decimal` validators), or a feature that does
+# not build on its own.
 lint-features:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -75,6 +75,9 @@ lint-features:
         "versioned,json"
         "versioned,json,time,decimal"
         "versioned,validate"
+        # The combination the cross-field validators actually run under: their
+        # bodies are cfg-ed on decimal/time and compile away without them.
+        "versioned,validate,decimal,time"
         "versioned,builder,validate"
         "versioned,json,schemars,utoipa"
         "versioned,sqlx"
@@ -162,19 +165,16 @@ check-docs-drift:
 # Run cargo-deny license/advisory/ban checks
 #
 # `--all-features` because that is what `cargo-deny-action` defaults to in CI.
-# Without it this recipe checks only the default feature set, which leaves the
-# optional dependencies (sqlx, utoipa, schemars, …) out of the graph entirely —
-# a duplicate-version ban that CI rejected passed here for exactly that reason.
+# Without it only the default feature set is checked, leaving the optional
+# dependencies (sqlx, utoipa, schemars, …) out of the graph entirely.
 deny-check:
     cargo deny --all-features check
 
 # Type-check the fuzz targets.
 #
 # `fuzz/` declares its own `[workspace]`, so `cargo check --workspace` never sees
-# it and the targets rot silently — one had been calling an associated function
-# as a method for long enough that nothing noticed. This does not need nightly:
-# `cargo check` compiles the targets without the sanitizer instrumentation
-# `cargo fuzz run` adds.
+# it and the targets rot silently. No nightly needed: `cargo check` compiles them
+# without the sanitizer instrumentation `cargo fuzz run` adds.
 check-fuzz:
     cd fuzz && cargo check --all-targets
 

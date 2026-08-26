@@ -51,6 +51,7 @@ pub struct Zaehler {
     #[cfg_attr(feature = "serde", serde(rename = "geraete"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub geraete: Option<Vec<Box<Geraet>>>,
     /// Eine generische ID, die für eigene Zwecke genutzt werden kann.
     /// Z.B. könnten hier UUIDs aus einer Datenbank stehen oder URLs zu einem Backend-System.
@@ -130,6 +131,7 @@ pub struct Zaehler {
     #[cfg_attr(feature = "serde", serde(rename = "zaehlerhersteller"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub zaehlerhersteller: Option<Box<Geschaeftspartner>>,
     /// Zählerkonstante auf dem Zähler
     #[cfg_attr(feature = "serde", serde(rename = "zaehlerkonstante"))]
@@ -172,10 +174,12 @@ pub struct Zaehler {
     #[cfg_attr(feature = "serde", serde(rename = "zaehlwerke"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub zaehlwerke: Option<Vec<Zaehlwerk>>,
     #[cfg_attr(feature = "serde", serde(rename = "zusatzAttribute"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub zusatz_attribute: Option<Vec<ZusatzAttribut>>,
     /// Unknown JSON fields captured during deserialization for round-trip preservation.
     /// `None` when no unknown fields were present (zero heap allocation).
@@ -217,15 +221,10 @@ impl Default for Zaehler {
 }
 impl Bo4eObject for Zaehler {
     type BoTyp = BoTyp;
-    fn bo_type(&self) -> BoTyp {
-        self.typ.unwrap_or(BoTyp::Zaehler)
-    }
-    fn schema_version(&self) -> &'static str {
-        "202607.1.0"
-    }
-    fn schema_series(&self) -> &'static str {
-        "202607"
-    }
+    const BO_TYP: BoTyp = BoTyp::Zaehler;
+    const TYP_WIRE: &'static str = "ZAEHLER";
+    const SCHEMA_VERSION: &'static str = "202607.1.0";
+    const SCHEMA_SERIES: &'static str = "202607";
 }
 #[cfg(feature = "json")]
 impl crate::json::sealed::Sealed for Zaehler {}

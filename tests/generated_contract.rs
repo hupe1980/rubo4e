@@ -242,6 +242,116 @@ fn every_struct_stamps_the_schema_declared_typ() {
     );
 }
 
+/// Every BO's `Bo4eObject` constants must agree with the schema, and with each
+/// other.
+///
+/// `TYP_WIRE` is emitted as a literal rather than derived from
+/// `BO_TYP.as_wire()`, because `Bo4eEnum::as_wire` is a trait method and cannot
+/// run in a const initializer. That leaves two spellings of one fact, which is
+/// exactly the shape that drifts — so this pins them together, and both against
+/// the schema.
+#[test]
+fn bo_constants_agree_with_the_schema_and_each_other() {
+    let mut checked = 0usize;
+    for (title, doc) in read_schemas(&schema_dir().join("bo")) {
+        let Some(declared) = metadata_literal(&doc, "_typ") else {
+            continue;
+        };
+        let src = generated_source_flat(&title);
+        assert!(
+            src.contains(&format!("constTYP_WIRE:&'staticstr=\"{declared}\";")),
+            "{title}: TYP_WIRE does not carry the schema's `_typ` const {declared:?}; \
+             run `just generate`"
+        );
+        assert!(
+            src.contains(&format!("constBO_TYP:BoTyp=BoTyp::{title};")),
+            "{title}: BO_TYP is not the variant named after the struct; run `just generate`"
+        );
+        checked += 1;
+    }
+    assert!(checked >= 30, "expected ~35 BO schemas, saw {checked}");
+}
+
+/// …and the same fact read through the API, for the types the test can name.
+///
+/// The source-level guard above covers all ~35; this one proves the two
+/// spellings really are the same value at runtime, which a string comparison
+/// over generated text cannot.
+#[test]
+fn typ_wire_is_the_discriminants_own_wire_string() {
+    use rubo4e::current::{
+        Bilanzierung, Lastgang, Marktlokation, Messlokation, Netzlokation, Rechnung, Tarif, Vertrag,
+    };
+    use rubo4e::{Bo4eEnum as _, Bo4eObject};
+
+    fn check<T: Bo4eObject>(expected: &str) {
+        assert_eq!(T::TYP_WIRE, T::BO_TYP.as_wire(), "TYP_WIRE vs BO_TYP");
+        assert_eq!(T::TYP_WIRE, expected);
+        assert_eq!(
+            T::SCHEMA_SERIES,
+            T::SCHEMA_VERSION.split('.').next().expect("a version"),
+            "SCHEMA_SERIES must be SCHEMA_VERSION's YYYYMM prefix"
+        );
+        assert!(
+            !T::SCHEMA_VERSION.starts_with('v'),
+            "SCHEMA_VERSION is the wire spelling, which has no `v`"
+        );
+    }
+
+    check::<Marktlokation>("MARKTLOKATION");
+    check::<Messlokation>("MESSLOKATION");
+    check::<Netzlokation>("NETZLOKATION");
+    check::<Vertrag>("VERTRAG");
+    check::<Rechnung>("RECHNUNG");
+    check::<Bilanzierung>("BILANZIERUNG");
+    // The two with required fields, which a `T: Default` bound would exclude.
+    check::<Lastgang>("LASTGANG");
+    check::<Tarif>("TARIF");
+}
+
+/// A struct the schema marks `required` gets a `new(...)` in place of the
+/// `Default` the derive cannot produce.
+///
+/// Without it, `Lastgang` and `Tarif` are the only generated types that cannot
+/// be constructed without the `builder` feature or writing out every optional
+/// field by hand.
+#[test]
+fn structs_with_required_fields_get_a_constructor() {
+    let mut checked = 0usize;
+    for category in ["bo", "com"] {
+        for (title, doc) in read_schemas(&schema_dir().join(category)) {
+            let required: Vec<&str> = doc
+                .get("required")
+                .and_then(|r| r.as_array())
+                .map(|a| a.iter().filter_map(|v| v.as_str()).collect())
+                .unwrap_or_default();
+            let src = generated_source_flat(&title);
+            if required.is_empty() {
+                assert!(
+                    src.contains(&format!("implDefaultfor{title}")),
+                    "{title} has no required field, so it must derive or emit `Default`"
+                );
+                continue;
+            }
+            assert!(
+                !src.contains(&format!("implDefaultfor{title}")),
+                "{title} has required fields {required:?}, so it cannot have a `Default`"
+            );
+            assert!(
+                src.contains("pubfnnew("),
+                "{title} has required fields {required:?} and no `Default`, so it needs \
+                 a `new(...)`; run `just generate`"
+            );
+            checked += 1;
+        }
+    }
+    assert_eq!(
+        checked, 2,
+        "v202607 declares `required` on exactly Lastgang and Tarif — if that changed, \
+         re-read the schemas before updating this number"
+    );
+}
+
 /// The `BoTyp` / `ComTyp` variant that a wire value maps to must be named after
 /// the struct it discriminates.
 ///

@@ -32,10 +32,14 @@
 //!
 //! - **BO4E metadata keys** (`_typ`, `_version`, `_id`) keep their leading
 //!   underscore in every mode; they are wire metadata, not Rust field names.
-//! - **Extension keys** — anything the schema does not define — pass through
-//!   byte-for-byte, and so does everything nested under them. The transform
-//!   switches off where the schema stops, so a vendor blob holding
-//!   `{"a": 3}` is not rewritten to `{"A": 3}`.
+//! - **Extension keys** — anything the schema does not define — are never
+//!   renamed, and neither is anything nested under them. The transform switches
+//!   off where the schema stops, so a vendor blob holding `{"a": 3}` is not
+//!   rewritten to `{"A": 3}`.
+//!
+//! Key **order inside** a nested extension object is not preserved: the
+//! top-level map is an `IndexMap`, but a value below it is a
+//! [`serde_json::Value`], whose objects are sorted. Names and values survive.
 //!
 //! # Where snake_case stays ambiguous
 //!
@@ -64,20 +68,21 @@ pub use extension::{
     ext_map_is_empty, Bo4eExtensionData, ExtensionInsertError, LimitedExtensionMap,
     MAX_EXTENSION_FIELDS, MAX_EXTENSION_KEY_LEN,
 };
-pub use limits::{json_limit_hit_counters, JsonLimitHitCounters, JsonParseLimits};
+pub use limits::{
+    json_limit_hit_counters, JsonLimitHitCounters, JsonParseLimits, DEFAULT_MAX_NESTING_DEPTH,
+};
 
 // ── Internal imports from submodules ───────────────────────────────────
-use depth::{DepthLimitedDeserializer, DepthState};
 use key_transform::{
     camel_to_snake, deserialize_with_key_transform_from_slice,
     deserialize_with_key_transform_from_str, serialize_with_key_transform, snake_to_camel,
-    KeyTransform, KeyTransformDeserializer,
+    KeyTransform,
 };
 #[cfg(feature = "tracing")]
 use limits::trace_json_outcome;
 use limits::{
     check_payload_limit, deserialize_german_from_slice, deserialize_german_from_str,
-    install_extension_budget, trace_deser_error,
+    install_extension_budget, resolved_max_depth, trace_deser_error,
 };
 #[cfg(feature = "tracing")]
 use std::time::Instant;
@@ -284,6 +289,7 @@ pub trait Bo4eJsonExt: sealed::Sealed + Serialize + DeserializeOwned + Sized {
                 deserialize_with_key_transform_from_str::<Self>(
                     s,
                     KeyTransform::new(snake_to_camel),
+                    DEFAULT_MAX_NESTING_DEPTH,
                 )
             },
         )
@@ -311,6 +317,7 @@ pub trait Bo4eJsonExt: sealed::Sealed + Serialize + DeserializeOwned + Sized {
                 deserialize_with_key_transform_from_slice::<Self>(
                     bytes,
                     KeyTransform::new(snake_to_camel),
+                    DEFAULT_MAX_NESTING_DEPTH,
                 )
             },
         )
@@ -340,7 +347,7 @@ pub trait Bo4eJsonExt: sealed::Sealed + Serialize + DeserializeOwned + Sized {
             "german_str",
             s.len(),
             "BO4E deserialization failed in from_json_german",
-            || deserialize_german_from_str::<Self>(s),
+            || deserialize_german_from_str::<Self>(s, DEFAULT_MAX_NESTING_DEPTH),
         )
     }
 
@@ -372,7 +379,7 @@ pub trait Bo4eJsonExt: sealed::Sealed + Serialize + DeserializeOwned + Sized {
             "german_bytes",
             bytes.len(),
             "BO4E deserialization failed in from_json_german_bytes",
-            || deserialize_german_from_slice(bytes),
+            || deserialize_german_from_slice(bytes, DEFAULT_MAX_NESTING_DEPTH),
         )
     }
 
@@ -399,15 +406,7 @@ pub trait Bo4eJsonExt: sealed::Sealed + Serialize + DeserializeOwned + Sized {
             "BO4E hardened deserialization failed in from_json_german_hardened",
             || {
                 let _budget = install_extension_budget(limits);
-                match limits.max_nesting_depth {
-                    // Depth is tracked inline by DepthLimitedDeserializer.
-                    Some(max_depth) => {
-                        let state = DepthState::new(max_depth);
-                        let mut de = serde_json::Deserializer::from_str(s);
-                        Self::deserialize(DepthLimitedDeserializer::new(&mut de, &state))
-                    }
-                    None => deserialize_german_from_str::<Self>(s),
-                }
+                deserialize_german_from_str::<Self>(s, resolved_max_depth(limits))
             },
         )
     }
@@ -435,20 +434,11 @@ pub trait Bo4eJsonExt: sealed::Sealed + Serialize + DeserializeOwned + Sized {
             "BO4E hardened deserialization failed in from_json_snake_case_hardened",
             || {
                 let _budget = install_extension_budget(limits);
-                match limits.max_nesting_depth {
-                    Some(max_depth) => {
-                        let state = DepthState::new(max_depth);
-                        let mut de = serde_json::Deserializer::from_str(s);
-                        Self::deserialize(KeyTransformDeserializer::new(
-                            DepthLimitedDeserializer::new(&mut de, &state),
-                            KeyTransform::new(snake_to_camel),
-                        ))
-                    }
-                    None => deserialize_with_key_transform_from_str::<Self>(
-                        s,
-                        KeyTransform::new(snake_to_camel),
-                    ),
-                }
+                deserialize_with_key_transform_from_str::<Self>(
+                    s,
+                    KeyTransform::new(snake_to_camel),
+                    resolved_max_depth(limits),
+                )
             },
         )
     }
@@ -478,14 +468,7 @@ pub trait Bo4eJsonExt: sealed::Sealed + Serialize + DeserializeOwned + Sized {
             "BO4E hardened deserialization failed in from_json_german_bytes_hardened",
             || {
                 let _budget = install_extension_budget(limits);
-                match limits.max_nesting_depth {
-                    Some(max_depth) => {
-                        let state = DepthState::new(max_depth);
-                        let mut de = serde_json::Deserializer::from_slice(bytes);
-                        Self::deserialize(DepthLimitedDeserializer::new(&mut de, &state))
-                    }
-                    None => deserialize_german_from_slice::<Self>(bytes),
-                }
+                deserialize_german_from_slice::<Self>(bytes, resolved_max_depth(limits))
             },
         )
     }
@@ -507,20 +490,11 @@ pub trait Bo4eJsonExt: sealed::Sealed + Serialize + DeserializeOwned + Sized {
             "BO4E hardened deserialization failed in from_json_snake_case_bytes_hardened",
             || {
                 let _budget = install_extension_budget(limits);
-                match limits.max_nesting_depth {
-                    Some(max_depth) => {
-                        let state = DepthState::new(max_depth);
-                        let mut de = serde_json::Deserializer::from_slice(bytes);
-                        Self::deserialize(KeyTransformDeserializer::new(
-                            DepthLimitedDeserializer::new(&mut de, &state),
-                            KeyTransform::new(snake_to_camel),
-                        ))
-                    }
-                    None => deserialize_with_key_transform_from_slice::<Self>(
-                        bytes,
-                        KeyTransform::new(snake_to_camel),
-                    ),
-                }
+                deserialize_with_key_transform_from_slice::<Self>(
+                    bytes,
+                    KeyTransform::new(snake_to_camel),
+                    resolved_max_depth(limits),
+                )
             },
         )
     }

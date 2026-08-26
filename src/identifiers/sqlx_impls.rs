@@ -14,64 +14,51 @@
 //!
 //! ## Usage
 //!
-//! Use the identifier type directly as a bind parameter or result column:
+//! Bind and read identifiers directly — no `.parse()` step, no `as _` override:
 //!
 //! ```no_run
 //! use rubo4e::identifiers::{MaloId, MarktpartnerId};
 //! use sqlx::Row as _;
 //!
-//! # async fn demo(pool: sqlx::PgPool, malo_id: MaloId) -> Result<(), sqlx::Error> {
-//! // As a query bind parameter:
+//! # async fn demo(pool: sqlx::PgPool, malo_id: MaloId, ids: Vec<MaloId>) -> Result<(), sqlx::Error> {
 //! sqlx::query("INSERT INTO malo (id) VALUES ($1)")
-//!     .bind(&malo_id)          // MaloId implements Encode
+//!     .bind(&malo_id)
 //!     .execute(&pool).await?;
 //!
-//! // As a result column via try_get:
-//! let row = sqlx::query("SELECT malo_id, mp_id FROM parties LIMIT 1")
+//! let row = sqlx::query("SELECT malo_id FROM parties LIMIT 1")
 //!     .fetch_one(&pool).await?;
-//! let id: MaloId = row.try_get("malo_id")?;
-//! let mp: MarktpartnerId = row.try_get("mp_id")?;
+//! let id: MaloId = row.try_get("malo_id")?;   // validated on decode
 //!
-//! // As a struct field with FromRow:
+//! // `Vec<Id>` binds to a `TEXT[]` column.
+//! sqlx::query("SELECT * FROM malo WHERE id = ANY($1)")
+//!     .bind(&ids)
+//!     .fetch_all(&pool).await?;
+//!
 //! #[derive(sqlx::FromRow)]
 //! struct MpRow {
-//!     mp_id: MarktpartnerId,   // decoded + validated automatically
+//!     mp_id: MarktpartnerId,
 //! }
-//! let rows: Vec<MpRow> = sqlx::query_as("SELECT mp_id FROM parties")
-//!     .fetch_all(&pool).await?;
 //! # Ok(())
 //! # }
 //! ```
 //!
 //! ## Error behaviour
 //!
-//! Decoding validates the value using the same rules as `TryFrom<String>`.
+//! Decoding validates the value using the same rules as `TryFrom<&str>` — the
+//! constructor, so a decoded identifier is as trustworthy as a constructed one.
 //! An invalid value stored in the database (e.g. a MaLo-ID with a wrong check
 //! digit) causes `row.try_get(...)` to return `Err(...)` wrapping an
 //! [`IdentifierError`](crate::error::IdentifierError).
 //!
 //! ## Array columns
 //!
-//! `PgHasArrayType` is implemented for every identifier, so `Vec<MaloId>` binds
-//! to a `TEXT[]` column directly:
-//!
-//! ```no_run
-//! use rubo4e::identifiers::MaloId;
-//!
-//! # async fn demo(pool: sqlx::PgPool, ids: Vec<MaloId>) -> Result<(), sqlx::Error> {
-//! sqlx::query("SELECT * FROM malo WHERE id = ANY($1)")
-//!     .bind(&ids)
-//!     .fetch_all(&pool).await?;
-//! # Ok(())
-//! # }
-//! ```
-//!
-//! This has to live here rather than in downstream code: both `PgHasArrayType`
+//! `Vec<MaloId>` binds to a `TEXT[]` column directly, so `= ANY($1)` works.
+//! `PgHasArrayType` has to be implemented here rather than downstream: both it
 //! and the identifier types are foreign to any consuming crate, so the orphan
-//! rule makes a local impl impossible.
+//! rule rules out a local impl.
 
 /// Stamps out `sqlx::Type + Encode + Decode` for a newtype that wraps a
-/// validated string and implements `TryFrom<String>` + `AsRef<str>`.
+/// validated string and implements `TryFrom<&str>` + `AsRef<str>`.
 macro_rules! impl_sqlx_text {
     ($($T:ty),+ $(,)?) => {$(
         impl sqlx::Type<sqlx::Postgres> for $T {
@@ -94,7 +81,11 @@ macro_rules! impl_sqlx_text {
             fn decode(
                 value: <sqlx::Postgres as sqlx::Database>::ValueRef<'r>,
             ) -> Result<Self, sqlx::error::BoxDynError> {
-                let s = <String as sqlx::Decode<sqlx::Postgres>>::decode(value)?;
+                // Borrow out of the row buffer rather than decoding a `String`
+                // first: the constructor copies into a `Box<str>` either way, so
+                // the owned intermediate is pure overhead. This also matches the
+                // enum impls the generator emits.
+                let s = <&str as sqlx::Decode<sqlx::Postgres>>::decode(value)?;
                 Self::try_from(s).map_err(|e| Box::new(e) as sqlx::error::BoxDynError)
             }
         }

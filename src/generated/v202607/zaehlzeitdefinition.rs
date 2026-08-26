@@ -49,6 +49,7 @@ pub struct Zaehlzeitdefinition {
     #[cfg_attr(feature = "serde", serde(rename = "saisons"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub saisons: Option<Vec<Zaehlzeitsaison>>,
     /// BO4E type discriminant — always `BoTyp::Zaehlzeitdefinition` for this struct.
     #[cfg_attr(feature = "serde", serde(rename = "_typ"))]
@@ -64,6 +65,7 @@ pub struct Zaehlzeitdefinition {
     #[cfg_attr(feature = "serde", serde(rename = "urheber"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub urheber: Option<Box<Marktteilnehmer>>,
     /// Version der BO-Struktur aka "fachliche Versionierung"
     #[cfg_attr(feature = "serde", serde(rename = "_version"))]
@@ -76,6 +78,7 @@ pub struct Zaehlzeitdefinition {
     #[cfg_attr(feature = "serde", serde(rename = "zusatzAttribute"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub zusatz_attribute: Option<Vec<ZusatzAttribut>>,
     /// Unknown JSON fields captured during deserialization for round-trip preservation.
     /// `None` when no unknown fields were present (zero heap allocation).
@@ -106,15 +109,10 @@ impl Default for Zaehlzeitdefinition {
 }
 impl Bo4eObject for Zaehlzeitdefinition {
     type BoTyp = BoTyp;
-    fn bo_type(&self) -> BoTyp {
-        self.typ.unwrap_or(BoTyp::Zaehlzeitdefinition)
-    }
-    fn schema_version(&self) -> &'static str {
-        "202607.1.0"
-    }
-    fn schema_series(&self) -> &'static str {
-        "202607"
-    }
+    const BO_TYP: BoTyp = BoTyp::Zaehlzeitdefinition;
+    const TYP_WIRE: &'static str = "ZAEHLZEITDEFINITION";
+    const SCHEMA_VERSION: &'static str = "202607.1.0";
+    const SCHEMA_SERIES: &'static str = "202607";
 }
 #[cfg(feature = "json")]
 impl crate::json::sealed::Sealed for Zaehlzeitdefinition {}

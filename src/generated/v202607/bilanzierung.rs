@@ -112,14 +112,17 @@ pub struct Bilanzierung {
     #[cfg_attr(feature = "serde", serde(rename = "jahresverbrauchsprognose"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub jahresverbrauchsprognose: Option<Menge>,
     #[cfg_attr(feature = "serde", serde(rename = "kundenwert"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub kundenwert: Option<Menge>,
     #[cfg_attr(feature = "serde", serde(rename = "lastprofil"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub lastprofil: Option<Vec<Lastprofil>>,
     #[cfg_attr(feature = "serde", serde(rename = "marktlokationsId"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
@@ -137,6 +140,7 @@ pub struct Bilanzierung {
     #[cfg_attr(feature = "serde", serde(rename = "temperaturArbeit"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub temperatur_arbeit: Option<Menge>,
     /// BO4E type discriminant — always `BoTyp::Bilanzierung` for this struct.
     #[cfg_attr(feature = "serde", serde(rename = "_typ"))]
@@ -196,6 +200,7 @@ pub struct Bilanzierung {
     #[cfg_attr(feature = "serde", serde(rename = "zusatzAttribute"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub zusatz_attribute: Option<Vec<ZusatzAttribut>>,
     /// Unknown JSON fields captured during deserialization for round-trip preservation.
     /// `None` when no unknown fields were present (zero heap allocation).
@@ -240,15 +245,10 @@ impl Default for Bilanzierung {
 }
 impl Bo4eObject for Bilanzierung {
     type BoTyp = BoTyp;
-    fn bo_type(&self) -> BoTyp {
-        self.typ.unwrap_or(BoTyp::Bilanzierung)
-    }
-    fn schema_version(&self) -> &'static str {
-        "202607.1.0"
-    }
-    fn schema_series(&self) -> &'static str {
-        "202607"
-    }
+    const BO_TYP: BoTyp = BoTyp::Bilanzierung;
+    const TYP_WIRE: &'static str = "BILANZIERUNG";
+    const SCHEMA_VERSION: &'static str = "202607.1.0";
+    const SCHEMA_SERIES: &'static str = "202607";
 }
 #[cfg(feature = "json")]
 impl crate::json::sealed::Sealed for Bilanzierung {}

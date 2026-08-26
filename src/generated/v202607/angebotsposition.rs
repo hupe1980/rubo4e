@@ -30,16 +30,19 @@ pub struct Angebotsposition {
     #[cfg_attr(feature = "serde", serde(rename = "positionskosten"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub positionskosten: Option<Betrag>,
     /// Menge des angebotenen Artikels (z.B. Wirkarbeit in kWh), in dieser Angebotsposition
     #[cfg_attr(feature = "serde", serde(rename = "positionsmenge"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub positionsmenge: Option<Menge>,
     /// Preis pro Einheit/Stückpreis des angebotenen Artikels.
     #[cfg_attr(feature = "serde", serde(rename = "positionspreis"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub positionspreis: Option<Preis>,
     /// BO4E type discriminant — always `ComTyp::Angebotsposition` for this struct.
     #[cfg_attr(feature = "serde", serde(rename = "_typ"))]
@@ -60,6 +63,7 @@ pub struct Angebotsposition {
     #[cfg_attr(feature = "serde", serde(rename = "zusatzAttribute"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub zusatz_attribute: Option<Vec<ZusatzAttribut>>,
     /// Unknown JSON fields captured during deserialization for round-trip preservation.
     /// `None` when no unknown fields were present (zero heap allocation).

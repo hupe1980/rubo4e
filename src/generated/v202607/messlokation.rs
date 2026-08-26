@@ -23,11 +23,13 @@ pub struct Messlokation {
     #[cfg_attr(feature = "serde", serde(rename = "geoadresse"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub geoadresse: Option<Geokoordinaten>,
     /// Liste der Geräte, die zu dieser Messstelle gehört
     #[cfg_attr(feature = "serde", serde(rename = "geraete"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub geraete: Option<Vec<Box<Geraet>>>,
     /// Codenummer des grundzuständigen Messstellenbetreibers, der für diese Messlokation zuständig ist.
     /// (Dieser ist immer dann Messstellenbetreiber, wenn kein anderer MSB die Einrichtungen an der Messlokation betreibt.)
@@ -55,6 +57,7 @@ pub struct Messlokation {
     #[cfg_attr(feature = "serde", serde(rename = "katasterinformation"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub katasterinformation: Option<Katasteradresse>,
     /// Lokationsbuendel Code, der die Funktion dieses BOs an der Lokationsbuendelstruktur beschreibt.
     #[cfg_attr(feature = "serde", serde(rename = "lokationsbuendelObjektcode"))]
@@ -65,17 +68,20 @@ pub struct Messlokation {
     #[cfg_attr(feature = "serde", serde(rename = "lokationszuordnungen"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub lokationszuordnungen: Option<Vec<Box<Lokationszuordnung>>>,
     /// Die Adresse, an der die Messeinrichtungen zu finden sind.
     /// (Nur angeben, wenn diese von der Adresse der Marktlokation abweicht.)
     #[cfg_attr(feature = "serde", serde(rename = "messadresse"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub messadresse: Option<Adresse>,
     /// Liste der Messdienstleistungen, die zu dieser Messstelle gehört
     #[cfg_attr(feature = "serde", serde(rename = "messdienstleistung"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub messdienstleistung: Option<Vec<Dienstleistung>>,
     /// Die Nummer des Messgebietes in der ene't-Datenbank
     #[cfg_attr(feature = "serde", serde(rename = "messgebietnr"))]
@@ -92,6 +98,7 @@ pub struct Messlokation {
     #[cfg_attr(feature = "serde", serde(rename = "messlokationszaehler"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub messlokationszaehler: Option<Vec<Box<Zaehler>>>,
     /// Spannungsebene der Messung
     #[cfg_attr(feature = "serde", serde(rename = "netzebeneMessung"))]
@@ -122,6 +129,7 @@ pub struct Messlokation {
     #[cfg_attr(feature = "serde", serde(rename = "zusatzAttribute"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub zusatz_attribute: Option<Vec<ZusatzAttribut>>,
     /// Unknown JSON fields captured during deserialization for round-trip preservation.
     /// `None` when no unknown fields were present (zero heap allocation).
@@ -162,15 +170,10 @@ impl Default for Messlokation {
 }
 impl Bo4eObject for Messlokation {
     type BoTyp = BoTyp;
-    fn bo_type(&self) -> BoTyp {
-        self.typ.unwrap_or(BoTyp::Messlokation)
-    }
-    fn schema_version(&self) -> &'static str {
-        "202607.1.0"
-    }
-    fn schema_series(&self) -> &'static str {
-        "202607"
-    }
+    const BO_TYP: BoTyp = BoTyp::Messlokation;
+    const TYP_WIRE: &'static str = "MESSLOKATION";
+    const SCHEMA_VERSION: &'static str = "202607.1.0";
+    const SCHEMA_SERIES: &'static str = "202607";
 }
 #[cfg(feature = "json")]
 impl crate::json::sealed::Sealed for Messlokation {}

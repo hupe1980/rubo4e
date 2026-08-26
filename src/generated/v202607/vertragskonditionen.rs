@@ -15,6 +15,7 @@ pub struct Vertragskonditionen {
     #[cfg_attr(feature = "serde", serde(rename = "abschlagszyklus"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub abschlagszyklus: Option<Zeitraum>,
     /// Anzahl der vereinbarten Abschläge pro Jahr, z.B. 12
     #[cfg_attr(feature = "serde", serde(rename = "anzahlAbschlaege"))]
@@ -54,6 +55,7 @@ pub struct Vertragskonditionen {
     #[cfg_attr(feature = "serde", serde(rename = "kuendigungsfrist"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub kuendigungsfrist: Option<Zeitraum>,
     /// BO4E type discriminant — always `ComTyp::Vertragskonditionen` for this struct.
     #[cfg_attr(feature = "serde", serde(rename = "_typ"))]
@@ -75,15 +77,18 @@ pub struct Vertragskonditionen {
     #[cfg_attr(feature = "serde", serde(rename = "vertragslaufzeit"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub vertragslaufzeit: Option<Zeitraum>,
     /// Falls der Vertrag nicht gekündigt wird, verlängert er sich automatisch um die hier angegebene Zeit
     #[cfg_attr(feature = "serde", serde(rename = "vertragsverlaengerung"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub vertragsverlaengerung: Option<Zeitraum>,
     #[cfg_attr(feature = "serde", serde(rename = "zusatzAttribute"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub zusatz_attribute: Option<Vec<ZusatzAttribut>>,
     /// Unknown JSON fields captured during deserialization for round-trip preservation.
     /// `None` when no unknown fields were present (zero heap allocation).

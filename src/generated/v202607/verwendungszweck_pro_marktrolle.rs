@@ -41,6 +41,7 @@ pub struct VerwendungszweckProMarktrolle {
     #[cfg_attr(feature = "serde", serde(rename = "zusatzAttribute"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub zusatz_attribute: Option<Vec<ZusatzAttribut>>,
     /// Verwendungszwecke
     #[cfg_attr(feature = "serde", serde(rename = "zwecke"))]

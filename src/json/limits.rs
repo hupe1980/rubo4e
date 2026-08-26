@@ -173,8 +173,12 @@ pub struct JsonParseLimits {
     /// Maximum accepted JSON nesting depth.
     ///
     /// Leaving it `None` does not disable depth checking: every entry point,
-    /// hardened or not, enforces a default cap of 128 so a deeply nested payload
-    /// cannot overflow the stack. This only lowers it.
+    /// hardened or not, enforces [`DEFAULT_MAX_NESTING_DEPTH`] (128) so a deeply
+    /// nested payload cannot overflow the stack.
+    ///
+    /// In practice this only ever lowers the cap. `serde_json` enforces a
+    /// recursion limit of its own at the same 128, and it is the inner parser,
+    /// so a value above that never takes effect.
     pub max_nesting_depth: Option<usize>,
     /// Cumulative byte budget for all captured extension values in one call,
     /// charged across every nesting level rather than only the root.
@@ -188,12 +192,15 @@ pub struct JsonParseLimits {
 }
 
 impl JsonParseLimits {
-    /// Every cap off — the parser's own defaults still apply.
+    /// Every opt-in cap off — the always-on ones still apply.
     ///
-    /// Note that this is not "no protection": the non-hardened entry points, and
-    /// this one, still enforce a default nesting-depth cap of 128 so a deeply
-    /// nested payload cannot overflow the stack. Use it for payloads you produced
-    /// yourself, or as a base for a profile with exactly one cap set.
+    /// This is not "no protection": the nesting-depth default of 128 and the two
+    /// extension caps ([`MAX_EXTENSION_FIELDS`], [`MAX_EXTENSION_KEY_LEN`]) hold
+    /// on every path. Use it for payloads you produced yourself, or as a base
+    /// for a profile with exactly one cap set.
+    ///
+    /// [`MAX_EXTENSION_FIELDS`]: crate::json::MAX_EXTENSION_FIELDS
+    /// [`MAX_EXTENSION_KEY_LEN`]: crate::json::MAX_EXTENSION_KEY_LEN
     #[must_use]
     pub const fn unlimited() -> Self {
         Self {
@@ -334,7 +341,8 @@ pub(super) fn charge_extension_bytes(bytes: usize) -> Result<(), (usize, usize)>
     })
 }
 
-/// Default maximum JSON nesting depth for all non-hardened deserialization paths.
+/// Default maximum JSON nesting depth, applied on **every** deserialization
+/// path — German or snake_case, string or bytes, hardened or not.
 ///
 /// Valid BO4E structures are at most 6–8 levels deep in practice.  128 is a
 /// generous allowance that eliminates the stack-overflow DoS surface while
@@ -346,9 +354,11 @@ pub(super) fn charge_extension_bytes(bytes: usize) -> Result<(), (usize, usize)>
 /// backend's default, and keeps the message actionable — it names the hardened
 /// entry point that can change it.
 ///
-/// The `_hardened` variants accept an explicit [`JsonParseLimits::max_nesting_depth`]
-/// which, when set, takes priority over this default.
-pub(super) const DEFAULT_MAX_NESTING_DEPTH: usize = 128;
+/// The `_hardened` variants accept an explicit
+/// [`JsonParseLimits::max_nesting_depth`], which replaces this default. Only a
+/// lower value has any effect: `serde_json`'s own limit sits at the same 128 and
+/// it parses first.
+pub const DEFAULT_MAX_NESTING_DEPTH: usize = 128;
 
 pub(super) fn check_payload_limit(
     payload_len: usize,
@@ -365,18 +375,39 @@ pub(super) fn check_payload_limit(
     Ok(())
 }
 
+/// The nesting-depth cap a call runs under: whatever `limits` asks for, or the
+/// always-on default.
+///
+/// Depth is capped on **every** path, hardened or not — a `None` here lowers
+/// nothing, it just leaves [`DEFAULT_MAX_NESTING_DEPTH`] in force.
+#[inline]
+pub(super) fn resolved_max_depth(limits: JsonParseLimits) -> usize {
+    limits
+        .max_nesting_depth
+        .unwrap_or(DEFAULT_MAX_NESTING_DEPTH)
+}
+
 pub(super) fn deserialize_german_from_str<T: DeserializeOwned>(
     s: &str,
+    max_depth: usize,
 ) -> Result<T, serde_json::Error> {
-    let state = DepthState::new(DEFAULT_MAX_NESTING_DEPTH);
+    let state = DepthState::new(max_depth);
     let mut de = serde_json::Deserializer::from_str(s);
-    T::deserialize(DepthLimitedDeserializer::new(&mut de, &state))
+    let value = T::deserialize(DepthLimitedDeserializer::new(&mut de, &state))?;
+    // The whole input must be consumed. Without this, `{…} <anything>` decodes
+    // here while `serde_json::from_str` on the same bytes rejects it — a parser
+    // differential between this crate and whatever validates in front of it.
+    de.end()?;
+    Ok(value)
 }
 
 pub(super) fn deserialize_german_from_slice<T: DeserializeOwned>(
     bytes: &[u8],
+    max_depth: usize,
 ) -> Result<T, serde_json::Error> {
-    let state = DepthState::new(DEFAULT_MAX_NESTING_DEPTH);
+    let state = DepthState::new(max_depth);
     let mut de = serde_json::Deserializer::from_slice(bytes);
-    T::deserialize(DepthLimitedDeserializer::new(&mut de, &state))
+    let value = T::deserialize(DepthLimitedDeserializer::new(&mut de, &state))?;
+    de.end()?;
+    Ok(value)
 }

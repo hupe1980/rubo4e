@@ -23,11 +23,13 @@ pub struct PreisblattKonzessionsabgabe {
     #[cfg_attr(feature = "serde", serde(rename = "gueltigkeit"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub gueltigkeit: Option<Zeitraum>,
     /// Der Netzbetreiber, der die Preise veröffentlicht hat
     #[cfg_attr(feature = "serde", serde(rename = "herausgeber"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub herausgeber: Option<Box<Marktteilnehmer>>,
     /// Eine generische ID, die für eigene Zwecke genutzt werden kann.
     /// Z.B. könnten hier UUIDs aus einer Datenbank stehen oder URLs zu einem Backend-System.
@@ -44,6 +46,7 @@ pub struct PreisblattKonzessionsabgabe {
     #[cfg_attr(feature = "serde", serde(rename = "preispositionen"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub preispositionen: Option<Vec<Preisposition>>,
     /// Merkmal, das anzeigt, ob es sich um vorläufige oder endgültige Preise handelt
     #[cfg_attr(feature = "serde", serde(rename = "preisstatus"))]
@@ -74,6 +77,7 @@ pub struct PreisblattKonzessionsabgabe {
     #[cfg_attr(feature = "serde", serde(rename = "zusatzAttribute"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub zusatz_attribute: Option<Vec<ZusatzAttribut>>,
     /// Unknown JSON fields captured during deserialization for round-trip preservation.
     /// `None` when no unknown fields were present (zero heap allocation).
@@ -107,15 +111,10 @@ impl Default for PreisblattKonzessionsabgabe {
 }
 impl Bo4eObject for PreisblattKonzessionsabgabe {
     type BoTyp = BoTyp;
-    fn bo_type(&self) -> BoTyp {
-        self.typ.unwrap_or(BoTyp::PreisblattKonzessionsabgabe)
-    }
-    fn schema_version(&self) -> &'static str {
-        "202607.1.0"
-    }
-    fn schema_series(&self) -> &'static str {
-        "202607"
-    }
+    const BO_TYP: BoTyp = BoTyp::PreisblattKonzessionsabgabe;
+    const TYP_WIRE: &'static str = "PREISBLATTKONZESSIONSABGABE";
+    const SCHEMA_VERSION: &'static str = "202607.1.0";
+    const SCHEMA_SERIES: &'static str = "202607";
 }
 #[cfg(feature = "json")]
 impl crate::json::sealed::Sealed for PreisblattKonzessionsabgabe {}

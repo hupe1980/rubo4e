@@ -15,24 +15,35 @@ rubo4e/
 ├── deny.toml                — cargo-deny policy (licences, advisories)
 ├── justfile                 — build / generate / test recipes
 ├── site/                    — this documentation site (Zola)
-├── src/                     — bo4e crate source
-│   ├── lib.rs               — crate root; feature-gated re-exports, prelude, Bo4eObject trait
-│   ├── error.rs             — IdentifierError and LengthExpectation types
-│   ├── json/                — Bo4eJsonExt, Bo4eExtensionData, LimitedExtensionMap
-│   ├── schema_helpers.rs    — schemars schema_with= helpers for OffsetDateTime and Date
-│   ├── time_serde.rs        — date_serde / opt_date_serde modules (time feature)
+├── src/                     — rubo4e crate source
+│   ├── lib.rs               — crate root; prelude, Bo4eObject / Bo4eEnum / Bo4eStrict
+│   ├── error.rs             — IdentifierError, LengthExpectation, UnknownVariant
+│   ├── strict.rs            — StrictError and the JSON-path helpers Bo4eStrict emits
 │   ├── convenience.rs       — hand-written ergonomic methods on generated types
+│   ├── decimal_serde.rs     — reads a decimal from either wire spelling; counts the lossy one
+│   ├── time_serde.rs        — date_serde / opt_date_serde modules (time feature)
+│   ├── offset_time.rs       — the `format: "time"` fields: time of day + UTC offset
+│   ├── iso8601_duration.rs  — Zeitraum.dauer, refusing Y/M rather than approximating
+│   ├── schema_helpers.rs    — schemars schema_with= helpers (dates, every identifier)
+│   ├── json/                — Bo4eJsonExt and the parsing hardening
+│   │   ├── mod.rs           — the three output modes + the sorted serializer
+│   │   ├── key_transform.rs — camelCase ↔ snake_case, scoped to the schema's edge
+│   │   ├── extension.rs     — LimitedExtensionMap, Bo4eExtensionData
+│   │   ├── depth.rs         — the nesting-depth guard, as a Deserializer wrapper
+│   │   └── limits.rs        — JsonParseLimits, the budgets, the hit counters
 │   ├── identifiers/         — validated domain newtypes
-│   │   ├── macros.rs        — trait boilerplate + §8.2 identifier generator
+│   │   ├── macros.rs        — trait boilerplate + §8.2 / EIC-restricted generators
 │   │   ├── checksum.rs      — BDEW chapter-8 check-digit arithmetic (one impl)
 │   │   ├── ascii_ids.rs     — NeloId, NebeId, CrId, SgId, SrId, TrId, PaketId
-│   │   ├── malo_id.rs, marktpartner_id.rs, melo_id.rs
+│   │   ├── sqlx_impls.rs    — Type / Encode / Decode / PgHasArrayType (sqlx feature)
+│   │   ├── malo_id.rs, marktpartner_id.rs, melo_id.rs, bank.rs
 │   │   └── eic_code.rs, bilanzkreis_id.rs, obis_code.rs, akiv_id.rs, …
 │   ├── validation/          — garde-based cross-field validators
 │   └── generated/           — written by generator; never pub outside crate
-│       ├── mod.rs           — re-exports v202607
+│       ├── mod.rs           — declares key_map (json) and each series (versioned)
+│       ├── key_map.rs       — the exact wire ↔ snake_case table, shared by all series
 │       └── v202607/         — flat .rs files, one per BO/COM/enum type
-│           ├── mod.rs       — re-exports all types + BoTyp / ComTyp discriminants
+│           ├── mod.rs       — re-exports all types + BoTyp / ComTyp / AnyBo
 │           ├── marktlokation.rs
 │           ├── vertrag.rs
 │           └── …
@@ -141,7 +152,7 @@ a type has to be looked up per type.
 |---|---|---|
 | Always | `Debug`, `Clone`, `PartialEq`, `Default`&nbsp;\* | `Debug`, `Clone`, `Copy`, `PartialEq`, `Eq`, `PartialOrd`, `Ord`, `Hash` |
 | Without `json` | **`Eq`, `Hash`** | — |
-| `versioned` | `Bo4eObject` (BOs only), `Bo4eStrict` | `Bo4eEnum`, `VARIANTS` / `COUNT` / `as_wire` / `from_wire` / `iter_known` |
+| `versioned` | `Bo4eObject` (BOs only) with `BO_TYP` / `TYP_WIRE` / `SCHEMA_VERSION` / `SCHEMA_SERIES`, `Bo4eStrict` | `Bo4eEnum`, `VARIANTS` / `COUNT` / `as_wire` / `from_wire` / `iter_known` |
 | `json` | `Bo4eJsonExt`, `Bo4eExtensionData`, `Display` | — |
 | `serde` | `Serialize`, `Deserialize` | `Serialize`, `Deserialize` |
 | `builder` | `TypedBuilder` | — |
@@ -151,8 +162,19 @@ a type has to be looked up per type.
 | `sqlx` | — | `Type` / `Encode` / `Decode` / `PgHasArrayType` |
 
 \* `Default` is absent on the two structs BO4E declares a *required* field on
-(`Lastgang`, `Tarif`) — a required field's type need not have one. Those stamp
-`_typ` and `_version` through the builder instead.
+(`Lastgang`, `Tarif`) — a required field's type need not have one. Each gets a
+feature-free `new(…)` taking those fields and defaulting the rest.
+
+**The BO facts are associated constants**, not just methods:
+`T::BO_TYP`, `T::TYP_WIRE`, `T::SCHEMA_VERSION`, `T::SCHEMA_SERIES`. Generic code
+therefore needs no value and no `Default` bound — which is what stops `Lastgang`
+and `Tarif` being silently excluded from anything written as `fn f<T: Default>()`.
+
+That makes `Bo4eObject` **not `dyn`-compatible**. Use `AnyBo` for a
+heterogeneous collection: the trait is sealed, so `AnyBo` is the sum over exactly
+its implementors, it carries the same four facts as methods (`schema_version()`
+and `schema_series()` return `Option`, since the `Unknown` catch-all has no
+generated type), and it is `Clone + PartialEq + Serialize + Deserialize` besides.
 
 **`Eq` and `Hash` on structs move together**, and only without `json`. One type
 blocks both: `serde_json::Value`, which reaches a generated struct through
@@ -174,16 +196,22 @@ reorder the values, so never persist a sort key derived from it. Compare
 | `serde` | ✓ (via `identifiers`) | `serde` | none | Derive `Serialize`/`Deserialize` on all types |
 | `json` | — | `serde_json` | none | `to_json_*()` methods; `serde` implied |
 | `time` | — | `time` | none | `OffsetDateTime` for datetime fields; `Date` for date-only fields; enables `rubo4e::time_serde` when `serde` is also on |
-| `decimal` | — | `rust_decimal` | none | `Decimal` for all monetary/quantity fields; without it they are `String` and still accept a JSON number |
+| `decimal` | — | `rust_decimal` | none | `Decimal` for all monetary/quantity fields; without it they are `String` and still accept a JSON number. Also turns on `schemars?/rust_decimal1` and `utoipa?/decimal` — see the note below |
 | `builder` | — | `typed-builder` | none | Typed builder derives on all BO/COM structs |
-| `validate` | — | `garde` | none | `.validate()` method on all structs |
+| `validate` | — | `garde` | none | `.validate()` on all structs — recursive: descends into nested BOs, COMs, and identifiers |
 | `schemars` | — | `schemars` | none | `JsonSchema` derive on all types; enables `rubo4e::schema_helpers` |
 | `versioned` | — | none | none | Conditional compilation of `v202607` and `current` modules; enables `rubo4e::convenience`, `rubo4e::strict`, and the `Bo4eEnum` / `Bo4eStrict` traits |
+| `time` + `versioned` | — | `time` | none | Additionally enables `rubo4e::offset_time` and `rubo4e::iso8601_duration`, and the `Zeitraum` / `Rechnung` date accessors that return their types |
 | `sqlx` | — | `sqlx` | none | `sqlx::Type`/`Encode`/`Decode`/`PgHasArrayType` for every identifier and every enum; no `json` required — both directions go through `&str` |
 | `utoipa` | — | `utoipa` | none | `ToSchema` derive on all types |
 | `strum` | — | `strum` | none | `FromStr`, `EnumIter`, `Into<&'static str>` on all enums (`Display`/`AsRef<str>`/introspection are always on) |
 | `tracing` | — | `tracing` | none | Structured diagnostics (identifier failures, extension-data events) |
 | `metrics` | — | `metrics` | none | Counter export hooks (metrics ecosystem) |
+
+> **Scalar-type schema impls.** `JsonSchema` / `ToSchema` for `Decimal` and the
+> `time` types hang off `decimal` and `time`, not off `schemars` / `utoipa`, so
+> this crate cannot become your workspace's accidental sole provider of them —
+> see [Ecosystem](@/docs/ecosystem.md#the-decimal-and-time-schema-impls-hang-off-decimal-time).
 
 > **MSRV:** The library targets Rust ≥ **1.88** (set in `Cargo.toml` via `rust-version`). No feature raises the floor: the binding constraint is the always-available dependency tree (`time` and `home` via `sqlx` both require 1.88).
 

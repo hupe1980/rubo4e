@@ -43,6 +43,7 @@ pub struct Ausschreibungslos {
     #[cfg_attr(feature = "serde", serde(rename = "gesamtMenge"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub gesamt_menge: Option<Menge>,
     /// Eine generische ID, die für eigene Zwecke genutzt werden kann.
     /// Z.B. könnten hier UUIDs aus einer Datenbank stehen oder URLs zu einem Backend-System.
@@ -54,11 +55,13 @@ pub struct Ausschreibungslos {
     #[cfg_attr(feature = "serde", serde(rename = "lieferstellen"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub lieferstellen: Option<Vec<Ausschreibungsdetail>>,
     /// Zeitraum, für den die in diesem Los enthaltenen Lieferstellen beliefert werden sollen
     #[cfg_attr(feature = "serde", serde(rename = "lieferzeitraum"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub lieferzeitraum: Option<Zeitraum>,
     /// Laufende Nummer des Loses
     #[cfg_attr(feature = "serde", serde(rename = "losnummer"))]
@@ -91,21 +94,25 @@ pub struct Ausschreibungslos {
     #[cfg_attr(feature = "serde", serde(rename = "wiederholungsintervall"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub wiederholungsintervall: Option<Zeitraum>,
     /// Kundenwunsch zur Kündigungsfrist in der Ausschreibung
     #[cfg_attr(feature = "serde", serde(rename = "wunschKuendingungsfrist"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub wunsch_kuendingungsfrist: Option<Zeitraum>,
     /// Maximalmenge Toleranzband (kWh, %)
     #[cfg_attr(feature = "serde", serde(rename = "wunschMaximalmenge"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub wunsch_maximalmenge: Option<Menge>,
     /// Mindesmenge Toleranzband (kWh, %)
     #[cfg_attr(feature = "serde", serde(rename = "wunschMindestmenge"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub wunsch_mindestmenge: Option<Menge>,
     /// Aufzählung der Möglichkeiten zur Rechnungslegung in Ausschreibungen
     #[cfg_attr(feature = "serde", serde(rename = "wunschRechnungslegung"))]
@@ -121,10 +128,12 @@ pub struct Ausschreibungslos {
     #[cfg_attr(feature = "serde", serde(rename = "wunschZahlungsziel"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub wunsch_zahlungsziel: Option<Zeitraum>,
     #[cfg_attr(feature = "serde", serde(rename = "zusatzAttribute"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub zusatz_attribute: Option<Vec<ZusatzAttribut>>,
     /// Unknown JSON fields captured during deserialization for round-trip preservation.
     /// `None` when no unknown fields were present (zero heap allocation).

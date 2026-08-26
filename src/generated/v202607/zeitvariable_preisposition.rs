@@ -26,6 +26,7 @@ pub struct ZeitvariablePreisposition {
     #[cfg_attr(feature = "serde", serde(rename = "preis"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub preis: Option<Preis>,
     /// Die Referenz worauf sich der Preis bezieht.
     /// Die explizite Einheit wird durch das Feld `bezugswert` im `COM Preis` angegeben.
@@ -53,6 +54,7 @@ pub struct ZeitvariablePreisposition {
     #[cfg_attr(feature = "serde", serde(rename = "zaehlzeitdefinition"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub zaehlzeitdefinition: Option<Box<Zaehlzeitdefinition>>,
     /// Der freie Register-Code (z.B. "HT", "NT", "ST", "SuperHT") innerhalb der referenzierten
     /// `zaehlzeitdefinition`, auf den sich diese Preisposition bezieht. Der Code sollte als
@@ -65,6 +67,7 @@ pub struct ZeitvariablePreisposition {
     #[cfg_attr(feature = "serde", serde(rename = "zusatzAttribute"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub zusatz_attribute: Option<Vec<ZusatzAttribut>>,
     /// Unknown JSON fields captured during deserialization for round-trip preservation.
     /// `None` when no unknown fields were present (zero heap allocation).

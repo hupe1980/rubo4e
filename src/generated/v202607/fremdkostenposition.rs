@@ -26,6 +26,7 @@ pub struct Fremdkostenposition {
     #[cfg_attr(feature = "serde", serde(rename = "betragKostenposition"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub betrag_kostenposition: Option<Betrag>,
     /// exklusiver bis-Zeitpunkt der Kostenzeitscheibe
     #[cfg_attr(feature = "serde", serde(rename = "bis"))]
@@ -58,6 +59,7 @@ pub struct Fremdkostenposition {
     #[cfg_attr(feature = "serde", serde(rename = "einzelpreis"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub einzelpreis: Option<Preis>,
     /// EIC-Code des Regel- oder Marktgebietes eingetragen. Z.B. '10YDE-EON------1' für die Regelzone TenneT
     #[cfg_attr(feature = "serde", serde(rename = "gebietcodeEic"))]
@@ -90,6 +92,7 @@ pub struct Fremdkostenposition {
     #[cfg_attr(feature = "serde", serde(rename = "menge"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub menge: Option<Menge>,
     /// Ein Titel für die Zeile. Hier kann z.B. der Netzbetreiber eingetragen werden, wenn es sich um Netzkosten handelt.
     #[cfg_attr(feature = "serde", serde(rename = "positionstitel"))]
@@ -144,10 +147,12 @@ pub struct Fremdkostenposition {
     #[cfg_attr(feature = "serde", serde(rename = "zeitmenge"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub zeitmenge: Option<Menge>,
     #[cfg_attr(feature = "serde", serde(rename = "zusatzAttribute"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub zusatz_attribute: Option<Vec<ZusatzAttribut>>,
     /// Unknown JSON fields captured during deserialization for round-trip preservation.
     /// `None` when no unknown fields were present (zero heap allocation).

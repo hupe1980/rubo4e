@@ -2,7 +2,7 @@
 #![warn(missing_docs, clippy::all)]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
-//! # bo4e
+//! # rubo4e
 //!
 //! Rust implementation of the **BO4E** energy-market data standard.
 //!
@@ -13,8 +13,8 @@
 //! | `identifiers`  | ✓       | Identifier types (`MaloId`, `EicCode`, `ObisCode`, …) + serde  |
 //! | `serde`        | ✓       | Serde derives + extension-data map                             |
 //! | `json`         |         | `serde_json` helpers (`to_json_*`, `from_json_*`)              |
-//! | `time`         |         | `time` crate for timestamps                                    |
-//! | `decimal`      |         | `rust_decimal::Decimal` for amounts/prices (see note below)     |
+//! | `time`         |         | `time` crate for timestamps; also `utoipa/time`                |
+//! | `decimal`      |         | `rust_decimal::Decimal` for amounts/prices (see note below); also `schemars/rust_decimal1` and `utoipa/decimal` |
 //! | `builder`      |         | `typed-builder` derives with `setter(into)` — accepts both `T` and `Option<T>`  |
 //! | `validate`     |         | `garde` validation                                             |
 //! | `schemars`     |         | JSON Schema generation                                         |
@@ -27,10 +27,10 @@
 //!
 //! ## Identifiers without schema overhead
 //!
-//! All identifier types (`MaloId`, `MeloId`, `NeloId`, `EicCode`, `ObisCode`,
-//! `MarktpartnerId`, `SrId`, `TrId`) **always** provide `Display`, `FromStr`,
-//! `TryFrom<&str>`, `TryFrom<String>`, and `AsRef<str>` without any feature
-//! flags — the minimum needed for EDIFACT wire-format encoding/decoding.
+//! Every identifier type **always** provides `Display`, `FromStr`,
+//! `TryFrom<&str>`, `TryFrom<String>`, `Into<String>`, `AsRef<str>`,
+//! `Borrow<str>`, and `Deref<Target = str>` without any feature flag — the
+//! minimum needed for EDIFACT wire-format encoding and decoding.
 //!
 //! To use only identifier types without pulling in the versioned BO4E schema:
 //! ```toml
@@ -232,85 +232,132 @@ pub mod current {
     pub use crate::generated::v202607::*;
 }
 
+/// Implemented by every generated BO4E business object (Geschäftsobjekt).
+///
+/// The BO type discriminant and the schema release are **associated constants**,
+/// readable from a type without a value, with method forms for when you have
+/// one. COM types and enums do not implement this trait.
+///
+/// Sealed: it cannot be implemented outside this crate.
+///
+/// ```
+/// use rubo4e::{current::{BoTyp, Lastgang, Vertrag}, Bo4eObject};
+///
+/// assert_eq!(Vertrag::BO_TYP, BoTyp::Vertrag);
+/// assert_eq!(Vertrag::TYP_WIRE, "VERTRAG");
+/// assert_eq!(Vertrag::SCHEMA_VERSION, "202607.1.0");
+/// assert_eq!(Vertrag::SCHEMA_SERIES, "202607");
+///
+/// // Generic code needs no value, so a `Default` bound is not required —
+/// // which is what admits `Lastgang` and `Tarif`, the two types the schema
+/// // marks `required` and which therefore have no `Default`.
+/// fn discriminant_of<T: Bo4eObject<BoTyp = BoTyp>>() -> BoTyp { T::BO_TYP }
+/// assert_eq!(discriminant_of::<Lastgang>(), BoTyp::Lastgang);
+/// ```
+///
+/// # Not `dyn`-compatible
+///
+/// Associated constants make a trait dyn-incompatible. For a heterogeneous
+/// collection use [`AnyBo`](crate::current::AnyBo), the sum type over exactly
+/// this trait's (sealed) implementors — it carries the same facts and is
+/// `Clone + PartialEq + Serialize + Deserialize` besides.
+///
+/// ```
+/// use rubo4e::current::{AnyBo, BoTyp, Marktlokation, Vertrag};
+///
+/// let objects: Vec<AnyBo> = vec![Vertrag::default().into(), Marktlokation::default().into()];
+/// assert_eq!(
+///     objects.iter().map(AnyBo::bo_type).collect::<Vec<_>>(),
+///     [BoTyp::Vertrag, BoTyp::Marktlokation],
+/// );
+/// ```
 #[cfg(feature = "versioned")]
-/// Marker trait implemented by every generated BO4E business object (Geschäftsobjekt).
-///
-/// Provides runtime access to the BO type discriminant and the schema version that
-/// was used to generate this type.  COM types and enums do NOT implement this trait.
-///
-/// # Sealed trait
-///
-/// `Bo4eObject` is sealed — it cannot be implemented by types outside this crate.
-/// This allows the library to add new methods in future releases without breaking
-/// downstream code that merely *uses* the trait.
-///
-/// # Design note — associated type over bare return type
-///
-/// `bo_type()` returns `Self::BoTyp` (an associated type) so that the single trait
-/// definition in `src/lib.rs` can serve all schema versions while keeping each
-/// version's `BoTyp` enum strongly typed.  For `dyn` usage, bind the associated type:
-///
-/// ```
-/// use rubo4e::current::{BoTyp, Marktlokation, Vertrag};
-/// use rubo4e::Bo4eObject;
-///
-/// let objects: Vec<Box<dyn Bo4eObject<BoTyp = BoTyp>>> = vec![
-///     Box::new(Vertrag::default()),
-///     Box::new(Marktlokation::default()),
-/// ];
-/// let types: Vec<BoTyp> = objects.iter().map(|o| o.bo_type()).collect();
-/// assert_eq!(types, [BoTyp::Vertrag, BoTyp::Marktlokation]);
-/// ```
-///
-/// # Example
-/// ```
-/// use rubo4e::current::{BoTyp, Vertrag};
-/// use rubo4e::Bo4eObject as _;
-///
-/// let v = Vertrag::default();
-/// assert_eq!(v.bo_type(), BoTyp::Vertrag);
-/// assert_eq!(v.schema_version(), "202607.1.0");  // exact release
-/// assert_eq!(v.schema_series(), "202607");       // the series this module covers
-/// ```
+#[cfg_attr(docsrs, doc(cfg(feature = "versioned")))]
 pub trait Bo4eObject: bo4e_object_sealed::Sealed {
     /// The BO type discriminant enum for this schema version (e.g. `v202607::BoTyp`).
-    type BoTyp;
-    /// Returns the [`Self::BoTyp`] discriminant identifying this business object.
-    fn bo_type(&self) -> Self::BoTyp;
-    /// Returns the exact BO4E schema release this type was generated from, in the
-    /// spelling the `_version` wire field carries (e.g. `"202607.1.0"`).
     ///
-    /// Note the missing `v`: BO4E prefixes its *git tags* with one
-    /// (`v202607.1.0`) but the value inside a payload never has it. This
-    /// accessor reports the wire spelling so it can be compared against a
-    /// `_version` read off a message without a normalisation step.
-    ///
-    /// **Do not dispatch on this value.** BO4E ships patch releases *inside* a
-    /// series, so a producer one patch ahead sends `"202607.2.0"` and an equality
-    /// match on `"202607.1.0"` rejects a payload this module handles perfectly.
-    /// Match on [`schema_series`](Bo4eObject::schema_series) instead.
-    fn schema_version(&self) -> &'static str;
+    /// An associated type, so one trait definition serves every schema version
+    /// while each version's `BoTyp` stays strongly typed.
+    type BoTyp: Bo4eEnum;
 
-    /// Returns the schema **series** — the `YYYYMM` prefix of the release
-    /// (e.g. `"202607"`), without the `v` the git tag prefixes it with.
+    /// The [`BoTyp`](Bo4eObject::BoTyp) discriminant for **this Rust type** —
+    /// the value the BO4E schema pins with a `const`.
     ///
-    /// This is the granularity at which the crate exposes a module
-    /// ([`crate::v202607`]), and the right key for version dispatch: every
-    /// release within a series deserializes into the same types.
+    /// Not the `_typ` a payload carried: a `Marktlokation` decoded from
+    /// `{"_typ":"VERTRAG", …}` is still a `Marktlokation`, and a `match` on this
+    /// must not take the branch the sender named. The `typ` field is public, so
+    /// comparing the two finds a payload whose discriminant disagrees with the
+    /// type it was read into.
     ///
     /// ```
-    /// # #[cfg(feature = "versioned")] {
-    /// use rubo4e::{current::Rechnung, Bo4eObject as _};
+    /// # #[cfg(feature = "json")] {
+    /// use rubo4e::{current::{BoTyp, Marktlokation}, Bo4eObject as _};
     ///
-    /// // A payload's own `_version`, whatever patch the sender is on:
-    /// let incoming = "202607.4.0";
-    /// assert_eq!(
-    ///     incoming.split('.').next(),
-    ///     Some(Rechnung::default().schema_series()),
-    /// );
+    /// let body = r#"{"_typ":"VERTRAG","marktlokationsId":"51238696781"}"#;
+    /// let malo: Marktlokation = serde_json::from_str(body).unwrap();
+    ///
+    /// assert_eq!(malo.bo_type(), BoTyp::Marktlokation);   // what it *is*
+    /// assert_eq!(malo.typ, Some(BoTyp::Vertrag));         // what it *claimed*
     /// # }
     /// ```
-    fn schema_series(&self) -> &'static str;
+    ///
+    /// To dispatch on what a payload says it is, decode
+    /// [`AnyBo`](crate::current::AnyBo).
+    const BO_TYP: Self::BoTyp;
+
+    /// The `_typ` wire string for this type (e.g. `"MARKTLOKATION"`).
+    ///
+    /// The same value as `Self::BO_TYP.as_wire()`, without needing
+    /// [`Bo4eEnum`] in scope.
+    const TYP_WIRE: &'static str;
+
+    /// The exact BO4E schema release this type was generated from, in the
+    /// spelling the `_version` wire field carries (e.g. `"202607.1.0"`).
+    ///
+    /// No `v`: BO4E prefixes its git tags with one, the value inside a payload
+    /// never has it, so this compares against a `_version` read off a message
+    /// directly.
+    ///
+    /// **Do not dispatch on it.** BO4E ships patch releases inside a series, so
+    /// a producer one patch ahead sends `"202607.2.0"` and an equality match
+    /// rejects a payload this module handles. Match on
+    /// [`SCHEMA_SERIES`](Bo4eObject::SCHEMA_SERIES) instead.
+    const SCHEMA_VERSION: &'static str;
+
+    /// The schema **series** — the `YYYYMM` prefix of the release, e.g.
+    /// `"202607"`.
+    ///
+    /// The granularity at which this crate exposes a module, and the right key
+    /// for version dispatch: every release within a series deserializes into the
+    /// same types.
+    ///
+    /// ```
+    /// use rubo4e::{current::Rechnung, Bo4eObject as _};
+    ///
+    /// let incoming = "202607.4.0";   // a sender's own `_version`
+    /// assert_eq!(incoming.split('.').next(), Some(Rechnung::SCHEMA_SERIES));
+    /// ```
+    const SCHEMA_SERIES: &'static str;
+
+    /// Returns [`BO_TYP`](Bo4eObject::BO_TYP).
+    fn bo_type(&self) -> Self::BoTyp {
+        Self::BO_TYP
+    }
+
+    /// Returns [`TYP_WIRE`](Bo4eObject::TYP_WIRE).
+    fn typ_wire(&self) -> &'static str {
+        Self::TYP_WIRE
+    }
+
+    /// Returns [`SCHEMA_VERSION`](Bo4eObject::SCHEMA_VERSION).
+    fn schema_version(&self) -> &'static str {
+        Self::SCHEMA_VERSION
+    }
+
+    /// Returns [`SCHEMA_SERIES`](Bo4eObject::SCHEMA_SERIES).
+    fn schema_series(&self) -> &'static str {
+        Self::SCHEMA_SERIES
+    }
 }
 
 #[cfg(feature = "versioned")]
@@ -327,26 +374,15 @@ pub mod bo4e_object_sealed {
 /// generated BO4E enum (`Zaehlertyp`, `Marktrolle`, `BdewArtikelnummer`, …).
 ///
 /// Every BO4E enum carries an `Unknown` forward-compatibility catch-all, so the
-/// `serde` / `FromStr` deserialization path never fails on an unrecognized wire
-/// value — it silently maps to `Unknown`.  That is the right default for
-/// forward-compatibility, but the wrong default at an ingest boundary that must
-/// reject typos, legacy codes, or values from a newer schema.  This trait gives
-/// every enum, **without requiring the `strum` feature**:
+/// `serde` / `FromStr` path never fails on an unrecognized wire value — the
+/// right default for forward-compatibility, and the wrong one at an ingest
+/// boundary that must reject typos, legacy codes, or values from a newer schema.
+/// The members below close that gap **without the `strum` feature**.
 ///
-/// - [`VARIANTS`](Bo4eEnum::VARIANTS) / [`COUNT`](Bo4eEnum::COUNT) — the known
-///   variants and their count, for drift-guarding SQL `CHECK` lists and mappings.
-/// - [`as_wire`](Bo4eEnum::as_wire) — the canonical BO4E wire string.
-/// - [`from_wire`](Bo4eEnum::from_wire) — **strict** parsing that returns
-///   [`Err`](crate::error::UnknownVariant) for out-of-schema values instead of
-///   yielding `Unknown`.
-/// - [`is_known`](Bo4eEnum::is_known) / [`is_unknown`](Bo4eEnum::is_unknown) —
-///   detect a value that fell through to the `Unknown` catch-all after a lenient
-///   `serde` round-trip.
-///
-/// The same members are also available as inherent methods on each enum, so you
-/// rarely need to import this trait unless you are writing code generic over the
-/// enum type (e.g. a generic `fn assert_covered<T: Bo4eEnum>()` that proves a
-/// database `CHECK` list covers `T::VARIANTS`).
+/// They are inherent methods on each enum too, so importing this trait is only
+/// necessary for code generic over the enum type — a
+/// `fn assert_covered<T: Bo4eEnum>()` proving a database `CHECK` list covers
+/// `T::VARIANTS`, say.
 ///
 /// # Example
 /// ```

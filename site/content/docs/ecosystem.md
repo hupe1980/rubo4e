@@ -34,6 +34,27 @@ println!("{json}");
 Identifier types appear as `{ "type": "string" }` in the schema — not as JSON objects.
 This matches the wire format and keeps schemas interoperable with non-Rust consumers.
 
+### The `Decimal` and `time` schema impls hang off `decimal` / `time`
+
+`schemars`'s `rust_decimal1` feature — the one that provides
+`impl JsonSchema for rust_decimal::Decimal` — is enabled by rubo4e's **`decimal`**
+feature, as `schemars?/rust_decimal1`, not by `schemars`. `utoipa`'s `decimal`
+and `time` features work the same way. They are needed exactly when the generated
+fields *are* those types, and the `?` means neither feature drags the integration
+in.
+
+That placement matters beyond tidiness. Cargo unifies features across a
+workspace, so a crate enabling `rust_decimal1` unconditionally becomes the sole
+provider of that impl for everything beside it: a sibling crate deriving
+`JsonSchema` over its own `Decimal` field compiles only for as long as something
+in the graph keeps `rubo4e/schemars` on.
+
+If you need the impl, declare it yourself:
+
+```toml
+schemars = { version = "1", features = ["rust_decimal1"] }
+```
+
 ## sqlx — Database Type Impls
 
 **Feature flag:** `sqlx`  
@@ -91,12 +112,18 @@ Note the asymmetry with the JSON path: an unrecognized string decodes to the
 Use `Sparte::from_wire(...)` on a `String` column, or check `is_known()`, when a
 value from outside the schema must be rejected.
 
-**Implemented for:** every identifier type — `AkivId`, `BilanzierungsgebietId`,
-`BilanzkreisId`, `CrId`, `EicCode`, `MaloId`, `MarktpartnerId`, `MeloId`,
-`NebeId`, `NeloId`, `ObisCode`, `PaketId`, `SgId`, `SrId`, `TrId`,
-`TranchennummerId` — and **every** generated enum. `PgHasArrayType` is on both, so
-`Vec<Sparte>` binds to a `TEXT[]` column just as `Vec<MaloId>` does. Neither needs
-the `json` feature: both directions go through `&str`.
+**Implemented for:** every identifier type — `AkivId`, `Bic`,
+`BilanzierungsgebietId`, `BilanzkreisId`, `CrId`, `EicCode`, `Iban`, `MaloId`,
+`MarktpartnerId`, `MeloId`, `NebeId`, `NeloId`, `ObisCode`, `PaketId`, `SgId`,
+`SrId`, `TrId`, `TranchennummerId` — and **every** generated enum.
+`PgHasArrayType` is on both, so `Vec<Sparte>` binds to a `TEXT[]` column just as
+`Vec<MaloId>` does. Neither needs the `json` feature: both directions go through
+`&str`.
+
+The list is hand-maintained in `impl_sqlx_text!`, so `tests/prelude_surface.rs`
+compares it against what `src/identifiers/` exports — an identifier missing from
+it compiles fine and simply cannot be a column, which is not a failure anything
+else would notice.
 
 ## utoipa — OpenAPI Schema Derivation
 
@@ -183,23 +210,19 @@ cargo add --dev rubo4e --features versioned,serde
 cargo add --dev proptest
 ```
 
-Your property tests can use the same inline strategy pattern:
+Your property tests can use the same strategy pattern this crate's own use —
+generate the **base**, and let `from_base` append the check digit:
 
 ```rust
 use proptest::prelude::*;
+use rubo4e::identifiers::MaloId;
 
-// Build a valid 11-digit BDEW ID string with the correct checksum.
+/// A valid 11-digit MaLo-ID: 10 base digits (the first is the Vergabestelle,
+/// never `0`) plus the BDEW §8.1 check digit `from_base` computes.
 fn valid_malo_id() -> impl Strategy<Value = String> {
-    prop::array::uniform10(0u8..=9u8).prop_map(|prefix| {
-        // Alternating-weight checksum: weights [2,1,2,1,…], reduce products ≥ 10 by −9
-        let sum: u32 = prefix.iter().enumerate()
-            .map(|(i, &d)| { let p = u32::from(d) * if i % 2 == 0 { 2 } else { 1 }; if p >= 10 { p - 9 } else { p } })
-            .sum();
-        let check = ((10 - (sum % 10)) % 10) as u8;
-        prefix.iter().chain(std::iter::once(&check))
-            .map(|&d| char::from_digit(u32::from(d), 10).unwrap())
-            .collect::<String>()
-    })
+    prop::string::string_regex("[1-9][0-9]{9}")
+        .expect("MaLo base regex")
+        .prop_map(|base| MaloId::from_base(&base).expect("valid base").to_string())
 }
 
 proptest! {
@@ -211,6 +234,12 @@ proptest! {
     }
 }
 ```
+
+Deriving the check digit rather than reimplementing it is the point. BDEW §8.1
+weights **odd** positions by 1 and **even** positions by 2 and sums the products
+whole — it is not Luhn, which halves the alphabet by reducing any product ≥ 10 by
+9, and a strategy built on Luhn generates strings `MaloId::new` rejects. The same
+shape works for every identifier that has a `from_base` or a `from_prefix`.
 
 See `tests/proptest_roundtrips.rs` in the `rubo4e` source for complete reference
 strategy implementations for all identifier types, enum variants, and date fields.
@@ -258,18 +287,23 @@ that keep application code concise:
 ```rust
 use rubo4e::v202607::{Rechnung, PreisblattNetznutzung, Zeitraum};
 
-// Rechnung — closed billing period (both dates must be present)
+// Rechnung — closed billing period, as a RangeInclusive<Date>
+// (`None` unless both `rechnungsperiode` dates are present)
 let r: Rechnung = todo!();
-if let Some((from, to)) = r.billing_period() {
-    println!("Invoice period: {from} – {to}");
+if let Some(period) = r.billing_period() {
+    println!("Invoice period: {} – {} inclusive", period.start(), period.end());
 }
 
-// PreisblattNetznutzung — open-ended or closed validity
+// PreisblattNetznutzung — validity bounds, either of which may be open.
+// `validity()` returns a pair, not an Option: a missing `gueltigkeit` reads as
+// (None, None), the same shape as "stated, but unbounded on both sides".
+// Use `is_valid_at(date)` where "no validity stated" must read as *not* valid.
 let p: PreisblattNetznutzung = todo!();
 match p.validity() {
-    Some((start, Some(end))) => println!("valid {start} – {end}"),
-    Some((start, None))      => println!("valid from {start} (open-ended)"),
-    None                     => println!("validity unknown"),
+    (Some(start), Some(end)) => println!("valid {start} – {end} inclusive"),
+    (Some(start), None)      => println!("valid from {start} (open-ended)"),
+    (None, Some(end))        => println!("valid until {end} inclusive"),
+    (None, None)             => println!("no validity stated"),
 }
 
 // Zeitraum — range accessors (also works for all 18+ types with gueltigkeit)

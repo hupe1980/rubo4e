@@ -8,6 +8,7 @@
 //!
 //! [`Zahlungsinformation::iban_checked`]: crate::current::Zahlungsinformation::iban_checked
 
+use super::char_at;
 use crate::error::{IdentifierError, LengthExpectation};
 
 // ─── IBAN ────────────────────────────────────────────────────────────────────
@@ -168,9 +169,13 @@ fn registered_iban_length(country: &str) -> Option<usize> {
         .map(|i| IBAN_LENGTHS[i].1)
 }
 
-/// Strips the grouping spaces an IBAN is conventionally written with and
-/// upper-cases the result.
-fn normalise_iban(s: &str) -> String {
+/// Strips the grouping whitespace these identifiers are conventionally written
+/// with and upper-cases the result.
+///
+/// Shared by [`Iban::new`] and [`Bic::new`]: both are written for people in
+/// spaced, sometimes lower-cased groups, and both have a single canonical
+/// compact form on the wire.
+fn normalise_grouping(s: &str) -> String {
     s.chars()
         .filter(|c| !c.is_whitespace())
         .map(|c| c.to_ascii_uppercase())
@@ -258,7 +263,7 @@ impl Iban {
     /// - [`IdentifierError::InvalidChecksum`] if the check digits do not verify.
     #[must_use = "the validated identifier is returned; ignoring it discards the result"]
     pub fn new(s: &str) -> Result<Self, IdentifierError> {
-        let normalised = normalise_iban(s);
+        let normalised = normalise_grouping(s);
         validate_iban(&normalised)?;
         Ok(Self(Box::from(normalised.as_str())))
     }
@@ -409,7 +414,7 @@ impl Bic {
     ///   country code, or a non-alphanumeric anywhere.
     #[must_use = "the validated identifier is returned; ignoring it discards the result"]
     pub fn new(s: &str) -> Result<Self, IdentifierError> {
-        let normalised = normalise_iban(s); // same normalisation: strip space, upper-case
+        let normalised = normalise_grouping(s);
         validate_bic(&normalised)?;
         Ok(Self(Box::from(normalised.as_str())))
     }
@@ -458,11 +463,6 @@ impl Bic {
     pub fn is_german(&self) -> bool {
         self.country_code() == "DE"
     }
-}
-
-/// The character at byte offset `i`, for an error report.
-fn char_at(s: &str, i: usize) -> char {
-    s[i..].chars().next().unwrap_or('\u{FFFD}')
 }
 
 impl_identifier_traits!(Iban, "an IBAN (ISO 13616) with valid MOD-97 check digits");
@@ -592,6 +592,29 @@ mod tests {
         let mut bad = candidate.into_bytes();
         bad[2] = if bad[2] == b'0' { b'1' } else { b'0' };
         assert!(Iban::new(&String::from_utf8(bad).unwrap()).is_err());
+    }
+
+    /// `registered_iban_length` binary-searches this table, which silently
+    /// returns wrong answers on unsorted input — a valid IBAN would be rejected
+    /// for having "the wrong length", or a wrong one accepted.
+    #[test]
+    fn the_registered_length_table_is_sorted_and_well_formed() {
+        assert!(
+            IBAN_LENGTHS.windows(2).all(|w| w[0].0 < w[1].0),
+            "IBAN_LENGTHS must be strictly sorted by country code"
+        );
+        for &(country, len) in IBAN_LENGTHS {
+            assert_eq!(country.len(), 2, "{country} is not an alpha-2 code");
+            assert!(
+                country.bytes().all(|b| b.is_ascii_uppercase()),
+                "{country} must be uppercase"
+            );
+            assert!(
+                (IBAN_MIN_LEN..=IBAN_MAX_LEN).contains(&len),
+                "{country} registers {len}, outside the ISO 13616 envelope"
+            );
+            assert_eq!(registered_iban_length(country), Some(len));
+        }
     }
 
     /// Builds a syntactically valid IBAN for `country` + `bban` by computing the

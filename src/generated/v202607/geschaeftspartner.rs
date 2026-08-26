@@ -21,6 +21,7 @@ pub struct Geschaeftspartner {
     #[cfg_attr(feature = "serde", serde(rename = "adresse"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub adresse: Option<Adresse>,
     /// Amtsgericht bzw Handelsregistergericht, das die Handelsregisternummer herausgegeben hat
     #[cfg_attr(feature = "serde", serde(rename = "amtsgericht"))]
@@ -35,6 +36,7 @@ pub struct Geschaeftspartner {
     #[cfg_attr(feature = "serde", serde(rename = "ansprechpartner"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub ansprechpartner: Option<Vec<Box<Person>>>,
     /// Rollen, die die Geschäftspartner inne haben (z.B. Interessent, Kunde)
     #[cfg_attr(feature = "serde", serde(rename = "geschaeftspartnerrollen"))]
@@ -67,6 +69,7 @@ pub struct Geschaeftspartner {
     #[cfg_attr(feature = "serde", serde(rename = "kontaktwege"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub kontaktwege: Option<Vec<Kontaktweg>>,
     /// Nachname (Familienname) der Person
     #[cfg_attr(feature = "serde", serde(rename = "nachname"))]
@@ -122,6 +125,7 @@ pub struct Geschaeftspartner {
     #[cfg_attr(feature = "serde", serde(rename = "zusatzAttribute"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub zusatz_attribute: Option<Vec<ZusatzAttribut>>,
     /// Unknown JSON fields captured during deserialization for round-trip preservation.
     /// `None` when no unknown fields were present (zero heap allocation).
@@ -164,15 +168,10 @@ impl Default for Geschaeftspartner {
 }
 impl Bo4eObject for Geschaeftspartner {
     type BoTyp = BoTyp;
-    fn bo_type(&self) -> BoTyp {
-        self.typ.unwrap_or(BoTyp::Geschaeftspartner)
-    }
-    fn schema_version(&self) -> &'static str {
-        "202607.1.0"
-    }
-    fn schema_series(&self) -> &'static str {
-        "202607"
-    }
+    const BO_TYP: BoTyp = BoTyp::Geschaeftspartner;
+    const TYP_WIRE: &'static str = "GESCHAEFTSPARTNER";
+    const SCHEMA_VERSION: &'static str = "202607.1.0";
+    const SCHEMA_SERIES: &'static str = "202607";
 }
 #[cfg(feature = "json")]
 impl crate::json::sealed::Sealed for Geschaeftspartner {}

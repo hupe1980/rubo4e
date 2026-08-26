@@ -47,6 +47,7 @@ pub struct Messwert {
     #[cfg_attr(feature = "serde", serde(rename = "wert"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub wert: Option<Menge>,
     /// Gibt den Zeitpunkt des Messwerts an.
     #[cfg_attr(feature = "serde", serde(rename = "zeitpunkt"))]
@@ -78,6 +79,7 @@ pub struct Messwert {
     #[cfg_attr(feature = "serde", serde(rename = "zusatzAttribute"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub zusatz_attribute: Option<Vec<ZusatzAttribut>>,
     /// Unknown JSON fields captured during deserialization for round-trip preservation.
     /// `None` when no unknown fields were present (zero heap allocation).

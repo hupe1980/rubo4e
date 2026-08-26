@@ -47,13 +47,16 @@ a literal, and checks the same for the MSRV. A within-series bump therefore
 touches the snapshot, the codegen, and the changelog — not a scattering of
 strings.
 
-Two more guards sit alongside them, in `tests/`:
+More guards of the same kind sit alongside them, in `tests/`:
 
 | Test | Catches |
 |---|---|
-| `prelude_surface.rs` | an identifier type reachable via `rubo4e::identifiers::` but missing from the prelude |
+| `prelude_surface.rs` | an identifier type reachable via `rubo4e::identifiers::` but missing from the prelude — and any identifier whose `Borrow<str>` disagrees with its `Hash` / `Ord`, which silently breaks `HashMap::get(&str)` |
 | `extension_round_trip.rs` | the snake_case key transform renaming keys inside extension data |
 | `hash_keys.rs` | generated types deriving `Hash` without `Eq`, which no `HashMap` key can use |
+| `json_strictness.rs` | a JSON entry point that stops at the end of the first value and ignores the rest, or one that skips the nesting-depth cap — either makes this crate accept a payload `serde_json` rejects |
+| `site_examples.rs` | a README or site snippet that stopped compiling, or stopped meaning what the surrounding prose says |
+| `interval_conventions.rs` | a validator or accessor reading an interval bound the opposite way to the schema it came from |
 | `pinned_tag.rs` | a schema tag or MSRV written out in a workflow, recipe, or the site config instead of derived |
 
 ## Layer 1 — Golden Schema Tests
@@ -171,8 +174,23 @@ cargo +nightly fuzz run fuzz_deserialize_vertrag
 **Targets:**
 ```
 fuzz/fuzz_targets/
-└── fuzz_deserialize_vertrag.rs   — serde_json::from_slice::<Vertrag>(...)
+├── fuzz_deserialize_marktlokation.rs  — identifiers, Ortsangabe exclusivity
+├── fuzz_deserialize_vertrag.rs        — date-time ordering
+├── fuzz_deserialize_rechnung.rs       — multi-Betrag arithmetic, currency agreement
+├── fuzz_deserialize_kosten.rs         — Kostenposition line-total arithmetic, two levels down
+├── fuzz_deserialize_bilanzierung.rs   — nested temporal ranges
+├── fuzz_deserialize_lastgang.rs       — large Zeitreihenwert arrays; depth and budget limits
+├── fuzz_deserialize_zeitreihenwert.rs — the hot path in batch market-data processing
+└── fuzz_parse_identifiers.rs          — every identifier parser, the duration and time-of-day parsers
 ```
+
+Each BO target runs three separate code paths over the same bytes —
+`serde_json::from_slice`, the hardened German reader, the hardened snake_case
+reader — and **validates** whatever decoded. The validators do `Decimal`
+arithmetic over wire values, and `rust_decimal` panics rather than errors on
+several of its constructors, so a validator that aborts on a decodable payload is
+as exploitable as a deserializer that does. Hence `validate` in the fuzz build
+alongside `time` and `decimal`.
 
 **What constitutes a fuzz failure:**
 - Any panic (including `unwrap`, `expect`, index out of bounds)

@@ -97,6 +97,12 @@ jobs:
           - versioned,json
           - versioned,json,time,decimal
           - versioned,validate
+          # The combination the cross-field validators actually run under: their
+          # bodies are `#[cfg]`-ed on `decimal` / `time` and compile away without
+          # them, and `versioned` is what emits them at all. Neither
+          # `versioned,validate` nor the big non-`versioned` combo below reaches
+          # the arithmetic.
+          - versioned,validate,decimal,time
           - versioned,builder,validate
           - versioned,json,schemars,utoipa
           - versioned,sqlx

@@ -13,7 +13,7 @@ anyhow     = "1"
 
 [package]
 name        = "rubo4e"
-version     = "0.10.0"
+version     = "0.11.0"
 edition     = "2021"
 rust-version = "1.88"
 description = "Rust implementation of the BO4E energy-market data standard"
@@ -35,7 +35,9 @@ default = ["identifiers"]
 # Identifier types only — MaloId, MeloId, NeloId, EicCode, ObisCode, etc.
 # with serde support but WITHOUT the versioned BO/COM schema types.
 # Ideal for parser and transport crates that need identifier validation
-# without the full 191-type schema overhead.
+# without the versioned schema's compile cost. (No count here: BO4E adds and
+# removes types inside a series, so a number goes stale without anything
+# noticing.)
 #
 # Usage: rubo4e = { version = "...", default-features = false, features = ["identifiers"] }
 identifiers = ["serde"]
@@ -44,11 +46,24 @@ identifiers = ["serde"]
 serde      = ["dep:serde", "dep:indexmap"]
 json       = ["serde", "dep:serde_json"]
 
-# Date/time backend
-time       = ["dep:time"]
+# Date/time backend.
+#
+# `utoipa?/time` rides along for the same reason `decimal` carries
+# `schemars?/rust_decimal1`: it is what supplies `ToSchema` for the `time` types,
+# and it is needed only when the generated fields actually *are* `time` types.
+time       = ["dep:time", "utoipa?/time"]
 
-# Scalar types
-decimal    = ["dep:rust_decimal"]
+# Scalar types.
+#
+# `schemars?/rust_decimal1` is what provides `impl JsonSchema for Decimal`, and
+# it belongs *here* rather than on the `schemars` dependency itself: without
+# `decimal` the generated fields are `String` and the impl is not needed. Cargo
+# unifies features across a workspace, so enabling it unconditionally made this
+# crate a silent sole provider of that impl — a sibling crate deriving
+# `JsonSchema` over its own `Decimal` field compiled only for as long as
+# *something* in the graph turned `rubo4e/schemars` on. The `?` means "only if
+# `schemars` is already enabled", so this does not pull `schemars` in.
+decimal    = ["dep:rust_decimal", "schemars?/rust_decimal1", "utoipa?/decimal"]
 
 # Ergonomics
 builder    = ["dep:typed-builder"]
@@ -99,9 +114,14 @@ time          = { version = "0.3",    features = ["serde", "serde-well-known", "
 indexmap      = { workspace = true, optional = true }
 typed-builder = { version = "0.23", optional = true }
 garde         = { version = "0.23", features = ["derive"],                optional = true }
-schemars      = { version = "1", optional = true, features = ["indexmap2", "rust_decimal1"] }
+# `indexmap2` is unconditional because `schemars` implies `serde`, which brings
+# `indexmap` in for the extension map.  `rust_decimal1` is *not* — see the
+# `decimal` feature above for why.
+schemars      = { version = "1", optional = true, features = ["indexmap2"] }
 sqlx          = { version = "0.8",  features = ["postgres"],             optional = true }
-utoipa        = { version = "5",    optional = true, features = ["time", "decimal", "indexmap"] }
+# `indexmap` is unconditional (the extension map); `time` and `decimal` are
+# pulled in by the features that make those types appear — see above.
+utoipa        = { version = "5",    optional = true, features = ["indexmap"] }
 strum         = { version = "0.28", features = ["derive"],                optional = true }
 tracing       = { version = "0.1",  default-features = false,             optional = true }
 metrics       = { version = "0.24", default-features = false,             optional = true }

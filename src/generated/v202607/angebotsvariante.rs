@@ -74,11 +74,13 @@ pub struct Angebotsvariante {
     #[cfg_attr(feature = "serde", serde(rename = "gesamtkosten"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub gesamtkosten: Option<Betrag>,
     /// Aufsummierte Wirkarbeitsmenge aller Angebotsteile
     #[cfg_attr(feature = "serde", serde(rename = "gesamtmenge"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub gesamtmenge: Option<Menge>,
     /// Eine generische ID, die für eigene Zwecke genutzt werden kann.
     /// Z.B. könnten hier UUIDs aus einer Datenbank stehen oder URLs zu einem Backend-System.
@@ -92,6 +94,7 @@ pub struct Angebotsvariante {
     #[cfg_attr(feature = "serde", serde(rename = "teile"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub teile: Option<Vec<Angebotsteil>>,
     /// BO4E type discriminant — always `ComTyp::Angebotsvariante` for this struct.
     #[cfg_attr(feature = "serde", serde(rename = "_typ"))]
@@ -112,6 +115,7 @@ pub struct Angebotsvariante {
     #[cfg_attr(feature = "serde", serde(rename = "zusatzAttribute"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub zusatz_attribute: Option<Vec<ZusatzAttribut>>,
     /// Unknown JSON fields captured during deserialization for round-trip preservation.
     /// `None` when no unknown fields were present (zero heap allocation).

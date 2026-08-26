@@ -18,13 +18,23 @@ BO4E names a release twice, and this crate needs a third name for it — the
 | Rust module | with `v`, series only | `rubo4e::v202607` |
 | The `_version` field inside a payload | no `v`, full triple | `202607.1.0` |
 
-`Bo4eObject::schema_version()` returns the **wire** spelling, so it can be
-compared against a `_version` read off a message without a normalisation step —
-never against the tag.
+`Bo4eObject::SCHEMA_VERSION` is the **wire** spelling, so it compares against a
+`_version` read off a message with no normalisation step — never against the tag.
 
 The series — the bare `YYYYMM` prefix — is the one to dispatch on, because it is
-the one that maps onto a set of Rust types. `Bo4eObject::schema_series()` returns
-it.
+the one that maps onto a set of Rust types. `Bo4eObject::SCHEMA_SERIES` is it.
+
+Both are associated **constants**, so they are readable from a type alone:
+
+```rust
+use rubo4e::{current::Rechnung, Bo4eObject};
+
+assert_eq!(Rechnung::SCHEMA_VERSION, "202607.1.0");
+assert_eq!(Rechnung::SCHEMA_SERIES,  "202607");
+```
+
+`schema_version()` and `schema_series()` remain as methods for when a value is in
+hand.
 
 ## Multi-version Dispatch
 
@@ -62,7 +72,7 @@ deserialize perfectly. `Bo4eObject::schema_series()` returns exactly the value
 this `match` keys on, so a test can assert the two agree.
 
 Key points:
-- `schema_series()` and `schema_version()` are on every BO type via the `Bo4eObject` trait — no new API needed
+- `SCHEMA_SERIES` and `SCHEMA_VERSION` are on every BO type via the `Bo4eObject` trait, as constants and as methods — no new API needed
 - Each new schema *series* is exactly one `match` arm; patches inside a series need none
 - Business logic (`handle_v202607`, `handle_v202801`, …) only handles the series it was written for
 - Older series can be migrated before the branch (`FROM v202607 TO v202801`) or handled by a thin shim inside the arm
@@ -251,7 +261,8 @@ When BO4E's annual format-version cutover lands, with new or renamed types:
    ```
 6. Update the convenience module (`src/convenience.rs`) if schema-breaking changes
    require updating field references (e.g. renamed fields in `Rechnung`,
-   `Rechnungsposition`).
+   `Rechnungsposition`), and advance `rubo4e::validation::current` to the new
+   series alongside `rubo4e::current`.
 7. Update the Known Schema Series table in this document, and keep the
    retiring series listed until you remove its module.
 8. Record a **Schema deltas** section in [`CHANGELOG.md`](https://github.com/hupe1980/rubo4e/blob/main/CHANGELOG.md) listing

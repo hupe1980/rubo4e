@@ -228,7 +228,7 @@ impl ObisComponents {
 /// assert_eq!(ObisCode::new("01-00:01.08.00").unwrap(), ObisCode::new("1-0:1.8.0").unwrap());
 /// assert_eq!(ObisCode::new("01-00:01.08.00").unwrap().as_ref(), "1-0:1.8.0");
 /// ```
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone)]
 #[cfg_attr(feature = "validate", derive(garde::Validate))]
 #[cfg_attr(feature = "validate", garde(allow_unvalidated))]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -243,6 +243,46 @@ pub struct ObisCode {
     /// Parsed once at construction so `components()` is infallible and free.
     #[cfg_attr(feature = "validate", garde(skip))]
     components: ObisComponents,
+}
+
+// `Eq`, `Ord`, and `Hash` read the canonical string and nothing else.
+//
+// Deriving them would fold `components` in too, breaking the `Borrow<str>`
+// contract every identifier here carries: `Borrow` requires `x.borrow()` to hash
+// and compare exactly as `x` does, and a two-field hash makes
+// `HashMap<ObisCode, _>::get("1-0:1.8.0")` miss a key that is present.
+// `components` is a pure function of `canonical`, so nothing is lost.
+impl PartialEq for ObisCode {
+    #[inline]
+    fn eq(&self, other: &Self) -> bool {
+        self.canonical == other.canonical
+    }
+}
+
+impl Eq for ObisCode {}
+
+impl std::hash::Hash for ObisCode {
+    #[inline]
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.canonical.hash(state);
+    }
+}
+
+impl PartialOrd for ObisCode {
+    #[inline]
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+/// Lexicographic on the canonical string — a total order for `BTreeMap` keys and
+/// `sort()`, not a numeric ordering of the value groups (`"10.1"` sorts before
+/// `"2.1"`). Compare [`components`](ObisCode::components) where the numbers matter.
+impl Ord for ObisCode {
+    #[inline]
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.canonical.cmp(&other.canonical)
+    }
 }
 
 #[cfg(feature = "validate")]
@@ -639,6 +679,39 @@ mod tests {
                 "error for {input:?} should name group {group}: {msg}"
             );
         }
+    }
+
+    // ── Trait contracts ──────────────────────────────────────────────────────
+
+    /// `Borrow<str>` promises that a borrowed key hashes and compares exactly as
+    /// the owned one does — otherwise a `HashMap` lookup by `&str` misses keys
+    /// that are present, with no error to show for it.
+    #[test]
+    fn borrowing_as_str_finds_the_same_entry() {
+        use std::collections::HashMap;
+
+        let mut by_code: HashMap<ObisCode, u32> = HashMap::new();
+        by_code.insert(ObisCode::new("1-0:1.8.0").unwrap(), 7);
+
+        assert_eq!(by_code.get("1-0:1.8.0"), Some(&7));
+        // …and the canonical spelling is the one to look up with.
+        assert_eq!(by_code.get("01-00:01.08.00"), None);
+    }
+
+    /// Every other identifier is `Ord`, and the module docs promise it for all of
+    /// them; a `BTreeMap` keyed by OBIS code must compile and order stably.
+    #[test]
+    fn codes_order_totally_by_canonical_string() {
+        use std::collections::BTreeMap;
+
+        let mut m: BTreeMap<ObisCode, u32> = BTreeMap::new();
+        for s in ["1-0:2.8.0", "1-0:1.8.0", "1-0:1.8.1"] {
+            m.insert(ObisCode::new(s).unwrap(), 0);
+        }
+        assert_eq!(
+            m.keys().map(ObisCode::as_str).collect::<Vec<_>>(),
+            ["1-0:1.8.0", "1-0:1.8.1", "1-0:2.8.0"]
+        );
     }
 
     /// Leading zeros are an accepted spelling of an in-range group, not an

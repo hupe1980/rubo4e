@@ -10,7 +10,7 @@ also carries a **Schema deltas** section (see [Versioning](https://hupe1980.gith
 so downstream guards (SQL `CHECK` lists, variant-count assertions, coverage
 tests) can be updated deliberately instead of discovering drift at runtime.
 
-## [0.10.0] — unreleased
+## [0.11.0] — unreleased
 
 This release is a wire-format correction. Every payload rubo4e produced carried
 an invalid `_version`, COMs never stamped `_typ`, and `Rechnung` could not read
@@ -214,7 +214,165 @@ contract say what BO4E actually does inside a series — see **Schema deltas** a
   the method still advertised canonical output. All five shapes now route through
   the sorting serializer; the enum variants keep their external tag.
 
+- **Every `from_json_*` entry point accepted trailing content after the
+  document.** They built a `serde_json::Deserializer` by hand and never called
+  `end()`, so the parser stopped at the close of the first JSON value and never
+  looked at the rest: `{"marktlokationsId":"51238696781"} <anything>` decoded
+  successfully, while `serde_json::from_str` on the same bytes rejects it.
+
+  A reader that accepts what the reader in front of it rejects is a parser
+  differential. A gateway, a schema gate, or a signature check validating with
+  plain `serde_json` and a service decoding with rubo4e would disagree about what
+  the payload even *is* — and the bytes past the first document are the ones only
+  one of them sees. All eight entry points (German and snake_case, `&str` and
+  `&[u8]`, hardened and not) now consume the whole input.
+  `tests/json_strictness.rs` asserts acceptance matches `serde_json` exactly,
+  trailing whitespace included.
+
+- **The snake_case readers skipped the nesting-depth cap entirely.** The docs say
+  every path enforces a depth limit of 128, hardened or not;
+  `from_json_snake_case` and `from_json_snake_case_bytes` wrapped the
+  deserializer for the key transform but not for depth, so
+  `JsonParseLimits::max_nesting_depth` was silently ignored on the non-hardened
+  snake path and only `serde_json`'s own limit applied. Both now carry the guard.
+
+- **`ObisCode` broke the `Borrow<str>` contract, so map lookups by string
+  silently missed.** It derives `Hash` over its cached `ObisComponents` as well
+  as its canonical string, while `impl_identifier_traits!` gives every identifier
+  `Borrow<str>` — and `Borrow` requires the borrowed form to hash and compare
+  exactly as the owned one does. `HashMap<ObisCode, _>::get("1-0:1.8.0")`
+  returned `None` for a key that was present: no error, no panic, a wrong answer.
+
+  `Eq`, `Hash`, `PartialOrd`, and `Ord` are now written by hand against the
+  canonical string alone (`components` is derived from it, so nothing is lost).
+  `ObisCode` also gains the `Ord` the identifier docs have always promised for
+  every member of the family. Look up by the **canonical** spelling —
+  `"1-0:1.8.0"`, not `"01-00:01.08.00"`.
+
+- **`validate_kostenposition_arithmetic` panicked on an amount at `Decimal`'s
+  maximum scale.** The rounding tolerance is half a unit in the amount's last
+  stated place, built with `Decimal::new(5, scale + 1)` — and `Decimal::new`
+  *panics* above scale 28 rather than returning an error. A payload can carry a
+  28-scale amount, and this validator is what an ingest boundary runs on
+  untrusted input, so a decodable payload could abort the process.
+
+  It now uses `try_new` and falls back to an exact comparison, which is the right
+  answer at a scale that leaves no room for a tolerance anyway. The fuzz build
+  gained the `validate` feature and every BO target now validates what it
+  decoded, which is the configuration that would have found this.
+
+- **Identifier validation failures logged the rejected value.** With `tracing`
+  on, a `MeloId`, `MaloId`, or `Iban` that failed to deserialize was emitted
+  verbatim at `warn!` — personal and payment data copied into whatever the log
+  sink happens to be, in exactly the case where the value is least trustworthy.
+  The event now carries the identifier type, the input's byte length, and the
+  error (which already names the offending position and the expected shape).
+
+- **`Marktlokation` / `Messlokation` validation required an Ortsangabe that BO4E
+  does not.** Both validators demanded that **exactly one** of
+  `lokationsadresse` (`messadresse`), `geoadresse`, and `katasterinformation` be
+  present. BO4E states mutual exclusivity, not presence — *"Es darf immer nur
+  eine Art der Ortsangabe vorhanden sein"* — and the schema backs that exactly:
+  no `required` array, no `oneOf`, all three properties `"default": null`, and
+  BO4E-python carrying the rule as a comment over three `Optional[…] = None`
+  fields with no validator behind it.
+
+  The reading is **at most one**, and the difference is not academic. BO4E has no
+  reference type, so a location referenced from a `Rechnung`, a `Vertrag`, or an
+  `Angebot` is a full `Marktlokation` carrying little more than its ID — the most
+  common shape in circulation, and `Validated::new` rejected every one of them.
+  For `Messlokation` the schema is blunter still: `messadresse` is documented
+  *"Nur angeben, wenn diese von der Adresse der Marktlokation abweicht"*, so a
+  Messlokation matching its Marktlokation is **supposed** to carry none.
+
+  The message now names which fields conflict rather than restating the rule.
+
+- **`validate_rechnung_arithmetic` mixed a house rule in with the sourced ones.**
+  Three of its four checks quote a sentence of the schema. The fourth — "if two
+  of the three totals are present the third must be too" — is this crate's own
+  judgement, and BO4E states nothing of the kind. Because `Validated::new` is
+  all-or-nothing, a consumer checking a document a **counterparty** sent could
+  not assert *"this conforms to BO4E"* without also asserting *"…and satisfies
+  `rubo4e`"*, with no way to separate the two.
+
+  `.validate()` now runs **only** rules traceable to the schema. The house rule
+  moved to `rubo4e::validation::current::quality::rechnung_totals_are_complete`,
+  which is not wired into any derive and is called by name. That boundary is now
+  a documented contract rather than an accident of what seemed sensible.
+
+- **`bo_type()` reported the `_typ` the payload carried, not the type it was
+  read into.** It was `self.typ.unwrap_or(<the schema constant>)`, so a
+  `Marktlokation` decoded from `{"_typ":"VERTRAG", …}` answered
+  `BoTyp::Vertrag` — and a `match bo.bo_type()` on a concrete value took the
+  branch the *sender* named rather than the one the value's own type calls for.
+  That is a type confusion reachable from any payload.
+
+  `bo_type()` now returns the discriminant the schema pins for that Rust type,
+  which is what "what kind of business object is this" means for a value whose
+  type is already known. The `_typ` field is public and unchanged, so a payload's
+  claim is still there — and `value.typ != Some(value.bo_type())` is now the way
+  to detect a payload whose discriminant disagrees with the type it was read
+  into. `AnyBo` is unaffected: it dispatches on `_typ` by design, and each of its
+  variants then holds the matching concrete type.
+
+- **`.validate()` did not descend into nested values.** `garde(dive)` was emitted
+  only on identifier-typed fields, so a struct's own cross-field rules ran and
+  nothing below them did: `Rechnung::validate()` never checked the `Zeitraum` on
+  `rechnungsperiode`, `Kosten::validate()` never checked a `Kostenposition`'s
+  line total two levels down, and an invalid identifier below the first level was
+  not looked at at all. `Validated<T>` proved considerably less than its
+  documentation claimed.
+
+  The generator now emits `garde(dive)` for every field whose type carries rules
+  — the identifier newtypes and every nested BO and COM — so one `.validate()`
+  covers the tree, and each failure is reported at its path
+  (`kostenbloecke[0].kostenpositionen[0]`).
+
+  **Action required:** values that passed `.validate()` before may now fail, and
+  the ones that do were already carrying a rule violation this crate was not
+  reporting. Enums and scalars are untouched; presence is still not checked,
+  because BO4E declares almost every field optional.
+
 ### Changed *(breaking)*
+
+- **The `Bo4eObject` facts are associated constants, and the trait is no longer
+  `dyn`-compatible.** `BO_TYP`, `TYP_WIRE`, `SCHEMA_VERSION`, and `SCHEMA_SERIES`
+  are readable from a type without a value; `bo_type()`, `typ_wire()`,
+  `schema_version()`, and `schema_series()` remain as provided methods.
+
+  The point is generic code. Reading a BO's discriminant used to mean
+  constructing one — `T::default().bo_type()` — which silently excludes the two
+  types the schema marks `required`, because a `T: Default` bound does not admit
+  `Lastgang` or `Tarif`. Nothing failed; they were simply never reached, and the
+  workaround was to name the `BoTyp` variant by hand.
+
+  Associated constants make a trait dyn-incompatible, so `Box<dyn Bo4eObject>` is
+  gone. That is the right trade rather than a cost: the trait is **sealed**, so
+  its implementors are a closed set of 35 generated types, and this crate already
+  ships the sum type over exactly that set. `AnyBo` is `Clone`, `PartialEq`,
+  `Serialize`, `Deserialize`, and matchable — none of which a trait object is —
+  and it now carries the same four facts (`typ_wire()`, `schema_version()`, and
+  `schema_series()` are new; the latter two return `Option` because the `Unknown`
+  catch-all has no generated type to report one for).
+
+  **Action required:** replace `Vec<Box<dyn Bo4eObject<BoTyp = BoTyp>>>` with
+  `Vec<AnyBo>` — `.into()` converts each element.
+
+- **`schemars`'s `rust_decimal1` and `utoipa`'s `decimal` / `time` features moved
+  to the features that need them.** They are enabled as
+  `schemars?/rust_decimal1`, `utoipa?/decimal`, and `utoipa?/time` from the
+  `decimal` and `time` features, so they turn on exactly when the generated
+  fields *are* those types, and neither pulls the integration in.
+
+  Enabling them unconditionally made this crate a silent sole provider of
+  `impl JsonSchema for Decimal` to its whole workspace: Cargo unifies features,
+  so a sibling crate deriving `JsonSchema` over its own `Decimal` field compiled
+  for as long as *something* in the graph kept `rubo4e/schemars` on — and broke
+  when that was turned off for an unrelated reason.
+
+  **Action required:** if you derive `JsonSchema` over a `rust_decimal::Decimal`
+  of your own, declare `schemars = { features = ["rust_decimal1"] }` in your own
+  manifest. It was never this crate's impl to provide.
 
 - **`BoTyp` and `ComTyp` variants are named after the types they discriminate.**
   Those two enums are the one place where BO4E's SCREAMING_SNAKE_CASE values have
@@ -467,6 +625,74 @@ contract say what BO4E actually does inside a series — see **Schema deltas** a
   orphan modules in `src/generated/`, unreferenced by `mod.rs`, compiling
   nowhere, and passing every drift check — indistinguishable from a live type.
 
+- **`rubo4e::validation::current`** — the counterpart of `rubo4e::current`, so no
+  downstream file has to name a schema version to reach a validator, and a CI
+  guard that greps for `rubo4e::v202607` stays clean. Without it, a consumer who
+  wanted one well-sourced rule had to either hardcode the version or take
+  `Validated::new` and every rule with it. `tests/validation.rs` pins the alias
+  to the versioned module by function-pointer identity.
+
+- **`rubo4e::validation::current::quality`** — rules this crate considers
+  sensible that BO4E does not state, kept out of `.validate()` on purpose and
+  called by name. `rechnung_totals_are_complete` is the first.
+
+- **`Lastgang::new(…)` and `Tarif::new(…)`.** These are the only two BOs the
+  v202607 schema marks `required`, so neither derives `Default` — which left
+  them the only generated types that could not be constructed without the
+  `builder` feature or writing out every optional field by hand. `new` takes the
+  required fields and defaults the rest, stamping `_typ` and `_version` exactly
+  as `Default` does elsewhere. The generator emits one for any struct with
+  required fields, and `tests/generated_contract.rs` reads `required` out of the
+  schemas and pins the correspondence in both directions.
+
+- **`Validated<T>` is now `Deserialize`, and the impl validates.** It had
+  `Serialize` but no `Deserialize`, which left out the single most obvious use
+  for a proof-of-validity wrapper: taking one as a request body. Decoding a
+  `Validated<T>` and getting a value back is now the proof, so there is no
+  `.validate()` call left to forget. An invalid payload fails at
+  deserialization with the whole `garde::Report` rendered into the error;
+  decode the plain `T` and call `Validated::new` where you need the structured
+  report back for a 422 body.
+
+- **`rubo4e::json::DEFAULT_MAX_NESTING_DEPTH`** — the always-on nesting cap (128)
+  the docs referred to, now a public constant rather than a figure to copy.
+
+- **`tests/json_strictness.rs`** — pins that every JSON entry point consumes its
+  whole input and caps nesting, and that acceptance matches `serde_json` exactly.
+  A reader that accepts what the reader in front of it rejects is the shape a
+  validating proxy gets bypassed through.
+
+- **A `Borrow<str>` contract guard over the whole identifier family** in
+  `tests/prelude_surface.rs`: every identifier must be findable in a `HashMap`
+  and a `BTreeMap` by the string it renders as. `ObisCode` was not.
+
+- **`tests/generated_contract.rs` guards the new constants and constructors.**
+  `TYP_WIRE` is emitted as a literal because `Bo4eEnum::as_wire` is a trait
+  method and cannot run in a const initializer — two spellings of one fact, which
+  is exactly the shape that drifts, so both are pinned against the schema and
+  against each other. A second test reads `required` out of every schema and
+  asserts the type has a `new(...)` and no `Default`, or a `Default` and no
+  required fields.
+
+- **A guard over the examples' documented run commands.** Each example's
+  `Run with:` header must name exactly the features its `[[example]]` entry
+  requires. `examples/builder.rs` documented a command cargo refuses — it omitted
+  `decimal`, which the example's own `rust_decimal` use needs — and nothing
+  noticed, because the header is a comment and the manifest is data.
+
+- **A drift guard over the `sqlx` impl list.** `impl_sqlx_text!` names its types
+  by hand, and a new identifier missing from it compiles fine and simply cannot
+  be a column. The list is now compared against the module's own exports, with
+  the four helper enums named explicitly as non-identifiers.
+
+- **`fuzz_deserialize_kosten`**, and `validate` in the fuzz feature set. Every BO
+  target now runs three readers over the same bytes — `serde_json::from_slice`,
+  the hardened German reader, and the hardened snake_case reader — and validates
+  whatever decoded. The validators do `Decimal` arithmetic over wire values, and
+  `rust_decimal` panics rather than erroring on several of its constructors, so a
+  validator that aborts on a decodable payload is as exploitable as a
+  deserializer that does.
+
 ### Removed
 
 - **The `simd-json` feature.** It was measured, and on this crate's own types it
@@ -519,6 +745,60 @@ contract say what BO4E actually does inside a series — see **Schema deltas** a
 
 ### Documentation
 
+- **The README and the ecosystem page destructured `billing_period()` as a
+  tuple.** It has returned a `RangeInclusive<Date>` since the interval-convention
+  fix earlier in this release, and `PreisblattNetznutzung::validity()` returns a
+  pair rather than an `Option`. Nothing type-checked the convenience-API
+  snippets, which is why they rotted; `tests/site_examples.rs` now compiles and
+  runs them.
+- **The README said `Zeitraum` requires `startdatum` strictly before
+  `enddatum`.** It is `<=` — both bounds are inclusive, so `start == end` is a
+  valid one-day period, exactly as the rest of the documentation and the code
+  say.
+- **The README's OpenAPI example quoted a `MaloId` pattern and example value
+  neither schema emits.** The pattern is `^[1-9][0-9]{10}$` (the Vergabestelle
+  digit is never `0`) and the example is the BDEW worked example `41373559241`.
+- **`schema_helpers::bilanzkreis_id_schema` was documented as object type `'Z'`
+  (Bilanzierungszone).** A Bilanzkreis is a market **party** — object type `'X'`,
+  which is what the schema it emits has always said.
+- **The `Kostenposition` rounding example computed `0.2843 × 3333` as
+  `947.5119`.** It is `947.5719`, which is what the site already said; the two
+  now agree.
+- **The extension-map DoS claim was overstated.** `MAX_EXTENSION_FIELDS` bounds
+  what a payload leaves *retained*, not what parsing it allocates:
+  `#[serde(flatten)]` makes serde buffer a struct's unrecognised entries into an
+  intermediate `Content` before the extension map's visitor ever runs.
+  `max_payload_bytes` is the cap that bounds peak memory, and the docs now say so
+  and say to set it first.
+- **Extension data was described as round-tripping "byte-for-byte".** Names and
+  values do, and top-level extension keys keep their arrival order — but key
+  order *inside* a nested extension object does not, because `serde_json::Value`
+  stores an object in a sorted map unless `preserve_order` is enabled somewhere
+  in the build. Documented rather than quietly untrue.
+- **The ecosystem page's proptest strategy computed a Luhn check digit and
+  called it BDEW §8.1.** The two are different: §8.1 weights odd positions by 1
+  and even positions by 2 and sums the products whole, while Luhn reduces any
+  product ≥ 10 by 9. On the BDEW specification's own worked example the snippet
+  produced `9` where the answer is `1`, so every ID it generated would have
+  failed the `MaloId::new(&s).unwrap()` on the next line of the same sample. It
+  now shows the pattern this crate's own property tests use: generate the base
+  and let `from_base` derive the digit.
+- **The `sqlx` integration list omitted `Iban` and `Bic`**, which have always had
+  the impls. `tests/prelude_surface.rs` now compares the list against the
+  module's exports so it cannot drift again.
+- **The identifier trait surface is documented in full** — `TryFrom<String>`,
+  `Into<String>`, `Borrow<str>`, and `Deref<Target = str>` were implemented but
+  unlisted — along with the `Borrow` contract that makes `map.get("41373559241")`
+  work without constructing and re-validating an identifier.
+- **The architecture page's module tree listed five modules and omitted seven.**
+  `strict`, `decimal_serde`, `offset_time`, `iso8601_duration`, `bank`,
+  `sqlx_impls`, and the four files under `json/` are now in it, as is the
+  generated `key_map.rs`.
+- **`JsonParseLimits::max_nesting_depth` was documented as only ever lowering the
+  cap.** That is true in effect, but for a reason worth stating: `serde_json`
+  enforces its own recursion limit at the same 128 and parses first, so a higher
+  value never takes effect. `DEFAULT_MAX_NESTING_DEPTH` is now public so the
+  figure can be referenced rather than copied.
 - **The generated `from_wire` doctest never ran.** Its positive assertion was
   emitted with a doubled `/// `, which made it a Rust line comment *inside* the
   code block — so every one of ~190 generated enums shipped an example that

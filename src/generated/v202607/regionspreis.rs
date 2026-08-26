@@ -23,6 +23,7 @@ pub struct Regionspreis {
     #[cfg_attr(feature = "serde", serde(rename = "regionszeitscheiben"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub regionszeitscheiben: Option<Vec<Regionszeitscheibe>>,
     /// Eine Liste von mit Zeitscheiben versehenen Tarifpreisen.
     /// Die Zeitscheiben sollten sich nicht überschneiden.
@@ -30,6 +31,7 @@ pub struct Regionspreis {
     #[cfg_attr(feature = "serde", serde(rename = "tarifpreiszeitscheiben"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub tarifpreiszeitscheiben: Option<Vec<Tarifpreiszeitscheibe>>,
     /// BO4E type discriminant — always `ComTyp::Regionspreis` for this struct.
     #[cfg_attr(feature = "serde", serde(rename = "_typ"))]
@@ -50,6 +52,7 @@ pub struct Regionspreis {
     #[cfg_attr(feature = "serde", serde(rename = "zusatzAttribute"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub zusatz_attribute: Option<Vec<ZusatzAttribut>>,
     /// Unknown JSON fields captured during deserialization for round-trip preservation.
     /// `None` when no unknown fields were present (zero heap allocation).

@@ -42,17 +42,18 @@ pub(super) fn estimated_json_value_bytes(value: &Value) -> usize {
 
 /// Hard upper bound on the number of unknown extension fields accepted per struct.
 ///
-/// Enforced during deserialization by [`LimitedExtensionMap`]: payloads that carry
-/// more than this many extra keys are rejected with a [`serde`] error, preventing
-/// unbounded `IndexMap` growth from adversarial JSON (DoS protection).
+/// Enforced during deserialization by [`LimitedExtensionMap`]: a payload that
+/// carries more extra keys than this on any one struct is rejected with a
+/// [`serde`] error, so no `IndexMap` here can grow without bound. See
+/// [`LimitedExtensionMap`] for what that does and does not bound.
 #[cfg(feature = "json")]
 pub const MAX_EXTENSION_FIELDS: usize = 128;
 
 /// Hard upper bound on the byte length of a single extension field key.
 ///
-/// Without this bound an adversary could craft a payload with `MAX_EXTENSION_FIELDS`
-/// keys each approaching 1 MB in length, consuming ~128 MB before the count cap fires.
-/// Keys longer than this limit are rejected immediately during deserialization.
+/// Without it, `MAX_EXTENSION_FIELDS` keys of a megabyte each would be within
+/// the count cap and would retain ~128 MB per struct. Longer keys are rejected
+/// as they are read.
 #[cfg(feature = "json")]
 pub const MAX_EXTENSION_KEY_LEN: usize = 256;
 
@@ -66,11 +67,17 @@ pub const MAX_EXTENSION_KEY_LEN: usize = 256;
 /// (gated on the `json` feature).  The field is serialized / deserialized via
 /// `#[serde(flatten)]` so unknown keys are transparently round-tripped.
 ///
-/// ## DoS protection
+/// ## What the caps bound
 ///
-/// `LimitedExtensionMap`'s `Deserialize` impl aborts as soon as the entry count
-/// reaches [`MAX_EXTENSION_FIELDS`], preventing an adversary from forcing
-/// unbounded memory growth via a crafted JSON payload.
+/// `Deserialize` stops as soon as the entry count reaches
+/// [`MAX_EXTENSION_FIELDS`] or a key exceeds [`MAX_EXTENSION_KEY_LEN`], so no
+/// payload leaves an unbounded map **retained** behind it.
+///
+/// They do not bound peak memory: `#[serde(flatten)]` buffers a struct's
+/// unrecognised entries into an intermediate `Content` before this visitor runs,
+/// so they exist in memory by the time the count is checked.
+/// [`JsonParseLimits::max_payload_bytes`](crate::json::JsonParseLimits::max_payload_bytes)
+/// is the only cap applied before parsing, and therefore the one to set first.
 #[cfg(feature = "json")]
 #[derive(Debug, Clone, Default)]
 pub struct LimitedExtensionMap(

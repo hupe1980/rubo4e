@@ -27,7 +27,8 @@ implementation does.
 - **Three-layer validation** — constructor checks, `garde` struct rules, cross-field business logic
 - **Strict enum parsing & introspection** — `from_wire` (reject out-of-schema values), `VARIANTS` / `COUNT` / `iter_known`, `Display` / `AsRef<str>`, `is_unknown`, unified by the `Bo4eEnum` trait — all **without** the `strum` feature
 - **Recursive strict decoding** — `Bo4eStrict::ensure_known_enums()` rejects any `Unknown` enum value anywhere in a deserialized payload, with JSON-paths — one call replaces hand-written per-field checks
-- **Typed builders** — readable, diffable construction via `typed-builder`; setters accept both `T` and `Option<T>` (note: BO4E BO fields are schema-optional, so AHB-mandatory contracts are enforced by your ingest layer, not the type system)
+- **Typed builders** — readable, diffable construction via `typed-builder`; setters accept both `T` and `Option<T>` (note: BO4E BO fields are schema-optional, so AHB-mandatory contracts are enforced by your ingest layer, not the type system); `Lastgang` and `Tarif`, the two the schema marks `required`, get a feature-free `new(…)`
+- **Type-level BO facts** — `T::BO_TYP`, `T::TYP_WIRE`, `T::SCHEMA_VERSION`, `T::SCHEMA_SERIES` as associated constants, so generic code needs no value and no `Default` bound
 - **German / snake_case / canonical JSON** — BO4E wire format out of the box, with a hardened path for untrusted input
 - **`Eq` + `Hash` on generated types** without the `json` feature, so a BO can key a `HashMap`; enums are always `Eq + Ord + Hash`
 - **Ergonomic convenience API** — extension traits, billing-period helpers, EDIFACT agency codes
@@ -86,8 +87,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 | `identifiers` | ✓       | Identifier types (`MaloId`, `EicCode`, `ObisCode`, …) + serde — zero schema overhead |
 | `serde`       | ✓       | Serde derives + extension-data map                |
 | `json`      |         | `serde_json` helpers (`to_json_german()`, …)      |
-| `time`      |         | `time` crate — `Date` for date fields, `OffsetDateTime` for timestamps |
-| `decimal`   |         | `rust_decimal::Decimal` for amounts and prices    |
+| `time`      |         | `time` crate — `Date` for date fields, `OffsetDateTime` for timestamps; also turns on `utoipa/time` |
+| `decimal`   |         | `rust_decimal::Decimal` for amounts and prices; also turns on `schemars/rust_decimal1` and `utoipa/decimal` |
 | `builder`   |         | `typed-builder` derives on all BO/COM structs     |
 | `validate`  |         | `garde` validation — constructor + cross-field rules |
 | `schemars`  |         | JSON Schema generation with patterns and examples |
@@ -102,6 +103,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 > ```sh
 > cargo add rubo4e --features versioned,time,decimal,json,validate,builder
 > ```
+
+`JsonSchema`/`ToSchema` for `Decimal` and the `time` types ride on `decimal` and
+`time`, not on `schemars`/`utoipa`, so this crate does not become your
+workspace's accidental sole provider of them. If you derive `JsonSchema` over a
+`Decimal` of your own, declare `schemars = { features = ["rust_decimal1"] }`
+yourself — see [Ecosystem](https://hupe1980.github.io/rubo4e/docs/ecosystem/).
 
 ---
 
@@ -119,8 +126,30 @@ use rubo4e::current::Marktlokation;  // whichever series is newest — moves wit
 **Three spellings of a release.** The Rust module is the *series* (`v202607`).
 The git tag carries a `v` and the full triple (`v202607.1.0`). The `_version`
 field *inside a payload* has the triple without the `v` (`202607.1.0`).
-`Bo4eObject::schema_version()` returns the wire spelling;
-`Bo4eObject::schema_series()` returns the series.
+`Bo4eObject::SCHEMA_VERSION` is the wire spelling, `SCHEMA_SERIES` the series.
+
+**The BO facts are associated constants**, so generic code needs no value and no
+`Default` bound — which is what admits `Lastgang` and `Tarif`, the two types the
+schema marks `required`:
+
+```rust
+use rubo4e::{current::{BoTyp, Lastgang, Vertrag}, Bo4eObject};
+
+assert_eq!(Vertrag::BO_TYP,        BoTyp::Vertrag);
+assert_eq!(Vertrag::TYP_WIRE,      "VERTRAG");
+assert_eq!(Vertrag::SCHEMA_SERIES, "202607");
+
+fn discriminant_of<T: Bo4eObject<BoTyp = BoTyp>>() -> BoTyp { T::BO_TYP }
+assert_eq!(discriminant_of::<Lastgang>(), BoTyp::Lastgang);
+```
+
+Method forms (`bo_type()`, `schema_version()`, …) exist for when you have a
+value. `bo_type()` reports what the value **is**, never the `_typ` a payload
+claimed — read the public `typ` field for that.
+
+Associated constants make a trait non-`dyn`-compatible, so use
+[`AnyBo`](https://docs.rs/rubo4e/latest/rubo4e/current/enum.AnyBo.html) for a
+heterogeneous collection.
 
 **Dispatch on the series, not the release.** BO4E ships patch releases inside a
 series, so a sender one patch ahead stamps a `_version` that an equality match
@@ -440,9 +469,10 @@ let unit = pos.einzelpreis.wert_decimal();          // Option<Decimal> via Preis
 use rubo4e::v202607::{Rechnung, PreisblattNetznutzung, Zeitraum};
 use time::macros::date;
 
-// Rechnung — closed billing period
-if let Some((from, to)) = rechnung.billing_period() {
-    println!("Invoice period: {from} – {to}");
+// Rechnung — closed billing period, as a RangeInclusive<Date>
+if let Some(period) = rechnung.billing_period() {
+    println!("Invoice period: {} – {} inclusive", period.start(), period.end());
+    let billed = period.contains(&date!(2026-01-31));   // the end date is inside
 }
 
 // Navigate rechnungsperiode fields directly
@@ -533,7 +563,10 @@ let restored = Marktlokation::from_json_german(&german)?;
 
 Unknown JSON fields are **preserved through round-trips** via the `_additional`
 extension-data map (requires `json` feature). This allows forward-compatible
-handling of new BO4E fields without library updates.
+handling of new BO4E fields without library updates. Keys and values come back
+unchanged, and the top-level ones keep their arrival order; key order *inside* a
+nested extension object does not survive, because `serde_json::Value` stores an
+object in a sorted map.
 
 **Decimal amounts serialize as JSON strings** (`"wert": "119.00"`), matching
 BO4E-python. Deserialization accepts JSON numbers too, the way go-bo4e writes
@@ -580,17 +613,19 @@ let strict = JsonParseLimits::untrusted_defaults()
     .with_max_extension_field_count(Some(0));  // reject any unknown field
 ```
 
-All four limits are enforced **during** parsing and at **every** nesting level —
-extension data buried in a nested COM is charged to the same budget as extension
-data on the root — so an oversized payload is rejected while it is being read,
-not after the object tree has been allocated. Every limit that fires bumps a
-process-wide counter readable via `json_limit_hit_counters()`, exported to the
-`metrics` ecosystem when the `metrics` feature is on.
+`max_payload_bytes` is checked before a byte is parsed; the other three are
+enforced during the single parse pass, at **every** nesting level — extension
+data buried in a nested COM is charged to the same budget as extension data on
+the root. Every limit that fires bumps a process-wide counter readable via
+`json_limit_hit_counters()`, exported to the `metrics` ecosystem when the
+`metrics` feature is on.
 
-These bound the parser, not the object graph it produces. `[{},{},{}…]` is three
-bytes per element on the wire and a full struct per element in memory, so size
-`max_payload_bytes` against the expanded cost and keep a concurrency limit in
-front of the endpoint.
+These bound what a payload *retains*, not what parsing it allocates:
+`#[serde(flatten)]` buffers a struct's unrecognised fields before the extension
+map sees them, so `max_payload_bytes` is the cap that bounds peak memory — set it
+first. Nor do any of them bound the object graph: `[{},{},{}…]` is three wire
+bytes and a full struct per element, so size `max_payload_bytes` against the
+expanded cost and keep a concurrency limit in front of the endpoint.
 
 See [Serialization](https://hupe1980.github.io/rubo4e/docs/serialization/#hardened-deserialization-for-untrusted-inputs)
 for the exact scope of each limit.
@@ -611,23 +646,52 @@ malo.validate()?;
 // Type-safe wrapper — only constructible via validation
 let validated = Validated::new(malo)?;     // Err(garde::Report) if invalid
 let inner: &Marktlokation = &validated;    // Deref to inner type
+
+// …and it validates on the way *in*, so a request body cannot skip the check:
+let malo: Validated<Marktlokation> = serde_json::from_str(&body)?;
 ```
+
+`.validate()` is **recursive**: it checks the value's own rules and descends into
+every nested BO, COM, and identifier, reporting each failure at its path
+(`rechnungsperiode`, `kostenbloecke[0].kostenpositionen[0]`). One call covers the
+tree.
 
 Cross-field rules run automatically via `#[garde(custom(...))]` attributes on the
 generated types:
 
 | Type | Rule |
 |---|---|
-| `Marktlokation`, `Messlokation` | exactly one of `lokationsadresse` / `geoadresse` / `katasterinformation` |
+| `Marktlokation`, `Messlokation` | **at most one** of `lokationsadresse`(`messadresse`) / `geoadresse` / `katasterinformation` |
 | `Vertrag` | `vertragsbeginn` strictly before `vertragsende` |
 | `Bilanzierung` | `bilanzierungsbeginn` ≤ `bilanzierungsende` |
-| `Zeitraum` | at least one temporal field; `startdatum` strictly before `enddatum` |
+| `Zeitraum` | at least one temporal field; `startdatum` **on or before** `enddatum` (both bounds inclusive) |
 | `Rechnung` | one currency throughout; `gesamtnetto + gesamtsteuer == gesamtbrutto`; `steuerbetraege` sum to `gesamtsteuer` |
 | `Kostenposition` | `einzelpreis × menge` rounds to `betrag_kostenposition` at its own scale |
 
-Every rule traces to a sentence in the BO4E schema. `zuZahlen` is **not** checked:
-the equation its schema names references a `rabattBrutto` field v202607 does not
-ship. See [Validation](https://hupe1980.github.io/rubo4e/docs/validation/).
+**Every rule traces to a sentence in the BO4E schema, and only those do**, so
+`.validate()` answers *"does this conform to BO4E"* — a claim you can make about
+a counterparty's document. This crate's own judgements live in
+`validation::current::quality` and are called by name:
+
+```rust
+use rubo4e::validation::current::quality;
+
+rechnung.validate()?;                               // conformance
+quality::rechnung_totals_are_complete(&rechnung)?;  // opt-in house rule
+```
+
+*At most one* Ortsangabe, not exactly one: BO4E states mutual exclusivity, not
+presence. And it has no reference type, so a location referenced from a
+`Rechnung` or a `Vertrag` is a full `Marktlokation` carrying little more than its
+ID — which makes the empty case the common one.
+
+Not asserted: **presence** (BO4E marks almost every field optional, so a
+`Validated<T>` does not prove your AHB's mandatory fields are there) and
+**`zuZahlen`** (its equation names a `rabattBrutto` field v202607 does not ship).
+
+Import from `rubo4e::validation::current`, the counterpart of `rubo4e::current`,
+so no file has to name a schema version.
+See [Validation](https://hupe1980.github.io/rubo4e/docs/validation/).
 
 ---
 
@@ -639,7 +703,8 @@ let schema = schemars::schema_for!(rubo4e::v202607::Marktlokation);
 
 // utoipa — OpenAPI 3.1 (requires `utoipa` feature)
 // All identifier types emit pattern, description, and example values:
-// MaloId → { type: string, pattern: "^[0-9]{11}$", example: "51238696781" }
+// MaloId → { type: string, pattern: "^[1-9][0-9]{10}$", example: "41373559241" }
+// (the leading digit is the Vergabestelle, and 0 is not assigned — see §3.2)
 ```
 
 ---

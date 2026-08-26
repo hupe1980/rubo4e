@@ -24,16 +24,19 @@ pub struct Rechnung {
     #[cfg_attr(feature = "serde", serde(rename = "aktuellerVerbrauch"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub aktueller_verbrauch: Option<Box<Energiemenge>>,
     /// Für Verbrauchsbasierte Rechnungen der Zählerstand zur Beginn des abgerechneten Zeitraums, Pflicht für Rechnungen gemäß EnWG § 40
     #[cfg_attr(feature = "serde", serde(rename = "anfangszaehlerstand"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub anfangszaehlerstand: Option<Box<Energiemenge>>,
     /// Für Verbrauchsbasierte Rechnungen der Zählerstand zum Ende des abgerechneten Zeitraums, Pflicht für Rechnungen gemäß EnWG § 40
     #[cfg_attr(feature = "serde", serde(rename = "endzaehlerstand"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub endzaehlerstand: Option<Box<Energiemenge>>,
     /// Zu diesem Datum ist die Zahlung fällig
     #[cfg_attr(feature = "serde", serde(rename = "faelligkeitsdatum"))]
@@ -66,21 +69,25 @@ pub struct Rechnung {
     #[cfg_attr(feature = "serde", serde(rename = "fremdkosten"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub fremdkosten: Option<Box<Fremdkosten>>,
     /// Die Summe aus Netto- und Steuerbetrag
     #[cfg_attr(feature = "serde", serde(rename = "gesamtbrutto"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub gesamtbrutto: Option<Betrag>,
     /// Die Summe der Nettobeträge der Rechnungsteile
     #[cfg_attr(feature = "serde", serde(rename = "gesamtnetto"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub gesamtnetto: Option<Betrag>,
     /// Die Summe der Steuerbeträge der Rechnungsteile
     #[cfg_attr(feature = "serde", serde(rename = "gesamtsteuer"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub gesamtsteuer: Option<Betrag>,
     /// Eine generische ID, die für eigene Zwecke genutzt werden kann.
     /// Z.B. könnten hier UUIDs aus einer Datenbank stehen oder URLs zu einem Backend-System.
@@ -108,6 +115,7 @@ pub struct Rechnung {
     #[cfg_attr(feature = "serde", serde(rename = "jahresverbrauch"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub jahresverbrauch: Option<Box<Energiemenge>>,
     #[cfg_attr(feature = "serde", serde(rename = "kaeuferreferenz"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
@@ -117,21 +125,25 @@ pub struct Rechnung {
     #[cfg_attr(feature = "serde", serde(rename = "marktlokation"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub marktlokation: Option<Box<Marktlokation>>,
     /// Messlokation, auf die sich die Rechnung bezieht
     #[cfg_attr(feature = "serde", serde(rename = "messlokation"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub messlokation: Option<Box<Messlokation>>,
     /// der Messtellenbetreiber an der Lieferstelle, relevant für Rechnungen gemäß EnWG § 40
     #[cfg_attr(feature = "serde", serde(rename = "messstellenbetreiber"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub messstellenbetreiber: Option<Box<Marktteilnehmer>>,
     /// der Netzbetreiber an der Lieferstelle, relevant für Rechnungen gemäß EnWG § 40
     #[cfg_attr(feature = "serde", serde(rename = "netzbetreiber"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub netzbetreiber: Option<Box<Marktteilnehmer>>,
     /// Aus der INVOIC entnommen, befüllt wenn es sich um eine Netznutzungsrechnung handelt
     #[cfg_attr(feature = "serde", serde(rename = "netznutzungrechnungsart"))]
@@ -152,6 +164,7 @@ pub struct Rechnung {
     #[cfg_attr(feature = "serde", serde(rename = "rabattNetto"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub rabatt_netto: Option<Betrag>,
     /// Ausstellungsdatum der Rechnung
     #[cfg_attr(feature = "serde", serde(rename = "rechnungsdatum"))]
@@ -184,11 +197,13 @@ pub struct Rechnung {
     #[cfg_attr(feature = "serde", serde(rename = "rechnungsempfaenger"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub rechnungsempfaenger: Option<Box<Geschaeftspartner>>,
     /// Der Aussteller der Rechnung. Die Rollencodenummer kennt man über den im Geschäftspartner verlinkten Marktteilnehmer.
     #[cfg_attr(feature = "serde", serde(rename = "rechnungsersteller"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub rechnungsersteller: Option<Box<Geschaeftspartner>>,
     /// Eine im Verwendungskontext eindeutige Nummer für die Rechnung
     #[cfg_attr(feature = "serde", serde(rename = "rechnungsnummer"))]
@@ -199,11 +214,13 @@ pub struct Rechnung {
     #[cfg_attr(feature = "serde", serde(rename = "rechnungsperiode"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub rechnungsperiode: Option<Zeitraum>,
     /// Die Rechnungspositionen
     #[cfg_attr(feature = "serde", serde(rename = "rechnungspositionen"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub rechnungspositionen: Option<Vec<Rechnungsposition>>,
     /// Status der Rechnung zur Kennzeichnung des Bearbeitungsstandes
     #[cfg_attr(feature = "serde", serde(rename = "rechnungsstatus"))]
@@ -224,6 +241,7 @@ pub struct Rechnung {
     #[cfg_attr(feature = "serde", serde(rename = "referenzverbraeuche"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub referenzverbraeuche: Option<Vec<Box<Energiemenge>>>,
     /// Sparte (Strom, Gas ...) für die die Rechnung ausgestellt ist
     #[cfg_attr(feature = "serde", serde(rename = "sparte"))]
@@ -235,11 +253,13 @@ pub struct Rechnung {
     #[cfg_attr(feature = "serde", serde(rename = "steuerbetraege"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub steuerbetraege: Option<Vec<Steuerbetrag>>,
     /// Rechnungen, die durch diese Rechnung zusammengefasst werden
     #[cfg_attr(feature = "serde", serde(rename = "teilrechnungen"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub teilrechnungen: Option<Vec<Box<Rechnung>>>,
     /// BO4E type discriminant — always `BoTyp::Rechnung` for this struct.
     #[cfg_attr(feature = "serde", serde(rename = "_typ"))]
@@ -261,38 +281,46 @@ pub struct Rechnung {
     #[cfg_attr(feature = "serde", serde(rename = "vertrag"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub vertrag: Option<Box<Vertrag>>,
     /// Die Summe evtl. vorausgezahlter Beträge, z.B. Abschläge. Angabe als Bruttowert
     #[cfg_attr(feature = "serde", serde(rename = "vorauszahlungen"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub vorauszahlungen: Option<Vec<Vorauszahlung>>,
     /// ggf. auf einen Vergleichszeitraum hochgerechneter Verbrauch des vorherigen Jahres zu Vergleichszwecken mit dem aktuellen Jahr, gemäß EnWG § 40
     #[cfg_attr(feature = "serde", serde(rename = "vorjahresverbrauch"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub vorjahresverbrauch: Option<Box<Energiemenge>>,
     #[cfg_attr(feature = "serde", serde(rename = "zaehler"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub zaehler: Option<Vec<Box<Zaehler>>>,
     /// Informationen wie eine Rechnung bezahlt werden soll
     #[cfg_attr(feature = "serde", serde(rename = "zahlungsinformationen"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub zahlungsinformationen: Option<Vec<Zahlungsinformation>>,
     /// Der zu zahlende Betrag, der sich aus (gesamtbrutto - vorausbezahlt - rabattBrutto) ergibt
     #[cfg_attr(feature = "serde", serde(rename = "zuZahlen"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub zu_zahlen: Option<Betrag>,
     #[cfg_attr(feature = "serde", serde(rename = "zukuenftigerAbschlag"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub zukuenftiger_abschlag: Option<Betrag>,
     #[cfg_attr(feature = "serde", serde(rename = "zusatzAttribute"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub zusatz_attribute: Option<Vec<ZusatzAttribut>>,
     /// Unknown JSON fields captured during deserialization for round-trip preservation.
     /// `None` when no unknown fields were present (zero heap allocation).
@@ -360,15 +388,10 @@ impl Default for Rechnung {
 }
 impl Bo4eObject for Rechnung {
     type BoTyp = BoTyp;
-    fn bo_type(&self) -> BoTyp {
-        self.typ.unwrap_or(BoTyp::Rechnung)
-    }
-    fn schema_version(&self) -> &'static str {
-        "202607.1.0"
-    }
-    fn schema_series(&self) -> &'static str {
-        "202607"
-    }
+    const BO_TYP: BoTyp = BoTyp::Rechnung;
+    const TYP_WIRE: &'static str = "RECHNUNG";
+    const SCHEMA_VERSION: &'static str = "202607.1.0";
+    const SCHEMA_SERIES: &'static str = "202607";
 }
 #[cfg(feature = "json")]
 impl crate::json::sealed::Sealed for Rechnung {}

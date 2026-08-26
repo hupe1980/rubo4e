@@ -97,7 +97,58 @@ fn emit_any_bo(bos: &[BoDispatch]) -> String {
     s.push_str("            #[cfg(feature = \"json\")]\n");
     s.push_str("            AnyBo::Unknown { .. } => BoTyp::Unknown,\n");
     s.push_str("        }\n");
-    s.push_str("    }\n");
+    s.push_str("    }\n\n");
+
+    // The remaining `Bo4eObject` facts, so `AnyBo` is a complete replacement for
+    // the `dyn Bo4eObject` the associated constants made impossible.
+    s.push_str("    /// Returns the `_typ` wire string for this BO object.\n");
+    s.push_str("    ///\n");
+    s.push_str("    /// Total: for the `Unknown` catch-all it is the value the payload\n");
+    s.push_str("    /// carried, which is the whole reason that variant keeps it.\n");
+    s.push_str("    pub fn typ_wire(&self) -> &str {\n");
+    s.push_str("        match self {\n");
+    for name in &bo_names {
+        s.push_str(&format!(
+            "            AnyBo::{name}(_) => <{name} as Bo4eObject>::TYP_WIRE,\n"
+        ));
+    }
+    s.push_str("            #[cfg(feature = \"json\")]\n");
+    s.push_str("            AnyBo::Unknown { typ, .. } => typ,\n");
+    s.push_str("        }\n");
+    s.push_str("    }\n\n");
+
+    for (accessor, konst, what) in [
+        (
+            "schema_version",
+            "SCHEMA_VERSION",
+            "the exact BO4E release these types were generated from (e.g. `\"202607.1.0\"`)",
+        ),
+        (
+            "schema_series",
+            "SCHEMA_SERIES",
+            "the schema series (e.g. `\"202607\"`) — the right key for version dispatch",
+        ),
+    ] {
+        s.push_str(&format!("    /// Returns {what}.\n"));
+        s.push_str("    ///\n");
+        s.push_str(
+            "    /// `None` for the `Unknown` catch-all: this crate generated no type for\n",
+        );
+        s.push_str("    /// it, so it has no release to report.\n");
+        s.push_str(&format!(
+            "    pub fn {accessor}(&self) -> Option<&'static str> {{\n"
+        ));
+        s.push_str("        match self {\n");
+        for name in &bo_names {
+            s.push_str(&format!(
+                "            AnyBo::{name}(_) => Some(<{name} as Bo4eObject>::{konst}),\n"
+            ));
+        }
+        s.push_str("            #[cfg(feature = \"json\")]\n");
+        s.push_str("            AnyBo::Unknown { .. } => None,\n");
+        s.push_str("        }\n");
+        s.push_str("    }\n\n");
+    }
     s.push_str("}\n\n");
 
     // ── From<T> for AnyBo ─────────────────────────────────────────────────
@@ -502,6 +553,21 @@ pub fn emit_key_map(nodes: &[SchemaNode]) -> Result<String> {
     format_source(s)
 }
 
+/// Whether a field's type has validation rules of its own, and so should be
+/// dived into by `garde`.
+///
+/// True for the identifier newtypes (each re-runs its constructor's check) and
+/// for every nested BO / COM (each carries its own `derive(Validate)`, and
+/// possibly a cross-field validator). False for scalars and enums, which have
+/// nothing to check. `Array` is transparent — a `Vec<T>` dives if `T` does.
+fn field_carries_validation(ft: &FieldType) -> bool {
+    match ft {
+        FieldType::Identifier(_) | FieldType::Bo(_) | FieldType::Com(_) => true,
+        FieldType::Array(inner) => field_carries_validation(inner),
+        FieldType::BoEnum(_) | FieldType::Primitive(_) | FieldType::JsonValue => false,
+    }
+}
+
 /// Whether a value of this type is a JSON object (or an array of them), i.e.
 /// whether it has keys the transform would rename.
 fn holds_nested_object(ft: &FieldType) -> bool {
@@ -570,6 +636,8 @@ struct Metadata<'a> {
     typ_enum: Option<&'static str>,
     /// The `BoTyp::X` / `ComTyp::X` path this struct's `_typ` is pinned to.
     typ_path: Option<String>,
+    /// The raw `_typ` wire value (e.g. `"MARKTLOKATION"`), when it has that field.
+    typ_wire: Option<&'a str>,
     /// The `_version` wire value this schema declares, when it has that field.
     version: Option<&'a str>,
 }
@@ -582,6 +650,7 @@ impl<'a> Metadata<'a> {
             let variant = names.variant(en, wire);
             format!("{en}::{variant}")
         });
+        let typ_wire = has_typ.then_some(node.typ_const.as_deref()).flatten();
         let version = node
             .fields
             .iter()
@@ -591,6 +660,7 @@ impl<'a> Metadata<'a> {
         Self {
             typ_enum,
             typ_path,
+            typ_wire,
             version,
         }
     }
@@ -681,6 +751,12 @@ fn emit_struct(
 
     if meta.emits_custom_default(fields) {
         emit_default_impl(&mut s, name, fields, &meta);
+    } else if meta.typ_path.is_some() || meta.version.is_some() {
+        // No `Default`, because a required field's type need not have one — so
+        // there is no `..Default::default()` either, and building the value by
+        // hand means writing out every one of its two dozen optional fields.
+        // `new` takes the required ones and defaults the rest.
+        emit_required_field_constructor(&mut s, name, fields, &meta);
     }
 
     emit_struct_impls(&mut s, name, is_bo, &meta, schema_version, fields);
@@ -720,7 +796,8 @@ fn emit_struct_derives(
     s.push_str("#[cfg_attr(feature = \"builder\", derive(typed_builder::TypedBuilder))]\n");
     s.push_str("#[cfg_attr(feature = \"validate\", derive(garde::Validate))]\n");
     // allow_unvalidated: fields without an explicit #[garde(...)] attribute are
-    // implicitly accepted.  Only identifier fields get #[garde(dive)].
+    // implicitly accepted.  Identifier and nested BO/COM fields get
+    // #[garde(dive)] — see `field_carries_validation`.
     s.push_str("#[cfg_attr(feature = \"validate\", garde(allow_unvalidated))]\n");
     s.push_str("#[cfg_attr(feature = \"schemars\", derive(schemars::JsonSchema))]\n");
     s.push_str("#[cfg_attr(feature = \"utoipa\", derive(utoipa::ToSchema))]\n");
@@ -770,6 +847,123 @@ fn emit_default_impl(s: &mut String, name: &str, fields: &[Field], meta: &Metada
         "\nimpl Default for {name} {{\n    fn default() -> Self {{\n        Self {{\n"
     ));
     for field in fields {
+        let value = match field.name.as_str() {
+            "_typ" => match &meta.typ_path {
+                Some(path) => format!("Some({path})"),
+                None => "Default::default()".to_owned(),
+            },
+            "_version" => match meta.version {
+                Some(v) => format!("Some({v:?}.to_owned())"),
+                None => "Default::default()".to_owned(),
+            },
+            _ => "Default::default()".to_owned(),
+        };
+        s.push_str(&format!("            {}: {value},\n", field.rust_name));
+    }
+    s.push_str("            _additional: Default::default(),\n");
+    s.push_str("        }\n    }\n}\n");
+}
+
+/// Emits `new(...)` for a struct that has required fields and therefore no
+/// `Default` — in v202607, `Lastgang` and `Tarif`.
+///
+/// Without it those two are the only generated types not constructible except
+/// through the `builder` feature or by writing out every optional field.
+///
+/// Parameters are the required fields in declaration order; everything else, the
+/// BO4E metadata included, is filled in exactly as `Default` would.
+fn emit_required_field_constructor(
+    s: &mut String,
+    name: &str,
+    fields: &[Field],
+    meta: &Metadata<'_>,
+) {
+    let required: Vec<&Field> = fields
+        .iter()
+        .filter(|f| !f.name.starts_with('_') && !f.is_optional)
+        .collect();
+    if required.is_empty() {
+        return;
+    }
+
+    let params = required
+        .iter()
+        .map(|f| {
+            format!(
+                "{}: {}",
+                f.rust_name,
+                field_type_to_rust(&f.field_type, false)
+            )
+        })
+        .collect::<Vec<_>>()
+        .join(", ");
+    let listed = required
+        .iter()
+        .map(|f| format!("`{}`", f.rust_name))
+        .collect::<Vec<_>>()
+        .join(", ");
+    let (count, is_are, its_their, type_s) = if required.len() == 1 {
+        ("one field".to_owned(), "is", "its", "type")
+    } else {
+        (
+            format!("{} fields", required.len()),
+            "are",
+            "their",
+            "types",
+        )
+    };
+
+    // Name only the metadata this struct actually carries: `Lastgang` has a
+    // plain `version` property rather than BO4E's `_version`, so claiming both
+    // would be wrong for it.
+    let stamped: Vec<&str> = [
+        meta.typ_path.is_some().then_some("`_typ`"),
+        meta.version.is_some().then_some("`_version`"),
+    ]
+    .into_iter()
+    .flatten()
+    .collect();
+
+    s.push_str(&format!("\nimpl {name} {{\n"));
+    s.push_str(&format!(
+        "    /// Creates a `{name}` from the {count} the BO4E schema marks `required`,\n\
+         \x20   /// defaulting every other field.\n\
+         \x20   ///\n\
+         \x20   /// `{name}` has no [`Default`]: {listed} {is_are} required, and {its_their}\n\
+         \x20   /// {type_s} need not implement `Default` — so this is the\n\
+         \x20   /// `..Default::default()` stand-in.\n"
+    ));
+    if !stamped.is_empty() {
+        s.push_str(&format!(
+            "    /// {} {} stamped exactly as elsewhere.\n",
+            stamped.join(" and "),
+            if stamped.len() == 1 { "is" } else { "are" },
+        ));
+    }
+    if required.len() > 3 {
+        s.push_str(
+            "    ///\n\
+             \x20   /// With this many parameters the `builder` feature reads better at a\n\
+             \x20   /// call site; this exists so the type is constructible without it.\n",
+        );
+    }
+    s.push_str("    #[must_use]\n");
+    // clippy's threshold is 7. `Tarif` genuinely has ten required fields, and a
+    // constructor is the only feature-free way to reach them — the doc comment
+    // above already points at the builder for readability.
+    if required.len() > 7 {
+        s.push_str("    #[allow(clippy::too_many_arguments)]\n");
+    }
+    s.push_str(&format!(
+        "    pub fn new({params}) -> Self {{\n        Self {{\n"
+    ));
+    for field in fields {
+        // Field-init shorthand for the parameters: `x: x` trips
+        // `clippy::redundant_field_names`.
+        if !field.name.starts_with('_') && !field.is_optional {
+            s.push_str(&format!("            {},\n", field.rust_name));
+            continue;
+        }
         let value = match field.name.as_str() {
             "_typ" => match &meta.typ_path {
                 Some(path) => format!("Some({path})"),
@@ -894,18 +1088,16 @@ fn emit_struct_impls(
     fields: &[Field],
 ) {
     // Bo4eObject impl — only BO types carry the BoTyp discriminant.
-    // `type BoTyp = BoTyp;` binds the associated type from crate::Bo4eObject to the
-    // local version-specific BoTyp enum so the impl compiles and dyn usage works as
-    // `dyn Bo4eObject<BoTyp = v202607::BoTyp>`.
+    // `type BoTyp = BoTyp;` binds the crate-level associated type to this
+    // version's local enum.
     if is_bo {
-        // Return the runtime `typ` field value so callers doing dynamic dispatch
-        // see the actual discriminant from the payload (e.g. "BUENDELVERTRAG"), not the
-        // hardcoded struct name.  `unwrap_or` falls back to the compile-time constant only
-        // when the field was explicitly set to `None` after construction.
-        let fallback = meta.typ_path.as_deref().unwrap_or("BoTyp::Unknown");
-        // `schema_version()` reports the same string the `_version` field carries,
-        // so the accessor and the wire form can never disagree.  That is the BO4E
-        // release *without* the `v` the git tag prefixes it with.
+        // The discriminant the schema pins for this type, never the `_typ` a
+        // payload carried: `bo_type()` says what the value *is*, and a `match`
+        // on it must not take the branch a sender named. `.typ` stays public for
+        // the payload's own claim.
+        let discriminant = meta.typ_path.as_deref().unwrap_or("BoTyp::Unknown");
+        // The BO4E release *without* the `v` the git tag prefixes it with — the
+        // same string the `_version` field carries, so the two cannot disagree.
         let wire_version = meta
             .version
             .unwrap_or_else(|| schema_version.trim_start_matches('v'));
@@ -913,7 +1105,14 @@ fn emit_struct_impls(
         // exposes a module, and the only part of the version a dispatcher can
         // match on without breaking every time BO4E ships a patch inside a series.
         let series = wire_version.split('.').next().unwrap_or(wire_version);
-        s.push_str(&format!("\nimpl Bo4eObject for {name} {{\n    type BoTyp = BoTyp;\n    fn bo_type(&self) -> BoTyp {{\n        self.typ.unwrap_or({fallback})\n    }}\n    fn schema_version(&self) -> &'static str {{\n        \"{wire_version}\"\n    }}\n    fn schema_series(&self) -> &'static str {{\n        \"{series}\"\n    }}\n}}\n"));
+        // The wire spelling of the discriminant, for `TYP_WIRE`.  Emitted as a
+        // literal rather than derived from `BO_TYP.as_wire()` at compile time,
+        // because `Bo4eEnum::as_wire` is a trait method and cannot run in a
+        // const initializer; `tests/generated_contract.rs` pins the two together.
+        let typ_wire = meta.typ_wire.unwrap_or("UNKNOWN");
+        s.push_str(&format!(
+            "\nimpl Bo4eObject for {name} {{\n             \x20   type BoTyp = BoTyp;\n             \x20   const BO_TYP: BoTyp = {discriminant};\n             \x20   const TYP_WIRE: &'static str = \"{typ_wire}\";\n             \x20   const SCHEMA_VERSION: &'static str = \"{wire_version}\";\n             \x20   const SCHEMA_SERIES: &'static str = \"{series}\";\n             }}\n"
+        ));
     }
 
     // Sealed marker + Bo4eJsonExt impl — restricts trait to BO4E types only.
@@ -1016,10 +1215,15 @@ fn emit_field(s: &mut String, field: &Field, meta: &Metadata<'_>) {
         }
     }
 
-    // garde: dive into identifier newtypes so their custom validators run.
-    if matches!(&field.field_type, FieldType::Identifier(_))
-        || matches!(&field.field_type, FieldType::Array(inner) if matches!(inner.as_ref(), FieldType::Identifier(_)))
-    {
+    // garde: dive into anything carrying rules of its own — the identifier
+    // newtypes and every nested BO / COM — so `.validate()` covers the tree.
+    //
+    // `garde` supplies the `Validate` impls for `Option`, `Vec`, and `Box`, so
+    // one `dive` reaches through `Option<Vec<Box<T>>>`. Enums and scalars carry
+    // no rules. A self-referential type (`Marktlokation` → `Lokationszuordnung`
+    // → …) recurses over the data, which is finite because the indirection is
+    // `Box`.
+    if field_carries_validation(&field.field_type) {
         s.push_str("    #[cfg_attr(feature = \"validate\", garde(dive))]\n");
     }
 

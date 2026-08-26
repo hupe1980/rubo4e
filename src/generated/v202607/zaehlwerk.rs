@@ -54,11 +54,13 @@ pub struct Zaehlwerk {
     #[cfg_attr(feature = "serde", serde(rename = "konzessionsabgabe"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub konzessionsabgabe: Option<Konzessionsabgabe>,
     /// Gemessene Werte des Zählwerks
     #[cfg_attr(feature = "serde", serde(rename = "messwerte"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub messwerte: Option<Vec<Messwert>>,
     /// Anzahl der Nachkommastellen
     #[cfg_attr(feature = "serde", serde(rename = "nachkommastelle"))]
@@ -102,6 +104,7 @@ pub struct Zaehlwerk {
     #[cfg_attr(feature = "serde", serde(rename = "verwendungszwecke"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub verwendungszwecke: Option<Vec<VerwendungszweckProMarktrolle>>,
     /// Anzahl der Vorkommastellen
     #[cfg_attr(feature = "serde", serde(rename = "vorkommastelle"))]
@@ -147,10 +150,12 @@ pub struct Zaehlwerk {
     #[cfg_attr(feature = "serde", serde(rename = "zaehlzeitregister"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub zaehlzeitregister: Option<Zaehlzeitregister>,
     #[cfg_attr(feature = "serde", serde(rename = "zusatzAttribute"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub zusatz_attribute: Option<Vec<ZusatzAttribut>>,
     /// Unknown JSON fields captured during deserialization for round-trip preservation.
     /// `None` when no unknown fields were present (zero heap allocation).

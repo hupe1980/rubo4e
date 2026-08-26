@@ -28,11 +28,13 @@ pub struct Vertragsteil {
     #[cfg_attr(feature = "serde", serde(rename = "maximaleAbnahmemenge"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub maximale_abnahmemenge: Option<Menge>,
     /// Für die Lokation festgelegte Mindestabnahmemenge (inklusiv)
     #[cfg_attr(feature = "serde", serde(rename = "minimaleAbnahmemenge"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub minimale_abnahmemenge: Option<Menge>,
     /// BO4E type discriminant — always `ComTyp::Vertragsteil` for this struct.
     #[cfg_attr(feature = "serde", serde(rename = "_typ"))]
@@ -54,6 +56,7 @@ pub struct Vertragsteil {
     #[cfg_attr(feature = "serde", serde(rename = "vertraglichFixierteMenge"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub vertraglich_fixierte_menge: Option<Menge>,
     /// Start der Gültigkeit des Vertragsteils (inklusiv)
     #[cfg_attr(feature = "serde", serde(rename = "vertragsteilbeginn"))]
@@ -112,6 +115,7 @@ pub struct Vertragsteil {
     #[cfg_attr(feature = "serde", serde(rename = "zusatzAttribute"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub zusatz_attribute: Option<Vec<ZusatzAttribut>>,
     /// Unknown JSON fields captured during deserialization for round-trip preservation.
     /// `None` when no unknown fields were present (zero heap allocation).

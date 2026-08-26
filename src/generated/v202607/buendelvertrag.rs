@@ -24,6 +24,7 @@ pub struct Buendelvertrag {
     #[cfg_attr(feature = "serde", serde(rename = "einzelvertraege"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub einzelvertraege: Option<Vec<Box<Vertrag>>>,
     /// Eine generische ID, die für eigene Zwecke genutzt werden kann.
     /// Z.B. könnten hier UUIDs aus einer Datenbank stehen oder URLs zu einem Backend-System.
@@ -48,11 +49,13 @@ pub struct Buendelvertrag {
     #[cfg_attr(feature = "serde", serde(rename = "unterzeichnervp1"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub unterzeichnervp1: Option<Vec<Unterschrift>>,
     /// Unterzeichner des Vertragspartners2
     #[cfg_attr(feature = "serde", serde(rename = "unterzeichnervp2"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub unterzeichnervp2: Option<Vec<Unterschrift>>,
     /// Version der BO-Struktur aka "fachliche Versionierung"
     #[cfg_attr(feature = "serde", serde(rename = "_version"))]
@@ -125,6 +128,7 @@ pub struct Buendelvertrag {
     #[cfg_attr(feature = "serde", serde(rename = "vertragskonditionen"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub vertragskonditionen: Option<Vec<Vertragskonditionen>>,
     /// Eine im Verwendungskontext eindeutige Nummer für den Vertrag
     #[cfg_attr(feature = "serde", serde(rename = "vertragsnummer"))]
@@ -136,12 +140,14 @@ pub struct Buendelvertrag {
     #[cfg_attr(feature = "serde", serde(rename = "vertragspartner1"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub vertragspartner1: Option<Box<Geschaeftspartner>>,
     /// Der "zweitgenannte" Vertragspartner. In der Regel der Empfänger des Vertrags.
     /// Beispiel "Vertrag zwischen Vertagspartner 1 und Vertragspartner 2"
     #[cfg_attr(feature = "serde", serde(rename = "vertragspartner2"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub vertragspartner2: Option<Box<Geschaeftspartner>>,
     /// Gibt den Status des Vertrages an
     #[cfg_attr(feature = "serde", serde(rename = "vertragsstatus"))]
@@ -151,6 +157,7 @@ pub struct Buendelvertrag {
     #[cfg_attr(feature = "serde", serde(rename = "zusatzAttribute"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub zusatz_attribute: Option<Vec<ZusatzAttribut>>,
     /// Unknown JSON fields captured during deserialization for round-trip preservation.
     /// `None` when no unknown fields were present (zero heap allocation).
@@ -190,15 +197,10 @@ impl Default for Buendelvertrag {
 }
 impl Bo4eObject for Buendelvertrag {
     type BoTyp = BoTyp;
-    fn bo_type(&self) -> BoTyp {
-        self.typ.unwrap_or(BoTyp::Buendelvertrag)
-    }
-    fn schema_version(&self) -> &'static str {
-        "202607.1.0"
-    }
-    fn schema_series(&self) -> &'static str {
-        "202607"
-    }
+    const BO_TYP: BoTyp = BoTyp::Buendelvertrag;
+    const TYP_WIRE: &'static str = "BUENDELVERTRAG";
+    const SCHEMA_VERSION: &'static str = "202607.1.0";
+    const SCHEMA_SERIES: &'static str = "202607";
 }
 #[cfg(feature = "json")]
 impl crate::json::sealed::Sealed for Buendelvertrag {}

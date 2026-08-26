@@ -53,11 +53,13 @@ pub struct Angebot {
     #[cfg_attr(feature = "serde", serde(rename = "angebotsgeber"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub angebotsgeber: Option<Box<Geschaeftspartner>>,
     /// Empfänger des Angebots
     #[cfg_attr(feature = "serde", serde(rename = "angebotsnehmer"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub angebotsnehmer: Option<Box<Geschaeftspartner>>,
     /// Eindeutige Nummer des Angebotes
     #[cfg_attr(feature = "serde", serde(rename = "angebotsnummer"))]
@@ -114,17 +116,20 @@ pub struct Angebot {
     #[cfg_attr(feature = "serde", serde(rename = "unterzeichnerAngebotsgeber"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub unterzeichner_angebotsgeber: Option<Box<Person>>,
     /// Person, die als Angebotsnehmer das Angebot angenommen hat
     #[cfg_attr(feature = "serde", serde(rename = "unterzeichnerAngebotsnehmer"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub unterzeichner_angebotsnehmer: Option<Box<Person>>,
     /// Eine oder mehrere Varianten des Angebots mit den Angebotsteilen;
     /// Ein Angebot besteht mindestens aus einer Variante.
     #[cfg_attr(feature = "serde", serde(rename = "varianten"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub varianten: Option<Vec<Angebotsvariante>>,
     /// Version der BO-Struktur aka "fachliche Versionierung"
     #[cfg_attr(feature = "serde", serde(rename = "_version"))]
@@ -137,6 +142,7 @@ pub struct Angebot {
     #[cfg_attr(feature = "serde", serde(rename = "zusatzAttribute"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub zusatz_attribute: Option<Vec<ZusatzAttribut>>,
     /// Unknown JSON fields captured during deserialization for round-trip preservation.
     /// `None` when no unknown fields were present (zero heap allocation).
@@ -173,15 +179,10 @@ impl Default for Angebot {
 }
 impl Bo4eObject for Angebot {
     type BoTyp = BoTyp;
-    fn bo_type(&self) -> BoTyp {
-        self.typ.unwrap_or(BoTyp::Angebot)
-    }
-    fn schema_version(&self) -> &'static str {
-        "202607.1.0"
-    }
-    fn schema_series(&self) -> &'static str {
-        "202607"
-    }
+    const BO_TYP: BoTyp = BoTyp::Angebot;
+    const TYP_WIRE: &'static str = "ANGEBOT";
+    const SCHEMA_VERSION: &'static str = "202607.1.0";
+    const SCHEMA_SERIES: &'static str = "202607";
 }
 #[cfg(feature = "json")]
 impl crate::json::sealed::Sealed for Angebot {}

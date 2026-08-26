@@ -181,3 +181,72 @@ fn the_tag_helper_agrees_with_the_snapshot_directory() {
         "the derived tag does not name a directory"
     );
 }
+
+/// Each example's `Run with:` line must name exactly the features its
+/// `[[example]]` entry requires.
+///
+/// `required-features` is what cargo enforces; the header comment is what a
+/// reader copies. `examples/builder.rs` documented a command cargo refuses —
+/// it omitted `decimal`, which the example's own `rust_decimal` use needs — and
+/// nothing noticed, because the header is a comment and the manifest is data.
+#[test]
+fn example_run_commands_match_their_required_features() {
+    let manifest = read("Cargo.toml");
+
+    // Each `[[example]]` block is `name = "..."` followed by `required-features = [...]`.
+    let mut examples: Vec<(String, Vec<String>)> = Vec::new();
+    for block in manifest.split("[[example]]").skip(1) {
+        let field = |key: &str| -> Option<&str> {
+            block
+                .lines()
+                .find_map(|l| l.trim().strip_prefix(key))?
+                .split_once('=')
+                .map(|(_, v)| v.trim())
+        };
+        let Some(name) = field("name") else { continue };
+        let name = name.trim_matches('"').to_owned();
+        let features: Vec<String> = field("required-features")
+            .unwrap_or("[]")
+            .trim_matches(['[', ']'])
+            .split(',')
+            .map(|f| f.trim().trim_matches('"').to_owned())
+            .filter(|f| !f.is_empty())
+            .collect();
+        examples.push((name, features));
+    }
+    assert!(
+        !examples.is_empty(),
+        "no [[example]] blocks parsed out of Cargo.toml"
+    );
+
+    for (name, required) in &examples {
+        let source = read(&format!("examples/{name}.rs"));
+        let line = source
+            .lines()
+            .find(|l| l.contains("cargo run --example"))
+            .unwrap_or_else(|| {
+                panic!("examples/{name}.rs has no `cargo run --example` line to check")
+            });
+        let documented: Vec<String> = line
+            .split("--features")
+            .nth(1)
+            .unwrap_or_else(|| panic!("examples/{name}.rs: the run line names no --features"))
+            .trim()
+            .split(',')
+            .map(|f| f.trim().to_owned())
+            .filter(|f| !f.is_empty())
+            .collect();
+
+        let mut want = required.clone();
+        let mut got = documented.clone();
+        want.sort();
+        got.sort();
+        assert_eq!(
+            got,
+            want,
+            "examples/{name}.rs documents `--features {}` but Cargo.toml requires {required:?} \
+             — cargo will refuse the documented command",
+            documented.join(","),
+        );
+    }
+}

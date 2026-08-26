@@ -20,7 +20,12 @@ package = "rubo4e"
 # `time::OffsetDateTime`, `time::Date`, and `rust_decimal::Decimal`, each of which
 # runs a real parser over attacker-controlled text. Fuzzing without them exercised
 # the one configuration where those parsers are not compiled in at all.
-features = ["json", "versioned", "time", "decimal"]
+#
+# `validate` for the same reason one level up: the cross-field validators run
+# `Decimal` arithmetic over values that came straight off the wire, and that is
+# where a panic hides — `Decimal::new` aborts above scale 28, which an amount in
+# a payload can reach. Deserializing without then validating never touched it.
+features = ["json", "versioned", "time", "decimal", "validate"]
 
 [[bin]]
 name = "fuzz_deserialize_vertrag"
@@ -67,6 +72,13 @@ bench = false
 [[bin]]
 name = "fuzz_parse_identifiers"
 path = "fuzz_targets/fuzz_parse_identifiers.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "fuzz_deserialize_kosten"
+path = "fuzz_targets/fuzz_deserialize_kosten.rs"
 test = false
 doc = false
 bench = false

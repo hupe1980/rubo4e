@@ -5,7 +5,7 @@
 //! existing optional source.
 //!
 //! Run with:
-//!   cargo run --example builder --features versioned,builder,json
+//!   cargo run --example builder --features versioned,builder,json,decimal
 
 use rubo4e::{
     json::Bo4eJsonExt,

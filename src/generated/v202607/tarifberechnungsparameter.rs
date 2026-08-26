@@ -20,11 +20,13 @@ pub struct Tarifberechnungsparameter {
     #[cfg_attr(feature = "serde", serde(rename = "hoechstpreisHT"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub hoechstpreis_ht: Option<Preis>,
     /// Höchstpreis für den Durchschnitts-Arbeitspreis NT
     #[cfg_attr(feature = "serde", serde(rename = "hoechstpreisNT"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub hoechstpreis_nt: Option<Preis>,
     /// Eine generische ID, die für eigene Zwecke genutzt werden kann.
     /// Z.B. könnten hier UUIDs aus einer Datenbank stehen oder URLs zu einem Backend-System.
@@ -98,6 +100,7 @@ pub struct Tarifberechnungsparameter {
     #[cfg_attr(feature = "serde", serde(rename = "mindestpreis"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub mindestpreis: Option<Preis>,
     /// BO4E type discriminant — always `ComTyp::Tarifberechnungsparameter` for this struct.
     #[cfg_attr(feature = "serde", serde(rename = "_typ"))]
@@ -118,11 +121,13 @@ pub struct Tarifberechnungsparameter {
     #[cfg_attr(feature = "serde", serde(rename = "zusatzAttribute"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub zusatz_attribute: Option<Vec<ZusatzAttribut>>,
     /// Liste mit zusätzlichen Preisen, beispielsweise Messpreise und/oder Leistungspreise
     #[cfg_attr(feature = "serde", serde(rename = "zusatzpreise"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "validate", garde(dive))]
     pub zusatzpreise: Option<Vec<Tarifpreis>>,
     /// Unknown JSON fields captured during deserialization for round-trip preservation.
     /// `None` when no unknown fields were present (zero heap allocation).
