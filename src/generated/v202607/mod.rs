@@ -1292,3 +1292,116 @@ impl crate::Bo4eStrict for AnyBo {
         }
     }
 }
+#[cfg(all(feature = "json", feature = "versioned"))]
+impl crate::json::Bo4eExtensions for AnyBo {
+    fn collect_extension_paths(&self, path: &str, out: &mut Vec<String>) {
+        match self {
+            AnyBo::Angebot(v) => {
+                crate::json::Bo4eExtensions::collect_extension_paths(&**v, path, out)
+            }
+            AnyBo::Ausschreibung(v) => {
+                crate::json::Bo4eExtensions::collect_extension_paths(&**v, path, out)
+            }
+            AnyBo::Bilanzierung(v) => {
+                crate::json::Bo4eExtensions::collect_extension_paths(&**v, path, out)
+            }
+            AnyBo::Buendelvertrag(v) => {
+                crate::json::Bo4eExtensions::collect_extension_paths(&**v, path, out)
+            }
+            AnyBo::Energiemenge(v) => {
+                crate::json::Bo4eExtensions::collect_extension_paths(&**v, path, out)
+            }
+            AnyBo::Fremdkosten(v) => {
+                crate::json::Bo4eExtensions::collect_extension_paths(&**v, path, out)
+            }
+            AnyBo::Geraet(v) => {
+                crate::json::Bo4eExtensions::collect_extension_paths(&**v, path, out)
+            }
+            AnyBo::Geschaeftspartner(v) => {
+                crate::json::Bo4eExtensions::collect_extension_paths(&**v, path, out)
+            }
+            AnyBo::Kosten(v) => {
+                crate::json::Bo4eExtensions::collect_extension_paths(&**v, path, out)
+            }
+            AnyBo::Lastgang(v) => {
+                crate::json::Bo4eExtensions::collect_extension_paths(&**v, path, out)
+            }
+            AnyBo::Lokationszuordnung(v) => {
+                crate::json::Bo4eExtensions::collect_extension_paths(&**v, path, out)
+            }
+            AnyBo::Marktlokation(v) => {
+                crate::json::Bo4eExtensions::collect_extension_paths(&**v, path, out)
+            }
+            AnyBo::Marktteilnehmer(v) => {
+                crate::json::Bo4eExtensions::collect_extension_paths(&**v, path, out)
+            }
+            AnyBo::Messlokation(v) => {
+                crate::json::Bo4eExtensions::collect_extension_paths(&**v, path, out)
+            }
+            AnyBo::Netzlokation(v) => {
+                crate::json::Bo4eExtensions::collect_extension_paths(&**v, path, out)
+            }
+            AnyBo::Person(v) => {
+                crate::json::Bo4eExtensions::collect_extension_paths(&**v, path, out)
+            }
+            AnyBo::Preisblatt(v) => {
+                crate::json::Bo4eExtensions::collect_extension_paths(&**v, path, out)
+            }
+            AnyBo::PreisblattDienstleistung(v) => {
+                crate::json::Bo4eExtensions::collect_extension_paths(&**v, path, out)
+            }
+            AnyBo::PreisblattHardware(v) => {
+                crate::json::Bo4eExtensions::collect_extension_paths(&**v, path, out)
+            }
+            AnyBo::PreisblattKonzessionsabgabe(v) => {
+                crate::json::Bo4eExtensions::collect_extension_paths(&**v, path, out)
+            }
+            AnyBo::PreisblattMessung(v) => {
+                crate::json::Bo4eExtensions::collect_extension_paths(&**v, path, out)
+            }
+            AnyBo::PreisblattNetznutzung(v) => {
+                crate::json::Bo4eExtensions::collect_extension_paths(&**v, path, out)
+            }
+            AnyBo::Rechnung(v) => {
+                crate::json::Bo4eExtensions::collect_extension_paths(&**v, path, out)
+            }
+            AnyBo::Region(v) => {
+                crate::json::Bo4eExtensions::collect_extension_paths(&**v, path, out)
+            }
+            AnyBo::Standorteigenschaften(v) => {
+                crate::json::Bo4eExtensions::collect_extension_paths(&**v, path, out)
+            }
+            AnyBo::SteuerbareRessource(v) => {
+                crate::json::Bo4eExtensions::collect_extension_paths(&**v, path, out)
+            }
+            AnyBo::Tarif(v) => {
+                crate::json::Bo4eExtensions::collect_extension_paths(&**v, path, out)
+            }
+            AnyBo::Tarifinfo(v) => {
+                crate::json::Bo4eExtensions::collect_extension_paths(&**v, path, out)
+            }
+            AnyBo::Tarifkosten(v) => {
+                crate::json::Bo4eExtensions::collect_extension_paths(&**v, path, out)
+            }
+            AnyBo::Tarifpreisblatt(v) => {
+                crate::json::Bo4eExtensions::collect_extension_paths(&**v, path, out)
+            }
+            AnyBo::TechnischeRessource(v) => {
+                crate::json::Bo4eExtensions::collect_extension_paths(&**v, path, out)
+            }
+            AnyBo::Vertrag(v) => {
+                crate::json::Bo4eExtensions::collect_extension_paths(&**v, path, out)
+            }
+            AnyBo::Zaehler(v) => {
+                crate::json::Bo4eExtensions::collect_extension_paths(&**v, path, out)
+            }
+            AnyBo::Zaehlzeitdefinition(v) => {
+                crate::json::Bo4eExtensions::collect_extension_paths(&**v, path, out)
+            }
+            AnyBo::Zeitreihe(v) => {
+                crate::json::Bo4eExtensions::collect_extension_paths(&**v, path, out)
+            }
+            AnyBo::Unknown { .. } => out.push(crate::strict::field_path(path, "_typ")),
+        }
+    }
+}

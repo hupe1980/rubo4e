@@ -202,3 +202,70 @@ impl crate::Bo4eStrict for Tarifpreiszeitscheibe {
         }
     }
 }
+#[cfg(feature = "json")]
+impl crate::json::Bo4eExtensions for Tarifpreiszeitscheibe {
+    fn collect_extension_paths(&self, path: &str, out: &mut Vec<String>) {
+        if let Some(map) = self._additional.as_map() {
+            for key in map.keys() {
+                out.push(crate::strict::extension_path(path, key));
+            }
+        }
+        if let Some(items) = &self.einheits_preispositionen {
+            let child = crate::strict::field_path(path, "einheitsPreispositionen");
+            for (i, item) in items.iter().enumerate() {
+                crate::json::Bo4eExtensions::collect_extension_paths(
+                    item,
+                    &crate::strict::index_path(&child, i),
+                    out,
+                );
+            }
+        }
+        if let Some(items) = &self.lastvariable_preispositionen {
+            let child = crate::strict::field_path(path, "lastvariablePreispositionen");
+            for (i, item) in items.iter().enumerate() {
+                crate::json::Bo4eExtensions::collect_extension_paths(
+                    item,
+                    &crate::strict::index_path(&child, i),
+                    out,
+                );
+            }
+        }
+        if let Some(items) = &self.relative_preispositionen {
+            let child = crate::strict::field_path(path, "relativePreispositionen");
+            for (i, item) in items.iter().enumerate() {
+                crate::json::Bo4eExtensions::collect_extension_paths(
+                    item,
+                    &crate::strict::index_path(&child, i),
+                    out,
+                );
+            }
+        }
+        if let Some(v) = &self.zeitscheibengueltigkeit {
+            crate::json::Bo4eExtensions::collect_extension_paths(
+                v,
+                &crate::strict::field_path(path, "zeitscheibengueltigkeit"),
+                out,
+            );
+        }
+        if let Some(items) = &self.zeitvariable_preispositionen {
+            let child = crate::strict::field_path(path, "zeitvariablePreispositionen");
+            for (i, item) in items.iter().enumerate() {
+                crate::json::Bo4eExtensions::collect_extension_paths(
+                    item,
+                    &crate::strict::index_path(&child, i),
+                    out,
+                );
+            }
+        }
+        if let Some(items) = &self.zusatz_attribute {
+            let child = crate::strict::field_path(path, "zusatzAttribute");
+            for (i, item) in items.iter().enumerate() {
+                crate::json::Bo4eExtensions::collect_extension_paths(
+                    item,
+                    &crate::strict::index_path(&child, i),
+                    out,
+                );
+            }
+        }
+    }
+}

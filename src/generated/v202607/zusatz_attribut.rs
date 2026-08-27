@@ -67,3 +67,13 @@ impl crate::Bo4eStrict for ZusatzAttribut {
     #[allow(unused_variables)]
     fn collect_unknown_enums(&self, path: &str, out: &mut Vec<String>) {}
 }
+#[cfg(feature = "json")]
+impl crate::json::Bo4eExtensions for ZusatzAttribut {
+    fn collect_extension_paths(&self, path: &str, out: &mut Vec<String>) {
+        if let Some(map) = self._additional.as_map() {
+            for key in map.keys() {
+                out.push(crate::strict::extension_path(path, key));
+            }
+        }
+    }
+}

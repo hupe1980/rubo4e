@@ -350,3 +350,96 @@ fn any_bo_facts_are_honest_about_the_unknown_variant() {
     assert_eq!(bo.schema_version(), None);
     assert_eq!(bo.schema_series(), None);
 }
+
+// ── Hardening applies through the dispatch ───────────────────────────────
+
+/// `AnyBo` is *the* untrusted-input entry point — the type a gateway reaches
+/// for precisely because it does not know what is arriving — so the budgets
+/// have to survive the dispatch. They do, and only because `Deserialize`
+/// buffers through the *caller's* deserializer rather than re-parsing with
+/// `serde_json::from_str`; nothing else in the suite pins that, so a
+/// well-meaning "avoid the intermediate Value" refactor would silently
+/// unhook every limit.
+#[cfg(all(feature = "json", feature = "versioned"))]
+mod hardening {
+    use rubo4e::json::{Bo4eJsonExt, JsonParseLimits};
+    use rubo4e::v202607::AnyBo;
+
+    fn malo(extra: &str) -> String {
+        format!(r#"{{"_typ":"MARKTLOKATION","marktlokationsId":"51238696781"{extra}}}"#)
+    }
+
+    #[test]
+    fn the_payload_size_cap_is_checked_before_parsing() {
+        let body = malo("");
+        let limits =
+            JsonParseLimits::untrusted_defaults().with_max_payload_bytes(Some(body.len() - 1));
+        assert!(AnyBo::from_json_german_hardened(&body, limits).is_err());
+
+        let limits = JsonParseLimits::untrusted_defaults().with_max_payload_bytes(Some(body.len()));
+        assert!(AnyBo::from_json_german_hardened(&body, limits).is_ok());
+    }
+
+    #[test]
+    fn the_extension_field_budget_applies_through_the_dispatch() {
+        let body = malo(r#","vendorA":1,"vendorB":2,"vendorC":3"#);
+
+        let strict = JsonParseLimits::untrusted_defaults().with_max_extension_field_count(Some(0));
+        assert!(
+            AnyBo::from_json_german_hardened(&body, strict).is_err(),
+            "an unknown field must be refused when the budget is zero"
+        );
+
+        let roomy = JsonParseLimits::untrusted_defaults().with_max_extension_field_count(Some(8));
+        assert!(AnyBo::from_json_german_hardened(&body, roomy).is_ok());
+    }
+
+    #[test]
+    fn the_nesting_depth_cap_applies_through_the_dispatch() {
+        let deep = format!(
+            r#"{{"_typ":"MARKTLOKATION","blob":{}{}}}"#,
+            "[".repeat(40),
+            "]".repeat(40)
+        );
+        let shallow = JsonParseLimits::untrusted_defaults().with_max_nesting_depth(Some(4));
+        assert!(
+            AnyBo::from_json_german_hardened(&deep, shallow).is_err(),
+            "depth is enforced on the buffering pass, not only on the concrete type"
+        );
+
+        let roomy = JsonParseLimits::untrusted_defaults().with_max_nesting_depth(Some(64));
+        assert!(AnyBo::from_json_german_hardened(&deep, roomy).is_ok());
+    }
+
+    /// An unrecognised `_typ` keeps its raw JSON, and that path is budgeted
+    /// too — it is the one an attacker steers into by inventing a type name.
+    #[test]
+    fn the_unknown_variant_is_budgeted_as_well() {
+        let body = r#"{"_typ":"NOT_A_BO4E_TYPE","a":1}"#;
+        let tiny = JsonParseLimits::untrusted_defaults().with_max_payload_bytes(Some(4));
+        assert!(AnyBo::from_json_german_hardened(body, tiny).is_err());
+
+        let ok = AnyBo::from_json_german_hardened(body, JsonParseLimits::untrusted_defaults())
+            .expect("an unknown _typ is preserved, not rejected");
+        assert!(matches!(ok, AnyBo::Unknown { .. }));
+    }
+
+    /// The snake_case reader rewrites keys in the same pass that
+    /// deserializes them, and `AnyBo` has to see the rewritten ones or every
+    /// typed field silently lands in `_additional`.
+    #[test]
+    fn the_snake_case_key_transform_reaches_the_dispatched_type() {
+        let body = r#"{"_typ":"MARKTLOKATION","marktlokations_id":"51238696781","sparte":"STROM"}"#;
+        let any = AnyBo::from_json_snake_case_hardened(body, JsonParseLimits::untrusted_defaults())
+            .expect("snake_case reader accepts it");
+
+        let AnyBo::Marktlokation(m) = any else {
+            panic!("expected a Marktlokation");
+        };
+        assert_eq!(
+            m.marktlokations_id.as_ref().map(AsRef::as_ref),
+            Some("51238696781"),
+            "the field must land on the struct, not in _additional"
+        );
+    }
+}

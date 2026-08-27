@@ -172,3 +172,40 @@ impl crate::Bo4eStrict for Zaehlzeitdefinition {
         }
     }
 }
+#[cfg(feature = "json")]
+impl crate::json::Bo4eExtensions for Zaehlzeitdefinition {
+    fn collect_extension_paths(&self, path: &str, out: &mut Vec<String>) {
+        if let Some(map) = self._additional.as_map() {
+            for key in map.keys() {
+                out.push(crate::strict::extension_path(path, key));
+            }
+        }
+        if let Some(items) = &self.saisons {
+            let child = crate::strict::field_path(path, "saisons");
+            for (i, item) in items.iter().enumerate() {
+                crate::json::Bo4eExtensions::collect_extension_paths(
+                    item,
+                    &crate::strict::index_path(&child, i),
+                    out,
+                );
+            }
+        }
+        if let Some(v) = &self.urheber {
+            crate::json::Bo4eExtensions::collect_extension_paths(
+                &**v,
+                &crate::strict::field_path(path, "urheber"),
+                out,
+            );
+        }
+        if let Some(items) = &self.zusatz_attribute {
+            let child = crate::strict::field_path(path, "zusatzAttribute");
+            for (i, item) in items.iter().enumerate() {
+                crate::json::Bo4eExtensions::collect_extension_paths(
+                    item,
+                    &crate::strict::index_path(&child, i),
+                    out,
+                );
+            }
+        }
+    }
+}

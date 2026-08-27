@@ -318,3 +318,77 @@ impl crate::Bo4eStrict for Buendelvertrag {
         }
     }
 }
+#[cfg(feature = "json")]
+impl crate::json::Bo4eExtensions for Buendelvertrag {
+    fn collect_extension_paths(&self, path: &str, out: &mut Vec<String>) {
+        if let Some(map) = self._additional.as_map() {
+            for key in map.keys() {
+                out.push(crate::strict::extension_path(path, key));
+            }
+        }
+        if let Some(items) = &self.einzelvertraege {
+            let child = crate::strict::field_path(path, "einzelvertraege");
+            for (i, item) in items.iter().enumerate() {
+                crate::json::Bo4eExtensions::collect_extension_paths(
+                    &**item,
+                    &crate::strict::index_path(&child, i),
+                    out,
+                );
+            }
+        }
+        if let Some(items) = &self.unterzeichnervp1 {
+            let child = crate::strict::field_path(path, "unterzeichnervp1");
+            for (i, item) in items.iter().enumerate() {
+                crate::json::Bo4eExtensions::collect_extension_paths(
+                    item,
+                    &crate::strict::index_path(&child, i),
+                    out,
+                );
+            }
+        }
+        if let Some(items) = &self.unterzeichnervp2 {
+            let child = crate::strict::field_path(path, "unterzeichnervp2");
+            for (i, item) in items.iter().enumerate() {
+                crate::json::Bo4eExtensions::collect_extension_paths(
+                    item,
+                    &crate::strict::index_path(&child, i),
+                    out,
+                );
+            }
+        }
+        if let Some(items) = &self.vertragskonditionen {
+            let child = crate::strict::field_path(path, "vertragskonditionen");
+            for (i, item) in items.iter().enumerate() {
+                crate::json::Bo4eExtensions::collect_extension_paths(
+                    item,
+                    &crate::strict::index_path(&child, i),
+                    out,
+                );
+            }
+        }
+        if let Some(v) = &self.vertragspartner1 {
+            crate::json::Bo4eExtensions::collect_extension_paths(
+                &**v,
+                &crate::strict::field_path(path, "vertragspartner1"),
+                out,
+            );
+        }
+        if let Some(v) = &self.vertragspartner2 {
+            crate::json::Bo4eExtensions::collect_extension_paths(
+                &**v,
+                &crate::strict::field_path(path, "vertragspartner2"),
+                out,
+            );
+        }
+        if let Some(items) = &self.zusatz_attribute {
+            let child = crate::strict::field_path(path, "zusatzAttribute");
+            for (i, item) in items.iter().enumerate() {
+                crate::json::Bo4eExtensions::collect_extension_paths(
+                    item,
+                    &crate::strict::index_path(&child, i),
+                    out,
+                );
+            }
+        }
+    }
+}

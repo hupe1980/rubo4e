@@ -266,3 +266,51 @@ impl crate::Bo4eStrict for Fremdkostenposition {
         }
     }
 }
+#[cfg(feature = "json")]
+impl crate::json::Bo4eExtensions for Fremdkostenposition {
+    fn collect_extension_paths(&self, path: &str, out: &mut Vec<String>) {
+        if let Some(map) = self._additional.as_map() {
+            for key in map.keys() {
+                out.push(crate::strict::extension_path(path, key));
+            }
+        }
+        if let Some(v) = &self.betrag_kostenposition {
+            crate::json::Bo4eExtensions::collect_extension_paths(
+                v,
+                &crate::strict::field_path(path, "betragKostenposition"),
+                out,
+            );
+        }
+        if let Some(v) = &self.einzelpreis {
+            crate::json::Bo4eExtensions::collect_extension_paths(
+                v,
+                &crate::strict::field_path(path, "einzelpreis"),
+                out,
+            );
+        }
+        if let Some(v) = &self.menge {
+            crate::json::Bo4eExtensions::collect_extension_paths(
+                v,
+                &crate::strict::field_path(path, "menge"),
+                out,
+            );
+        }
+        if let Some(v) = &self.zeitmenge {
+            crate::json::Bo4eExtensions::collect_extension_paths(
+                v,
+                &crate::strict::field_path(path, "zeitmenge"),
+                out,
+            );
+        }
+        if let Some(items) = &self.zusatz_attribute {
+            let child = crate::strict::field_path(path, "zusatzAttribute");
+            for (i, item) in items.iter().enumerate() {
+                crate::json::Bo4eExtensions::collect_extension_paths(
+                    item,
+                    &crate::strict::index_path(&child, i),
+                    out,
+                );
+            }
+        }
+    }
+}

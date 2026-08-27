@@ -244,3 +244,65 @@ impl crate::Bo4eStrict for Rechnungsposition {
         }
     }
 }
+#[cfg(feature = "json")]
+impl crate::json::Bo4eExtensions for Rechnungsposition {
+    fn collect_extension_paths(&self, path: &str, out: &mut Vec<String>) {
+        if let Some(map) = self._additional.as_map() {
+            for key in map.keys() {
+                out.push(crate::strict::extension_path(path, key));
+            }
+        }
+        if let Some(v) = &self.einzelpreis {
+            crate::json::Bo4eExtensions::collect_extension_paths(
+                v,
+                &crate::strict::field_path(path, "einzelpreis"),
+                out,
+            );
+        }
+        if let Some(v) = &self.gesamtpreis {
+            crate::json::Bo4eExtensions::collect_extension_paths(
+                v,
+                &crate::strict::field_path(path, "gesamtpreis"),
+                out,
+            );
+        }
+        if let Some(v) = &self.lieferungszeitraum {
+            crate::json::Bo4eExtensions::collect_extension_paths(
+                v,
+                &crate::strict::field_path(path, "lieferungszeitraum"),
+                out,
+            );
+        }
+        if let Some(v) = &self.positions_menge {
+            crate::json::Bo4eExtensions::collect_extension_paths(
+                v,
+                &crate::strict::field_path(path, "positionsMenge"),
+                out,
+            );
+        }
+        if let Some(v) = &self.steuerbetrag {
+            crate::json::Bo4eExtensions::collect_extension_paths(
+                v,
+                &crate::strict::field_path(path, "steuerbetrag"),
+                out,
+            );
+        }
+        if let Some(v) = &self.zeitbezogene_menge {
+            crate::json::Bo4eExtensions::collect_extension_paths(
+                v,
+                &crate::strict::field_path(path, "zeitbezogeneMenge"),
+                out,
+            );
+        }
+        if let Some(items) = &self.zusatz_attribute {
+            let child = crate::strict::field_path(path, "zusatzAttribute");
+            for (i, item) in items.iter().enumerate() {
+                crate::json::Bo4eExtensions::collect_extension_paths(
+                    item,
+                    &crate::strict::index_path(&child, i),
+                    out,
+                );
+            }
+        }
+    }
+}

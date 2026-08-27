@@ -68,6 +68,8 @@ pub use extension::{
     ext_map_is_empty, Bo4eExtensionData, ExtensionInsertError, LimitedExtensionMap,
     MAX_EXTENSION_FIELDS, MAX_EXTENSION_KEY_LEN,
 };
+#[cfg(feature = "versioned")]
+pub use extension::{Bo4eExtensions, UnknownFieldError};
 pub use limits::{
     json_limit_hit_counters, JsonLimitHitCounters, JsonParseLimits, DEFAULT_MAX_NESTING_DEPTH,
 };
@@ -82,7 +84,7 @@ use key_transform::{
 use limits::trace_json_outcome;
 use limits::{
     check_payload_limit, deserialize_german_from_slice, deserialize_german_from_str,
-    install_extension_budget, resolved_max_depth, trace_deser_error,
+    deserialize_german_from_value, install_extension_budget, resolved_max_depth, trace_deser_error,
 };
 #[cfg(feature = "tracing")]
 use std::time::Instant;
@@ -380,6 +382,93 @@ pub trait Bo4eJsonExt: sealed::Sealed + Serialize + DeserializeOwned + Sized {
             bytes.len(),
             "BO4E deserialization failed in from_json_german_bytes",
             || deserialize_german_from_slice(bytes, DEFAULT_MAX_NESTING_DEPTH),
+        )
+    }
+
+    /// Decodes an already-parsed [`serde_json::Value`], with the same nesting-depth
+    /// guard the text readers apply.
+    ///
+    /// The counterpart of [`from_json_german`] for callers holding a `Value` —
+    /// a payload that arrived through another layer, or one assembled with
+    /// `serde_json::json!`.
+    ///
+    /// # This is not a validation of the document
+    ///
+    /// It cannot be: serde ignores keys a struct does not declare, and this crate
+    /// keeps them in extension data, so a misspelled field decodes cleanly and
+    /// reads back as `None`. If you are decoding to *check* something you built,
+    /// reach for [`from_json_value_hardened`] with
+    /// [`max_extension_field_count`] set to `Some(0)`, or build the value typed
+    /// and skip the round-trip altogether.
+    ///
+    /// # Errors
+    /// Returns [`serde_json::Error`] on a type mismatch, or when the value nests
+    /// deeper than [`DEFAULT_MAX_NESTING_DEPTH`].
+    ///
+    /// [`from_json_german`]: Bo4eJsonExt::from_json_german
+    /// [`from_json_value_hardened`]: Bo4eJsonExt::from_json_value_hardened
+    /// [`max_extension_field_count`]: JsonParseLimits::max_extension_field_count
+    fn from_json_value(value: serde_json::Value) -> Result<Self, serde_json::Error> {
+        traced_deserialize::<Self, _>(
+            "deserialize",
+            "german_value",
+            0,
+            "BO4E deserialization failed in from_json_value",
+            || deserialize_german_from_value::<Self>(value, DEFAULT_MAX_NESTING_DEPTH),
+        )
+    }
+
+    /// Hardened decode of an already-parsed [`serde_json::Value`].
+    ///
+    /// Applies the extension-data and depth budgets, so the strictness the text
+    /// readers offer is reachable for a caller who already holds a `Value`. Set
+    /// [`max_extension_field_count`](JsonParseLimits::max_extension_field_count)
+    /// to `Some(0)` to make **any** field BO4E does not define an error — which
+    /// is what turns a decode into an actual check on a document you assembled:
+    ///
+    /// ```
+    /// # #[cfg(feature = "versioned")] {
+    /// use rubo4e::current::Kosten;
+    /// use rubo4e::json::{Bo4eJsonExt, JsonParseLimits};
+    ///
+    /// let body = serde_json::json!({
+    ///     "_typ": "KOSTEN",
+    ///     "kostenbloecke": [{ "kostenblockBEZEICHNUNG": "x" }]   // misspelled
+    /// });
+    ///
+    /// // The plain decode cannot fail…
+    /// assert!(Kosten::from_json_value(body.clone()).is_ok());
+    ///
+    /// // …and this one does, naming the struct the stray key sat on.
+    /// let closed = JsonParseLimits::unlimited().with_max_extension_field_count(Some(0));
+    /// assert!(Kosten::from_json_value_hardened(body, closed).is_err());
+    /// # }
+    /// ```
+    ///
+    /// # `max_payload_bytes` does not apply
+    ///
+    /// There are no bytes left to cap: the caller already paid for the parse, and
+    /// the `Value` is already allocated. That cap is the one that bounds peak
+    /// memory, so decode from `&str` or `&[u8]` for anything untrusted and keep
+    /// this for values you already hold. The field is ignored here rather than
+    /// rejected, so one `JsonParseLimits` can be shared across both paths.
+    ///
+    /// # Errors
+    /// Returns [`serde_json::Error`] on a type mismatch, or when a configured
+    /// limit is exceeded.
+    fn from_json_value_hardened(
+        value: serde_json::Value,
+        limits: JsonParseLimits,
+    ) -> Result<Self, serde_json::Error> {
+        traced_deserialize::<Self, _>(
+            "deserialize_hardened",
+            "german_value",
+            0,
+            "BO4E hardened deserialization failed in from_json_value_hardened",
+            || {
+                let _budget = install_extension_budget(limits);
+                deserialize_german_from_value::<Self>(value, resolved_max_depth(limits))
+            },
         )
     }
 

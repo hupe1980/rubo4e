@@ -41,6 +41,11 @@ fn value_to_char(v: u32) -> Option<char> {
 ///    Returns `None` if `check_number` would be 36 (i.e. the character
 ///    would be `'-'`, which ENTSO-E prohibits as a check character).
 ///
+/// The `− 1` is applied *inside* the modulus as `+ 36`: the same congruence
+/// class, with no intermediate that can go negative. Spelled `sum - 1` it needs
+/// a `sum == 0` guard, and that guard answered `None` for an all-`'0'` prefix
+/// whose check character the algorithm defines as `'0'`.
+///
 /// # Safety
 /// `prefix_bytes` must contain only valid EIC alphabet bytes (`[A-Z0-9-]`);
 /// invalid bytes contribute 0 to the sum (safe but may yield a wrong check char).
@@ -52,11 +57,7 @@ pub(crate) fn compute_check_char(prefix_bytes: &[u8; 15]) -> Option<char> {
         // casting u8 → char is sound for ASCII (code points 0x00–0x7F).
         .map(|(i, &b)| char_value(b as char).unwrap_or(0) * (16 - i as u32))
         .sum();
-    // Guard against underflow: sum must be ≥ 1 for valid prefixes.
-    if sum == 0 {
-        return None;
-    }
-    let check_number = 36 - (sum - 1) % 37;
+    let check_number = 36 - (sum + 36) % 37;
     // '-' (value 36) is not a valid check character per ENTSO-E spec.
     if check_number == 36 {
         return None;
@@ -519,6 +520,32 @@ mod tests {
     fn compute_check_char_wrong_length_returns_none() {
         assert!(EicCode::compute_check_char("TOOSHORT").is_none());
         assert!(EicCode::compute_check_char("TOOLONGPREFIXHERE").is_none());
+    }
+
+    /// An all-`'0'` prefix sums to zero, and the algorithm's check character for
+    /// it is `'0'` — `36 - (0 - 1 mod 37) = 36 - 36 = 0`. Spelling the `- 1`
+    /// outside the modulus needs an underflow guard, and that guard used to
+    /// answer `None` here.
+    #[test]
+    fn a_zero_sum_prefix_has_a_check_character() {
+        assert_eq!(EicCode::compute_check_char("000000000000000"), Some('0'));
+    }
+
+    /// A prefix whose weighted sum is ≡ 1 (mod 37) would need check number 36,
+    /// which maps to `'-'` — prohibited as a check character — so it has no
+    /// valid completion at all.
+    ///
+    /// The weights run 16, 15, … 2, so a `'8'` at position 13 and a `'7'` at
+    /// position 14 sum to `3·8 + 2·7 = 38 ≡ 1 (mod 37)`.
+    #[test]
+    fn a_prefix_needing_a_dash_has_no_completion() {
+        let prefix = "000000000000087";
+        assert_eq!(prefix.len(), 15);
+        assert_eq!(EicCode::compute_check_char(prefix), None);
+        assert!(matches!(
+            EicCode::new_from_prefix(prefix),
+            Err(IdentifierError::InvalidChecksum)
+        ));
     }
 
     #[test]

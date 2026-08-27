@@ -7,6 +7,7 @@
 //! Sources:
 //! - `site/snippets/quickstart.md` — the landing page round-trip
 //! - `README.md` § Quick Start — the builder walkthrough
+//! - `README.md` § A decode does **not** validate field names
 #![cfg(all(
     feature = "versioned",
     feature = "json",
@@ -480,4 +481,48 @@ fn docs_zeitraum_string_fields_parse_on_demand() {
         ..Default::default()
     };
     assert!(calendar.duration().expect("stated").is_err());
+}
+
+/// `README.md` § A decode does **not** validate field names.
+///
+/// The claim the section is built on is a negative one — that a decode round-trip
+/// *cannot* fail on a renamed field — so if a future change made decoding strict,
+/// the README would be wrong and nothing else would notice.
+#[test]
+fn readme_decode_does_not_validate_field_names() {
+    use rubo4e::current::{Kosten, Kostenblock};
+    use rubo4e::json::{Bo4eExtensions, JsonParseLimits};
+
+    let body = serde_json::json!({
+        "_typ": "KOSTEN",
+        "kostenbloecke": [{ "kostenblockBEZEICHNUNG": "x" }]   // misspelled
+    });
+
+    // Built from a literal, so a field rename must fail here — right?
+    let kosten: Kosten = serde_json::from_value(body.clone()).expect("it cannot fail");
+    assert_eq!(
+        kosten.kostenbloecke.as_ref().unwrap()[0].kostenblockbezeichnung,
+        None
+    );
+
+    // The recursive check is the one that answers.
+    assert_eq!(
+        kosten.extension_paths(),
+        ["kostenbloecke[0].kostenblockBEZEICHNUNG"]
+    );
+    assert!(kosten.ensure_no_extension_data().is_err());
+
+    // …or make the decode itself the check.
+    let closed = JsonParseLimits::unlimited().with_max_extension_field_count(Some(0));
+    assert!(Kosten::from_json_value_hardened(body, closed).is_err());
+
+    // Better still: construct it typed, where the rename is a compile error.
+    let kosten = Kosten {
+        kostenbloecke: Some(vec![Kostenblock {
+            kostenblockbezeichnung: Some("x".into()),
+            ..Default::default()
+        }]),
+        ..Default::default()
+    };
+    assert!(kosten.ensure_no_extension_data().is_ok());
 }

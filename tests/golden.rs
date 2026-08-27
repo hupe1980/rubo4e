@@ -14,7 +14,9 @@
 
 #[cfg(all(feature = "json", feature = "versioned"))]
 mod golden_tests {
-    use rubo4e::v202607::{Marktlokation, Messlokation, Netzlokation, Rechnung, Vertrag};
+    use rubo4e::v202607::{
+        Lastgang, Marktlokation, Messlokation, Netzlokation, Rechnung, Vertrag, Zeitreihe,
+    };
 
     macro_rules! golden_roundtrip {
         ($name:ident, $ty:ty, $file:literal) => {
@@ -83,6 +85,51 @@ mod golden_tests {
         Netzlokation,
         "netzlokation_typical.json"
     );
+    golden_roundtrip!(lastgang_minimal, Lastgang, "lastgang_minimal.json");
+    golden_roundtrip!(lastgang_typical, Lastgang, "lastgang_typical.json");
+    golden_roundtrip!(zeitreihe_minimal, Zeitreihe, "zeitreihe_minimal.json");
+    golden_roundtrip!(zeitreihe_typical, Zeitreihe, "zeitreihe_typical.json");
+
+    /// The golden `Lastgang` is a well-formed quarter-hourly profile, so the
+    /// coverage audit must find nothing — which pins the fixture as the
+    /// reference shape a producer should emit, not just as something that
+    /// round-trips.
+    #[cfg(feature = "time")]
+    #[test]
+    fn lastgang_typical_is_a_clean_hour() {
+        use rubo4e::timeseries::Bo4eTimeSeries;
+
+        let json = include_str!("golden/lastgang_typical.json");
+        let lg: Lastgang = serde_json::from_str(json).unwrap();
+
+        let report = lg.audit();
+        assert!(report.is_usable(), "{report:?}");
+        assert_eq!(report.covered, time::Duration::HOUR);
+        assert_eq!(report.coverage_ratio(), Some(1.0));
+
+        #[cfg(feature = "decimal")]
+        {
+            assert_eq!(lg.expected_interval(), Some(time::Duration::minutes(15)));
+            // 400 + 480 + 512 + 408 kW, each held a quarter-hour → 450 kWh.
+            assert_eq!(lg.integrate(), Some(rust_decimal::Decimal::from(450)));
+            assert_eq!(lg.sum(), None, "KW is not an extensive quantity");
+        }
+    }
+
+    /// The golden `Zeitreihe` states KWH, so the aggregate flips: those values
+    /// are additive and `sum()` is the meaningful one.
+    #[cfg(all(feature = "time", feature = "decimal"))]
+    #[test]
+    fn zeitreihe_typical_sums_its_energies() {
+        use rubo4e::timeseries::Bo4eTimeSeries;
+
+        let json = include_str!("golden/zeitreihe_typical.json");
+        let zr: Zeitreihe = serde_json::from_str(json).unwrap();
+
+        assert!(zr.audit().is_usable());
+        assert_eq!(zr.sum(), Some(rust_decimal::Decimal::from(450)));
+        assert_eq!(zr.expected_interval(), None, "a Zeitreihe declares none");
+    }
 
     /// Verify specific field values survive deserialization for Marktlokation.
     #[test]

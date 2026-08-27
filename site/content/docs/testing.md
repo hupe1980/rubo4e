@@ -20,6 +20,11 @@ and command to run.
 | 6. Doctest | Documentation is executable | all | `src/**` rustdoc comments | ~50 s |
 | 7. Feature matrix | Every feature builds warning-free | (per combination) | CI job / `just lint-features` | minutes |
 
+Two Criterion benches sit alongside them, measured rather than asserted:
+`benches/json_perf.rs` for the three serialization modes and
+`benches/timeseries_perf.rs` for the coverage audit at a day, a month and a
+settlement year, across clean, gappy, duplicated and reversed series.
+
 ## Layer 0 — Schema Drift Guards
 
 `src/generated/` is committed, so nothing at build time forces it to agree with
@@ -81,7 +86,11 @@ tests/golden/
 ├── netzlokation_minimal.json
 ├── netzlokation_typical.json
 ├── rechnung_minimal.json
-└── rechnung_typical.json
+├── rechnung_typical.json
+├── lastgang_minimal.json       # only the required zeitIntervallLaenge
+├── lastgang_typical.json       # a clean quarter-hourly hour in kW
+├── zeitreihe_minimal.json
+└── zeitreihe_typical.json      # the same hour as kWh readings
 ```
 
 Files are **not** nested in a version subdirectory — all live directly under
@@ -92,6 +101,12 @@ Files are **not** nested in a version subdirectory — all live directly under
 - Re-serialized output with `to_json_german()` deserializes back to a value equal
   to the original (field values identical; key ordering not required to match)
 - Unknown fields in the payload are preserved in `_additional` and survive the round-trip
+
+The two time-series fixtures carry a second assertion beyond the round-trip: the
+`Lastgang` must audit clean (`is_usable()`, full coverage, 450 kWh integrated)
+and the `Zeitreihe` must sum to the same 450 kWh. That pins them as the
+*reference shape a producer should emit*, not merely as something that survives a
+round-trip — see [Time Series & Units](@/docs/timeseries.md).
 
 ## Layer 2 — Snapshot Serialization Tests
 
@@ -177,16 +192,24 @@ fuzz/fuzz_targets/
 ├── fuzz_deserialize_marktlokation.rs  — identifiers, Ortsangabe exclusivity
 ├── fuzz_deserialize_vertrag.rs        — date-time ordering
 ├── fuzz_deserialize_rechnung.rs       — multi-Betrag arithmetic, currency agreement
-├── fuzz_deserialize_kosten.rs         — Kostenposition line-total arithmetic, two levels down
+├── fuzz_deserialize_kosten.rs         — Kostenposition line-total arithmetic, two levels down; the `Value` reader and both recursive walks
 ├── fuzz_deserialize_bilanzierung.rs   — nested temporal ranges
-├── fuzz_deserialize_lastgang.rs       — large Zeitreihenwert arrays; depth and budget limits
+├── fuzz_deserialize_lastgang.rs       — large Zeitreihenwert arrays; depth and budget limits; the coverage audit
 ├── fuzz_deserialize_zeitreihenwert.rs — the hot path in batch market-data processing
 └── fuzz_parse_identifiers.rs          — every identifier parser, the duration and time-of-day parsers
 ```
 
 Each BO target runs three separate code paths over the same bytes —
 `serde_json::from_slice`, the hardened German reader, the hardened snake_case
-reader — and **validates** whatever decoded. The validators do `Decimal`
+reader — and **validates** whatever decoded. The `Lastgang` target additionally
+runs the coverage audit: it parses every `startuhrzeit` off the wire, joins each
+with its date, sorts the results and accumulates `time::Duration`s over them —
+and `Duration` addition *panics* rather than saturating, so the accumulation is
+fuzzed rather than reasoned about. The `Kosten` target runs the two recursive
+walks — `extension_paths` and `unknown_enum_paths` — because
+`collect_extension_paths` is the one place a JSON-path is assembled from bytes
+the payload chose rather than from the schema, and it runs the
+`serde_json::Value` reader, which is a fourth deserializer over the same input. The validators do `Decimal`
 arithmetic over wire values, and `rust_decimal` panics rather than errors on
 several of its constructors, so a validator that aborts on a decodable payload is
 as exploitable as a deserializer that does. Hence `validate` in the fuzz build

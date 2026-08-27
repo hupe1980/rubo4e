@@ -401,6 +401,20 @@ pub(super) fn deserialize_german_from_str<T: DeserializeOwned>(
     Ok(value)
 }
 
+/// Depth-limited decode of an already-parsed [`serde_json::Value`].
+///
+/// The same wrapper the text readers use: `Value` is itself a `Deserializer`, so
+/// the depth guard composes over it unchanged. There is no `end()` to call —
+/// a `Value` is a whole document by construction, so the trailing-input
+/// differential the text path guards against cannot arise.
+pub(super) fn deserialize_german_from_value<T: DeserializeOwned>(
+    value: serde_json::Value,
+    max_depth: usize,
+) -> Result<T, serde_json::Error> {
+    let state = DepthState::new(max_depth);
+    T::deserialize(DepthLimitedDeserializer::new(value, &state))
+}
+
 pub(super) fn deserialize_german_from_slice<T: DeserializeOwned>(
     bytes: &[u8],
     max_depth: usize,

@@ -1,0 +1,69 @@
+{
+  "_typ": "ZEITREIHE",
+  "_version": "202607.1.0",
+  "bezeichnung": "Viertelstundenwerte Wirkarbeit",
+  "beschreibung": "Abrechnungsrelevante Energiemengen",
+  "einheit": "KWH",
+  "messart": "MITTELWERT",
+  "messgroesse": "WIRKLEISTUNG",
+  "medium": "STROM",
+  "wertherkunft": "ABGELESEN",
+  "werte": [
+    {
+      "_typ": "ZEITREIHENWERT",
+      "_version": "202607.1.0",
+      "status": "ABGELESEN",
+      "wert": "100.0",
+      "zeitraum": {
+        "_typ": "ZEITRAUM",
+        "_version": "202607.1.0",
+        "startdatum": "2026-01-01",
+        "startuhrzeit": "00:00:00+01:00",
+        "enddatum": "2026-01-01",
+        "enduhrzeit": "00:15:00+01:00"
+      }
+    },
+    {
+      "_typ": "ZEITREIHENWERT",
+      "_version": "202607.1.0",
+      "status": "ABGELESEN",
+      "wert": "120.0",
+      "zeitraum": {
+        "_typ": "ZEITRAUM",
+        "_version": "202607.1.0",
+        "startdatum": "2026-01-01",
+        "startuhrzeit": "00:15:00+01:00",
+        "enddatum": "2026-01-01",
+        "enduhrzeit": "00:30:00+01:00"
+      }
+    },
+    {
+      "_typ": "ZEITREIHENWERT",
+      "_version": "202607.1.0",
+      "status": "ABGELESEN",
+      "wert": "128.0",
+      "zeitraum": {
+        "_typ": "ZEITRAUM",
+        "_version": "202607.1.0",
+        "startdatum": "2026-01-01",
+        "startuhrzeit": "00:30:00+01:00",
+        "enddatum": "2026-01-01",
+        "enduhrzeit": "00:45:00+01:00"
+      }
+    },
+    {
+      "_typ": "ZEITREIHENWERT",
+      "_version": "202607.1.0",
+      "status": "ABGELESEN",
+      "wert": "102.0",
+      "zeitraum": {
+        "_typ": "ZEITRAUM",
+        "_version": "202607.1.0",
+        "startdatum": "2026-01-01",
+        "startuhrzeit": "00:45:00+01:00",
+        "enddatum": "2026-01-01",
+        "enduhrzeit": "01:00:00+01:00"
+      }
+    }
+  ]
+}

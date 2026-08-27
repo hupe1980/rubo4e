@@ -397,3 +397,92 @@ impl crate::Bo4eStrict for Tarifpreisblatt {
         }
     }
 }
+#[cfg(feature = "json")]
+impl crate::json::Bo4eExtensions for Tarifpreisblatt {
+    fn collect_extension_paths(&self, path: &str, out: &mut Vec<String>) {
+        if let Some(map) = self._additional.as_map() {
+            for key in map.keys() {
+                out.push(crate::strict::extension_path(path, key));
+            }
+        }
+        if let Some(v) = &self.anbieter {
+            crate::json::Bo4eExtensions::collect_extension_paths(
+                &**v,
+                &crate::strict::field_path(path, "anbieter"),
+                out,
+            );
+        }
+        if let Some(v) = &self.berechnungsparameter {
+            crate::json::Bo4eExtensions::collect_extension_paths(
+                v,
+                &crate::strict::field_path(path, "berechnungsparameter"),
+                out,
+            );
+        }
+        if let Some(v) = &self.energiemix {
+            crate::json::Bo4eExtensions::collect_extension_paths(
+                v,
+                &crate::strict::field_path(path, "energiemix"),
+                out,
+            );
+        }
+        if let Some(v) = &self.preisgarantie {
+            crate::json::Bo4eExtensions::collect_extension_paths(
+                v,
+                &crate::strict::field_path(path, "preisgarantie"),
+                out,
+            );
+        }
+        if let Some(items) = &self.tarif_auf_abschlaege {
+            let child = crate::strict::field_path(path, "tarifAufAbschlaege");
+            for (i, item) in items.iter().enumerate() {
+                crate::json::Bo4eExtensions::collect_extension_paths(
+                    item,
+                    &crate::strict::index_path(&child, i),
+                    out,
+                );
+            }
+        }
+        if let Some(v) = &self.tarifeinschraenkung {
+            crate::json::Bo4eExtensions::collect_extension_paths(
+                v,
+                &crate::strict::field_path(path, "tarifeinschraenkung"),
+                out,
+            );
+        }
+        if let Some(items) = &self.tarifpreise {
+            let child = crate::strict::field_path(path, "tarifpreise");
+            for (i, item) in items.iter().enumerate() {
+                crate::json::Bo4eExtensions::collect_extension_paths(
+                    item,
+                    &crate::strict::index_path(&child, i),
+                    out,
+                );
+            }
+        }
+        if let Some(v) = &self.vertragskonditionen {
+            crate::json::Bo4eExtensions::collect_extension_paths(
+                v,
+                &crate::strict::field_path(path, "vertragskonditionen"),
+                out,
+            );
+        }
+        if let Some(v) = &self.zeitliche_gueltigkeit {
+            crate::json::Bo4eExtensions::collect_extension_paths(
+                v,
+                &crate::strict::field_path(path, "zeitlicheGueltigkeit"),
+                out,
+            );
+        }
+        if let Some(items) = &self.zusatz_attribute {
+            let child = crate::strict::field_path(path, "zusatzAttribute");
+            for (i, item) in items.iter().enumerate() {
+                crate::json::Bo4eExtensions::collect_extension_paths(
+                    item,
+                    &crate::strict::index_path(&child, i),
+                    out,
+                );
+            }
+        }
+    }
+}

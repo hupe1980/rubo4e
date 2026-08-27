@@ -259,3 +259,54 @@ impl crate::Bo4eStrict for Ausschreibung {
         }
     }
 }
+#[cfg(feature = "json")]
+impl crate::json::Bo4eExtensions for Ausschreibung {
+    fn collect_extension_paths(&self, path: &str, out: &mut Vec<String>) {
+        if let Some(map) = self._additional.as_map() {
+            for key in map.keys() {
+                out.push(crate::strict::extension_path(path, key));
+            }
+        }
+        if let Some(v) = &self.abgabefrist {
+            crate::json::Bo4eExtensions::collect_extension_paths(
+                v,
+                &crate::strict::field_path(path, "abgabefrist"),
+                out,
+            );
+        }
+        if let Some(v) = &self.ausschreibender {
+            crate::json::Bo4eExtensions::collect_extension_paths(
+                &**v,
+                &crate::strict::field_path(path, "ausschreibender"),
+                out,
+            );
+        }
+        if let Some(v) = &self.bindefrist {
+            crate::json::Bo4eExtensions::collect_extension_paths(
+                v,
+                &crate::strict::field_path(path, "bindefrist"),
+                out,
+            );
+        }
+        if let Some(items) = &self.lose {
+            let child = crate::strict::field_path(path, "lose");
+            for (i, item) in items.iter().enumerate() {
+                crate::json::Bo4eExtensions::collect_extension_paths(
+                    item,
+                    &crate::strict::index_path(&child, i),
+                    out,
+                );
+            }
+        }
+        if let Some(items) = &self.zusatz_attribute {
+            let child = crate::strict::field_path(path, "zusatzAttribute");
+            for (i, item) in items.iter().enumerate() {
+                crate::json::Bo4eExtensions::collect_extension_paths(
+                    item,
+                    &crate::strict::index_path(&child, i),
+                    out,
+                );
+            }
+        }
+    }
+}

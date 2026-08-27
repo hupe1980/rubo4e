@@ -110,7 +110,7 @@ fidelity question rather than a correctness one: a relayed go-bo4e payload comes
 out as `"119"` where the sender wrote `119.00`, and the two compare equal as
 `Decimal`.
 
-The loss is unrecoverable, so it is made visible instead:
+The loss is unrecoverable, so the spelling is made visible instead:
 
 ```rust
 use rubo4e::decimal_serde::decimal_from_json_number_count;
@@ -120,6 +120,13 @@ use rubo4e::decimal_serde::decimal_from_json_number_count;
 // Zero means every producer on this link spells decimals as strings.
 gauge("bo4e_decimal_from_json_number", decimal_from_json_number_count());
 ```
+
+**The counter measures the spelling, not the damage.** An integer number is
+exact — `119` reaches the visitor as a `u64`, never as an `f64` — and is counted
+anyway, because Go marshals a whole amount exactly that way. A counter that only
+saw the lossy fractional path would read a steady zero against the very producer
+it exists to identify. The **fractional** case is the lossy one, and with the
+`tracing` feature it also emits a `debug!` naming the value.
 
 Without the `decimal` feature the field is a `String` holding the lexical form,
 so `"119.00"` survives as written — at the cost of having no arithmetic.
@@ -168,6 +175,9 @@ let vertrag: Vertrag = serde_json::from_str(&json_string)?;
 Deserialization accepts both:
 - BO4E German camelCase (`from_json_german`, `from_json_german_bytes`)
 - Snake_case key form (`from_json_snake_case`, `from_json_snake_case_bytes`)
+- An already-parsed `serde_json::Value` (`from_json_value`) — German keys only;
+  a `Value` in snake form is exotic enough that the round-trip through a string
+  is the honest path for it
 
 Snake_case mode transforms key style only. It is **not** a German->English translation.
 
@@ -287,6 +297,31 @@ Available hardened variants:
 - `from_json_german_bytes_hardened`
 - `from_json_snake_case_bytes_hardened`
 
+#### `AnyBo` is a hardened entry point too
+
+A gateway that does not know what is arriving reaches for `AnyBo` — precisely the
+place where the budgets matter most — and all four of them survive the `_typ`
+dispatch:
+
+```rust
+use rubo4e::current::AnyBo;
+
+let bo = AnyBo::from_json_german_hardened(&body, JsonParseLimits::untrusted_defaults())?;
+match bo {
+    AnyBo::Marktlokation(m) => { /* … */ }
+    AnyBo::Unknown { typ, .. } => { /* a BO type this build does not know */ }
+    _ => {}
+}
+```
+
+This works only because `AnyBo`'s `Deserialize` buffers through the **caller's**
+deserializer rather than re-parsing with `serde_json::from_str` — that is what
+keeps the depth limiter and the snake_case key transform in the path. The cost is
+one intermediate `serde_json::Value`; deserialize the concrete BO type on a hot
+path where you already know it. `tests/any_bo.rs` pins each limit through the
+dispatch, so a refactor that removes the intermediate tree fails the build rather
+than silently unhooking them.
+
 #### What each limit means
 
 | Limit | Scope | Enforced |
@@ -375,6 +410,132 @@ nested object is not kept: below the top level a value is a `serde_json::Value`,
 whose objects are a sorted map, so `{"b":1,"a":2}` comes back as `{"a":2,"b":1}`.
 Enable `serde_json`'s `preserve_order` in your own `Cargo.toml` if that ordering
 matters; feature unification applies it here too.
+
+### A decode does **not** validate field names
+
+The permissiveness above has a consequence that is easy to miss, and expensive to
+miss: **decoding a document is not a check on it.**
+
+Serde ignores keys a struct does not declare; this crate goes further and keeps
+them. So a misspelled or renamed key does not fail a decode — it lands in
+`_additional`, the decode returns `Ok`, and the field it was meant to fill reads
+back as `None`.
+
+```rust
+let body = serde_json::json!({
+    "_typ": "KOSTEN",
+    "kostenbloecke": [{ "kostenblockBEZEICHNUNG": "x" }]   // misspelled
+});
+
+// Built from a literal, so a rubo4e field rename must fail here — right?
+let kosten: Kosten = serde_json::from_value(body.clone())?;   // it cannot fail
+assert_eq!(kosten.kostenbloecke.unwrap()[0].kostenblockbezeichnung, None);
+```
+
+That pattern — assemble a BO4E document as `serde_json::Value`, decode it "to
+validate", send the *literal* — is a natural thing to reach for, and it validates
+nothing. `has_extension_data()` does not rescue it either: it is shallow, and
+answers `false` at the root because the stray key sits one level down.
+
+#### `Bo4eExtensions` — the recursive check
+
+```rust
+use rubo4e::json::Bo4eExtensions;
+
+assert_eq!(kosten.extension_paths(), ["kostenbloecke[0].kostenblockBEZEICHNUNG"]);
+kosten.ensure_no_extension_data()?;   // Err(UnknownFieldError { paths })
+```
+
+It descends through every nested BO, COM, `Option` and `Vec`, and reports each
+finding at its JSON-path. Only the **top-level key** of each extension entry
+counts: everything under it is opaque by design, so a vendor blob
+`{"vendorX": {"a": 1, "b": 2}}` is one finding, not three.
+
+Paths are dotted with bracketed array indices, like `Bo4eStrict`'s. Extension keys
+come off the wire, though, so they can contain the characters the path syntax
+uses — a key of `a.b` rendered `parent.a.b` would name two fields that do not
+exist. Anything that is not a plain `[A-Za-z0-9_]` identifier is bracket-quoted:
+`parent["a.b"]`.
+
+The order is deterministic: a struct's own undefined keys first, then its
+children's, depth-first in field order. Within one struct the keys follow
+`_additional`'s own order — arrival order when the value was decoded from text,
+sorted when it came from a `serde_json::Value`, whose objects are a `BTreeMap`.
+
+#### …or make the decode itself the check
+
+For a producer, failing at the decode is usually what you wanted in the first
+place. `from_json_value_hardened` with the extension budget closed does that:
+
+```rust
+use rubo4e::json::{Bo4eJsonExt, JsonParseLimits};
+
+let closed = JsonParseLimits::unlimited().with_max_extension_field_count(Some(0));
+let kosten = Kosten::from_json_value_hardened(body, closed)?;   // Err on any stray key
+```
+
+`from_json_value` and `from_json_value_hardened` are the `serde_json::Value`
+counterparts of the `&str` readers, with the same depth and extension budgets —
+so the strictness the text path always had is reachable where the trap actually
+lives. `max_payload_bytes` is the one cap that does not apply: there are no bytes
+left to cap, the caller already paid for the parse. It is ignored rather than
+rejected, so one `JsonParseLimits` can be shared across both paths.
+
+#### Two questions, two calls
+
+A payload can leave the schema in two ways, and neither check sees the other's
+finding:
+
+| Question | Call | Trait |
+|---|---|---|
+| Does it use a **value** this schema version does not define? | `ensure_known_enums()` | `Bo4eStrict` |
+| Does it use a **field** this schema version does not define? | `ensure_no_extension_data()` | `Bo4eExtensions` |
+
+```rust
+// `sparte` is a defined field carrying an undefined value.
+let malo: Marktlokation = serde_json::from_value(json!({"sparte": "PLASMA"}))?;
+assert_eq!(malo.unknown_enum_paths(), ["sparte"]);
+assert!(malo.extension_paths().is_empty());
+
+// `spartee` is an undefined field. No enum was ever reached.
+let malo: Marktlokation = serde_json::from_value(json!({"spartee": "STROM"}))?;
+assert_eq!(malo.extension_paths(), ["spartee"]);
+assert!(malo.unknown_enum_paths().is_empty());
+```
+
+They are separate on purpose. Rejecting an unknown **value** is usually right at
+an ingest boundary. Rejecting an unknown **field** usually is not — that is
+precisely how a counterparty one schema release ahead reaches you, and refusing it
+throws away the forward compatibility `_additional` exists to provide. Run the
+field check on documents you **produce**, and inbound only where a closed field
+set is contractually agreed.
+
+#### Best of all: do not decode to check
+
+Construct the value typed, and a field rename is a compile error rather than a
+runtime one — no check needed:
+
+```rust
+let kosten = Kosten {
+    kostenbloecke: Some(vec![Kostenblock {
+        kostenblockbezeichnung: Some("x".into()),
+        ..Default::default()
+    }]),
+    ..Default::default()
+};
+```
+
+A hand-written `"_typ"` in a `json!` literal is the reliable marker for the
+decode-to-check habit; a CI grep for one is a cheap guard.
+
+#### One surprise this surfaces: `ZusatzAttribut` has no `_typ`
+
+It is the single BO4E schema that declares none — it has exactly `name` and
+`wert`, and `ComTyp` has no variant for it. A producer that stamps
+`"_typ": "ZUSATZATTRIBUT"` on one by analogy with every other COM is sending a
+field BO4E does not define, and the check says so. That is correct: the reference
+implementation emits no such key either, because pydantic emits what the model
+declares and the model declares none.
 
 ### Two caps you cannot turn off
 

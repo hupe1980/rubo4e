@@ -148,3 +148,8 @@ required-features = ["versioned", "builder", "json", "decimal"]
 name = "json_perf"
 harness = false
 required-features = ["versioned", "json", "time", "decimal"]
+
+[[bench]]
+name = "timeseries_perf"
+harness = false
+required-features = ["versioned", "time", "decimal"]

@@ -25,6 +25,18 @@
 //! | `tracing`      |         | Structured diagnostics via the `tracing` crate                 |
 //! | `metrics`      |         | Optional export hooks via the `metrics` crate                  |
 //!
+//! ## Where to start
+//!
+//! | You want to | Look at |
+//! |---|---|
+//! | Read or write a BO4E payload | [`current`], [`json::Bo4eJsonExt`] |
+//! | Reject a payload that carries an out-of-schema value | [`Bo4eStrict`], [`Bo4eEnum`] |
+//! | Check that a document you produced uses only fields BO4E defines | [`json::Bo4eExtensions`] |
+//! | Check a market identifier | [`identifiers`] |
+//! | Check a document against BO4E's own rules | [`validation`] |
+//! | Work with a `Lastgang` or a `Zeitreihe` | [`timeseries`] |
+//! | Convert between units, or turn power into energy | [`units`] |
+//!
 //! ## Identifiers without schema overhead
 //!
 //! Every identifier type **always** provides `Display`, `FromStr`,
@@ -207,6 +219,14 @@ mod generated;
 #[cfg(feature = "versioned")]
 #[cfg_attr(docsrs, doc(cfg(feature = "versioned")))]
 pub mod convenience;
+
+#[cfg(feature = "versioned")]
+#[cfg_attr(docsrs, doc(cfg(feature = "versioned")))]
+pub mod units;
+
+#[cfg(all(feature = "versioned", feature = "time"))]
+#[cfg_attr(docsrs, doc(cfg(all(feature = "versioned", feature = "time"))))]
+pub mod timeseries;
 
 /// BO4E schema v202607 types.
 #[cfg(feature = "versioned")]
@@ -523,6 +543,15 @@ pub mod bo4e_enum_sealed {
 /// bracketed array indices (e.g. `zaehler[0].zaehlertyp`). The field names are the
 /// BO4E wire (camelCase) names, matching the JSON you deserialized from.
 ///
+/// # It checks values, not fields
+///
+/// A payload can fall outside the schema in two ways, and this covers one of
+/// them. An unrecognised **value** in a declared field decodes to `Unknown` and
+/// is found here. An unrecognised **field** never reaches an enum at all — it
+/// lands in extension data, the decode succeeds, and this reports nothing.
+/// [`Bo4eExtensions::ensure_no_extension_data`](crate::json::Bo4eExtensions::ensure_no_extension_data)
+/// is the sibling that finds those.
+///
 /// # Not sealed
 ///
 /// Unlike [`Bo4eTyped`] and [`Bo4eEnum`], `Bo4eStrict` is intentionally **not**
@@ -623,6 +652,11 @@ pub mod prelude {
     #[cfg(feature = "json")]
     pub use crate::json::Bo4eExtensionData;
 
+    /// Recursive check for fields BO4E does not define — the counterpart of
+    /// [`Bo4eStrict`], which checks values.
+    #[cfg(all(feature = "json", feature = "versioned"))]
+    pub use crate::json::Bo4eExtensions;
+
     #[cfg(feature = "json")]
     pub use crate::json::Bo4eJsonExt;
 
@@ -646,4 +680,14 @@ pub mod prelude {
     /// Pick the price tier that applies to a quantity, honouring BO4E's gap rule.
     #[cfg(all(feature = "versioned", feature = "decimal"))]
     pub use crate::convenience::PreisstaffelSliceExt;
+
+    /// The physical dimension behind a `Mengeneinheit` — what may be added to
+    /// what, and what converts into what.
+    #[cfg(feature = "versioned")]
+    pub use crate::units::Dimension;
+
+    /// Timeline operations on `Lastgang` and `Zeitreihe`: `audit`, `span`,
+    /// `sum`, `integrate`.
+    #[cfg(all(feature = "versioned", feature = "time"))]
+    pub use crate::timeseries::Bo4eTimeSeries;
 }

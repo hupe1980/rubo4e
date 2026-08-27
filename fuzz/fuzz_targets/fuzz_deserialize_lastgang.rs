@@ -2,6 +2,28 @@
 
 use libfuzzer_sys::fuzz_target;
 use rubo4e::json::{Bo4eJsonExt, JsonParseLimits};
+use rubo4e::timeseries::Bo4eTimeSeries;
+
+/// The timeline walk over attacker-controlled intervals.
+///
+/// `audit` parses every `startuhrzeit` / `enduhrzeit` off the wire, joins each
+/// with its date, sorts the results and does `OffsetDateTime` arithmetic over
+/// them — three places a payload can steer into an overflow. `time::Duration`
+/// addition **panics** rather than saturating, so the accumulation is fuzzed
+/// rather than reasoned about. `integrate` runs `Decimal` arithmetic over the
+/// same values.
+fn audit(v: &rubo4e::v202607::Lastgang) {
+    let report = v.audit();
+    let _ = report.coverage_ratio();
+    let _ = report.missing();
+    let _ = report.is_usable();
+    let _ = v.integrate();
+    let _ = v.sum();
+    // …and against an explicit reference, which is the clipping path.
+    if let Some(span) = v.span() {
+        let _ = v.audit_over(span);
+    }
+}
 
 fuzz_target!(|data: &[u8]| {
     // Lastgang contains nested `Zeitreihenwert` arrays (potentially large) and
@@ -13,6 +35,7 @@ fuzz_target!(|data: &[u8]| {
     // as exploitable as a deserializer that does.
     if let Ok(v) = serde_json::from_slice::<rubo4e::v202607::Lastgang>(data) {
         let _ = rubo4e::prelude::Validate::validate(&v);
+        audit(&v);
     }
 
     if let Ok(s) = std::str::from_utf8(data) {
@@ -21,6 +44,7 @@ fuzz_target!(|data: &[u8]| {
             JsonParseLimits::untrusted_defaults(),
         ) {
             let _ = rubo4e::prelude::Validate::validate(&v);
+            audit(&v);
         }
         // The snake_case reader is a second parser over the same bytes, with its
         // own key-transform and depth wrappers around the deserializer.

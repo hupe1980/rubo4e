@@ -15,8 +15,10 @@ use crate::error::{IdentifierError, LengthExpectation};
 
 /// Maximum IBAN length permitted by ISO 13616.
 ///
-/// The longest country format in the registry is 32 (Saint Lucia); 34 is the
-/// standard's own ceiling and the width every SEPA field is sized for.
+/// No country reaches it: the longest registered format is Russia's 33, then
+/// Saint Lucia's 32. 34 is the standard's own ceiling and the width every SEPA
+/// field is sized for, so it is the bound to check against rather than
+/// whichever country happens to be longest this year.
 pub const IBAN_MAX_LEN: usize = 34;
 
 /// Shortest IBAN in the ISO 13616 registry (Norway).
@@ -33,8 +35,10 @@ pub const IBAN_MIN_LEN: usize = 15;
 /// # What is verified
 ///
 /// - **Length**: within ISO 13616's 15–34 envelope, and exactly the registered
-///   length for country codes the registry pins. One it does not pin is left to
-///   the checksum, so a stale table cannot refuse a valid IBAN.
+///   length for country codes the built-in registry table pins. A country it does
+///   not list is left to the checksum, so a stale table cannot refuse a valid
+///   IBAN — the registry adds countries, and this crate ships on its own
+///   schedule.
 /// - **Check digits**: ISO 7064 MOD-97-10, which detects every single-character
 ///   error and every adjacent transposition.
 ///

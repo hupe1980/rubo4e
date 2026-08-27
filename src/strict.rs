@@ -73,6 +73,49 @@ pub fn field_path(parent: &str, field: &str) -> String {
     }
 }
 
+/// Joins an **extension** key onto a parent JSON-path.
+///
+/// Unlike [`field_path`], the key here comes off the wire rather than out of the
+/// schema, so it can be any string up to
+/// [`MAX_EXTENSION_KEY_LEN`](crate::json::MAX_EXTENSION_KEY_LEN) bytes — dots,
+/// brackets and quotes included. A key of `"a.b"` rendered as `parent.a.b` would
+/// read as two nested fields that do not exist, so anything that is not a plain
+/// `[A-Za-z0-9_]` identifier is bracket-quoted instead:
+///
+/// ```
+/// # #[cfg(all(feature = "versioned", feature = "json"))] {
+/// use rubo4e::strict::extension_path;
+///
+/// assert_eq!(extension_path("", "meineId"), "meineId");
+/// assert_eq!(extension_path("adresse", "meineId"), "adresse.meineId");
+/// // Not an identifier — quoted, so the key stays one segment.
+/// assert_eq!(extension_path("adresse", "a.b"), r#"adresse["a.b"]"#);
+/// assert_eq!(extension_path("", "a.b"), r#"["a.b"]"#);
+/// assert_eq!(extension_path("x", "he\"y"), r#"x["he\"y"]"#);
+/// # }
+/// ```
+///
+/// Used by generated [`Bo4eExtensions`](crate::json::Bo4eExtensions) impls.
+#[cfg(feature = "json")]
+#[cfg_attr(docsrs, doc(cfg(feature = "json")))]
+pub fn extension_path(parent: &str, key: &str) -> String {
+    let plain = !key.is_empty() && key.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_');
+    if plain {
+        return field_path(parent, key);
+    }
+    let mut out = String::with_capacity(parent.len() + key.len() + 4);
+    out.push_str(parent);
+    out.push_str("[\"");
+    for c in key.chars() {
+        if c == '"' || c == '\\' {
+            out.push('\\');
+        }
+        out.push(c);
+    }
+    out.push_str("\"]");
+    out
+}
+
 /// Joins an array index onto a parent JSON-path (`parent[i]`).
 ///
 /// Used by generated [`Bo4eStrict`](crate::Bo4eStrict) impls; rarely called directly.

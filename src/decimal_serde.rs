@@ -26,6 +26,12 @@
 //! a non-zero count on a link you believed was string-encoded means a producer
 //! changed or a proxy re-encoded the payload.
 //!
+//! **Integer numbers are counted too, and they are exact.** `119` reaches the
+//! visitor as a `u64`, never as an `f64`, so no digits are lost — but Go writes
+//! a whole amount exactly that way, so a counter that skipped it would read zero
+//! against a go-bo4e producer and answer the question it exists to answer
+//! wrongly. The counter measures the **spelling**, not the damage.
+//!
 //! Serialization always writes a string, matching BO4E-python. Compare amounts
 //! rather than their spellings: `119` and `119.00` are the same `Decimal`.
 //!
@@ -48,34 +54,49 @@ use std::sync::atomic::{AtomicU64, Ordering};
 static DECIMAL_FROM_JSON_NUMBER: AtomicU64 = AtomicU64::new(0);
 
 /// Returns how many decimal fields this process has read from a JSON **number**
-/// rather than a JSON string.
-///
-/// Every one of those went through `f64`, losing its scale and any precision
-/// past ~15 significant digits — see the [module docs](crate::decimal_serde). The counter is
-/// process-wide, monotonically non-decreasing, and uses `Ordering::Relaxed`:
-/// suitable for an observability endpoint, not for synchronization.
+/// rather than a JSON string — of any shape, integer or fractional.
 ///
 /// A steady zero means every producer on the link spells decimals as strings,
-/// the way BO4E-python does. A rising count identifies a go-bo4e-style producer
-/// (or a proxy that re-encoded the payload) whose amounts reach you at `f64`
-/// fidelity.
+/// the way BO4E-python does. A rising count identifies a go-bo4e-style producer,
+/// or a proxy that re-encoded the payload.
+///
+/// The counter measures the spelling, not the damage: a whole amount arrives as
+/// an integer and is exact, and is counted anyway, because that is precisely the
+/// case a "count only what was lossy" counter would miss on the producer that
+/// most often causes it. A **fractional** number is the lossy one — it has been
+/// through `f64` before any deserializer sees it, losing its scale and any
+/// precision past ~15 significant digits (see the
+/// [module docs](crate::decimal_serde)) — and with the `tracing` feature it also
+/// emits a `debug!` naming the value.
+///
+/// Process-wide, monotonically non-decreasing, `Ordering::Relaxed`: suitable for
+/// an observability endpoint, not for synchronization.
 #[must_use]
 pub fn decimal_from_json_number_count() -> u64 {
     DECIMAL_FROM_JSON_NUMBER.load(Ordering::Relaxed)
 }
 
-/// Records one decimal read from a JSON number.
+/// Records one decimal read from a JSON number of any shape.
 #[inline]
-fn note_json_number(#[allow(unused_variables)] rendered: &str) {
+fn note_json_number() {
     DECIMAL_FROM_JSON_NUMBER.fetch_add(1, Ordering::Relaxed);
 
     #[cfg(feature = "metrics")]
     metrics::counter!("bo4e_decimal_from_json_number_total").increment(1);
+}
+
+/// Records one decimal read from a **fractional** JSON number — the lossy shape.
+///
+/// Counted like any other number read, and additionally traced: this is the one
+/// where the scale is already gone.
+#[inline]
+fn note_lossy_json_number(#[allow(unused_variables)] rendered: &str) {
+    note_json_number();
 
     #[cfg(feature = "tracing")]
     tracing::debug!(
         value = rendered,
-        "decimal read from a JSON number; scale and precision beyond f64 are already lost"
+        "decimal read from a fractional JSON number; scale and precision beyond f64 are already lost"
     );
 }
 
@@ -83,7 +104,7 @@ fn note_json_number(#[allow(unused_variables)] rendered: &str) {
 
 #[cfg(feature = "decimal")]
 mod imp {
-    use super::{fmt, note_json_number};
+    use super::{fmt, note_json_number, note_lossy_json_number};
     use rust_decimal::Decimal;
 
     pub(super) type Value = Decimal;
@@ -104,10 +125,12 @@ mod imp {
         }
 
         fn visit_u64<E: serde::de::Error>(self, v: u64) -> Result<Decimal, E> {
+            note_json_number();
             Ok(Decimal::from(v))
         }
 
         fn visit_i64<E: serde::de::Error>(self, v: i64) -> Result<Decimal, E> {
+            note_json_number();
             Ok(Decimal::from(v))
         }
 
@@ -118,11 +141,13 @@ mod imp {
         // `visit_u64` / `visit_i64` — but another `Deserializer` may.
         #[allow(clippy::unnecessary_fallible_conversions)]
         fn visit_u128<E: serde::de::Error>(self, v: u128) -> Result<Decimal, E> {
+            note_json_number();
             Decimal::try_from(v).map_err(E::custom)
         }
 
         #[allow(clippy::unnecessary_fallible_conversions)]
         fn visit_i128<E: serde::de::Error>(self, v: i128) -> Result<Decimal, E> {
+            note_json_number();
             Decimal::try_from(v).map_err(E::custom)
         }
 
@@ -136,7 +161,7 @@ mod imp {
         /// fractional case, where the scale was lost.
         fn visit_f64<E: serde::de::Error>(self, v: f64) -> Result<Decimal, E> {
             let rendered = v.to_string();
-            note_json_number(&rendered);
+            note_lossy_json_number(&rendered);
             rendered.parse::<Decimal>().map_err(E::custom)
         }
     }
@@ -146,7 +171,7 @@ mod imp {
 
 #[cfg(not(feature = "decimal"))]
 mod imp {
-    use super::{fmt, note_json_number};
+    use super::{fmt, note_json_number, note_lossy_json_number};
 
     pub(super) type Value = String;
 
@@ -170,18 +195,22 @@ mod imp {
         }
 
         fn visit_u64<E: serde::de::Error>(self, v: u64) -> Result<String, E> {
+            note_json_number();
             Ok(v.to_string())
         }
 
         fn visit_i64<E: serde::de::Error>(self, v: i64) -> Result<String, E> {
+            note_json_number();
             Ok(v.to_string())
         }
 
         fn visit_u128<E: serde::de::Error>(self, v: u128) -> Result<String, E> {
+            note_json_number();
             Ok(v.to_string())
         }
 
         fn visit_i128<E: serde::de::Error>(self, v: i128) -> Result<String, E> {
+            note_json_number();
             Ok(v.to_string())
         }
 
@@ -189,7 +218,7 @@ mod imp {
         /// so this cannot recover digits the parser dropped.
         fn visit_f64<E: serde::de::Error>(self, v: f64) -> Result<String, E> {
             let rendered = v.to_string();
-            note_json_number(&rendered);
+            note_lossy_json_number(&rendered);
             Ok(rendered)
         }
     }
@@ -297,14 +326,31 @@ mod tests {
     }
 
     /// The counter is process-wide and monotonic, so this asserts only that a
-    /// fractional JSON number moves it — never a delta, which another test
-    /// running concurrently in this binary would race with.
+    /// JSON number moves it — never a delta, which another test running
+    /// concurrently in this binary would race with.
     #[test]
     fn reading_a_decimal_from_a_json_number_is_counted() {
         assert!(read(r#"{"wert":0.5}"#).is_some());
         assert!(
             decimal_from_json_number_count() > 0,
             "a decimal read from a JSON number must be counted"
+        );
+    }
+
+    /// An **integer** number must be counted too. Go marshals a whole amount as
+    /// `119`, never as `119.0`, so a counter that only saw the fractional path
+    /// would read zero against the very producer it exists to identify.
+    ///
+    /// The counter is process-wide and every test in this binary can move it, so
+    /// the exact-delta assertion lives in `tests/decimal_number_counter.rs`,
+    /// which runs alone.
+    #[test]
+    fn an_integer_json_number_moves_the_counter() {
+        let before = decimal_from_json_number_count();
+        assert!(read(r#"{"wert":119}"#).is_some());
+        assert!(
+            decimal_from_json_number_count() > before,
+            "an integer JSON number is a number spelling, and is counted as one"
         );
     }
 

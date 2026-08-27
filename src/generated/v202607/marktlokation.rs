@@ -405,3 +405,91 @@ impl crate::Bo4eStrict for Marktlokation {
         }
     }
 }
+#[cfg(feature = "json")]
+impl crate::json::Bo4eExtensions for Marktlokation {
+    fn collect_extension_paths(&self, path: &str, out: &mut Vec<String>) {
+        if let Some(map) = self._additional.as_map() {
+            for key in map.keys() {
+                out.push(crate::strict::extension_path(path, key));
+            }
+        }
+        if let Some(v) = &self.endkunde {
+            crate::json::Bo4eExtensions::collect_extension_paths(
+                &**v,
+                &crate::strict::field_path(path, "endkunde"),
+                out,
+            );
+        }
+        if let Some(v) = &self.geoadresse {
+            crate::json::Bo4eExtensions::collect_extension_paths(
+                v,
+                &crate::strict::field_path(path, "geoadresse"),
+                out,
+            );
+        }
+        if let Some(v) = &self.katasterinformation {
+            crate::json::Bo4eExtensions::collect_extension_paths(
+                v,
+                &crate::strict::field_path(path, "katasterinformation"),
+                out,
+            );
+        }
+        if let Some(v) = &self.lokationsadresse {
+            crate::json::Bo4eExtensions::collect_extension_paths(
+                v,
+                &crate::strict::field_path(path, "lokationsadresse"),
+                out,
+            );
+        }
+        if let Some(items) = &self.lokationszuordnungen {
+            let child = crate::strict::field_path(path, "lokationszuordnungen");
+            for (i, item) in items.iter().enumerate() {
+                crate::json::Bo4eExtensions::collect_extension_paths(
+                    &**item,
+                    &crate::strict::index_path(&child, i),
+                    out,
+                );
+            }
+        }
+        if let Some(items) = &self.verbrauchsmengen {
+            let child = crate::strict::field_path(path, "verbrauchsmengen");
+            for (i, item) in items.iter().enumerate() {
+                crate::json::Bo4eExtensions::collect_extension_paths(
+                    &**item,
+                    &crate::strict::index_path(&child, i),
+                    out,
+                );
+            }
+        }
+        if let Some(items) = &self.zaehlwerke {
+            let child = crate::strict::field_path(path, "zaehlwerke");
+            for (i, item) in items.iter().enumerate() {
+                crate::json::Bo4eExtensions::collect_extension_paths(
+                    item,
+                    &crate::strict::index_path(&child, i),
+                    out,
+                );
+            }
+        }
+        if let Some(items) = &self.zaehlwerke_der_beteiligten_marktrolle {
+            let child = crate::strict::field_path(path, "zaehlwerkeDerBeteiligtenMarktrolle");
+            for (i, item) in items.iter().enumerate() {
+                crate::json::Bo4eExtensions::collect_extension_paths(
+                    item,
+                    &crate::strict::index_path(&child, i),
+                    out,
+                );
+            }
+        }
+        if let Some(items) = &self.zusatz_attribute {
+            let child = crate::strict::field_path(path, "zusatzAttribute");
+            for (i, item) in items.iter().enumerate() {
+                crate::json::Bo4eExtensions::collect_extension_paths(
+                    item,
+                    &crate::strict::index_path(&child, i),
+                    out,
+                );
+            }
+        }
+    }
+}

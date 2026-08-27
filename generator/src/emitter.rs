@@ -257,6 +257,26 @@ fn emit_any_bo(bos: &[BoDispatch]) -> String {
     );
     s.push_str("        }\n");
     s.push_str("    }\n");
+    s.push_str("}\n\n");
+
+    // ── Bo4eExtensions — the same delegation for out-of-schema *fields*.
+    // `Unknown` holds raw JSON for a `_typ` no generated type matches, so every
+    // key in it is by definition undefined here; reporting each one individually
+    // would be noise, and the `_typ` is the finding.
+    s.push_str("#[cfg(all(feature = \"json\", feature = \"versioned\"))]\n");
+    s.push_str("impl crate::json::Bo4eExtensions for AnyBo {\n");
+    s.push_str("    fn collect_extension_paths(&self, path: &str, out: &mut Vec<String>) {\n");
+    s.push_str("        match self {\n");
+    for name in &bo_names {
+        s.push_str(&format!(
+            "            AnyBo::{name}(v) => crate::json::Bo4eExtensions::collect_extension_paths(&**v, path, out),\n"
+        ));
+    }
+    s.push_str(
+        "            AnyBo::Unknown { .. } => out.push(crate::strict::field_path(path, \"_typ\")),\n",
+    );
+    s.push_str("        }\n");
+    s.push_str("    }\n");
     s.push_str("}\n");
 
     s
@@ -1066,6 +1086,93 @@ fn strict_field_stmt(field: &Field) -> Option<String> {
     }
 }
 
+/// Emits the recursive `Bo4eExtensions` walker for a struct.
+///
+/// The generated `collect_extension_paths` reports every key this struct's
+/// `_additional` map holds, then descends into every nested BO and COM (through
+/// `Option`s and `Vec`s) and does the same there. Enums are skipped: they carry
+/// no fields, so they carry no extension data.
+///
+/// The whole impl is gated on `json`. Without it `_additional` is a zero-sized
+/// stub and serde simply drops an unknown key, so there is nothing left to
+/// report and a check that answered "clean" would be lying.
+fn emit_extensions_struct_impl(s: &mut String, name: &str, fields: &[Field]) {
+    let stmts: Vec<String> = fields.iter().filter_map(extensions_field_stmt).collect();
+
+    s.push_str("#[cfg(feature = \"json\")]\n");
+    s.push_str(&format!("impl crate::json::Bo4eExtensions for {name} {{\n"));
+    s.push_str("    fn collect_extension_paths(&self, path: &str, out: &mut Vec<String>) {\n");
+    // The struct's own undeclared keys, at its own path. Read straight off
+    // `_additional` rather than through `Bo4eExtensionData::extension_data`,
+    // which substitutes a shared `LazyLock` empty map: a clean struct is the
+    // common case, and this way it costs a null check rather than a lazy deref.
+    s.push_str("        if let Some(map) = self._additional.as_map() {\n");
+    s.push_str("            for key in map.keys() {\n");
+    s.push_str("                out.push(crate::strict::extension_path(path, key));\n");
+    s.push_str("            }\n");
+    s.push_str("        }\n");
+    for stmt in &stmts {
+        s.push_str("        ");
+        s.push_str(stmt);
+        s.push('\n');
+    }
+    s.push_str("    }\n");
+    s.push_str("}\n");
+}
+
+/// Returns the recursion statement for one struct field, or `None` when the
+/// field is not a nested struct.
+///
+/// Mirrors [`strict_field_stmt`], minus the enum arm: an enum has no fields, so
+/// it cannot hold extension data.
+fn extensions_field_stmt(field: &Field) -> Option<String> {
+    fn descendable(ft: &FieldType) -> bool {
+        matches!(ft, FieldType::Bo(_) | FieldType::Com(_))
+    }
+    let json = &field.name;
+    let rust = &field.rust_name;
+    match &field.field_type {
+        FieldType::Array(inner) if descendable(inner) => {
+            let elem = if matches!(inner.as_ref(), FieldType::Bo(_)) {
+                "&**item"
+            } else {
+                "item"
+            };
+            let loop_body = format!(
+                "let child = crate::strict::field_path(path, \"{json}\"); \
+                 for (i, item) in items.iter().enumerate() {{ \
+                 crate::json::Bo4eExtensions::collect_extension_paths({elem}, &crate::strict::index_path(&child, i), out); }}"
+            );
+            if field.is_optional {
+                Some(format!(
+                    "if let Some(items) = &self.{rust} {{ {loop_body} }}"
+                ))
+            } else {
+                Some(format!("{{ let items = &self.{rust}; {loop_body} }}"))
+            }
+        }
+        other if descendable(other) => {
+            let is_bo = matches!(other, FieldType::Bo(_));
+            if field.is_optional {
+                let expr = if is_bo { "&**v" } else { "v" };
+                Some(format!(
+                    "if let Some(v) = &self.{rust} {{ crate::json::Bo4eExtensions::collect_extension_paths({expr}, &crate::strict::field_path(path, \"{json}\"), out); }}"
+                ))
+            } else {
+                let expr = if is_bo {
+                    format!("&**self.{rust}")
+                } else {
+                    format!("&self.{rust}")
+                };
+                Some(format!(
+                    "crate::json::Bo4eExtensions::collect_extension_paths({expr}, &crate::strict::field_path(path, \"{json}\"), out);"
+                ))
+            }
+        }
+        _ => None,
+    }
+}
+
 /// Emits all trait impls for a generated struct: `Bo4eTyped` and its kind
 /// marker, `Bo4eJsonExt`, `Sealed`, `Bo4eExtensionData`, `Display`, and
 /// `Bo4eStrict`.
@@ -1156,8 +1263,14 @@ fn emit_struct_impls(
     s.push_str("    }\n");
     s.push_str("}\n");
 
-    // Bo4eStrict: recursive out-of-schema (Unknown) enum-value detection.
+    // Bo4eStrict: recursive out-of-schema (Unknown) enum-*value* detection.
     emit_strict_struct_impl(s, name, fields);
+
+    // Bo4eExtensions: the sibling walk, over out-of-schema *fields*. A decode
+    // cannot detect a renamed key — serde ignores what a struct does not declare
+    // and this crate keeps it in `_additional` — so a producer that checks a
+    // document by round-tripping it checks nothing. This is the call that does.
+    emit_extensions_struct_impl(s, name, fields);
 }
 
 /// Whether `ft` is a bare decimal — the shape `crate::decimal_serde` handles.

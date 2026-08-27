@@ -259,3 +259,65 @@ impl crate::Bo4eStrict for Ausschreibungsdetail {
         }
     }
 }
+#[cfg(feature = "json")]
+impl crate::json::Bo4eExtensions for Ausschreibungsdetail {
+    fn collect_extension_paths(&self, path: &str, out: &mut Vec<String>) {
+        if let Some(map) = self._additional.as_map() {
+            for key in map.keys() {
+                out.push(crate::strict::extension_path(path, key));
+            }
+        }
+        if let Some(v) = &self.lieferzeitraum {
+            crate::json::Bo4eExtensions::collect_extension_paths(
+                v,
+                &crate::strict::field_path(path, "lieferzeitraum"),
+                out,
+            );
+        }
+        if let Some(v) = &self.marktlokationsadresse {
+            crate::json::Bo4eExtensions::collect_extension_paths(
+                v,
+                &crate::strict::field_path(path, "marktlokationsadresse"),
+                out,
+            );
+        }
+        if let Some(v) = &self.prognose_arbeit_lieferzeitraum {
+            crate::json::Bo4eExtensions::collect_extension_paths(
+                v,
+                &crate::strict::field_path(path, "prognoseArbeitLieferzeitraum"),
+                out,
+            );
+        }
+        if let Some(v) = &self.prognose_jahresarbeit {
+            crate::json::Bo4eExtensions::collect_extension_paths(
+                v,
+                &crate::strict::field_path(path, "prognoseJahresarbeit"),
+                out,
+            );
+        }
+        if let Some(v) = &self.prognose_leistung {
+            crate::json::Bo4eExtensions::collect_extension_paths(
+                v,
+                &crate::strict::field_path(path, "prognoseLeistung"),
+                out,
+            );
+        }
+        if let Some(v) = &self.rechnungsadresse {
+            crate::json::Bo4eExtensions::collect_extension_paths(
+                v,
+                &crate::strict::field_path(path, "rechnungsadresse"),
+                out,
+            );
+        }
+        if let Some(items) = &self.zusatz_attribute {
+            let child = crate::strict::field_path(path, "zusatzAttribute");
+            for (i, item) in items.iter().enumerate() {
+                crate::json::Bo4eExtensions::collect_extension_paths(
+                    item,
+                    &crate::strict::index_path(&child, i),
+                    out,
+                );
+            }
+        }
+    }
+}

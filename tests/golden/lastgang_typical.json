@@ -1,0 +1,71 @@
+{
+  "_typ": "LASTGANG",
+  "_version": "202607.1.0",
+  "sparte": "STROM",
+  "messgroesse": "KW",
+  "obisKennzahl": "1-0:1.8.0",
+  "zeitIntervallLaenge": {
+    "_typ": "MENGE",
+    "_version": "202607.1.0",
+    "wert": "15",
+    "einheit": "MINUTE"
+  },
+  "werte": [
+    {
+      "_typ": "ZEITREIHENWERT",
+      "_version": "202607.1.0",
+      "status": "ABGELESEN",
+      "wert": "400.0",
+      "zeitraum": {
+        "_typ": "ZEITRAUM",
+        "_version": "202607.1.0",
+        "startdatum": "2026-01-01",
+        "startuhrzeit": "00:00:00+01:00",
+        "enddatum": "2026-01-01",
+        "enduhrzeit": "00:15:00+01:00"
+      }
+    },
+    {
+      "_typ": "ZEITREIHENWERT",
+      "_version": "202607.1.0",
+      "status": "ABGELESEN",
+      "wert": "480.0",
+      "zeitraum": {
+        "_typ": "ZEITRAUM",
+        "_version": "202607.1.0",
+        "startdatum": "2026-01-01",
+        "startuhrzeit": "00:15:00+01:00",
+        "enddatum": "2026-01-01",
+        "enduhrzeit": "00:30:00+01:00"
+      }
+    },
+    {
+      "_typ": "ZEITREIHENWERT",
+      "_version": "202607.1.0",
+      "status": "ABGELESEN",
+      "wert": "512.0",
+      "zeitraum": {
+        "_typ": "ZEITRAUM",
+        "_version": "202607.1.0",
+        "startdatum": "2026-01-01",
+        "startuhrzeit": "00:30:00+01:00",
+        "enddatum": "2026-01-01",
+        "enduhrzeit": "00:45:00+01:00"
+      }
+    },
+    {
+      "_typ": "ZEITREIHENWERT",
+      "_version": "202607.1.0",
+      "status": "ABGELESEN",
+      "wert": "408.0",
+      "zeitraum": {
+        "_typ": "ZEITRAUM",
+        "_version": "202607.1.0",
+        "startdatum": "2026-01-01",
+        "startuhrzeit": "00:45:00+01:00",
+        "enddatum": "2026-01-01",
+        "enduhrzeit": "01:00:00+01:00"
+      }
+    }
+  ]
+}

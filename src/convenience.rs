@@ -122,10 +122,10 @@ pub type OffsetTimeResult =
 
 #[cfg(all(feature = "versioned", feature = "time"))]
 mod zeitraum_impl {
-    use super::OffsetTimeResult;
+    use super::{OffsetTimeResult, ZeitpunktError};
     use crate::generated::v202607::Zeitraum;
-    use std::ops::RangeInclusive;
-    use time::Date;
+    use std::ops::{Range, RangeInclusive};
+    use time::{Date, OffsetDateTime};
 
     /// # Boundary conventions
     ///
@@ -134,9 +134,23 @@ mod zeitraum_impl {
     ///
     /// | Pair | Type | Interval | Read by |
     /// |---|---|---|---|
-    /// | `startdatum` / `enddatum` | `time::Date` | `[start, end]` — **closed** | the methods below |
-    /// | `startuhrzeit` / `enduhrzeit` | time of day + offset | `[start, end)` | [`startuhrzeit_parsed`](Zeitraum::startuhrzeit_parsed) |
+    /// | `startdatum` / `enddatum` | `time::Date` | `[start, end]` — **closed** | [`as_inclusive_range`](Zeitraum::as_inclusive_range) |
+    /// | `startuhrzeit` / `enduhrzeit` | time of day + offset | `[start, end)` — **half-open** | [`startuhrzeit_parsed`](Zeitraum::startuhrzeit_parsed) |
+    /// | all four together | `time::OffsetDateTime` | `[start, end)` — **half-open** | [`as_instant_range`](Zeitraum::as_instant_range) |
     /// | `dauer` | ISO 8601 duration | — | [`duration`](Zeitraum::duration) |
+    ///
+    /// # The date accessors read only the date pair
+    ///
+    /// A `Zeitraum` that states all four fields is BO4E's third mode — *"Zeitraum:
+    /// Startzeitpunkt (Datum und Uhrzeit) bis Endzeitpunkt (Datum und Uhrzeit)"* —
+    /// and it is the one every quarter-hourly `Zeitreihenwert` uses. The date
+    /// accessors still answer for such a value, and they answer about **whole
+    /// days**: a 15-minute slot inside one day has
+    /// [`whole_days`](Zeitraum::whole_days) `Some(1)` and
+    /// [`contains`](Zeitraum::contains) that whole day. That is the right reading
+    /// of the date pair and the wrong reading of the value, so route on
+    /// [`is_instant_range`](Zeitraum::is_instant_range) and use
+    /// [`as_instant_range`](Zeitraum::as_instant_range) where it is `true`.
     ///
     /// So `2026-01-01 … 2026-01-31` is the whole of January, 31 days, and
     /// `startdatum == enddatum` is a valid one-day period — the schema gives
@@ -157,6 +171,11 @@ mod zeitraum_impl {
         ///
         /// Use this where an open-ended interval means "not yet determined" and
         /// should be filtered out; [`bounds`](Self::bounds) keeps it instead.
+        ///
+        /// Reads the **date pair only**. A value that also states a time of day
+        /// on both ends names a moment inside a day, not the day —
+        /// [`as_instant_range`](Self::as_instant_range) is the accessor for that,
+        /// and [`is_instant_range`](Self::is_instant_range) tells them apart.
         ///
         /// ```
         /// # #[cfg(all(feature = "versioned", feature = "time"))] {
@@ -213,6 +232,10 @@ mod zeitraum_impl {
         /// [`as_inclusive_range`](Self::as_inclusive_range) where a period must
         /// actually be stated.
         ///
+        /// Reads the **date pair only**, so a value carrying a time of day
+        /// contains the whole day either boundary falls in. Use
+        /// [`contains_instant`](Self::contains_instant) for those.
+        ///
         /// ```
         /// # #[cfg(all(feature = "versioned", feature = "time"))] {
         /// use rubo4e::v202607::Zeitraum;
@@ -253,6 +276,10 @@ mod zeitraum_impl {
         ///
         /// Returns `None` if either bound is absent, and `0` for a reversed pair
         /// (which [`validate_zeitraum`] rejects).
+        ///
+        /// Counts **calendar days**, from the date pair alone: a 15-minute slot
+        /// inside one day is `Some(1)`, not a fraction.
+        /// [`instant_duration`](Self::instant_duration) measures such a value.
         ///
         /// [`validate_zeitraum`]: crate::validation::v202607::validate_zeitraum
         ///
@@ -357,6 +384,394 @@ mod zeitraum_impl {
         #[must_use]
         pub fn enduhrzeit_parsed(&self) -> Option<OffsetTimeResult> {
             Some(crate::offset_time::parse(self.enduhrzeit.as_deref()?))
+        }
+
+        /// Resolves `startdatum` **and** `startuhrzeit` into one instant.
+        ///
+        /// This is BO4E's third `Zeitraum` mode — *"Zeitraum: Startzeitpunkt
+        /// (Datum und Uhrzeit) bis Endzeitpunkt (Datum und Uhrzeit)"* — the one
+        /// every quarter-hourly [`Zeitreihenwert`] uses. It needs both halves:
+        /// a date alone is a whole day, and a time of day alone is a daily
+        /// recurring window, so either on its own answers `None` rather than
+        /// guessing the other.
+        ///
+        /// [`Zeitreihenwert`]: crate::current::Zeitreihenwert
+        ///
+        /// # Errors
+        ///
+        /// [`ZeitpunktError::Time`] when `startuhrzeit` does not parse, and
+        /// [`ZeitpunktError::MissingOffset`] when it carries no UTC offset —
+        /// without one there is no instant, only a wall-clock reading, and in a
+        /// market that changes offset twice a year that is a two-hour hole to
+        /// paper over.
+        ///
+        /// ```
+        /// # #[cfg(all(feature = "versioned", feature = "time"))] {
+        /// use rubo4e::v202607::Zeitraum;
+        /// use time::macros::{date, datetime};
+        ///
+        /// let slot = Zeitraum {
+        ///     startdatum: Some(date!(2026-01-01)),
+        ///     startuhrzeit: Some("00:00:00+01:00".into()),
+        ///     enddatum: Some(date!(2026-01-01)),
+        ///     enduhrzeit: Some("00:15:00+01:00".into()),
+        ///     ..Default::default()
+        /// };
+        /// assert_eq!(slot.start_instant(), Some(Ok(datetime!(2026-01-01 00:00 +01:00))));
+        ///
+        /// // A date without a time of day is a day, not an instant.
+        /// let day = Zeitraum { startdatum: Some(date!(2026-01-01)), ..Default::default() };
+        /// assert_eq!(day.start_instant(), None);
+        /// # }
+        /// ```
+        #[must_use]
+        pub fn start_instant(&self) -> Option<Result<OffsetDateTime, ZeitpunktError>> {
+            Some(combine(self.startdatum?, self.startuhrzeit.as_deref()?))
+        }
+
+        /// Resolves `enddatum` **and** `enduhrzeit` into one instant.
+        ///
+        /// The counterpart of [`start_instant`](Self::start_instant). BO4E
+        /// declares `enduhrzeit` **exclusive**, so this is the instant the period
+        /// stops rather than its last moment — see
+        /// [`as_instant_range`](Self::as_instant_range).
+        ///
+        /// # Errors
+        ///
+        /// As [`start_instant`](Self::start_instant).
+        #[must_use]
+        pub fn end_instant(&self) -> Option<Result<OffsetDateTime, ZeitpunktError>> {
+            Some(combine(self.enddatum?, self.enduhrzeit.as_deref()?))
+        }
+
+        /// Returns the period as a **half-open** instant range, `[start, end)`.
+        ///
+        /// `Range`, not `RangeInclusive`, and deliberately so: `startuhrzeit` is
+        /// *"im betrachteten Zeitraum **inklusiv**"* and `enduhrzeit`
+        /// *"**exklusiv**"*, which is the opposite of what the date pair does on
+        /// the same struct. Consecutive quarter-hours therefore abut without
+        /// overlapping, and `00:15` belongs to exactly one of them — the property
+        /// a load profile is summed under.
+        ///
+        /// `None` unless all four fields are present;
+        /// [`as_inclusive_range`](Self::as_inclusive_range) reads the date pair
+        /// on its own, and answers for a whole day even when a time of day is
+        /// also stated. [`is_instant_range`](Self::is_instant_range) tells the
+        /// two shapes apart before you pick.
+        ///
+        /// # Errors
+        ///
+        /// As [`start_instant`](Self::start_instant), reporting whichever end
+        /// failed first.
+        ///
+        /// ```
+        /// # #[cfg(all(feature = "versioned", feature = "time"))] {
+        /// use rubo4e::v202607::Zeitraum;
+        /// use time::macros::datetime;
+        ///
+        /// let slot = Zeitraum::from_instants(
+        ///     datetime!(2026-01-01 00:00 +01:00),
+        ///     datetime!(2026-01-01 00:15 +01:00),
+        /// );
+        /// let range = slot.as_instant_range().unwrap().unwrap();
+        /// assert!(range.contains(&datetime!(2026-01-01 00:00 +01:00)));   // start: inside
+        /// assert!(!range.contains(&datetime!(2026-01-01 00:15 +01:00)));  // end:   outside
+        /// # }
+        /// ```
+        #[must_use]
+        pub fn as_instant_range(&self) -> Option<Result<Range<OffsetDateTime>, ZeitpunktError>> {
+            let start = self.start_instant()?;
+            let end = self.end_instant()?;
+            Some(match (start, end) {
+                (Err(e), _) | (Ok(_), Err(e)) => Err(e),
+                (Ok(s), Ok(e)) => Ok(s..e),
+            })
+        }
+
+        /// Whether this `Zeitraum` states a full instant on **both** ends — the
+        /// shape [`as_instant_range`](Self::as_instant_range) reads.
+        ///
+        /// Checks presence only, not that the times parse. Use it to route a
+        /// value to the instant accessors or the date ones, since the date
+        /// accessors answer for a whole day either way:
+        ///
+        /// ```
+        /// # #[cfg(all(feature = "versioned", feature = "time"))] {
+        /// use rubo4e::v202607::Zeitraum;
+        /// use time::macros::{date, datetime};
+        ///
+        /// let slot = Zeitraum::from_instants(
+        ///     datetime!(2026-01-01 00:00 +01:00),
+        ///     datetime!(2026-01-01 00:15 +01:00),
+        /// );
+        /// assert!(slot.is_instant_range());
+        /// // The date pair still answers — for the whole day, which is not the
+        /// // period this value means.
+        /// assert_eq!(slot.whole_days(), Some(1));
+        ///
+        /// let january = Zeitraum {
+        ///     startdatum: Some(date!(2026-01-01)),
+        ///     enddatum: Some(date!(2026-01-31)),
+        ///     ..Default::default()
+        /// };
+        /// assert!(!january.is_instant_range());
+        /// # }
+        /// ```
+        #[must_use]
+        pub fn is_instant_range(&self) -> bool {
+            self.startdatum.is_some()
+                && self.startuhrzeit.is_some()
+                && self.enddatum.is_some()
+                && self.enduhrzeit.is_some()
+        }
+
+        /// The exact length of the instant range, `end - start`.
+        ///
+        /// Unlike [`duration`](Self::duration), which parses the `dauer` string a
+        /// sender wrote, this measures what the boundaries actually say — the
+        /// number an interval-length check is run against.
+        ///
+        /// # Errors
+        ///
+        /// As [`as_instant_range`](Self::as_instant_range).
+        ///
+        /// ```
+        /// # #[cfg(all(feature = "versioned", feature = "time"))] {
+        /// use rubo4e::v202607::Zeitraum;
+        /// use time::{Duration, macros::datetime};
+        ///
+        /// let slot = Zeitraum::from_instants(
+        ///     datetime!(2026-01-01 00:00 +01:00),
+        ///     datetime!(2026-01-01 00:15 +01:00),
+        /// );
+        /// assert_eq!(slot.instant_duration(), Some(Ok(Duration::minutes(15))));
+        /// # }
+        /// ```
+        #[must_use]
+        pub fn instant_duration(&self) -> Option<Result<time::Duration, ZeitpunktError>> {
+            Some(self.as_instant_range()?.map(|r| r.end - r.start))
+        }
+
+        /// Returns `true` if `at` falls in `[start_instant, end_instant)`.
+        ///
+        /// An **absent** boundary is open on that side, matching
+        /// [`contains`](Self::contains) on the date pair: a `Zeitraum` stating
+        /// only a start instant contains everything from it onwards, and one
+        /// stating no instants at all contains everything. Filter on
+        /// [`is_instant_range`](Self::is_instant_range) where a period must
+        /// actually be stated.
+        ///
+        /// A **malformed** boundary is not open — it answers `false` outright. A
+        /// bound you cannot read is not one you can establish you are inside, and
+        /// this predicate is what a `.filter()` over a set of periods calls: the
+        /// safe direction there is to drop the record, not to admit it. Use
+        /// [`as_instant_range`](Self::as_instant_range) when a malformed value
+        /// has to be distinguishable from an out-of-range one.
+        ///
+        /// ```
+        /// # #[cfg(all(feature = "versioned", feature = "time"))] {
+        /// use rubo4e::v202607::Zeitraum;
+        /// use time::macros::datetime;
+        ///
+        /// let slot = Zeitraum::from_instants(
+        ///     datetime!(2026-01-01 00:00 +01:00),
+        ///     datetime!(2026-01-01 00:15 +01:00),
+        /// );
+        /// assert!(slot.contains_instant(datetime!(2026-01-01 00:00 +01:00)));
+        /// assert!(!slot.contains_instant(datetime!(2026-01-01 00:15 +01:00)));
+        /// // The same moment written in another offset compares equal.
+        /// assert!(slot.contains_instant(datetime!(2026-01-01 00:10 +01:00)));
+        /// # }
+        /// ```
+        #[must_use]
+        pub fn contains_instant(&self, at: OffsetDateTime) -> bool {
+            let after_start = match self.start_instant() {
+                Some(Ok(s)) => at >= s,
+                Some(Err(_)) => return false,
+                None => true,
+            };
+            let before_end = match self.end_instant() {
+                Some(Ok(e)) => at < e,
+                Some(Err(_)) => return false,
+                None => true,
+            };
+            after_start && before_end
+        }
+
+        /// Builds a `Zeitraum` for the half-open instant range `[start, end)`.
+        ///
+        /// Fills all four fields, writing each time of day with the offset its
+        /// `OffsetDateTime` carries, so
+        /// [`as_instant_range`](Self::as_instant_range) returns exactly what went
+        /// in. This is the constructor a producer of load profiles wants: getting
+        /// the inclusive/exclusive pair right by hand is the mistake this type
+        /// invites.
+        ///
+        /// ```
+        /// # #[cfg(all(feature = "versioned", feature = "time"))] {
+        /// use rubo4e::v202607::Zeitraum;
+        /// use time::macros::datetime;
+        ///
+        /// let start = datetime!(2026-01-01 00:00 +01:00);
+        /// let slot = Zeitraum::from_instants(start, start + time::Duration::minutes(15));
+        ///
+        /// assert_eq!(slot.startuhrzeit.as_deref(), Some("00:00:00+01:00"));
+        /// assert_eq!(slot.enduhrzeit.as_deref(),   Some("00:15:00+01:00"));
+        /// assert_eq!(slot.as_instant_range(), Some(Ok(start..start + time::Duration::minutes(15))));
+        /// # }
+        /// ```
+        #[must_use]
+        pub fn from_instants(start: OffsetDateTime, end: OffsetDateTime) -> Zeitraum {
+            Zeitraum {
+                startdatum: Some(start.date()),
+                startuhrzeit: Some(crate::offset_time::format(
+                    start.time(),
+                    Some(start.offset()),
+                )),
+                enddatum: Some(end.date()),
+                enduhrzeit: Some(crate::offset_time::format(end.time(), Some(end.offset()))),
+                ..Default::default()
+            }
+        }
+    }
+
+    /// Joins a date and a `format: "time"` string into one instant.
+    fn combine(date: Date, uhrzeit: &str) -> Result<OffsetDateTime, ZeitpunktError> {
+        let (time, offset) = crate::offset_time::parse(uhrzeit).map_err(ZeitpunktError::Time)?;
+        let offset = offset.ok_or(ZeitpunktError::MissingOffset)?;
+        Ok(date.with_time(time).assume_offset(offset))
+    }
+}
+
+/// Why a `Zeitraum` boundary could not be resolved to an instant.
+///
+/// Returned by [`Zeitraum::start_instant`](crate::current::Zeitraum::start_instant)
+/// and its siblings.
+#[cfg(all(feature = "versioned", feature = "time"))]
+#[cfg_attr(docsrs, doc(cfg(all(feature = "versioned", feature = "time"))))]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[non_exhaustive]
+pub enum ZeitpunktError {
+    /// The `startuhrzeit` / `enduhrzeit` string is not a time of day.
+    #[error("{0}")]
+    Time(#[from] crate::offset_time::OffsetTimeError),
+
+    /// The time of day parsed but states no UTC offset, so it names a
+    /// wall-clock reading rather than a moment.
+    ///
+    /// BO4E's own examples all carry one (`"18:00:00+01:00"`). Germany changes
+    /// offset twice a year, so assuming `+01:00` is wrong for half of it and
+    /// assuming UTC is wrong for all of it.
+    #[error("time of day carries no UTC offset, so it does not name an instant")]
+    MissingOffset,
+}
+
+// ── Messwertstatus — what a reading actually is ──────────────────────────────
+
+#[cfg(feature = "versioned")]
+mod messwertstatus_impl {
+    use crate::generated::v202607::Messwertstatus;
+
+    impl Messwertstatus {
+        /// Whether this status marks a value that carries usable data at all.
+        ///
+        /// `false` for exactly two of the nine: `FEHLT` — the value is declared
+        /// absent — and `NICHT_VERWENDBAR` — it is present but the sender says
+        /// not to use it. A `Zeitreihenwert` in either state still occupies its
+        /// slot on the timeline, so a coverage check alone reports the series as
+        /// contiguous while every reading in it is unusable. That is the gap
+        /// [`CoverageReport::unusable`] closes.
+        ///
+        /// [`CoverageReport::unusable`]: crate::timeseries::CoverageReport::unusable
+        ///
+        /// The `Unknown` catch-all is **not** usable: an out-of-schema status is
+        /// a claim this crate cannot read, and treating it as a clean reading is
+        /// the dangerous default.
+        ///
+        /// ```
+        /// # #[cfg(feature = "versioned")] {
+        /// use rubo4e::current::Messwertstatus;
+        ///
+        /// assert!(Messwertstatus::Abgelesen.is_usable());
+        /// assert!(Messwertstatus::Ersatzwert.is_usable());   // substituted, but a value
+        /// assert!(!Messwertstatus::Fehlt.is_usable());
+        /// assert!(!Messwertstatus::NichtVerwendbar.is_usable());
+        /// assert!(!Messwertstatus::Unknown.is_usable());
+        /// # }
+        /// ```
+        #[must_use]
+        pub const fn is_usable(self) -> bool {
+            !matches!(
+                self,
+                Messwertstatus::Fehlt | Messwertstatus::NichtVerwendbar | Messwertstatus::Unknown
+            )
+        }
+
+        /// Whether this status marks a value that was **measured** rather than
+        /// derived.
+        ///
+        /// `true` only for `ABGELESEN`. Everything else is a substitute, a
+        /// forecast, a provisional figure or an absence — all legitimate on the
+        /// wire, and none of them a meter reading. Settlement rules distinguish
+        /// them, so a pipeline that bills on `ERSATZWERT` as if it were
+        /// `ABGELESEN` is making a claim the sender did not.
+        #[must_use]
+        pub const fn is_measured(self) -> bool {
+            matches!(self, Messwertstatus::Abgelesen)
+        }
+
+        /// Whether this status marks a value that stands **in place of** a
+        /// measurement: `ERSATZWERT`, `VORSCHLAGSWERT`, `PROGNOSEWERT`,
+        /// `VORLAEUFIGERWERT`, `ENERGIEMENGESUMMIERT`,
+        /// `ANGABE_FUER_LIEFERSCHEIN`.
+        ///
+        /// A value, and a usable one — but not a reading. The three predicates
+        /// partition the enum: every variant is measured, substituted, or
+        /// unusable.
+        #[must_use]
+        pub const fn is_substitute(self) -> bool {
+            matches!(
+                self,
+                Messwertstatus::Ersatzwert
+                    | Messwertstatus::Vorschlagswert
+                    | Messwertstatus::Prognosewert
+                    | Messwertstatus::Vorlaeufigerwert
+                    | Messwertstatus::Energiemengesummiert
+                    | Messwertstatus::AngabeFuerLieferschein
+            )
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::Messwertstatus;
+
+        /// The three predicates must partition the enum: exactly one holds for
+        /// every variant, so a new status in the next release fails here rather
+        /// than falling through every branch unnoticed.
+        #[test]
+        fn the_predicates_partition_every_variant() {
+            for status in Messwertstatus::VARIANTS {
+                let flags = [
+                    status.is_measured(),
+                    status.is_substitute(),
+                    !status.is_usable(),
+                ];
+                assert_eq!(
+                    flags.iter().filter(|f| **f).count(),
+                    1,
+                    "{} is in {} of the three classes",
+                    status.as_wire(),
+                    flags.iter().filter(|f| **f).count(),
+                );
+            }
+        }
+
+        #[test]
+        fn the_catch_all_is_not_treated_as_a_clean_reading() {
+            assert!(!Messwertstatus::Unknown.is_usable());
+            assert!(!Messwertstatus::Unknown.is_measured());
+            assert!(!Messwertstatus::Unknown.is_substitute());
         }
     }
 }

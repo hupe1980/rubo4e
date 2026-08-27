@@ -61,9 +61,10 @@ pub enum Iso8601DurationError {
 
 /// Parses an ISO 8601 duration into an exact [`time::Duration`].
 ///
-/// Accepts `[-]P[nW]` and `[-]P[nD][T[nH][nM][nS]]`, with a decimal fraction
-/// permitted on the last component present (`PT0.5S`, `PT1.5H`). Both `,` and
-/// `.` are accepted as the decimal separator, as ISO 8601 allows.
+/// Accepts `[-]P[nW]` and `[-]P[nD][T[nH][nM][nS]]`. A decimal fraction is
+/// permitted on the **last** component present (`PT0.5S`, `P1.5D`, `PT1.5H`) and
+/// rejected anywhere else (`P1.5DT1H`), as ISO 8601 requires. Both `,` and `.`
+/// are accepted as the decimal separator, which ISO 8601 also allows.
 ///
 /// # Errors
 ///
@@ -100,10 +101,21 @@ pub fn parse(s: &str) -> Result<time::Duration, Iso8601DurationError> {
 
     let mut seconds = 0f64;
     let mut any = false;
+    // ISO 8601 allows a decimal fraction on the **smallest** component only, so
+    // once one appears nothing may follow it. `P1.5DT1H` states a day and a half
+    // and then an hour, which is not a duration any other implementation reads
+    // the same way.
+    let mut after_fraction = false;
 
-    for (value, unit) in Components::new(date_part) {
+    for (value, unit, fractional) in Components::new(date_part) {
+        if after_fraction {
+            return Err(malformed(
+                "a decimal fraction is only allowed on the last component",
+            ));
+        }
         let value = value?;
         any = true;
+        after_fraction = fractional;
         seconds += match unit {
             'Y' | 'M' => return Err(Iso8601DurationError::CalendarComponent { unit }),
             'W' => value * 604_800.0, // a week is exactly 7 days
@@ -113,9 +125,15 @@ pub fn parse(s: &str) -> Result<time::Duration, Iso8601DurationError> {
     }
 
     if let Some(time_part) = time_part {
-        for (value, unit) in Components::new(time_part) {
+        for (value, unit, fractional) in Components::new(time_part) {
+            if after_fraction {
+                return Err(malformed(
+                    "a decimal fraction is only allowed on the last component",
+                ));
+            }
             let value = value?;
             any = true;
+            after_fraction = fractional;
             seconds += match unit {
                 'H' => value * 3_600.0,
                 // After the 'T', 'M' is minutes — the one place the letter is
@@ -150,7 +168,8 @@ impl<'a> Components<'a> {
 }
 
 impl Iterator for Components<'_> {
-    type Item = (Result<f64, Iso8601DurationError>, char);
+    /// `(value, unit, carried_a_decimal_fraction)`.
+    type Item = (Result<f64, Iso8601DurationError>, char, bool);
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.rest.is_empty() {
@@ -169,12 +188,14 @@ impl Iterator for Components<'_> {
                     reason: "a value with no unit",
                 }),
                 '?',
+                false,
             ));
         };
         self.rest = chars.as_str();
 
         // ISO 8601 permits a comma as the decimal separator.
         let normalised = digits.replace(',', ".");
+        let fractional = normalised.contains('.');
         let value = if normalised.is_empty() {
             Err(Iso8601DurationError::Malformed {
                 reason: "a unit with no value",
@@ -190,7 +211,7 @@ impl Iterator for Components<'_> {
                     reason: "a component value must be a non-negative number",
                 })
         };
-        Some((value, unit))
+        Some((value, unit, fractional))
     }
 }
 
@@ -251,6 +272,28 @@ mod tests {
         assert_eq!(parse("PT0.5S"), Ok(Duration::milliseconds(500)));
         assert_eq!(parse("PT0,5S"), Ok(Duration::milliseconds(500)));
         assert_eq!(parse("PT1.5H"), Ok(Duration::minutes(90)));
+    }
+
+    /// ISO 8601 allows a fraction on the smallest component only. Accepting one
+    /// anywhere would make `P1.5DT1H` mean something no other implementation
+    /// reads the same way.
+    #[test]
+    fn a_fraction_is_only_allowed_on_the_last_component() {
+        assert_eq!(parse("P1.5D"), Ok(Duration::hours(36)));
+        assert_eq!(parse("PT1.5H"), Ok(Duration::minutes(90)));
+        assert_eq!(parse("PT1H30.5M"), Ok(Duration::seconds(5430)));
+        // …but a fraction on the *only* component is fine, week form included.
+        assert_eq!(parse("P1.5W"), Ok(Duration::days(10) + Duration::hours(12)));
+        for bad in ["P1.5DT1H", "PT1.5H30M", "PT0.5M1S", "P1.5WT1H"] {
+            let err = parse(bad).unwrap_err();
+            assert_eq!(
+                err,
+                Iso8601DurationError::Malformed {
+                    reason: "a decimal fraction is only allowed on the last component",
+                },
+                "{bad:?}"
+            );
+        }
     }
 
     #[test]

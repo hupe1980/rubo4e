@@ -154,6 +154,63 @@ fn parse_offset(s: &str) -> Option<UtcOffset> {
     .ok()
 }
 
+/// Renders a time of day and its UTC offset back into BO4E's `format: "time"`
+/// spelling — the inverse of [`parse`].
+///
+/// The output is always `HH:MM:SS` plus the offset, with a fractional part only
+/// when the time carries sub-second precision, so `parse(format(t, o))` returns
+/// what went in. A `None` offset writes no offset, preserving the "zone not
+/// stated" claim rather than inventing `Z`.
+///
+/// ```
+/// # #[cfg(feature = "time")] {
+/// use rubo4e::offset_time::{format, parse};
+/// use time::macros::{offset, time};
+///
+/// assert_eq!(format(time!(18:00:00), Some(offset!(+1))), "18:00:00+01:00");
+/// assert_eq!(format(time!(06:30:00), Some(offset!(UTC))), "06:30:00Z");
+/// assert_eq!(format(time!(06:30:00), None), "06:30:00");
+/// assert_eq!(format(time!(12:00:00.5), None), "12:00:00.5");
+///
+/// let (t, o) = parse(&format(time!(23:59:59.25), Some(offset!(-5:30)))).unwrap();
+/// assert_eq!((t, o), (time!(23:59:59.25), Some(offset!(-5:30))));
+/// # }
+/// ```
+#[must_use]
+pub fn format(time: Time, offset: Option<UtcOffset>) -> String {
+    use std::fmt::Write as _;
+
+    let mut out = String::with_capacity(24);
+    let _ = write!(
+        out,
+        "{:02}:{:02}:{:02}",
+        time.hour(),
+        time.minute(),
+        time.second()
+    );
+    let nanos = time.nanosecond();
+    if nanos != 0 {
+        // Trim trailing zeros so a whole millisecond does not carry six of them.
+        // `nanos != 0` guarantees at least one digit survives, so the fraction is
+        // never left empty — which is not a valid ISO 8601 time.
+        out.push('.');
+        out.push_str(std::format!("{nanos:09}").trim_end_matches('0'));
+    }
+    match offset {
+        None => {}
+        Some(o) if o.is_utc() => out.push('Z'),
+        Some(o) => {
+            let (h, m, s) = o.as_hms();
+            out.push(if o.is_negative() { '-' } else { '+' });
+            let _ = write!(out, "{:02}:{:02}", h.unsigned_abs(), m.unsigned_abs());
+            if s != 0 {
+                let _ = write!(out, ":{:02}", s.unsigned_abs());
+            }
+        }
+    }
+    out
+}
+
 /// A one- or two-digit non-negative number. Rejects `+1`, `1_0`, and the empty
 /// string, all of which `str::parse` would otherwise be lenient about.
 fn two_digits(s: &str) -> Option<u8> {

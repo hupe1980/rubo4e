@@ -679,3 +679,233 @@ impl crate::Bo4eStrict for Rechnung {
         }
     }
 }
+#[cfg(feature = "json")]
+impl crate::json::Bo4eExtensions for Rechnung {
+    fn collect_extension_paths(&self, path: &str, out: &mut Vec<String>) {
+        if let Some(map) = self._additional.as_map() {
+            for key in map.keys() {
+                out.push(crate::strict::extension_path(path, key));
+            }
+        }
+        if let Some(v) = &self.aktueller_verbrauch {
+            crate::json::Bo4eExtensions::collect_extension_paths(
+                &**v,
+                &crate::strict::field_path(path, "aktuellerVerbrauch"),
+                out,
+            );
+        }
+        if let Some(v) = &self.anfangszaehlerstand {
+            crate::json::Bo4eExtensions::collect_extension_paths(
+                &**v,
+                &crate::strict::field_path(path, "anfangszaehlerstand"),
+                out,
+            );
+        }
+        if let Some(v) = &self.endzaehlerstand {
+            crate::json::Bo4eExtensions::collect_extension_paths(
+                &**v,
+                &crate::strict::field_path(path, "endzaehlerstand"),
+                out,
+            );
+        }
+        if let Some(v) = &self.fremdkosten {
+            crate::json::Bo4eExtensions::collect_extension_paths(
+                &**v,
+                &crate::strict::field_path(path, "fremdkosten"),
+                out,
+            );
+        }
+        if let Some(v) = &self.gesamtbrutto {
+            crate::json::Bo4eExtensions::collect_extension_paths(
+                v,
+                &crate::strict::field_path(path, "gesamtbrutto"),
+                out,
+            );
+        }
+        if let Some(v) = &self.gesamtnetto {
+            crate::json::Bo4eExtensions::collect_extension_paths(
+                v,
+                &crate::strict::field_path(path, "gesamtnetto"),
+                out,
+            );
+        }
+        if let Some(v) = &self.gesamtsteuer {
+            crate::json::Bo4eExtensions::collect_extension_paths(
+                v,
+                &crate::strict::field_path(path, "gesamtsteuer"),
+                out,
+            );
+        }
+        if let Some(v) = &self.jahresverbrauch {
+            crate::json::Bo4eExtensions::collect_extension_paths(
+                &**v,
+                &crate::strict::field_path(path, "jahresverbrauch"),
+                out,
+            );
+        }
+        if let Some(v) = &self.marktlokation {
+            crate::json::Bo4eExtensions::collect_extension_paths(
+                &**v,
+                &crate::strict::field_path(path, "marktlokation"),
+                out,
+            );
+        }
+        if let Some(v) = &self.messlokation {
+            crate::json::Bo4eExtensions::collect_extension_paths(
+                &**v,
+                &crate::strict::field_path(path, "messlokation"),
+                out,
+            );
+        }
+        if let Some(v) = &self.messstellenbetreiber {
+            crate::json::Bo4eExtensions::collect_extension_paths(
+                &**v,
+                &crate::strict::field_path(path, "messstellenbetreiber"),
+                out,
+            );
+        }
+        if let Some(v) = &self.netzbetreiber {
+            crate::json::Bo4eExtensions::collect_extension_paths(
+                &**v,
+                &crate::strict::field_path(path, "netzbetreiber"),
+                out,
+            );
+        }
+        if let Some(v) = &self.rabatt_netto {
+            crate::json::Bo4eExtensions::collect_extension_paths(
+                v,
+                &crate::strict::field_path(path, "rabattNetto"),
+                out,
+            );
+        }
+        if let Some(v) = &self.rechnungsempfaenger {
+            crate::json::Bo4eExtensions::collect_extension_paths(
+                &**v,
+                &crate::strict::field_path(path, "rechnungsempfaenger"),
+                out,
+            );
+        }
+        if let Some(v) = &self.rechnungsersteller {
+            crate::json::Bo4eExtensions::collect_extension_paths(
+                &**v,
+                &crate::strict::field_path(path, "rechnungsersteller"),
+                out,
+            );
+        }
+        if let Some(v) = &self.rechnungsperiode {
+            crate::json::Bo4eExtensions::collect_extension_paths(
+                v,
+                &crate::strict::field_path(path, "rechnungsperiode"),
+                out,
+            );
+        }
+        if let Some(items) = &self.rechnungspositionen {
+            let child = crate::strict::field_path(path, "rechnungspositionen");
+            for (i, item) in items.iter().enumerate() {
+                crate::json::Bo4eExtensions::collect_extension_paths(
+                    item,
+                    &crate::strict::index_path(&child, i),
+                    out,
+                );
+            }
+        }
+        if let Some(items) = &self.referenzverbraeuche {
+            let child = crate::strict::field_path(path, "referenzverbraeuche");
+            for (i, item) in items.iter().enumerate() {
+                crate::json::Bo4eExtensions::collect_extension_paths(
+                    &**item,
+                    &crate::strict::index_path(&child, i),
+                    out,
+                );
+            }
+        }
+        if let Some(items) = &self.steuerbetraege {
+            let child = crate::strict::field_path(path, "steuerbetraege");
+            for (i, item) in items.iter().enumerate() {
+                crate::json::Bo4eExtensions::collect_extension_paths(
+                    item,
+                    &crate::strict::index_path(&child, i),
+                    out,
+                );
+            }
+        }
+        if let Some(items) = &self.teilrechnungen {
+            let child = crate::strict::field_path(path, "teilrechnungen");
+            for (i, item) in items.iter().enumerate() {
+                crate::json::Bo4eExtensions::collect_extension_paths(
+                    &**item,
+                    &crate::strict::index_path(&child, i),
+                    out,
+                );
+            }
+        }
+        if let Some(v) = &self.vertrag {
+            crate::json::Bo4eExtensions::collect_extension_paths(
+                &**v,
+                &crate::strict::field_path(path, "vertrag"),
+                out,
+            );
+        }
+        if let Some(items) = &self.vorauszahlungen {
+            let child = crate::strict::field_path(path, "vorauszahlungen");
+            for (i, item) in items.iter().enumerate() {
+                crate::json::Bo4eExtensions::collect_extension_paths(
+                    item,
+                    &crate::strict::index_path(&child, i),
+                    out,
+                );
+            }
+        }
+        if let Some(v) = &self.vorjahresverbrauch {
+            crate::json::Bo4eExtensions::collect_extension_paths(
+                &**v,
+                &crate::strict::field_path(path, "vorjahresverbrauch"),
+                out,
+            );
+        }
+        if let Some(items) = &self.zaehler {
+            let child = crate::strict::field_path(path, "zaehler");
+            for (i, item) in items.iter().enumerate() {
+                crate::json::Bo4eExtensions::collect_extension_paths(
+                    &**item,
+                    &crate::strict::index_path(&child, i),
+                    out,
+                );
+            }
+        }
+        if let Some(items) = &self.zahlungsinformationen {
+            let child = crate::strict::field_path(path, "zahlungsinformationen");
+            for (i, item) in items.iter().enumerate() {
+                crate::json::Bo4eExtensions::collect_extension_paths(
+                    item,
+                    &crate::strict::index_path(&child, i),
+                    out,
+                );
+            }
+        }
+        if let Some(v) = &self.zu_zahlen {
+            crate::json::Bo4eExtensions::collect_extension_paths(
+                v,
+                &crate::strict::field_path(path, "zuZahlen"),
+                out,
+            );
+        }
+        if let Some(v) = &self.zukuenftiger_abschlag {
+            crate::json::Bo4eExtensions::collect_extension_paths(
+                v,
+                &crate::strict::field_path(path, "zukuenftigerAbschlag"),
+                out,
+            );
+        }
+        if let Some(items) = &self.zusatz_attribute {
+            let child = crate::strict::field_path(path, "zusatzAttribute");
+            for (i, item) in items.iter().enumerate() {
+                crate::json::Bo4eExtensions::collect_extension_paths(
+                    item,
+                    &crate::strict::index_path(&child, i),
+                    out,
+                );
+            }
+        }
+    }
+}

@@ -24,6 +24,8 @@ rubo4e/
 │   ├── time_serde.rs        — date_serde / opt_date_serde modules (time feature)
 │   ├── offset_time.rs       — the `format: "time"` fields: time of day + UTC offset
 │   ├── iso8601_duration.rs  — Zeitraum.dauer, refusing Y/M rather than approximating
+│   ├── units.rs             — Mengeneinheit dimensions, conversion, energy ↔ power
+│   ├── timeseries.rs        — Lastgang / Zeitreihe on a timeline; the coverage audit
 │   ├── schema_helpers.rs    — schemars schema_with= helpers (dates, every identifier)
 │   ├── json/                — Bo4eJsonExt and the parsing hardening
 │   │   ├── mod.rs           — the three output modes + the sorted serializer
@@ -209,8 +211,9 @@ reorder the values, so never persist a sort key derived from it. Compare
 | `builder` | — | `typed-builder` | none | Typed builder derives on all BO/COM structs |
 | `validate` | — | `garde` | none | `.validate()` on all structs — recursive: descends into nested BOs, COMs, and identifiers |
 | `schemars` | — | `schemars` | none | `JsonSchema` derive on all types; enables `rubo4e::schema_helpers` |
-| `versioned` | — | none | none | Conditional compilation of `v202607` and `current` modules; enables `rubo4e::convenience`, `rubo4e::strict`, and the `Bo4eEnum` / `Bo4eStrict` traits |
-| `time` + `versioned` | — | `time` | none | Additionally enables `rubo4e::offset_time` and `rubo4e::iso8601_duration`, and the `Zeitraum` / `Rechnung` date accessors that return their types |
+| `versioned` | — | none | none | Conditional compilation of `v202607` and `current` modules; enables `rubo4e::convenience`, `rubo4e::strict`, `rubo4e::units`, and the `Bo4eEnum` / `Bo4eStrict` traits |
+| `time` + `versioned` | — | `time` | none | Additionally enables `rubo4e::offset_time`, `rubo4e::iso8601_duration` and `rubo4e::timeseries`, and the `Zeitraum` / `Rechnung` accessors that return their types |
+| `decimal` + `versioned` | — | `rust_decimal` | none | Additionally enables the `rubo4e::units` conversion arithmetic (`factor_to_base`, `conversion_factor`, `Menge::convert_to`) and, with `time`, the `Bo4eTimeSeries` aggregates |
 | `sqlx` | — | `sqlx` | none | `sqlx::Type`/`Encode`/`Decode`/`PgHasArrayType` for every identifier and every enum; no `json` required — both directions go through `&str` |
 | `utoipa` | — | `utoipa` | none | `ToSchema` derive on all types |
 | `strum` | — | `strum` | none | `FromStr`, `EnumIter`, `Into<&'static str>` on all enums (`Display`/`AsRef<str>`/introspection are always on) |

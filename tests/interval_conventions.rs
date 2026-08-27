@@ -11,6 +11,7 @@
 //! | `date-time` pairs (`vertragsbeginn`/`vertragsende`, `von`/`bis`) | `[start, end)` |
 //! | `Zeitraum`'s **date** pair | `[start, end]` |
 //! | `Zeitraum`'s **time** pair | `[start, end)` |
+//! | `Zeitraum`'s **instant** pair (all four fields) | `[start, end)` |
 //! | decimal bounds (`staffelgrenzeVon`/`Bis`) | `[von, bis]` |
 //!
 //! These read each statement out of the committed schema and check it against
@@ -160,6 +161,122 @@ fn the_zeitraum_time_pair_is_half_open_unlike_its_date_pair() {
         !require_stated("com/Zeitraum.json", "enduhrzeit"),
         "enduhrzeit is EXclusive — the opposite of enddatum on the same type"
     );
+}
+
+/// `Zeitraum`'s third mode joins a date and a time of day into an instant, and
+/// it inherits the **time** pair's convention rather than the date pair's:
+/// `startuhrzeit` inclusive, `enduhrzeit` exclusive, so the period is
+/// `[start, end)` and consecutive quarter-hours abut without overlapping.
+///
+/// This is what `as_instant_range` returns and what the date accessors on the
+/// same value do *not* say, so the two conventions have to stay pinned apart.
+#[test]
+fn the_zeitraum_instant_range_is_half_open() {
+    use rubo4e::current::Zeitraum;
+    use time::macros::datetime;
+
+    // The schema statements the range's shape is derived from.
+    assert!(require_stated("com/Zeitraum.json", "startuhrzeit"));
+    assert!(!require_stated("com/Zeitraum.json", "enduhrzeit"));
+
+    let start = datetime!(2026-01-01 00:00 +01:00);
+    let end = start + time::Duration::minutes(15);
+    let slot = Zeitraum::from_instants(start, end);
+
+    let range = slot
+        .as_instant_range()
+        .expect("all four fields present")
+        .expect("both ends parse");
+    assert_eq!(range, start..end);
+    assert!(slot.contains_instant(start), "start is inside");
+    assert!(!slot.contains_instant(end), "end is outside");
+    assert_eq!(
+        slot.instant_duration(),
+        Some(Ok(time::Duration::minutes(15)))
+    );
+
+    // Consecutive slots abut: the boundary belongs to exactly one of them.
+    let next = Zeitraum::from_instants(end, end + time::Duration::minutes(15));
+    assert!(next.contains_instant(end));
+    assert!(!slot.contains_instant(end));
+
+    // The date pair on the very same value still answers about whole days —
+    // which is why routing on `is_instant_range` matters.
+    assert!(slot.is_instant_range());
+    assert_eq!(slot.whole_days(), Some(1));
+    assert!(slot.contains(time::macros::date!(2026 - 01 - 01)));
+}
+
+/// The two open ends of `contains_instant` are not the same thing: an *absent*
+/// boundary is unbounded, a *malformed* one is unreadable. Admitting a record
+/// whose bound you could not parse is the wrong direction for a filter.
+#[test]
+fn contains_instant_treats_an_absent_bound_as_open_and_a_broken_one_as_no() {
+    use rubo4e::current::Zeitraum;
+    use time::macros::{date, datetime};
+
+    let t = datetime!(2026-01-01 12:00 +01:00);
+
+    // Absent on both sides: unbounded, and contains everything.
+    assert!(Zeitraum::default().contains_instant(t));
+
+    // Absent on one side: open in that direction only.
+    let from = Zeitraum {
+        startdatum: Some(date!(2026 - 01 - 01)),
+        startuhrzeit: Some("00:00:00+01:00".into()),
+        ..Default::default()
+    };
+    assert!(from.contains_instant(t));
+    assert!(!from.contains_instant(datetime!(2025-12-31 23:00 +01:00)));
+
+    // Malformed: not open, not contained. `as_instant_range` still reports why.
+    let broken = Zeitraum {
+        startuhrzeit: Some("not a time".into()),
+        ..from.clone()
+    };
+    assert!(!broken.contains_instant(t));
+    assert!(broken.start_instant().is_some_and(|r| r.is_err()));
+
+    // A time of day with no offset is malformed for this purpose too: it names a
+    // wall-clock reading, not a moment.
+    let no_offset = Zeitraum {
+        startuhrzeit: Some("00:00:00".into()),
+        ..from
+    };
+    assert!(!no_offset.contains_instant(t));
+}
+
+/// A `Zeitraum` whose instants collapse to a point encloses no time, because the
+/// end is exclusive — so `.validate()` rejects it, the way it does for the
+/// half-open `date-time` pairs elsewhere in the schema.
+#[test]
+fn validate_zeitraum_rejects_an_empty_instant_range() {
+    #![cfg(feature = "validate")]
+    use garde::Validate as _;
+    use rubo4e::current::Zeitraum;
+    use time::macros::datetime;
+
+    let instant = datetime!(2026-01-01 00:00 +01:00);
+    assert!(
+        Zeitraum::from_instants(instant, instant)
+            .validate()
+            .is_err(),
+        "start == end encloses no time when the end is exclusive"
+    );
+    assert!(
+        Zeitraum::from_instants(instant, instant + time::Duration::nanoseconds(1))
+            .validate()
+            .is_ok(),
+    );
+
+    // The *date* pair keeps the opposite rule on the same type: both bounds are
+    // inclusive, so a one-day period is start == end and stays valid.
+    let one_day = Zeitraum {
+        startdatum: Some(time::macros::date!(2026 - 03 - 15)),
+        enddatum: Some(time::macros::date!(2026 - 03 - 15)),
+        ..Default::default()
+    };
+    assert!(one_day.validate().is_ok());
 }
 
 // ─── Timestamp pairs are half-open ───────────────────────────────────────────

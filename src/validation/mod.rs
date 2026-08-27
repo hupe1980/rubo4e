@@ -442,6 +442,15 @@ macro_rules! impl_validators {
             /// When both dates are present, `startdatum` must be **on or before**
             /// `enddatum` (only checked when `time` is active).
             ///
+            /// # …and where it *is* `<`
+            ///
+            /// When all four fields are present the value is the third mode — a
+            /// start Zeitpunkt and an end Zeitpunkt — and there the start must be
+            /// **strictly** before the end: `startuhrzeit` is *"inklusiv"* and
+            /// `enduhrzeit` *"exklusiv"*, so an end at or before the start
+            /// encloses no time at all. The date check cannot see it, because
+            /// both instants can fall on the same date.
+            ///
             /// # Why `<=` and not `<`
             ///
             /// BO4E declares both dates **inclusive**, and gives `'2025-01-01'` as
@@ -470,6 +479,29 @@ macro_rules! impl_validators {
                         return Err(garde::Error::new(format!(
                             "startdatum ({start}) must be on or before enddatum ({end}); \
                              both bounds are inclusive, so a one-day period has start == end"
+                        )));
+                    }
+                }
+
+                // When all four fields are present the value is BO4E's third mode
+                // — a start *Zeitpunkt* and an end *Zeitpunkt* — and the two
+                // inclusivity statements pin its shape: `startuhrzeit` is
+                // "inklusiv" and `enduhrzeit` "exklusiv", so the period is
+                // [start, end) and an end at or before the start encloses
+                // nothing. That is a contradiction the date check alone cannot
+                // see: both instants can share a date.
+                //
+                // An unparsable Uhrzeit is *not* reported here. Rejecting it
+                // would make `.validate()` answer a question about string syntax
+                // that the schema states no rule for; read it through
+                // `startuhrzeit_parsed` and decide there.
+                #[cfg(feature = "time")]
+                if let (Some(Ok(start)), Some(Ok(end))) = (v.start_instant(), v.end_instant()) {
+                    if start >= end {
+                        return Err(garde::Error::new(format!(
+                            "start instant ({start}) must be strictly before end instant \
+                             ({end}); startuhrzeit is inclusive and enduhrzeit exclusive, \
+                             so the period would enclose no time at all"
                         )));
                     }
                 }

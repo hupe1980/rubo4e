@@ -27,10 +27,13 @@ implementation does.
 - **Three-layer validation** — constructor checks, `garde` struct rules, cross-field business logic
 - **Strict enum parsing & introspection** — `from_wire` (reject out-of-schema values), `VARIANTS` / `COUNT` / `iter_known`, `Display` / `AsRef<str>`, `is_unknown`, unified by the `Bo4eEnum` trait — all **without** the `strum` feature
 - **Recursive strict decoding** — `Bo4eStrict::ensure_known_enums()` rejects any `Unknown` enum value anywhere in a deserialized payload, with JSON-paths — one call replaces hand-written per-field checks
+- **Recursive unknown-field detection** — `Bo4eExtensions::ensure_no_extension_data()` finds every field BO4E does not define, at any depth, because a decode round-trip **cannot**: a misspelled key decodes cleanly and reads back as `None`
 - **Typed builders** — readable, diffable construction via `typed-builder`; setters accept both `T` and `Option<T>` (note: BO4E BO fields are schema-optional, so AHB-mandatory contracts are enforced by your ingest layer, not the type system); `Lastgang` and `Tarif`, the two the schema marks `required`, get a feature-free `new(…)`
 - **Type-level `_typ` facts** — `T::TYP`, `T::TYP_WIRE`, `T::SCHEMA_VERSION`, `T::SCHEMA_SERIES` as associated constants on every BO **and** COM, so generic code needs no value and no `Default` bound
 - **German / snake_case / canonical JSON** — BO4E wire format out of the box, with a hardened path for untrusted input
 - **`Eq` + `Hash` on generated types** without the `json` feature, so a BO can key a `HashMap`; enums are always `Eq + Ord + Hash`
+- **Time-series audit** — `Lastgang` / `Zeitreihe` placed on a timeline in one call: gaps, overlaps, wrong-length intervals, unusable readings, coverage ratio — and `integrate()`, the step from a load profile in kW to the energy an invoice bills
+- **Unit dimensions** — `Mengeneinheit` grouped into eleven physical dimensions, with exact conversion, the energy ↔ power pairing, and calendar units refused rather than averaged
 - **Ergonomic convenience API** — extension traits, billing-period helpers, EDIFACT agency codes
 - **JSON Schema** via `schemars`, OpenAPI via `utoipa`, PostgreSQL via `sqlx`
 - **Golden corpus**, **fuzz harnesses**, and **drift guards** that fail the build when the committed codegen stops matching the pinned schema
@@ -244,6 +247,80 @@ implement it on your own domain wrappers to extend the recursive check.
 [`Bo4eEnum`]: https://docs.rs/rubo4e/latest/rubo4e/trait.Bo4eEnum.html
 [`StrictError`]: https://docs.rs/rubo4e/latest/rubo4e/strict/struct.StrictError.html
 
+### A decode does **not** validate field names (`Bo4eExtensions`)
+
+Serde ignores keys a struct does not declare, and this crate goes further and
+*keeps* them in `_additional` so a payload from a newer schema survives intact.
+Both are the right defaults for inbound traffic. Together they mean the natural
+way to check a document you assembled as JSON proves nothing:
+
+```rust
+let body = serde_json::json!({
+    "_typ": "KOSTEN",
+    "kostenbloecke": [{ "kostenblockBEZEICHNUNG": "x" }]   // misspelled
+});
+
+// Built from a literal, so a field rename must fail here — right?
+let kosten: Kosten = serde_json::from_value(body)?;   // it cannot fail
+assert_eq!(kosten.kostenbloecke.unwrap()[0].kostenblockbezeichnung, None);
+```
+
+The key lands in extension data, the decode succeeds, the field reads back as
+`None`, and the *literal* is what gets sent. `has_extension_data()` does not save
+you either: it is shallow, and answers `false` at the root because the stray key
+is one level down.
+
+`Bo4eExtensions` is the recursive check that answers, with JSON-paths:
+
+```rust
+use rubo4e::json::Bo4eExtensions;
+
+assert_eq!(kosten.extension_paths(), ["kostenbloecke[0].kostenblockBEZEICHNUNG"]);
+kosten.ensure_no_extension_data()?;   // Err(UnknownFieldError { paths })
+```
+
+Or make the decode itself the check, which is what a producer usually wants:
+
+```rust
+use rubo4e::json::{Bo4eJsonExt, JsonParseLimits};
+
+let closed = JsonParseLimits::unlimited().with_max_extension_field_count(Some(0));
+let kosten = Kosten::from_json_value_hardened(body, closed)?;   // Err on any stray key
+```
+
+`from_json_value` / `from_json_value_hardened` are the `serde_json::Value`
+counterparts of the `&str` readers — the same depth and extension budgets,
+reachable where the trap actually lives. (`max_payload_bytes` does not apply: the
+caller already paid for the parse.)
+
+**Two questions, two calls.** A payload can leave the schema in two ways, and
+neither check sees the other's finding:
+
+| Question | Call |
+|---|---|
+| Does it use a **value** this schema version does not define? | `ensure_known_enums()` — `Bo4eStrict` |
+| Does it use a **field** this schema version does not define? | `ensure_no_extension_data()` — `Bo4eExtensions` |
+
+They are separate on purpose. Rejecting an unknown *value* is usually right at an
+ingest boundary; rejecting an unknown *field* usually is not — that is how a
+counterparty one release ahead reaches you at all. Run the field check on
+documents you **produce**, and inbound only where a closed field set is agreed.
+
+**Better still, do not decode-to-check.** Construct the value typed and a field
+rename is a compile error:
+
+```rust
+let kosten = Kosten { kostenbloecke: Some(vec![Kostenblock {
+    kostenblockbezeichnung: Some("x".into()), ..Default::default()
+}]), ..Default::default() };
+```
+
+One surprise the check surfaces: `ZusatzAttribut` is the single BO4E schema that
+declares **no** `_typ` — it has exactly `name` and `wert`, and `ComTyp` has no
+variant for it. A producer that stamps `"_typ": "ZUSATZATTRIBUT"` on one by
+analogy with every other COM is sending a field BO4E does not define, and the
+reference implementation emits no such key either.
+
 ---
 
 ## Identifiers
@@ -442,7 +519,7 @@ This pattern:
 - Requires no new rubo4e API — `schema_series()` is already on every BO and COM via `Bo4eTyped`
 - Is trivially extensible: each new schema series is one `match` arm, and patches inside a series need none
 - Localises migration to the storage layer; business logic only handles the series it was written for
-- Avoids over-engineering (`trait` objects, `Any*` enums) for a straightforward branch
+- Keeps the branch a branch. `AnyBo` is the sum type over the *Geschäftsobjekte*, for a payload whose `_typ` is unknown until it is read — it is not a version abstraction, and there is deliberately no `AnyVersion`: two schema series have different field sets, so anything unifying them would have to erase the difference that made the dispatch necessary
 
 See [Schema Versioning](https://hupe1980.github.io/rubo4e/docs/versioning/) for the full upgrade workflow.
 
@@ -525,6 +602,7 @@ let start    = z.startuhrzeit_parsed();       // Option<Result<(Time, Option<Utc
 | `date-time` pairs (`vertragsbeginn`/`vertragsende`, `von`/`bis`) | `[start, end)` |
 | `Zeitraum`'s **date** pair | `[start, end]` |
 | `Zeitraum`'s **time** pair (`startuhrzeit`/`enduhrzeit`) | `[start, end)` |
+| `Zeitraum`'s **instant** pair (all four boundary fields) | `[start, end)` |
 | price-tier bounds (`staffelgrenzeVon`/`Bis`) | `[von, bis]`, plus a gap rule |
 
 `enddatum` is inclusive — *"Enddatum des betrachteten Zeitraums ist
@@ -542,6 +620,148 @@ wire string and an accessor parses on demand: `dauer` is an ISO 8601 duration
 `PreisstaffelSliceExt::select_for` picks a price tier, including BO4E's rule that
 a value between two tiers *"rutscht in die obere Zone"* — which a plain
 `von <= x <= bis` scan misses entirely.
+
+---
+
+## Time Series — `Lastgang` and `Zeitreihe`
+
+`Lastgang` and `Zeitreihe` are the highest-volume payload in German market
+communication — a year of quarter-hours is 35 040 entries — and the two the
+schema leaves most open. Each entry states its own `Zeitraum`, and nothing
+requires the entries to be sorted, contiguous, disjoint, or the length the
+`Lastgang` declares. `Bo4eTimeSeries` answers *"is this series actually
+complete?"* in one call.
+
+```rust
+use rubo4e::current::Lastgang;
+use rubo4e::timeseries::Bo4eTimeSeries;
+
+let lg: Lastgang = serde_json::from_str(&body)?;
+
+let report = lg.audit();                       // against the span the entries cover
+let report = lg.audit_over(start..end);        // …or against the period it was *meant* to
+
+report.gaps;           // Vec<Range<OffsetDateTime>> — stretches nothing covers
+report.overlaps;       // …and stretches more than one entry covers (a double-billed slot)
+report.wrong_length;   // indices whose length is not zeitIntervallLaenge
+report.unplaced;       // entries with no resolvable interval, each with a reason
+report.unusable;       // indices whose status is FEHLT / NICHT_VERWENDBAR
+report.out_of_order;   // the entries are not listed in ascending start order
+
+report.is_complete();      // the timeline is covered exactly once
+report.is_usable();        // …and every entry carries a usable value
+report.coverage_ratio();   // Option<f64> in 0.0 ..= 1.0
+
+lg.all_values_usable();    // the status check alone: one pass, no allocation
+```
+
+A year of quarter-hours (35 040 entries) audits in ≈ 3.4 ms — one allocation,
+one sort, each `Zeitraum` parsed exactly once. `benches/timeseries_perf.rs`
+measures the clean, gappy, duplicated and reversed shapes.
+
+**`is_complete()` is a claim about the timeline, not the readings.** A
+`Zeitreihenwert` whose status is `FEHLT` still occupies its slot, so a series
+where every reading is declared absent covers its span exactly once and contains
+nothing. `Messwertstatus` gets three predicates that partition the enum —
+`is_measured()` (`ABGELESEN`), `is_substitute()` (`ERSATZWERT`, `PROGNOSEWERT`, …),
+and `is_usable()` (everything but `FEHLT`, `NICHT_VERWENDBAR`, and the `Unknown`
+catch-all) — and a drift guard fails the build if a schema release breaks the
+partition.
+
+**`audit()` is not `validate()`.** BO4E requires none of these properties, so a
+gappy load profile is a *conforming* load profile. Nothing here is wired into
+`.validate()` — the same line `validation::current::quality` draws.
+
+### `Zeitraum`'s third mode: an instant range
+
+A quarter-hourly `Zeitreihenwert` uses BO4E's third `Zeitraum` mode — *"Zeitraum:
+Startzeitpunkt (Datum und Uhrzeit) bis Endzeitpunkt (Datum und Uhrzeit)"* — all
+four boundary fields at once. It is **half-open**, `[start, end)`, because
+`startuhrzeit` is *"inklusiv"* and `enduhrzeit` *"exklusiv"* — the opposite of the
+date pair on the same struct.
+
+```rust
+let start = datetime!(2026-01-01 00:00 +01:00);
+let slot = Zeitraum::from_instants(start, start + Duration::minutes(15));
+
+slot.as_instant_range();     // Option<Result<Range<OffsetDateTime>, _>>  — half-open
+slot.start_instant();        // date + time of day + offset, as one moment
+slot.instant_duration();     // Some(Ok(15 minutes)) — what the boundaries actually say
+slot.contains_instant(t);    // [start, end)
+slot.is_instant_range();     // does this value state all four fields?
+```
+
+Two traps this closes:
+
+- **The date accessors read the date pair, and only that.** `whole_days()` on a
+  15-minute slot is `Some(1)` and `contains()` covers the entire day — correct
+  about the date pair, wrong about the value. Route on `is_instant_range()`.
+- **The offset is not optional.** A time of day with no UTC offset is a
+  wall-clock reading, not a moment; `start_instant()` returns
+  `ZeitpunktError::MissingOffset` rather than guessing. Germany changes offset
+  twice a year, so `+01:00` is wrong for half of it and UTC for all of it. Slots
+  written in *different* offsets land on one timeline, so `01:30+02:00` and
+  `00:30+01:00` are reported as an overlap, not as two adjacent slots.
+
+`contains_instant` distinguishes the two open ends: an **absent** bound is
+unbounded on that side, a **malformed** one answers `false` outright. A bound you
+cannot read is not one you can establish you are inside, and dropping the record
+is the safe direction for the `.filter()` this predicate exists for.
+
+`.validate()` gained the matching rule: when all four fields are present the start
+instant must be **strictly** before the end instant, because the end is exclusive.
+The date check cannot see it — both instants can fall on the same date.
+
+### Units have dimensions
+
+BO4E puts energies, powers, a volume, eleven durations, a percentage and a
+frequency into one flat `Mengeneinheit`, and says nothing about which may be added
+or converted. `rubo4e::units` states it once.
+
+```rust
+use rubo4e::units::Dimension;
+
+Mengeneinheit::Kwh.dimension();                             // Some(Dimension::Energy)
+Mengeneinheit::Mwh.conversion_factor(Mengeneinheit::Kwh);   // Some(1000)
+Mengeneinheit::Kwh.conversion_factor(Mengeneinheit::Kw);    // None — a different dimension
+Mengeneinheit::ViertelStunde.exact_duration();              // Some(15 minutes)
+Mengeneinheit::Monat.exact_duration();                      // None — no fixed length
+```
+
+Eleven dimensions (`Energy`, `Power`, `ReactiveEnergy`, `ReactivePower`, `Volume`,
+`Time`, `Count`, `Ratio`, `Frequency`, `EnergyPerTemperature`, `Dimensionless`),
+each with a base unit. `MONAT` / `QUARTAL` / `HALBJAHR` / `JAHR` are in
+`Dimension::Time` but have **no** factor and **no** duration — the same call
+`iso8601_duration` makes about `P1Y`. A drift guard checks that exactly those four
+lack one, and that every schema-defined unit has a dimension.
+
+`is_extensive()` separates what may be summed over a period (energy, volume,
+count) from what may not (power, frequency, percentage) — which is what makes the
+two aggregates mean different things:
+
+```rust
+lastgang.sum();              // None — messgroesse is KW, and adding kW is meaningless
+lastgang.integrate();        // Some(450) — Σ value × interval_hours
+lastgang.integrated_unit();  // Some(Mengeneinheit::Kwh) — what that 450 is in
+
+// The same arithmetic on a single quantity:
+Menge { wert: Some(dec!(400)), einheit: Some(Mengeneinheit::Kw), ..d() }
+    .energy_over(Duration::minutes(15));         // 100 KWH
+
+// …and the one that reads Lastgang.zeitIntervallLaenge:
+Menge { wert: Some(dec!(15)), einheit: Some(Mengeneinheit::Minute), ..d() }
+    .as_duration();                              // Some(15 minutes)
+```
+
+For a **stated** unit exactly one of the two answers: `KWH` sums and does not
+integrate, `KW` integrates and does not sum. A series that states no unit answers
+to both, on the caller's word.
+
+`Menge::convert_to` scales through the base unit rather than by a rounded scalar,
+so 120 `SEKUNDE` is exactly 2 `MINUTE` — `1/60` has no exact decimal form, and
+multiplying by it leaves `2.000…004`.
+
+See [Time Series & Units](https://hupe1980.github.io/rubo4e/docs/timeseries/).
 
 ---
 
@@ -576,7 +796,8 @@ through `f64` before any Rust deserializer sees it, so `119.00` arrives as `119`
 (scale lost) and anything past ~15 significant digits is rounded. Nothing in the
 German energy market comes near that many digits, so this is a fidelity question
 rather than a correctness one; `decimal_serde::decimal_from_json_number_count()`
-counts every such read so you can tell which spelling your producers use. See
+counts every decimal read from a number — integers included, since Go writes a
+whole amount as `119` — so you can tell which spelling your producers use. See
 [Serialization](https://hupe1980.github.io/rubo4e/docs/serialization/#decimal-amounts-are-written-as-json-strings).
 
 The snake_case mapping is an exact table emitted by the generator, not a runtime
@@ -665,7 +886,7 @@ generated types:
 | `Marktlokation`, `Messlokation` | **at most one** of `lokationsadresse`(`messadresse`) / `geoadresse` / `katasterinformation` |
 | `Vertrag` | `vertragsbeginn` strictly before `vertragsende` |
 | `Bilanzierung` | `bilanzierungsbeginn` ≤ `bilanzierungsende` |
-| `Zeitraum` | at least one temporal field; `startdatum` **on or before** `enddatum` (both bounds inclusive) |
+| `Zeitraum` | at least one temporal field; `startdatum` **on or before** `enddatum` (both bounds inclusive); with all four boundary fields, start instant **strictly before** end instant (the end is exclusive) |
 | `Rechnung` | one currency throughout; `gesamtnetto + gesamtsteuer == gesamtbrutto`; `steuerbetraege` sum to `gesamtsteuer` |
 | `Kostenposition` | `einzelpreis × menge` rounds to `betrag_kostenposition` at its own scale |
 
@@ -755,6 +976,7 @@ an out-of-schema string becomes `Unknown`, mirroring the serde path — so use
 | [Identifiers](https://hupe1980.github.io/rubo4e/docs/identifiers/) | Every identifier type, its validation rules, and the BDEW check-digit procedures |
 | [Serialization](https://hupe1980.github.io/rubo4e/docs/serialization/) | JSON output modes, extension data, hardened parsing |
 | [Validation](https://hupe1980.github.io/rubo4e/docs/validation/) | The three validation layers and `Validated<T>` |
+| [Time Series & Units](https://hupe1980.github.io/rubo4e/docs/timeseries/) | `Lastgang` / `Zeitreihe` coverage audits, `Zeitraum`'s instant mode, and unit dimensions |
 | [Schema Versioning](https://hupe1980.github.io/rubo4e/docs/versioning/) | Version modules, `current`, and the upgrade workflow |
 | [Ecosystem](https://hupe1980.github.io/rubo4e/docs/ecosystem/) | sqlx, schemars, utoipa, strum integrations |
 | [Code Generator](https://hupe1980.github.io/rubo4e/docs/generator/) | How generation works and how to re-run it |

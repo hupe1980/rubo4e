@@ -188,6 +188,22 @@ three interval conventions; `tests/interval_conventions.rs` reads each one out o
 the committed schema and checks it against the code, so a release that flips one
 fails CI rather than an invoice.
 
+**Zeitraum, third mode** (all four boundary fields present):
+```
+start_instant < end_instant   (strict — equal encloses no time)
+```
+
+The same struct, the opposite rule, and both come straight out of the schema:
+`startuhrzeit` is *"im betrachteten Zeitraum **inklusiv**"* and `enduhrzeit`
+*"**exklusiv**"*, so an instant range is `[start, end)` and a start at or after
+the end covers nothing. The date check cannot see it, because both instants can
+fall on the same date — which is exactly the shape every quarter-hourly
+`Zeitreihenwert` has. See [Time Series & Units](@/docs/timeseries.md).
+
+An unparsable `startuhrzeit` is **not** reported here: rejecting it would make
+`.validate()` answer a question about string syntax that the schema states no rule
+for. Read it through `startuhrzeit_parsed()` and decide there.
+
 Additionally, a `Zeitraum` must have at least one temporal attribute set (`dauer`,
 `startdatum`, `enddatum`, `startuhrzeit`, or `enduhrzeit`). A completely empty
 `Zeitraum` fails validation.
@@ -253,6 +269,27 @@ amount, which accepts either rounding mode: `0.2843 €/kWh × 3333 kWh` is
 An amount at `Decimal`'s maximum scale of 28 leaves no room for a tolerance, so
 the comparison there is exact.
 
+## What `.validate()` does not check: field names
+
+`.validate()` runs rules over the value it is given. It cannot say anything about
+keys that never reached a field — a misspelled `kostenblockBEZEICHNUNG` is not a
+failed rule, it is a key that landed in extension data while the field it was
+meant to fill stayed `None`. `Validated<Kosten>` proves the rules hold; it does
+not prove the document said what its author meant.
+
+There are three separate questions, and they need three separate answers:
+
+| Question | Call |
+|---|---|
+| Do the **cross-field rules** hold? | `.validate()` / `Validated<T>` |
+| Does it use a **value** BO4E does not define? | `Bo4eStrict::ensure_known_enums()` |
+| Does it use a **field** BO4E does not define? | `Bo4eExtensions::ensure_no_extension_data()` |
+
+The third is documented in full under
+[Serialization](@/docs/serialization.md#a-decode-does-not-validate-field-names),
+along with why a decode round-trip cannot answer it and why constructing values
+typed is better than any of the three.
+
 ## Conformance rules vs. quality rules
 
 `.validate()` runs **only rules traceable to a sentence of the BO4E schema**, so
@@ -273,6 +310,12 @@ Nothing here is wired into `#[derive(garde::Validate)]`, so `.validate()` and
 | Function | Rule | Why it is not conformance |
 |---|---|---|
 | `rechnung_totals_are_complete` | all three of `gesamtnetto` / `gesamtsteuer` / `gesamtbrutto`, or none | BO4E marks none of them `required` and says nothing about stating them together |
+
+The time-series audit is the same kind of judgement, and lives outside
+`validation` for the same reason. `Bo4eTimeSeries::audit()` reports gaps,
+overlaps, wrong-length intervals and unusable readings on a `Lastgang` or a
+`Zeitreihe` — none of which the schema requires, so a gappy load profile is a
+conforming one. See [Time Series & Units](@/docs/timeseries.md#audit-is-not-validate).
 
 ```rust
 use rubo4e::validation::current::quality;

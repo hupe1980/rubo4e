@@ -21,7 +21,47 @@ It also advances the schema snapshot to **v202607.1.0** and makes the versioning
 contract say what BO4E actually does inside a series — see **Schema deltas** and
 **Changed** below.
 
+And it closes the crate's largest functional gap: `Lastgang` and `Zeitreihe`, the
+two highest-volume BO4E payloads, had no support at all — not even a way to read
+the instant range a quarter-hourly `Zeitreihenwert` states. See
+[Time Series & Units](https://hupe1980.github.io/rubo4e/docs/timeseries/).
+
+It also closes a trap in the other direction: **a decode round-trip does not
+validate field names**, and nothing in the crate's surface said so. See
+`Bo4eExtensions` under **Added**, and
+[Serialization](https://hupe1980.github.io/rubo4e/docs/serialization/#a-decode-does-not-validate-field-names).
+
 ### Fixed *(breaking)*
+
+- **`EicCode::compute_check_char` answered `None` for a prefix whose check
+  character the ENTSO-E algorithm defines.** The formula is
+  `36 − (Σ products − 1) mod 37`, and the crate spelled the `− 1` outside the
+  modulus, which needs an underflow guard for `Σ == 0`. That guard rejected the
+  all-`'0'` prefix, whose check character is `'0'`. The subtraction now happens
+  inside the modulus as `+ 36` — the same congruence class, with no intermediate
+  that can go negative — and the guard is gone. No published EIC was affected
+  (position 3 must be an object-type character, so `"000000000000000"` is not a
+  valid prefix), but the function is public and was wrong about it.
+
+- **`decimal_from_json_number_count()` did not count an integer JSON number**,
+  which is the shape that matters most. The counter exists to answer *"do my
+  producers spell decimals as strings or as numbers?"*, and only the fractional
+  `visit_f64` path bumped it — but Go marshals a whole amount as `119`, never as
+  `119.0`, so a go-bo4e producer sending round euro amounts left the counter at a
+  steady zero and the answer was "strings". Every number shape now counts.
+
+  The counter measures the **spelling**, not the damage: an integer is exact
+  (`visit_u64`, never `f64`) and is counted anyway. The lossy fractional case is
+  still the one that emits the `tracing` `debug!`, now worded to say which shape
+  it is. `tests/decimal_number_counter.rs` runs alone in its own binary so the
+  deltas can be asserted exactly rather than as "it moved".
+
+- **ISO 8601 durations accepted a decimal fraction on any component.** The
+  standard allows one on the **smallest** component only; `parse` took
+  `P1.5DT1H` and read it as a day and a half plus an hour, which no other
+  implementation does. It is now rejected, and the module docs say so — they had
+  claimed the rule was enforced while it was not. `P1.5D`, `PT1.5H` and
+  `PT1H30.5M` are unaffected.
 
 - **Every payload rubo4e produced carried an invalid `_version`.** The generator
   filled the field in from the schema *release tag*, which BO4E spells
@@ -472,6 +512,134 @@ contract say what BO4E actually does inside a series — see **Schema deltas** a
   Behaviour for well-formed input is unchanged; see *Added* for what this buys.
 
 ### Added
+
+- **`Bo4eExtensions` — a recursive check for fields BO4E does not define.**
+  A decode round-trip cannot detect a misspelled or renamed field, and consumers
+  reach for it as if it could. Serde ignores keys a struct does not declare, this
+  crate keeps them in `_additional`, and so
+  `serde_json::from_value::<T>(literal)` — the natural way to check a document
+  assembled as JSON — returns `Ok` while the field the key was meant to fill
+  reads back as `None`, and the literal is what gets sent.
+
+  `extension_paths()` and `ensure_no_extension_data()` walk every nested BO, COM,
+  `Option` and `Vec` and report each undefined field at its JSON-path
+  (`kostenbloecke[0].kostenblockBEZEICHNUNG`), returning `UnknownFieldError`.
+  Implemented for every BO, COM and `AnyBo`, and — like `Bo4eStrict`, whose shape
+  it mirrors — deliberately **not** sealed.
+
+  The existing `Bo4eExtensionData::has_extension_data()` did not close this: it
+  is shallow, and answers `false` at the root for exactly the payload above,
+  because the stray key sits one level down. Both its accessors now say so.
+
+  It is the sibling of `Bo4eStrict`, not a replacement: one finds out-of-schema
+  **values**, the other out-of-schema **fields**, and neither sees the other's
+  finding. Rejecting an unknown field inbound throws away the forward
+  compatibility `_additional` exists for, so the field check is for documents you
+  **produce**.
+
+  One surprise it surfaces: `ZusatzAttribut` is the single BO4E schema that
+  declares no `_typ`, so a producer stamping `"_typ": "ZUSATZATTRIBUT"` on one by
+  analogy with every other COM is sending an undefined field. Correct, and the
+  reference implementation emits no such key either.
+
+- **`from_json_value` and `from_json_value_hardened`.** The hardened readers took
+  `&str` and `&[u8]` only, so a caller holding a `serde_json::Value` — which is
+  exactly the caller who assembled a document with `json!` and is about to
+  decode-to-check it — had no way to reach any budget at all. Both now exist,
+  with the same depth and extension-data caps;
+  `.with_max_extension_field_count(Some(0))` turns the decode itself into the
+  check. `max_payload_bytes` is ignored on this path rather than rejected (the
+  caller already paid for the parse), so one `JsonParseLimits` serves both.
+
+- **`strict::extension_path`** — the path joiner for keys that come off the wire.
+  Extension keys can contain the characters the path syntax uses, and `a.b`
+  rendered `parent.a.b` names two fields that do not exist, so anything that is
+  not a plain `[A-Za-z0-9_]` identifier is bracket-quoted: `parent["a.b"]`.
+
+- **Time-series support for `Lastgang` and `Zeitreihe` (`rubo4e::timeseries`).**
+  The two highest-volume BO4E payloads had no support at all: each
+  `Zeitreihenwert` states its own `Zeitraum`, and nothing in the schema requires
+  the entries to be sorted, contiguous, disjoint, or the length the `Lastgang`
+  declares. Every consumer wrote the same walk by hand.
+
+  `Bo4eTimeSeries::audit()` does it in one pass and returns a `CoverageReport`:
+  `gaps`, `overlaps`, `wrong_length`, `unplaced` (each with a typed reason),
+  `unusable`, `out_of_order`, `covered`, plus `is_complete()`, `is_usable()`,
+  `coverage_ratio()` and `missing()`. `audit_over(range)` measures against the
+  period the series was *supposed* to cover, since a series missing its whole
+  last day looks complete against itself.
+
+  Also on the trait: `placed()` (the resolvable entries, allocation-free),
+  `span()`, `sum()` and `integrate()`. The trait is deliberately **not** sealed —
+  three methods make a downstream wrapper participate, the same way `Bo4eStrict`
+  works.
+
+- **`Zeitraum`'s third mode — an instant range — is now readable.** BO4E declares
+  *"Zeitraum: Startzeitpunkt (Datum und Uhrzeit) bis Endzeitpunkt (Datum und
+  Uhrzeit)"*, which is the shape every quarter-hourly `Zeitreihenwert` uses, and
+  the crate could only read the date pair and the time pair independently. That
+  made a 15-minute slot indistinguishable from the whole day it falls in:
+  `whole_days()` answered `Some(1)` and `contains()` covered the entire date.
+
+  New: `start_instant()`, `end_instant()`, `as_instant_range()`,
+  `instant_duration()`, `contains_instant()`, `is_instant_range()`, and
+  `Zeitraum::from_instants(start, end)` for producing one. The range is
+  half-open, `[start, end)` — `startuhrzeit` is *"inklusiv"*, `enduhrzeit`
+  *"exklusiv"* — the opposite of the date pair on the same struct. The date
+  accessors are unchanged and now say in their own docs that they read the date
+  pair and only that.
+
+  A time of day with no UTC offset gives `ZeitpunktError::MissingOffset` rather
+  than a guess: a wall-clock reading is not a moment, and Germany changes offset
+  twice a year.
+
+- **`.validate()` gained the matching `Zeitraum` rule.** With all four boundary
+  fields present, the start instant must be **strictly** before the end instant,
+  because the end is exclusive. The existing date check cannot see the violation
+  — both instants can fall on the same date. Traceable to the two inclusivity
+  statements the schema puts on the fields, so it is a conformance rule rather
+  than a house rule.
+
+- **Physical dimensions and unit arithmetic (`rubo4e::units`).** BO4E puts
+  energies, powers, their reactive counterparts, a volume, eleven durations, a
+  percentage, a frequency and a dimensionless marker into one flat
+  `Mengeneinheit`, and says nothing about which may be added or converted.
+
+  `Mengeneinheit::dimension()` groups them into eleven `Dimension`s;
+  `factor_to_base()` and `conversion_factor()` convert within one;
+  `exact_duration()` gives the length of a duration unit; `energy_unit()` /
+  `power_unit()` pair `KW` with `KWH`; `is_extensive()` separates what may be
+  summed over a period from what may not. `MONAT`, `QUARTAL`, `HALBJAHR` and
+  `JAHR` have no factor and no duration — the same refusal `iso8601_duration`
+  makes about `P1Y`, for the same reason.
+
+  On `Menge`: `convert_to()`, `as_duration()` (what reads
+  `Lastgang.zeitIntervallLaenge`), and `energy_over()` (power × time → energy).
+  `convert_to` scales through the base unit rather than by a rounded scalar, so
+  120 `SEKUNDE` is exactly 2 `MINUTE` — `1/60` has no exact decimal form.
+
+- **`Messwertstatus` classification.** `is_measured()`, `is_substitute()` and
+  `is_usable()` partition the enum, with a drift guard that fails the build if a
+  schema release breaks the partition. A `FEHLT` reading still occupies its slot
+  on a timeline, so a coverage check alone reports a series of nothing but
+  absences as contiguous; `CoverageReport::unusable` and `is_usable()` close that
+  gap, and `sum()` / `integrate()` refuse rather than adding a zero that is an
+  absence.
+
+- **Tests pinning the parse budgets through `AnyBo`'s `_typ` dispatch.** Nothing
+  asserted that `max_payload_bytes`, `max_nesting_depth`,
+  `max_extension_field_count` or the snake_case key transform survived the
+  dispatch — they do, but only because `Deserialize` buffers through the
+  caller's deserializer rather than re-parsing with `serde_json::from_str`, and a
+  well-meaning "avoid the intermediate `Value`" refactor would have unhooked
+  every one of them without a test failing. `AnyBo` is the type a gateway reaches
+  for exactly when it does not know what is arriving, so this is the entry point
+  where the budgets matter most.
+
+- **`offset_time::format`** — the inverse of `offset_time::parse`, rendering a
+  time of day and its UTC offset back into BO4E's `format: "time"` spelling.
+  `Zeitraum::from_instants` is built on it, and a round-trip test pins
+  `parse(format(t, o)) == (t, o)`.
 
 - **Three more code-bearing fields are now validated newtypes.** Auditing the
   name/code pairs above turned up code halves left untyped while their name half

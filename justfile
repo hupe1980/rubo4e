@@ -73,6 +73,10 @@ lint-features:
         "sqlx" "utoipa" "strum" "tracing" "metrics" "identifiers" "versioned"
         # Realistic combinations.
         "versioned,json"
+        # The two the timeseries module lives under: `time` alone gives the
+        # timeline walk, `decimal` adds the interval length and the aggregates.
+        "versioned,time"
+        "versioned,time,decimal"
         "versioned,json,time,decimal"
         "versioned,validate"
         # The combination the cross-field validators actually run under: their

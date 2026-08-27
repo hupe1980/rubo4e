@@ -67,6 +67,20 @@ pub const MAX_EXTENSION_KEY_LEN: usize = 256;
 /// (gated on the `json` feature).  The field is serialized / deserialized via
 /// `#[serde(flatten)]` so unknown keys are transparently round-tripped.
 ///
+/// ## A decode does not validate field names
+///
+/// Serde ignores keys a struct does not declare, and this map goes further and
+/// **keeps** them — which is what lets a payload from a newer schema reach you
+/// intact. The consequence is that decoding a document is not a check on it: a
+/// misspelled or renamed key lands here, the decode succeeds, and the field it
+/// was meant to fill reads back as `None`. A producer that assembles BO4E
+/// documents as `serde_json::Value` and round-trips them "to validate" is
+/// validating nothing.
+///
+/// Construct values typed, so a field rename is a compile error. Where a document
+/// really does arrive as JSON, [`Bo4eExtensions::ensure_no_extension_data`] is
+/// the check that answers.
+///
 /// ## What the caps bound
 ///
 /// `Deserialize` stops as soon as the entry count reaches
@@ -329,12 +343,206 @@ impl<'de> serde::Deserialize<'de> for LimitedExtensionMap {
 /// Downstream code may call the provided methods but cannot add new implementors.
 #[cfg(feature = "json")]
 pub trait Bo4eExtensionData: sealed::Sealed {
-    /// Returns the unknown JSON fields captured during deserialization,
-    /// or an empty map if none were present.
+    /// Returns the unknown JSON fields captured during deserialization **on this
+    /// struct**, or an empty map if none were present.
+    ///
+    /// Shallow — see [`has_extension_data`](Bo4eExtensionData::has_extension_data).
+    /// For the whole tree, use
+    /// [`Bo4eExtensions::extension_paths`].
     fn extension_data(&self) -> &indexmap::IndexMap<String, serde_json::Value>;
 
-    /// Returns `true` if any unknown extension fields were captured.
+    /// Returns `true` if any unknown extension fields were captured **on this
+    /// struct**.
+    ///
+    /// Shallow. A stray key one level down — in a nested COM, or in an element of
+    /// a `Vec` — leaves this `false`, so it is not the check to gate a document
+    /// on: it answers "clean" for a document that is not.
+    /// [`Bo4eExtensions::ensure_no_extension_data`] is the recursive one.
     fn has_extension_data(&self) -> bool;
+}
+
+// ─── Recursive extension-data check ──────────────────────────────────────────
+
+/// The fields a payload carried that this BO4E schema version does not define,
+/// reported by [`Bo4eExtensions::ensure_no_extension_data`].
+#[cfg(all(feature = "json", feature = "versioned"))]
+#[cfg_attr(docsrs, doc(cfg(all(feature = "json", feature = "versioned"))))]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UnknownFieldError {
+    /// JSON-paths of every field that landed in extension data.
+    ///
+    /// Dotted, with array indices in brackets, relative to the value that was
+    /// checked — `kostenbloecke[0].kostenblockBEZEICHNUNG`. A key that is not a
+    /// plain identifier is bracket-quoted; see
+    /// [`extension_path`](crate::strict::extension_path).
+    pub paths: Vec<String>,
+}
+
+#[cfg(all(feature = "json", feature = "versioned"))]
+impl std::fmt::Display for UnknownFieldError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{} field(s) are not defined by this BO4E schema version: {}",
+            self.paths.len(),
+            self.paths.join(", ")
+        )
+    }
+}
+
+#[cfg(all(feature = "json", feature = "versioned"))]
+impl std::error::Error for UnknownFieldError {}
+
+#[cfg(all(feature = "json", feature = "versioned", feature = "validate"))]
+impl From<UnknownFieldError> for garde::Error {
+    fn from(e: UnknownFieldError) -> Self {
+        garde::Error::new(e.to_string())
+    }
+}
+
+/// Recursive check for fields BO4E does not define — anywhere in a decoded value.
+///
+/// # The trap this closes
+///
+/// A decode round-trip **cannot** detect a misspelled or renamed field. Serde
+/// ignores keys a struct does not declare, and this crate goes further and
+/// *keeps* them, in `_additional`, so a payload from a newer schema survives a
+/// round-trip. Both are the right defaults for inbound traffic. The consequence
+/// is that the natural way to check a document you assembled yourself proves
+/// nothing:
+///
+/// ```
+/// # #[cfg(all(feature = "json", feature = "versioned"))] {
+/// use rubo4e::current::Kosten;
+///
+/// let body = serde_json::json!({
+///     "_typ": "KOSTEN",
+///     "kostenbloecke": [{ "_typ": "KOSTENBLOCK", "kostenblockBEZEICHNUNG": "x" }]
+/// });
+///
+/// // The key is misspelled. The decode succeeds anyway.
+/// let kosten: Kosten = serde_json::from_value(body).unwrap();
+/// // …and the field it was meant to fill is empty.
+/// assert_eq!(kosten.kostenbloecke.as_ref().unwrap()[0].kostenblockbezeichnung, None);
+/// # }
+/// ```
+///
+/// A producer that assembles BO4E documents as `serde_json::Value` and decodes
+/// them "to check" is therefore shipping whatever it built, unchecked. This trait
+/// is the check that actually answers:
+///
+/// ```
+/// # #[cfg(all(feature = "json", feature = "versioned"))] {
+/// use rubo4e::{current::Kosten, json::Bo4eExtensions};
+/// # let body = serde_json::json!({
+/// #     "_typ": "KOSTEN",
+/// #     "kostenbloecke": [{ "_typ": "KOSTENBLOCK", "kostenblockBEZEICHNUNG": "x" }]
+/// # });
+/// let kosten: Kosten = serde_json::from_value(body).unwrap();
+///
+/// assert_eq!(
+///     kosten.extension_paths(),
+///     ["kostenbloecke[0].kostenblockBEZEICHNUNG"],
+/// );
+/// assert!(kosten.ensure_no_extension_data().is_err());
+/// # }
+/// ```
+///
+/// Better still, do not decode-to-check at all: construct the value typed, and a
+/// field rename is a compile error rather than a runtime one.
+///
+/// # Recursive, unlike [`Bo4eExtensionData`]
+///
+/// [`has_extension_data`](Bo4eExtensionData::has_extension_data) answers for
+/// **one** struct. In the example above it answers `false` at the root, because
+/// the stray key is one level down — a clean bill of health for a broken
+/// document. This trait descends through every nested BO, COM, `Option` and
+/// `Vec`, and reports each finding at its JSON-path.
+///
+/// # The sibling of [`Bo4eStrict`](crate::Bo4eStrict)
+///
+/// The two cover the two ways a payload can fall outside the schema, and a
+/// strict ingest boundary wants both:
+///
+/// | Question | Call |
+/// |---|---|
+/// | Does it use a **value** this schema version does not define? | [`ensure_known_enums`](crate::Bo4eStrict::ensure_known_enums) |
+/// | Does it use a **field** this schema version does not define? | [`ensure_no_extension_data`](Bo4eExtensions::ensure_no_extension_data) |
+///
+/// They are separate on purpose. Rejecting an unknown *value* is usually right
+/// at an ingest boundary; rejecting an unknown *field* usually is not — that is
+/// how a counterparty one schema release ahead reaches you, and refusing it
+/// throws away the forward-compatibility `_additional` exists to provide. Run
+/// this one on documents you **produce**, and on inbound traffic only where a
+/// closed field set is contractually agreed.
+///
+/// # What counts as one field
+///
+/// Only the top-level key of each extension entry. Everything nested under it is
+/// opaque by design — the schema stops there, and so does this walk — so a
+/// vendor blob `{"vendorX": {"a": 1, "b": 2}}` reports `vendorX`, once.
+///
+/// # `AnyBo::Unknown` reports its `_typ`
+///
+/// A payload whose `_typ` matches no generated type has no field set to check it
+/// against, so nothing can be said about its keys. Rather than answer "clean" for
+/// a document it cannot read, the walk reports `_typ` — the thing that made it
+/// uncheckable. Read it as *"this was not checked"*, not as *"`_typ` is an
+/// undefined field"*; the field is defined, and it is
+/// [`Bo4eStrict`](crate::Bo4eStrict) that has the standing to call its **value**
+/// out of schema, which it also does.
+///
+/// # Order
+///
+/// Deterministic: a struct's own undefined keys first, then its children's,
+/// depth-first in field order.
+///
+/// Within one struct, the keys follow `_additional`'s own order — which is
+/// **arrival order** when the value was decoded from text, and **sorted** when it
+/// was decoded from a [`serde_json::Value`], whose objects are a `BTreeMap`
+/// unless `preserve_order` is on. The arrival order was gone before this crate
+/// saw the payload in that case; the structural order holds either way.
+///
+/// # Not sealed
+///
+/// Like [`Bo4eStrict`](crate::Bo4eStrict), and for the same reason: a downstream
+/// crate that wraps BO4E types in its own domain types can implement this to make
+/// its wrappers participate in the same recursive check.
+#[cfg(all(feature = "json", feature = "versioned"))]
+#[cfg_attr(docsrs, doc(cfg(all(feature = "json", feature = "versioned"))))]
+pub trait Bo4eExtensions {
+    /// Appends, to `out`, the JSON-path of every extension field in `self`
+    /// (recursively). `path` is the path of `self` relative to the root of the
+    /// check (`""` at the top level).
+    ///
+    /// The low-level primitive; prefer
+    /// [`ensure_no_extension_data`](Bo4eExtensions::ensure_no_extension_data) or
+    /// [`extension_paths`](Bo4eExtensions::extension_paths) unless you are
+    /// composing the walk yourself.
+    fn collect_extension_paths(&self, path: &str, out: &mut Vec<String>);
+
+    /// Returns the JSON-paths of every field, at any depth, that BO4E does not
+    /// define. Empty when the value uses only schema fields.
+    fn extension_paths(&self) -> Vec<String> {
+        let mut out = Vec::new();
+        self.collect_extension_paths("", &mut out);
+        out
+    }
+
+    /// Returns `Err(`[`UnknownFieldError`]`)` listing every field BO4E does not
+    /// define, or `Ok(())` when there are none.
+    ///
+    /// # Errors
+    ///
+    /// [`UnknownFieldError`], carrying one path per undefined field.
+    fn ensure_no_extension_data(&self) -> Result<(), UnknownFieldError> {
+        let paths = self.extension_paths();
+        if paths.is_empty() {
+            Ok(())
+        } else {
+            Err(UnknownFieldError { paths })
+        }
+    }
 }
 
 /// A single shared empty-map sentinel used by all generated `Bo4eExtensionData` impls.
