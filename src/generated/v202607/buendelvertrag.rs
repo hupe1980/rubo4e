@@ -1,5 +1,5 @@
 use super::{
-    Bo4eObject, BoTyp, Geschaeftspartner, Sparte, Unterschrift, Vertrag, Vertragsart,
+    Bo4eObject, Bo4eTyped, BoTyp, Geschaeftspartner, Sparte, Unterschrift, Vertrag, Vertragsart,
     Vertragskonditionen, Vertragsstatus, ZusatzAttribut,
 };
 #[derive(Debug, Clone, PartialEq)]
@@ -195,13 +195,16 @@ impl Default for Buendelvertrag {
         }
     }
 }
-impl Bo4eObject for Buendelvertrag {
-    type BoTyp = BoTyp;
-    const BO_TYP: BoTyp = BoTyp::Buendelvertrag;
+impl Bo4eTyped for Buendelvertrag {
+    type Typ = BoTyp;
+    const TYP: BoTyp = BoTyp::Buendelvertrag;
     const TYP_WIRE: &'static str = "BUENDELVERTRAG";
     const SCHEMA_VERSION: &'static str = "202607.1.0";
     const SCHEMA_SERIES: &'static str = "202607";
 }
+impl crate::bo4e_typed_sealed::Sealed for Buendelvertrag {}
+impl Bo4eObject for Buendelvertrag {}
+impl crate::bo4e_object_sealed::Sealed for Buendelvertrag {}
 #[cfg(feature = "json")]
 impl crate::json::sealed::Sealed for Buendelvertrag {}
 #[cfg(feature = "json")]

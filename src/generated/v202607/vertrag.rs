@@ -1,6 +1,6 @@
 use super::{
-    Bo4eObject, BoTyp, Geschaeftspartner, Sparte, Unterschrift, Vertragsart, Vertragskonditionen,
-    Vertragsstatus, Vertragsteil, ZusatzAttribut,
+    Bo4eObject, Bo4eTyped, BoTyp, Geschaeftspartner, Sparte, Unterschrift, Vertragsart,
+    Vertragskonditionen, Vertragsstatus, Vertragsteil, ZusatzAttribut,
 };
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(not(feature = "json"), derive(Eq, Hash))]
@@ -202,13 +202,16 @@ impl Default for Vertrag {
         }
     }
 }
-impl Bo4eObject for Vertrag {
-    type BoTyp = BoTyp;
-    const BO_TYP: BoTyp = BoTyp::Vertrag;
+impl Bo4eTyped for Vertrag {
+    type Typ = BoTyp;
+    const TYP: BoTyp = BoTyp::Vertrag;
     const TYP_WIRE: &'static str = "VERTRAG";
     const SCHEMA_VERSION: &'static str = "202607.1.0";
     const SCHEMA_SERIES: &'static str = "202607";
 }
+impl crate::bo4e_typed_sealed::Sealed for Vertrag {}
+impl Bo4eObject for Vertrag {}
+impl crate::bo4e_object_sealed::Sealed for Vertrag {}
 #[cfg(feature = "json")]
 impl crate::json::sealed::Sealed for Vertrag {}
 #[cfg(feature = "json")]

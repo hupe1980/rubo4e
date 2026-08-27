@@ -1,4 +1,6 @@
-use super::{Adresse, ComTyp, Menge, Zaehlertyp, Zeitraum, ZusatzAttribut};
+use super::{
+    Adresse, Bo4eComponent, Bo4eTyped, ComTyp, Menge, Zaehlertyp, Zeitraum, ZusatzAttribut,
+};
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(not(feature = "json"), derive(Eq, Hash))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -160,6 +162,16 @@ impl Default for Ausschreibungsdetail {
         }
     }
 }
+impl Bo4eTyped for Ausschreibungsdetail {
+    type Typ = ComTyp;
+    const TYP: ComTyp = ComTyp::Ausschreibungsdetail;
+    const TYP_WIRE: &'static str = "AUSSCHREIBUNGSDETAIL";
+    const SCHEMA_VERSION: &'static str = "202607.1.0";
+    const SCHEMA_SERIES: &'static str = "202607";
+}
+impl crate::bo4e_typed_sealed::Sealed for Ausschreibungsdetail {}
+impl Bo4eComponent for Ausschreibungsdetail {}
+impl crate::bo4e_component_sealed::Sealed for Ausschreibungsdetail {}
 #[cfg(feature = "json")]
 impl crate::json::sealed::Sealed for Ausschreibungsdetail {}
 #[cfg(feature = "json")]

@@ -1,5 +1,6 @@
 use super::{
-    Bo4eObject, BoTyp, StandorteigenschaftenGas, StandorteigenschaftenStrom, ZusatzAttribut,
+    Bo4eObject, Bo4eTyped, BoTyp, StandorteigenschaftenGas, StandorteigenschaftenStrom,
+    ZusatzAttribut,
 };
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(not(feature = "json"), derive(Eq, Hash))]
@@ -77,13 +78,16 @@ impl Default for Standorteigenschaften {
         }
     }
 }
-impl Bo4eObject for Standorteigenschaften {
-    type BoTyp = BoTyp;
-    const BO_TYP: BoTyp = BoTyp::Standorteigenschaften;
+impl Bo4eTyped for Standorteigenschaften {
+    type Typ = BoTyp;
+    const TYP: BoTyp = BoTyp::Standorteigenschaften;
     const TYP_WIRE: &'static str = "STANDORTEIGENSCHAFTEN";
     const SCHEMA_VERSION: &'static str = "202607.1.0";
     const SCHEMA_SERIES: &'static str = "202607";
 }
+impl crate::bo4e_typed_sealed::Sealed for Standorteigenschaften {}
+impl Bo4eObject for Standorteigenschaften {}
+impl crate::bo4e_object_sealed::Sealed for Standorteigenschaften {}
 #[cfg(feature = "json")]
 impl crate::json::sealed::Sealed for Standorteigenschaften {}
 #[cfg(feature = "json")]

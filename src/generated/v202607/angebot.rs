@@ -1,5 +1,6 @@
 use super::{
-    Angebotsvariante, Bo4eObject, BoTyp, Geschaeftspartner, Person, Sparte, ZusatzAttribut,
+    Angebotsvariante, Bo4eObject, Bo4eTyped, BoTyp, Geschaeftspartner, Person, Sparte,
+    ZusatzAttribut,
 };
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(not(feature = "json"), derive(Eq, Hash))]
@@ -177,13 +178,16 @@ impl Default for Angebot {
         }
     }
 }
-impl Bo4eObject for Angebot {
-    type BoTyp = BoTyp;
-    const BO_TYP: BoTyp = BoTyp::Angebot;
+impl Bo4eTyped for Angebot {
+    type Typ = BoTyp;
+    const TYP: BoTyp = BoTyp::Angebot;
     const TYP_WIRE: &'static str = "ANGEBOT";
     const SCHEMA_VERSION: &'static str = "202607.1.0";
     const SCHEMA_SERIES: &'static str = "202607";
 }
+impl crate::bo4e_typed_sealed::Sealed for Angebot {}
+impl Bo4eObject for Angebot {}
+impl crate::bo4e_object_sealed::Sealed for Angebot {}
 #[cfg(feature = "json")]
 impl crate::json::sealed::Sealed for Angebot {}
 #[cfg(feature = "json")]

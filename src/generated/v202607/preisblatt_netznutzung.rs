@@ -1,5 +1,5 @@
 use super::{
-    Bilanzierungsmethode, Bo4eObject, BoTyp, Kundengruppe, Marktteilnehmer, Netzebene,
+    Bilanzierungsmethode, Bo4eObject, Bo4eTyped, BoTyp, Kundengruppe, Marktteilnehmer, Netzebene,
     Preisposition, Preisstatus, Sparte, Zeitraum, ZusatzAttribut,
 };
 #[derive(Debug, Clone, PartialEq)]
@@ -120,13 +120,16 @@ impl Default for PreisblattNetznutzung {
         }
     }
 }
-impl Bo4eObject for PreisblattNetznutzung {
-    type BoTyp = BoTyp;
-    const BO_TYP: BoTyp = BoTyp::PreisblattNetznutzung;
+impl Bo4eTyped for PreisblattNetznutzung {
+    type Typ = BoTyp;
+    const TYP: BoTyp = BoTyp::PreisblattNetznutzung;
     const TYP_WIRE: &'static str = "PREISBLATTNETZNUTZUNG";
     const SCHEMA_VERSION: &'static str = "202607.1.0";
     const SCHEMA_SERIES: &'static str = "202607";
 }
+impl crate::bo4e_typed_sealed::Sealed for PreisblattNetznutzung {}
+impl Bo4eObject for PreisblattNetznutzung {}
+impl crate::bo4e_object_sealed::Sealed for PreisblattNetznutzung {}
 #[cfg(feature = "json")]
 impl crate::json::sealed::Sealed for PreisblattNetznutzung {}
 #[cfg(feature = "json")]

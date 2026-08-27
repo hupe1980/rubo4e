@@ -44,7 +44,7 @@ mod serde_tests {
         );
     }
 
-    /// L-03: The `Unknown` variant must serialize as `"UNKNOWN"` (BO4E SCREAMING_SNAKE_CASE),
+    /// The `Unknown` variant must serialize as `"UNKNOWN"` (BO4E SCREAMING_SNAKE_CASE),
     /// not as the Rust identifier name `"Unknown"`.
     ///
     /// This matters when code that received an unknown enum value re-serializes it —
@@ -66,7 +66,7 @@ mod serde_tests {
         );
     }
 
-    /// L-03: Round-trip of a payload containing an unknown enum value preserves
+    /// A round-trip of a payload containing an unknown enum value preserves
     /// the `Unknown` variant without panic, and re-serializes as `"UNKNOWN"`.
     #[test]
     fn unknown_enum_round_trip() {

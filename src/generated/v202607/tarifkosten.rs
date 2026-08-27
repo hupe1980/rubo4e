@@ -1,6 +1,6 @@
 use super::{
-    Bo4eObject, BoTyp, Energiemix, Kosten, Kundentyp, Marktteilnehmer, Registeranzahl, Sparte,
-    Tarifmerkmal, Tariftyp, Vertragskonditionen, Zeitraum, ZusatzAttribut,
+    Bo4eObject, Bo4eTyped, BoTyp, Energiemix, Kosten, Kundentyp, Marktteilnehmer, Registeranzahl,
+    Sparte, Tarifmerkmal, Tariftyp, Vertragskonditionen, Zeitraum, ZusatzAttribut,
 };
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(not(feature = "json"), derive(Eq, Hash))]
@@ -183,13 +183,16 @@ impl Default for Tarifkosten {
         }
     }
 }
-impl Bo4eObject for Tarifkosten {
-    type BoTyp = BoTyp;
-    const BO_TYP: BoTyp = BoTyp::Tarifkosten;
+impl Bo4eTyped for Tarifkosten {
+    type Typ = BoTyp;
+    const TYP: BoTyp = BoTyp::Tarifkosten;
     const TYP_WIRE: &'static str = "TARIFKOSTEN";
     const SCHEMA_VERSION: &'static str = "202607.1.0";
     const SCHEMA_SERIES: &'static str = "202607";
 }
+impl crate::bo4e_typed_sealed::Sealed for Tarifkosten {}
+impl Bo4eObject for Tarifkosten {}
+impl crate::bo4e_object_sealed::Sealed for Tarifkosten {}
 #[cfg(feature = "json")]
 impl crate::json::sealed::Sealed for Tarifkosten {}
 #[cfg(feature = "json")]

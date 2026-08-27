@@ -1,6 +1,6 @@
 use super::{
-    Bilanzierungsmethode, Bo4eObject, BoTyp, Dienstleistungstyp, Geraet, Marktteilnehmer,
-    Netzebene, Preisposition, Preisstatus, Sparte, Zeitraum, ZusatzAttribut,
+    Bilanzierungsmethode, Bo4eObject, Bo4eTyped, BoTyp, Dienstleistungstyp, Geraet,
+    Marktteilnehmer, Netzebene, Preisposition, Preisstatus, Sparte, Zeitraum, ZusatzAttribut,
 };
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(not(feature = "json"), derive(Eq, Hash))]
@@ -135,13 +135,16 @@ impl Default for PreisblattHardware {
         }
     }
 }
-impl Bo4eObject for PreisblattHardware {
-    type BoTyp = BoTyp;
-    const BO_TYP: BoTyp = BoTyp::PreisblattHardware;
+impl Bo4eTyped for PreisblattHardware {
+    type Typ = BoTyp;
+    const TYP: BoTyp = BoTyp::PreisblattHardware;
     const TYP_WIRE: &'static str = "PREISBLATTHARDWARE";
     const SCHEMA_VERSION: &'static str = "202607.1.0";
     const SCHEMA_SERIES: &'static str = "202607";
 }
+impl crate::bo4e_typed_sealed::Sealed for PreisblattHardware {}
+impl Bo4eObject for PreisblattHardware {}
+impl crate::bo4e_object_sealed::Sealed for PreisblattHardware {}
 #[cfg(feature = "json")]
 impl crate::json::sealed::Sealed for PreisblattHardware {}
 #[cfg(feature = "json")]

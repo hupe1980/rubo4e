@@ -1,4 +1,4 @@
-//! Struct size regression guard (L-05).
+//! Struct size regression guard.
 //!
 //! Asserts that key identifier newtypes stay within expected memory bounds.
 //! These sizes are recorded at the time they were designed and serve as a

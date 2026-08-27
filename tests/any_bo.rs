@@ -1,4 +1,4 @@
-//! Integration tests for `AnyBo` dynamic dispatch (H-08).
+//! Integration tests for `AnyBo` dynamic dispatch.
 //!
 //! Verifies:
 //! - Each known BO type round-trips correctly through `AnyBo::deserialize`.
@@ -274,33 +274,32 @@ fn any_bo_enforces_hardened_nesting_depth() {
     );
 }
 
-/// `bo_type()` on a concrete BO describes the **Rust type**, not the `_typ` the
-/// payload carried — otherwise a `match` on it takes the branch the sender
-/// named. `AnyBo` is the type that dispatches on a payload's claim.
+/// A concrete BO's `TYP` describes the **Rust type**, not the `_typ` the payload
+/// carried — otherwise a `match` on it takes the branch the sender named.
+/// `AnyBo` is the type that dispatches on a payload's claim.
 #[test]
 #[cfg(all(feature = "json", feature = "versioned"))]
 fn a_concrete_bo_reports_its_own_type_not_the_payloads_claim() {
     use rubo4e::current::{BoTyp, Marktlokation, Vertrag};
-    use rubo4e::Bo4eObject as _;
+    use rubo4e::Bo4eTyped;
 
     let malo: Marktlokation =
         serde_json::from_str(r#"{"_typ":"VERTRAG","marktlokationsId":"51238696781"}"#)
             .expect("the lenient decode succeeds — that is the point");
 
-    assert_eq!(malo.bo_type(), BoTyp::Marktlokation);
+    assert_eq!(Marktlokation::TYP, BoTyp::Marktlokation);
     // The payload's own claim is preserved, so the mismatch stays detectable.
     assert_eq!(malo.typ, Some(BoTyp::Vertrag));
-    assert_ne!(malo.typ, Some(malo.bo_type()));
+    assert_ne!(malo.typ, Some(Marktlokation::TYP));
 
     // A `_typ` the schema does not define decodes to the catch-all, and still
     // does not change what the value is.
     let v: Vertrag = serde_json::from_str(r#"{"_typ":"NOT_A_BO"}"#).expect("lenient");
-    assert_eq!(v.bo_type(), BoTyp::Vertrag);
+    assert_eq!(Vertrag::TYP, BoTyp::Vertrag);
     assert_eq!(v.typ, Some(BoTyp::Unknown));
 
-    // …and a payload with no `_typ` at all reports the type just the same.
+    // …and a payload with no `_typ` at all leaves the constant unchanged.
     let bare: Vertrag = serde_json::from_str("{}").expect("valid");
-    assert_eq!(bare.bo_type(), BoTyp::Vertrag);
     assert_eq!(bare.typ, None);
 }
 
@@ -311,7 +310,7 @@ fn a_concrete_bo_reports_its_own_type_not_the_payloads_claim() {
 #[cfg(all(feature = "json", feature = "versioned"))]
 fn any_bo_carries_every_bo4e_object_fact() {
     use rubo4e::current::{AnyBo, BoTyp, Marktlokation, Vertrag};
-    use rubo4e::Bo4eObject;
+    use rubo4e::Bo4eTyped;
 
     // The heterogeneous collection the `dyn` doctest used to build.
     let objects: Vec<AnyBo> = vec![Vertrag::default().into(), Marktlokation::default().into()];

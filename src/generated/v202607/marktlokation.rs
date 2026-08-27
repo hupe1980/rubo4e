@@ -1,7 +1,7 @@
 use super::{
-    Adresse, Bilanzierungsmethode, Bo4eObject, BoTyp, Energiemenge, Energierichtung, Gasqualitaet,
-    Gebiettyp, Geokoordinaten, Geschaeftspartner, Katasteradresse, Kundentyp, Lokationszuordnung,
-    Netzebene, Sparte, Verbrauchsart, Zaehlwerk, ZusatzAttribut,
+    Adresse, Bilanzierungsmethode, Bo4eObject, Bo4eTyped, BoTyp, Energiemenge, Energierichtung,
+    Gasqualitaet, Gebiettyp, Geokoordinaten, Geschaeftspartner, Katasteradresse, Kundentyp,
+    Lokationszuordnung, Netzebene, Sparte, Verbrauchsart, Zaehlwerk, ZusatzAttribut,
 };
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(not(feature = "json"), derive(Eq, Hash))]
@@ -230,13 +230,16 @@ impl Default for Marktlokation {
         }
     }
 }
-impl Bo4eObject for Marktlokation {
-    type BoTyp = BoTyp;
-    const BO_TYP: BoTyp = BoTyp::Marktlokation;
+impl Bo4eTyped for Marktlokation {
+    type Typ = BoTyp;
+    const TYP: BoTyp = BoTyp::Marktlokation;
     const TYP_WIRE: &'static str = "MARKTLOKATION";
     const SCHEMA_VERSION: &'static str = "202607.1.0";
     const SCHEMA_SERIES: &'static str = "202607";
 }
+impl crate::bo4e_typed_sealed::Sealed for Marktlokation {}
+impl Bo4eObject for Marktlokation {}
+impl crate::bo4e_object_sealed::Sealed for Marktlokation {}
 #[cfg(feature = "json")]
 impl crate::json::sealed::Sealed for Marktlokation {}
 #[cfg(feature = "json")]

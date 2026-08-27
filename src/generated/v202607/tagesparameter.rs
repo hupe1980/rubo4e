@@ -1,4 +1,4 @@
-use super::{ComTyp, ZusatzAttribut};
+use super::{Bo4eComponent, Bo4eTyped, ComTyp, ZusatzAttribut};
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(not(feature = "json"), derive(Eq, Hash))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -80,6 +80,16 @@ impl Default for Tagesparameter {
         }
     }
 }
+impl Bo4eTyped for Tagesparameter {
+    type Typ = ComTyp;
+    const TYP: ComTyp = ComTyp::Tagesparameter;
+    const TYP_WIRE: &'static str = "TAGESPARAMETER";
+    const SCHEMA_VERSION: &'static str = "202607.1.0";
+    const SCHEMA_SERIES: &'static str = "202607";
+}
+impl crate::bo4e_typed_sealed::Sealed for Tagesparameter {}
+impl Bo4eComponent for Tagesparameter {}
+impl crate::bo4e_component_sealed::Sealed for Tagesparameter {}
 #[cfg(feature = "json")]
 impl crate::json::sealed::Sealed for Tagesparameter {}
 #[cfg(feature = "json")]

@@ -1,4 +1,4 @@
-use super::{Betrag, Bo4eObject, BoTyp, Fremdkostenblock, Zeitraum, ZusatzAttribut};
+use super::{Betrag, Bo4eObject, Bo4eTyped, BoTyp, Fremdkostenblock, Zeitraum, ZusatzAttribut};
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(not(feature = "json"), derive(Eq, Hash))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -84,13 +84,16 @@ impl Default for Fremdkosten {
         }
     }
 }
-impl Bo4eObject for Fremdkosten {
-    type BoTyp = BoTyp;
-    const BO_TYP: BoTyp = BoTyp::Fremdkosten;
+impl Bo4eTyped for Fremdkosten {
+    type Typ = BoTyp;
+    const TYP: BoTyp = BoTyp::Fremdkosten;
     const TYP_WIRE: &'static str = "FREMDKOSTEN";
     const SCHEMA_VERSION: &'static str = "202607.1.0";
     const SCHEMA_SERIES: &'static str = "202607";
 }
+impl crate::bo4e_typed_sealed::Sealed for Fremdkosten {}
+impl Bo4eObject for Fremdkosten {}
+impl crate::bo4e_object_sealed::Sealed for Fremdkosten {}
 #[cfg(feature = "json")]
 impl crate::json::sealed::Sealed for Fremdkosten {}
 #[cfg(feature = "json")]

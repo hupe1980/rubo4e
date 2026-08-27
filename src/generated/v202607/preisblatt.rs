@@ -1,5 +1,5 @@
 use super::{
-    Bo4eObject, BoTyp, Marktteilnehmer, Preisposition, Preisstatus, Sparte, Zeitraum,
+    Bo4eObject, Bo4eTyped, BoTyp, Marktteilnehmer, Preisposition, Preisstatus, Sparte, Zeitraum,
     ZusatzAttribut,
 };
 #[derive(Debug, Clone, PartialEq)]
@@ -108,13 +108,16 @@ impl Default for Preisblatt {
         }
     }
 }
-impl Bo4eObject for Preisblatt {
-    type BoTyp = BoTyp;
-    const BO_TYP: BoTyp = BoTyp::Preisblatt;
+impl Bo4eTyped for Preisblatt {
+    type Typ = BoTyp;
+    const TYP: BoTyp = BoTyp::Preisblatt;
     const TYP_WIRE: &'static str = "PREISBLATT";
     const SCHEMA_VERSION: &'static str = "202607.1.0";
     const SCHEMA_SERIES: &'static str = "202607";
 }
+impl crate::bo4e_typed_sealed::Sealed for Preisblatt {}
+impl Bo4eObject for Preisblatt {}
+impl crate::bo4e_object_sealed::Sealed for Preisblatt {}
 #[cfg(feature = "json")]
 impl crate::json::sealed::Sealed for Preisblatt {}
 #[cfg(feature = "json")]

@@ -24,21 +24,21 @@ mod strum_tests {
     #[test]
     fn display_produces_variant_name() {
         use rubo4e::v202607::Sparte;
-        // H-08: strum::Display must produce the canonical BO4E JSON string,
+        // strum::Display must produce the canonical BO4E JSON string,
         // identical to what serde serializes — not the Rust PascalCase variant name.
         assert_eq!(Sparte::Strom.to_string(), "STROM");
         assert_eq!(Sparte::Gas.to_string(), "GAS");
-        // L-01: Unknown uses SCREAMING_SNAKE_CASE like all other BO4E enum values.
+        // Unknown uses SCREAMING_SNAKE_CASE like every other BO4E enum value.
         assert_eq!(Sparte::Unknown.to_string(), "UNKNOWN");
     }
 
     #[test]
     fn from_str_roundtrips_known_variants() {
         use rubo4e::v202607::Sparte;
-        // H-08: FromStr must accept the canonical BO4E JSON strings.
+        // FromStr must accept the canonical BO4E JSON strings.
         assert_eq!(Sparte::from_str("STROM").unwrap(), Sparte::Strom);
         assert_eq!(Sparte::from_str("GAS").unwrap(), Sparte::Gas);
-        // L-01: Unknown uses SCREAMING_SNAKE_CASE.
+        // Unknown uses SCREAMING_SNAKE_CASE.
         assert_eq!(Sparte::from_str("UNKNOWN").unwrap(), Sparte::Unknown);
     }
 
@@ -52,7 +52,7 @@ mod strum_tests {
     #[test]
     fn into_static_str_returns_variant_name() {
         use rubo4e::v202607::Sparte;
-        // H-08: IntoStaticStr derive adds `From<Sparte> for &'static str`.
+        // The IntoStaticStr derive adds `From<Sparte> for &'static str`.
         // Use the canonical conversion — no trait import required since it goes
         // through the derived `From` impl, not a method on the `IntoStaticStr` trait.
         let s: &'static str = <&'static str>::from(Sparte::Strom);
@@ -62,7 +62,7 @@ mod strum_tests {
     #[test]
     fn as_ref_str_returns_variant_name() {
         use rubo4e::v202607::Sparte;
-        // H-08: AsRef<str> returns the canonical BO4E JSON string.
+        // AsRef<str> returns the canonical BO4E JSON string.
         assert_eq!(Sparte::Gas.as_ref(), "GAS");
     }
 

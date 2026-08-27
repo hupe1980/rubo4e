@@ -1,4 +1,6 @@
-use super::{ComTyp, Menge, Messwertstatus, Messwertstatuszusatz, ZusatzAttribut};
+use super::{
+    Bo4eComponent, Bo4eTyped, ComTyp, Menge, Messwertstatus, Messwertstatuszusatz, ZusatzAttribut,
+};
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(not(feature = "json"), derive(Eq, Hash))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -108,6 +110,16 @@ impl Default for Messwert {
         }
     }
 }
+impl Bo4eTyped for Messwert {
+    type Typ = ComTyp;
+    const TYP: ComTyp = ComTyp::Messwert;
+    const TYP_WIRE: &'static str = "MESSWERT";
+    const SCHEMA_VERSION: &'static str = "202607.1.0";
+    const SCHEMA_SERIES: &'static str = "202607";
+}
+impl crate::bo4e_typed_sealed::Sealed for Messwert {}
+impl Bo4eComponent for Messwert {}
+impl crate::bo4e_component_sealed::Sealed for Messwert {}
 #[cfg(feature = "json")]
 impl crate::json::sealed::Sealed for Messwert {}
 #[cfg(feature = "json")]

@@ -1,6 +1,6 @@
 use super::{
-    Betrag, Bo4eObject, BoTyp, Energiemenge, Fremdkosten, Geschaeftspartner, Marktlokation,
-    Marktteilnehmer, Messlokation, NetznutzungRechnungsart, NetznutzungRechnungstyp,
+    Betrag, Bo4eObject, Bo4eTyped, BoTyp, Energiemenge, Fremdkosten, Geschaeftspartner,
+    Marktlokation, Marktteilnehmer, Messlokation, NetznutzungRechnungsart, NetznutzungRechnungstyp,
     Rechnungsposition, Rechnungsstatus, Rechnungstyp, Sparte, Steuerbetrag, Vertrag, Vorauszahlung,
     Zaehler, Zahlungsinformation, Zeitraum, ZusatzAttribut,
 };
@@ -386,13 +386,16 @@ impl Default for Rechnung {
         }
     }
 }
-impl Bo4eObject for Rechnung {
-    type BoTyp = BoTyp;
-    const BO_TYP: BoTyp = BoTyp::Rechnung;
+impl Bo4eTyped for Rechnung {
+    type Typ = BoTyp;
+    const TYP: BoTyp = BoTyp::Rechnung;
     const TYP_WIRE: &'static str = "RECHNUNG";
     const SCHEMA_VERSION: &'static str = "202607.1.0";
     const SCHEMA_SERIES: &'static str = "202607";
 }
+impl crate::bo4e_typed_sealed::Sealed for Rechnung {}
+impl Bo4eObject for Rechnung {}
+impl crate::bo4e_object_sealed::Sealed for Rechnung {}
 #[cfg(feature = "json")]
 impl crate::json::sealed::Sealed for Rechnung {}
 #[cfg(feature = "json")]

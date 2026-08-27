@@ -318,7 +318,7 @@ mod decimal_spelling_tests {
 mod outbound_tests {
     use rubo4e::current::{Betrag, Marktlokation, Rechnung, Vertrag};
     use rubo4e::json::Bo4eJsonExt;
-    use rubo4e::Bo4eObject as _;
+    use rubo4e::Bo4eTyped as _;
 
     /// Reference implementations stamp `_version` on every BO, and rubo4e knows
     /// the value statically — a caller should never have to supply it.

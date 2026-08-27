@@ -1,6 +1,6 @@
 use super::{
     Ausschreibungslos, Ausschreibungsportal, Ausschreibungsstatus, Ausschreibungstyp, Bo4eObject,
-    BoTyp, Geschaeftspartner, Zeitraum, ZusatzAttribut,
+    Bo4eTyped, BoTyp, Geschaeftspartner, Zeitraum, ZusatzAttribut,
 };
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(not(feature = "json"), derive(Eq, Hash))]
@@ -159,13 +159,16 @@ impl Default for Ausschreibung {
         }
     }
 }
-impl Bo4eObject for Ausschreibung {
-    type BoTyp = BoTyp;
-    const BO_TYP: BoTyp = BoTyp::Ausschreibung;
+impl Bo4eTyped for Ausschreibung {
+    type Typ = BoTyp;
+    const TYP: BoTyp = BoTyp::Ausschreibung;
     const TYP_WIRE: &'static str = "AUSSCHREIBUNG";
     const SCHEMA_VERSION: &'static str = "202607.1.0";
     const SCHEMA_SERIES: &'static str = "202607";
 }
+impl crate::bo4e_typed_sealed::Sealed for Ausschreibung {}
+impl Bo4eObject for Ausschreibung {}
+impl crate::bo4e_object_sealed::Sealed for Ausschreibung {}
 #[cfg(feature = "json")]
 impl crate::json::sealed::Sealed for Ausschreibung {}
 #[cfg(feature = "json")]

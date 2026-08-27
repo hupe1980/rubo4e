@@ -59,7 +59,7 @@ from the schema, so neither can drift from what the standard declares:
 #### `_version` has no `v`
 
 BO4E tags its schema releases `v202607.1.0`, but the `_version` value **inside a
-payload** is `202607.1.0`. `Bo4eObject::SCHEMA_VERSION` is the wire
+payload** is `202607.1.0`. `Bo4eTyped::SCHEMA_VERSION` is the wire
 spelling, so it compares directly against a `_version` read off a message.
 
 Do not hardcode either string — a literal goes stale on the next schema series.

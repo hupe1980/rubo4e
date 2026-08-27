@@ -28,7 +28,7 @@ implementation does.
 - **Strict enum parsing & introspection** — `from_wire` (reject out-of-schema values), `VARIANTS` / `COUNT` / `iter_known`, `Display` / `AsRef<str>`, `is_unknown`, unified by the `Bo4eEnum` trait — all **without** the `strum` feature
 - **Recursive strict decoding** — `Bo4eStrict::ensure_known_enums()` rejects any `Unknown` enum value anywhere in a deserialized payload, with JSON-paths — one call replaces hand-written per-field checks
 - **Typed builders** — readable, diffable construction via `typed-builder`; setters accept both `T` and `Option<T>` (note: BO4E BO fields are schema-optional, so AHB-mandatory contracts are enforced by your ingest layer, not the type system); `Lastgang` and `Tarif`, the two the schema marks `required`, get a feature-free `new(…)`
-- **Type-level BO facts** — `T::BO_TYP`, `T::TYP_WIRE`, `T::SCHEMA_VERSION`, `T::SCHEMA_SERIES` as associated constants, so generic code needs no value and no `Default` bound
+- **Type-level `_typ` facts** — `T::TYP`, `T::TYP_WIRE`, `T::SCHEMA_VERSION`, `T::SCHEMA_SERIES` as associated constants on every BO **and** COM, so generic code needs no value and no `Default` bound
 - **German / snake_case / canonical JSON** — BO4E wire format out of the box, with a hardened path for untrusted input
 - **`Eq` + `Hash` on generated types** without the `json` feature, so a BO can key a `HashMap`; enums are always `Eq + Ord + Hash`
 - **Ergonomic convenience API** — extension traits, billing-period helpers, EDIFACT agency codes
@@ -126,30 +126,31 @@ use rubo4e::current::Marktlokation;  // whichever series is newest — moves wit
 **Three spellings of a release.** The Rust module is the *series* (`v202607`).
 The git tag carries a `v` and the full triple (`v202607.1.0`). The `_version`
 field *inside a payload* has the triple without the `v` (`202607.1.0`).
-`Bo4eObject::SCHEMA_VERSION` is the wire spelling, `SCHEMA_SERIES` the series.
+`Bo4eTyped::SCHEMA_VERSION` is the wire spelling, `SCHEMA_SERIES` the series.
 
-**The BO facts are associated constants**, so generic code needs no value and no
-`Default` bound — which is what admits `Lastgang` and `Tarif`, the two types the
-schema marks `required`:
+**The `_typ` facts are associated constants** on [`Bo4eTyped`], carried by every
+BO *and* COM, so one bound reaches both and generic code needs no value — hence
+no `Default` bound, which is what admits `Lastgang` and `Tarif`, the two types
+the schema marks `required`:
 
 ```rust
-use rubo4e::{current::{BoTyp, Lastgang, Vertrag}, Bo4eObject};
+use rubo4e::{current::{Adresse, BoTyp, Lastgang, Vertrag}, Bo4eObject, Bo4eTyped};
 
-assert_eq!(Vertrag::BO_TYP,        BoTyp::Vertrag);
-assert_eq!(Vertrag::TYP_WIRE,      "VERTRAG");
+assert_eq!(Vertrag::TYP, BoTyp::Vertrag);
 assert_eq!(Vertrag::SCHEMA_SERIES, "202607");
 
-fn discriminant_of<T: Bo4eObject<BoTyp = BoTyp>>() -> BoTyp { T::BO_TYP }
-assert_eq!(discriminant_of::<Lastgang>(), BoTyp::Lastgang);
+fn wire_typ<T: Bo4eTyped>() -> &'static str { T::TYP_WIRE }
+assert_eq!(wire_typ::<Lastgang>(), "LASTGANG");   // a BO
+assert_eq!(wire_typ::<Adresse>(),  "ADRESSE");    // a COM
+
+// `Bo4eObject` / `Bo4eComponent` narrow it and bind the discriminant enum.
+fn bo_typ<T: Bo4eObject<Typ = BoTyp>>() -> BoTyp { T::TYP }
 ```
 
-Method forms (`bo_type()`, `schema_version()`, …) exist for when you have a
-value. `bo_type()` reports what the value **is**, never the `_typ` a payload
-claimed — read the public `typ` field for that.
+`T::TYP` is what the type **is**, never the `_typ` a payload claimed — the public
+`typ` field holds that.
 
-Associated constants make a trait non-`dyn`-compatible, so use
-[`AnyBo`](https://docs.rs/rubo4e/latest/rubo4e/current/enum.AnyBo.html) for a
-heterogeneous collection.
+[`Bo4eTyped`]: https://docs.rs/rubo4e/latest/rubo4e/trait.Bo4eTyped.html
 
 **Dispatch on the series, not the release.** BO4E ships patch releases inside a
 series, so a sender one patch ahead stamps a `_version` that an equality match
@@ -237,7 +238,7 @@ nelo.ensure_known_enums()?;                               // Err lists e.g. ["za
 paths of every `Unknown` enum value; `unknown_enum_paths()` returns them directly.
 Implemented for every BO, COM, enum, and `AnyBo`. This replaces the hand-written
 `record.field == T::Unknown` re-checks a strict ingest boundary would otherwise
-need. Unlike `Bo4eObject`/`Bo4eEnum`, `Bo4eStrict` is **not sealed**, so you can
+need. Unlike `Bo4eTyped`/`Bo4eEnum`, `Bo4eStrict` is **not sealed**, so you can
 implement it on your own domain wrappers to extend the recursive check.
 
 [`Bo4eEnum`]: https://docs.rs/rubo4e/latest/rubo4e/trait.Bo4eEnum.html
@@ -413,7 +414,7 @@ BO4E JSON, the idiomatic dispatch is a plain `match` — on the **series**, not 
 exact release:
 
 ```rust
-use rubo4e::{v202607, Bo4eObject as _};
+use rubo4e::{v202607, Bo4eTyped as _};
 
 fn process_rechnung(
     json: &str,
@@ -438,7 +439,7 @@ though the `v202607` types read it perfectly. `schema_series()` returns exactly
 the value the `match` keys on, so a test can assert the two agree.
 
 This pattern:
-- Requires no new rubo4e API — `schema_series()` is already on every BO type via `Bo4eObject`
+- Requires no new rubo4e API — `schema_series()` is already on every BO and COM via `Bo4eTyped`
 - Is trivially extensible: each new schema series is one `match` arm, and patches inside a series need none
 - Localises migration to the storage layer; business logic only handles the series it was written for
 - Avoids over-engineering (`trait` objects, `Any*` enums) for a straightforward branch

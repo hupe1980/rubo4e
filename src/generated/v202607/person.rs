@@ -1,5 +1,6 @@
 use super::{
-    Adresse, Anrede, Bo4eObject, BoTyp, Kontaktweg, Titel, ZusatzAttribut, Zustaendigkeit,
+    Adresse, Anrede, Bo4eObject, Bo4eTyped, BoTyp, Kontaktweg, Titel, ZusatzAttribut,
+    Zustaendigkeit,
 };
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(not(feature = "json"), derive(Eq, Hash))]
@@ -149,13 +150,16 @@ impl Default for Person {
         }
     }
 }
-impl Bo4eObject for Person {
-    type BoTyp = BoTyp;
-    const BO_TYP: BoTyp = BoTyp::Person;
+impl Bo4eTyped for Person {
+    type Typ = BoTyp;
+    const TYP: BoTyp = BoTyp::Person;
     const TYP_WIRE: &'static str = "PERSON";
     const SCHEMA_VERSION: &'static str = "202607.1.0";
     const SCHEMA_SERIES: &'static str = "202607";
 }
+impl crate::bo4e_typed_sealed::Sealed for Person {}
+impl Bo4eObject for Person {}
+impl crate::bo4e_object_sealed::Sealed for Person {}
 #[cfg(feature = "json")]
 impl crate::json::sealed::Sealed for Person {}
 #[cfg(feature = "json")]

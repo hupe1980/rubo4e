@@ -1,5 +1,5 @@
 use super::{
-    Bo4eObject, BoTyp, Marktlokation, Messlokation, Netzlokation, SteuerbareRessource,
+    Bo4eObject, Bo4eTyped, BoTyp, Marktlokation, Messlokation, Netzlokation, SteuerbareRessource,
     TechnischeRessource, Zeitraum, ZusatzAttribut,
 };
 #[derive(Debug, Clone, PartialEq)]
@@ -119,13 +119,16 @@ impl Default for Lokationszuordnung {
         }
     }
 }
-impl Bo4eObject for Lokationszuordnung {
-    type BoTyp = BoTyp;
-    const BO_TYP: BoTyp = BoTyp::Lokationszuordnung;
+impl Bo4eTyped for Lokationszuordnung {
+    type Typ = BoTyp;
+    const TYP: BoTyp = BoTyp::Lokationszuordnung;
     const TYP_WIRE: &'static str = "LOKATIONSZUORDNUNG";
     const SCHEMA_VERSION: &'static str = "202607.1.0";
     const SCHEMA_SERIES: &'static str = "202607";
 }
+impl crate::bo4e_typed_sealed::Sealed for Lokationszuordnung {}
+impl Bo4eObject for Lokationszuordnung {}
+impl crate::bo4e_object_sealed::Sealed for Lokationszuordnung {}
 #[cfg(feature = "json")]
 impl crate::json::sealed::Sealed for Lokationszuordnung {}
 #[cfg(feature = "json")]

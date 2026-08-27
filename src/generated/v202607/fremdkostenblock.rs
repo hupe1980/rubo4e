@@ -1,4 +1,4 @@
-use super::{Betrag, ComTyp, Fremdkostenposition, ZusatzAttribut};
+use super::{Betrag, Bo4eComponent, Bo4eTyped, ComTyp, Fremdkostenposition, ZusatzAttribut};
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(not(feature = "json"), derive(Eq, Hash))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -83,6 +83,16 @@ impl Default for Fremdkostenblock {
         }
     }
 }
+impl Bo4eTyped for Fremdkostenblock {
+    type Typ = ComTyp;
+    const TYP: ComTyp = ComTyp::Fremdkostenblock;
+    const TYP_WIRE: &'static str = "FREMDKOSTENBLOCK";
+    const SCHEMA_VERSION: &'static str = "202607.1.0";
+    const SCHEMA_SERIES: &'static str = "202607";
+}
+impl crate::bo4e_typed_sealed::Sealed for Fremdkostenblock {}
+impl Bo4eComponent for Fremdkostenblock {}
+impl crate::bo4e_component_sealed::Sealed for Fremdkostenblock {}
 #[cfg(feature = "json")]
 impl crate::json::sealed::Sealed for Fremdkostenblock {}
 #[cfg(feature = "json")]

@@ -1,6 +1,6 @@
 use super::{
-    ComTyp, Energierichtung, Konzessionsabgabe, Mengeneinheit, Messwert, Verbrauchsart,
-    VerwendungszweckProMarktrolle, Waermenutzung, Zaehlzeitregister, ZusatzAttribut,
+    Bo4eComponent, Bo4eTyped, ComTyp, Energierichtung, Konzessionsabgabe, Mengeneinheit, Messwert,
+    Verbrauchsart, VerwendungszweckProMarktrolle, Waermenutzung, Zaehlzeitregister, ZusatzAttribut,
 };
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(not(feature = "json"), derive(Eq, Hash))]
@@ -198,6 +198,16 @@ impl Default for Zaehlwerk {
         }
     }
 }
+impl Bo4eTyped for Zaehlwerk {
+    type Typ = ComTyp;
+    const TYP: ComTyp = ComTyp::Zaehlwerk;
+    const TYP_WIRE: &'static str = "ZAEHLWERK";
+    const SCHEMA_VERSION: &'static str = "202607.1.0";
+    const SCHEMA_SERIES: &'static str = "202607";
+}
+impl crate::bo4e_typed_sealed::Sealed for Zaehlwerk {}
+impl Bo4eComponent for Zaehlwerk {}
+impl crate::bo4e_component_sealed::Sealed for Zaehlwerk {}
 #[cfg(feature = "json")]
 impl crate::json::sealed::Sealed for Zaehlwerk {}
 #[cfg(feature = "json")]

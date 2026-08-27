@@ -1,4 +1,4 @@
-use super::{ComTyp, Dienstleistungstyp, ZusatzAttribut};
+use super::{Bo4eComponent, Bo4eTyped, ComTyp, Dienstleistungstyp, ZusatzAttribut};
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(not(feature = "json"), derive(Eq, Hash))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -73,6 +73,16 @@ impl Default for Dienstleistung {
         }
     }
 }
+impl Bo4eTyped for Dienstleistung {
+    type Typ = ComTyp;
+    const TYP: ComTyp = ComTyp::Dienstleistung;
+    const TYP_WIRE: &'static str = "DIENSTLEISTUNG";
+    const SCHEMA_VERSION: &'static str = "202607.1.0";
+    const SCHEMA_SERIES: &'static str = "202607";
+}
+impl crate::bo4e_typed_sealed::Sealed for Dienstleistung {}
+impl Bo4eComponent for Dienstleistung {}
+impl crate::bo4e_component_sealed::Sealed for Dienstleistung {}
 #[cfg(feature = "json")]
 impl crate::json::sealed::Sealed for Dienstleistung {}
 #[cfg(feature = "json")]

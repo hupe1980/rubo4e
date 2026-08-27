@@ -18,16 +18,16 @@ BO4E names a release twice, and this crate needs a third name for it — the
 | Rust module | with `v`, series only | `rubo4e::v202607` |
 | The `_version` field inside a payload | no `v`, full triple | `202607.1.0` |
 
-`Bo4eObject::SCHEMA_VERSION` is the **wire** spelling, so it compares against a
+`Bo4eTyped::SCHEMA_VERSION` is the **wire** spelling, so it compares against a
 `_version` read off a message with no normalisation step — never against the tag.
 
 The series — the bare `YYYYMM` prefix — is the one to dispatch on, because it is
-the one that maps onto a set of Rust types. `Bo4eObject::SCHEMA_SERIES` is it.
+the one that maps onto a set of Rust types. `Bo4eTyped::SCHEMA_SERIES` is it.
 
 Both are associated **constants**, so they are readable from a type alone:
 
 ```rust
-use rubo4e::{current::Rechnung, Bo4eObject};
+use rubo4e::{current::Rechnung, Bo4eTyped};
 
 assert_eq!(Rechnung::SCHEMA_VERSION, "202607.1.0");
 assert_eq!(Rechnung::SCHEMA_SERIES,  "202607");
@@ -43,7 +43,7 @@ When your storage layer persists a `bo4e_version` column alongside the JSON payl
 the series, not on the exact release**:
 
 ```rust
-use rubo4e::{v202607, Bo4eObject as _};
+use rubo4e::{v202607, Bo4eTyped as _};
 
 /// The `YYYYMM` prefix of a `_version` value: `"202607.1.0"` → `"202607"`.
 fn series_of(wire_version: &str) -> &str {
@@ -68,11 +68,11 @@ fn process_rechnung(json: &str, bo4e_version: &str) -> Result<(), Box<dyn std::e
 **Do not match on the full `_version`.** BO4E ships patch releases inside a
 series — `202607.0.0`, then `202607.1.0` — and a sender one patch ahead of you
 stamps a string an equality match rejects, for a payload the `v202607` types
-deserialize perfectly. `Bo4eObject::schema_series()` returns exactly the value
+deserialize perfectly. `Bo4eTyped::SCHEMA_SERIES` is exactly the value
 this `match` keys on, so a test can assert the two agree.
 
 Key points:
-- `SCHEMA_SERIES` and `SCHEMA_VERSION` are on every BO type via the `Bo4eObject` trait, as constants and as methods — no new API needed
+- `SCHEMA_SERIES` and `SCHEMA_VERSION` are on every BO and COM via the `Bo4eTyped` trait, as constants and as methods — no new API needed
 - Each new schema *series* is exactly one `match` arm; patches inside a series need none
 - Business logic (`handle_v202607`, `handle_v202801`, …) only handles the series it was written for
 - Older series can be migrated before the branch (`FROM v202607 TO v202801`) or handled by a thin shim inside the arm
@@ -156,7 +156,7 @@ So the honest statement is:
 > **The Rust module path pins the series. The `rubo4e` version pins the values.**
 
 If a variant set must not move under you, pin the **crate version** in
-`Cargo.toml` (`rubo4e = "=0.11.0"`) and upgrade deliberately. Importing
+`Cargo.toml` (`rubo4e = "=0.12.0"`) and upgrade deliberately. Importing
 `rubo4e::v202607::Sparte` instead of `rubo4e::current::Sparte` narrows the blast
 radius — you will not silently jump a format-version cutover — but it does not
 freeze the enum.

@@ -1,5 +1,5 @@
 use super::{
-    Bo4eObject, BoTyp, Energiemix, Kundentyp, Marktteilnehmer, Registeranzahl, Sparte,
+    Bo4eObject, Bo4eTyped, BoTyp, Energiemix, Kundentyp, Marktteilnehmer, Registeranzahl, Sparte,
     Tarifmerkmal, Tariftyp, Vertragskonditionen, Zeitraum, ZusatzAttribut,
 };
 #[derive(Debug, Clone, PartialEq)]
@@ -176,13 +176,16 @@ impl Default for Tarifinfo {
         }
     }
 }
-impl Bo4eObject for Tarifinfo {
-    type BoTyp = BoTyp;
-    const BO_TYP: BoTyp = BoTyp::Tarifinfo;
+impl Bo4eTyped for Tarifinfo {
+    type Typ = BoTyp;
+    const TYP: BoTyp = BoTyp::Tarifinfo;
     const TYP_WIRE: &'static str = "TARIFINFO";
     const SCHEMA_VERSION: &'static str = "202607.1.0";
     const SCHEMA_SERIES: &'static str = "202607";
 }
+impl crate::bo4e_typed_sealed::Sealed for Tarifinfo {}
+impl Bo4eObject for Tarifinfo {}
+impl crate::bo4e_object_sealed::Sealed for Tarifinfo {}
 #[cfg(feature = "json")]
 impl crate::json::sealed::Sealed for Tarifinfo {}
 #[cfg(feature = "json")]

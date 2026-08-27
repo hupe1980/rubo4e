@@ -1,4 +1,4 @@
-use super::{ComTyp, Marktteilnehmer, ZusatzAttribut};
+use super::{Bo4eComponent, Bo4eTyped, ComTyp, Marktteilnehmer, ZusatzAttribut};
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(not(feature = "json"), derive(Eq, Hash))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -82,6 +82,16 @@ impl Default for Konfigurationsprodukt {
         }
     }
 }
+impl Bo4eTyped for Konfigurationsprodukt {
+    type Typ = ComTyp;
+    const TYP: ComTyp = ComTyp::Konfigurationsprodukt;
+    const TYP_WIRE: &'static str = "KONFIGURATIONSPRODUKT";
+    const SCHEMA_VERSION: &'static str = "202607.1.0";
+    const SCHEMA_SERIES: &'static str = "202607";
+}
+impl crate::bo4e_typed_sealed::Sealed for Konfigurationsprodukt {}
+impl Bo4eComponent for Konfigurationsprodukt {}
+impl crate::bo4e_component_sealed::Sealed for Konfigurationsprodukt {}
 #[cfg(feature = "json")]
 impl crate::json::sealed::Sealed for Konfigurationsprodukt {}
 #[cfg(feature = "json")]

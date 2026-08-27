@@ -134,8 +134,7 @@ where
 /// Captures a map key that serializes as a string without allocating a
 /// `serde_json::Value` intermediate.
 ///
-/// M-C fix: replaces `serde_json::to_value(key)` (which allocates a
-/// `Value::String`) with a minimal serializer that captures the string directly.
+/// Avoids `serde_json::to_value(key)`, which allocates a `Value::String`.
 ///
 /// non-string key branches are removed — BO4E JSON objects always
 /// use string keys.  A `debug_assert` fires in debug builds if a non-string

@@ -1,5 +1,6 @@
 use super::{
-    Bo4eObject, BoTyp, Geschaeftspartner, Marktrolle, Rollencodetyp, Sparte, ZusatzAttribut,
+    Bo4eObject, Bo4eTyped, BoTyp, Geschaeftspartner, Marktrolle, Rollencodetyp, Sparte,
+    ZusatzAttribut,
 };
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(not(feature = "json"), derive(Eq, Hash))]
@@ -101,13 +102,16 @@ impl Default for Marktteilnehmer {
         }
     }
 }
-impl Bo4eObject for Marktteilnehmer {
-    type BoTyp = BoTyp;
-    const BO_TYP: BoTyp = BoTyp::Marktteilnehmer;
+impl Bo4eTyped for Marktteilnehmer {
+    type Typ = BoTyp;
+    const TYP: BoTyp = BoTyp::Marktteilnehmer;
     const TYP_WIRE: &'static str = "MARKTTEILNEHMER";
     const SCHEMA_VERSION: &'static str = "202607.1.0";
     const SCHEMA_SERIES: &'static str = "202607";
 }
+impl crate::bo4e_typed_sealed::Sealed for Marktteilnehmer {}
+impl Bo4eObject for Marktteilnehmer {}
+impl crate::bo4e_object_sealed::Sealed for Marktteilnehmer {}
 #[cfg(feature = "json")]
 impl crate::json::sealed::Sealed for Marktteilnehmer {}
 #[cfg(feature = "json")]

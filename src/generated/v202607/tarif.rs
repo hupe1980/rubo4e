@@ -1,7 +1,7 @@
 use super::{
-    Bo4eObject, BoTyp, Energiemix, Kundentyp, Marktteilnehmer, Preisgarantie, Regionspreis,
-    Registeranzahl, Sparte, Tarifberechnungsparameter, Tarifeinschraenkung, Tarifmerkmal, Tariftyp,
-    Vertragskonditionen, Zeitraum, ZusatzAttribut,
+    Bo4eObject, Bo4eTyped, BoTyp, Energiemix, Kundentyp, Marktteilnehmer, Preisgarantie,
+    Regionspreis, Registeranzahl, Sparte, Tarifberechnungsparameter, Tarifeinschraenkung,
+    Tarifmerkmal, Tariftyp, Vertragskonditionen, Zeitraum, ZusatzAttribut,
 };
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(not(feature = "json"), derive(Eq, Hash))]
@@ -251,13 +251,16 @@ impl Tarif {
         }
     }
 }
-impl Bo4eObject for Tarif {
-    type BoTyp = BoTyp;
-    const BO_TYP: BoTyp = BoTyp::Tarif;
+impl Bo4eTyped for Tarif {
+    type Typ = BoTyp;
+    const TYP: BoTyp = BoTyp::Tarif;
     const TYP_WIRE: &'static str = "TARIF";
     const SCHEMA_VERSION: &'static str = "202607.1.0";
     const SCHEMA_SERIES: &'static str = "202607";
 }
+impl crate::bo4e_typed_sealed::Sealed for Tarif {}
+impl Bo4eObject for Tarif {}
+impl crate::bo4e_object_sealed::Sealed for Tarif {}
 #[cfg(feature = "json")]
 impl crate::json::sealed::Sealed for Tarif {}
 #[cfg(feature = "json")]

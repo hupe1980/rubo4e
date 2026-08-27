@@ -1,5 +1,5 @@
 use super::{
-    Adresse, Bo4eObject, BoTyp, Dienstleistung, Geokoordinaten, Geraet, Katasteradresse,
+    Adresse, Bo4eObject, Bo4eTyped, BoTyp, Dienstleistung, Geokoordinaten, Geraet, Katasteradresse,
     Lokationszuordnung, Netzebene, Sparte, Zaehler, ZusatzAttribut,
 };
 #[derive(Debug, Clone, PartialEq)]
@@ -168,13 +168,16 @@ impl Default for Messlokation {
         }
     }
 }
-impl Bo4eObject for Messlokation {
-    type BoTyp = BoTyp;
-    const BO_TYP: BoTyp = BoTyp::Messlokation;
+impl Bo4eTyped for Messlokation {
+    type Typ = BoTyp;
+    const TYP: BoTyp = BoTyp::Messlokation;
     const TYP_WIRE: &'static str = "MESSLOKATION";
     const SCHEMA_VERSION: &'static str = "202607.1.0";
     const SCHEMA_SERIES: &'static str = "202607";
 }
+impl crate::bo4e_typed_sealed::Sealed for Messlokation {}
+impl Bo4eObject for Messlokation {}
+impl crate::bo4e_object_sealed::Sealed for Messlokation {}
 #[cfg(feature = "json")]
 impl crate::json::sealed::Sealed for Messlokation {}
 #[cfg(feature = "json")]

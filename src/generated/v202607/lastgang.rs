@@ -1,6 +1,6 @@
 use super::{
-    Bo4eObject, BoTyp, Marktlokation, Menge, Mengeneinheit, Messlokation, Sparte, Zeitreihenwert,
-    ZusatzAttribut,
+    Bo4eObject, Bo4eTyped, BoTyp, Marktlokation, Menge, Mengeneinheit, Messlokation, Sparte,
+    Zeitreihenwert, ZusatzAttribut,
 };
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(not(feature = "json"), derive(Eq, Hash))]
@@ -112,13 +112,16 @@ impl Lastgang {
         }
     }
 }
-impl Bo4eObject for Lastgang {
-    type BoTyp = BoTyp;
-    const BO_TYP: BoTyp = BoTyp::Lastgang;
+impl Bo4eTyped for Lastgang {
+    type Typ = BoTyp;
+    const TYP: BoTyp = BoTyp::Lastgang;
     const TYP_WIRE: &'static str = "LASTGANG";
     const SCHEMA_VERSION: &'static str = "202607.1.0";
     const SCHEMA_SERIES: &'static str = "202607";
 }
+impl crate::bo4e_typed_sealed::Sealed for Lastgang {}
+impl Bo4eObject for Lastgang {}
+impl crate::bo4e_object_sealed::Sealed for Lastgang {}
 #[cfg(feature = "json")]
 impl crate::json::sealed::Sealed for Lastgang {}
 #[cfg(feature = "json")]

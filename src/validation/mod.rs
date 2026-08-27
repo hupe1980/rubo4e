@@ -445,10 +445,9 @@ macro_rules! impl_validators {
             /// # Why `<=` and not `<`
             ///
             /// BO4E declares both dates **inclusive**, and gives `'2025-01-01'` as
-            /// the example for *both* of them: `startdatum == enddatum` is a valid
-            /// one-day period, not an empty one. Requiring a strict `<` — as an
-            /// earlier revision did, on the assumption that `enddatum` was
-            /// exclusive — rejected every single-day Zeitraum in circulation.
+            /// the example for *both* of them: `startdatum == enddatum` is a
+            /// valid one-day period, not an empty one, and a strict `<` would
+            /// reject every single-day Zeitraum in circulation.
             pub fn validate_zeitraum(v: &Zeitraum, _: &()) -> Result<(), garde::Error> {
                 let has_duration = v.dauer.is_some();
                 let has_date = v.startdatum.is_some() || v.enddatum.is_some();

@@ -1,6 +1,6 @@
 use super::{
-    Bo4eObject, BoTyp, KundengruppeKa, Marktteilnehmer, Preisposition, Preisstatus, Sparte,
-    Zeitraum, ZusatzAttribut,
+    Bo4eObject, Bo4eTyped, BoTyp, KundengruppeKa, Marktteilnehmer, Preisposition, Preisstatus,
+    Sparte, Zeitraum, ZusatzAttribut,
 };
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(not(feature = "json"), derive(Eq, Hash))]
@@ -109,13 +109,16 @@ impl Default for PreisblattKonzessionsabgabe {
         }
     }
 }
-impl Bo4eObject for PreisblattKonzessionsabgabe {
-    type BoTyp = BoTyp;
-    const BO_TYP: BoTyp = BoTyp::PreisblattKonzessionsabgabe;
+impl Bo4eTyped for PreisblattKonzessionsabgabe {
+    type Typ = BoTyp;
+    const TYP: BoTyp = BoTyp::PreisblattKonzessionsabgabe;
     const TYP_WIRE: &'static str = "PREISBLATTKONZESSIONSABGABE";
     const SCHEMA_VERSION: &'static str = "202607.1.0";
     const SCHEMA_SERIES: &'static str = "202607";
 }
+impl crate::bo4e_typed_sealed::Sealed for PreisblattKonzessionsabgabe {}
+impl Bo4eObject for PreisblattKonzessionsabgabe {}
+impl crate::bo4e_object_sealed::Sealed for PreisblattKonzessionsabgabe {}
 #[cfg(feature = "json")]
 impl crate::json::sealed::Sealed for PreisblattKonzessionsabgabe {}
 #[cfg(feature = "json")]

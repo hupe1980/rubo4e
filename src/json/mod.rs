@@ -1142,8 +1142,8 @@ mod tests {
     /// Fixture for the snake_case mode, which only rewrites keys the generator
     /// put in the key map — so it has to be built from real BO4E wire names.
     ///
-    /// `hoechstpreisHT` is deliberate: it is one of the keys whose snake form is
-    /// not recoverable by a heuristic, so it pins the regression.
+    /// `hoechstpreisHT` is deliberate: its snake form is one a heuristic cannot
+    /// invert, which is what the table exists for.
     #[derive(Debug, PartialEq, Serialize, Deserialize)]
     struct SnakeSample {
         #[serde(rename = "marktlokationsId")]

@@ -4,7 +4,7 @@
 //! wire compatibility with the BO4E standard.
 //!
 //! Each test asserts **structural equality** between the original `serde_json::Value`
-//! and the re-serialized value tree (M-04 fix).  This catches field-ordering changes,
+//! and the re-serialized value tree.  This catches field-ordering changes,
 //! null-emission regressions, and key-casing bugs that a simple re-parse cannot detect.
 //!
 //! Run with:
@@ -38,7 +38,7 @@ mod golden_tests {
                     &serde_json::to_string(&typed).expect(concat!("failed to serialize ", $file)),
                 )
                 .expect(concat!("failed to re-parse serialized ", $file));
-                // M-04: assert structural equality to catch field-ordering,
+                // Structural equality, to catch field-ordering,
                 // null-emission, and key-casing regressions.
                 assert_eq!(
                     original, reserialized,

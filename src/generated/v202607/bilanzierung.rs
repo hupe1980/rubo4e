@@ -1,7 +1,7 @@
 use super::{
-    Abwicklungsmodell, Aggregationsverantwortung, Bo4eObject, BoTyp, Fallgruppenzuordnung,
-    Lastprofil, Menge, Profiltyp, Prognosegrundlage, WahlrechtPrognosegrundlage, Zeitreihentyp,
-    ZusatzAttribut,
+    Abwicklungsmodell, Aggregationsverantwortung, Bo4eObject, Bo4eTyped, BoTyp,
+    Fallgruppenzuordnung, Lastprofil, Menge, Profiltyp, Prognosegrundlage,
+    WahlrechtPrognosegrundlage, Zeitreihentyp, ZusatzAttribut,
 };
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(not(feature = "json"), derive(Eq, Hash))]
@@ -243,13 +243,16 @@ impl Default for Bilanzierung {
         }
     }
 }
-impl Bo4eObject for Bilanzierung {
-    type BoTyp = BoTyp;
-    const BO_TYP: BoTyp = BoTyp::Bilanzierung;
+impl Bo4eTyped for Bilanzierung {
+    type Typ = BoTyp;
+    const TYP: BoTyp = BoTyp::Bilanzierung;
     const TYP_WIRE: &'static str = "BILANZIERUNG";
     const SCHEMA_VERSION: &'static str = "202607.1.0";
     const SCHEMA_SERIES: &'static str = "202607";
 }
+impl crate::bo4e_typed_sealed::Sealed for Bilanzierung {}
+impl Bo4eObject for Bilanzierung {}
+impl crate::bo4e_object_sealed::Sealed for Bilanzierung {}
 #[cfg(feature = "json")]
 impl crate::json::sealed::Sealed for Bilanzierung {}
 #[cfg(feature = "json")]

@@ -155,7 +155,7 @@ fn docs_obis_canonical_form() -> Result<(), Box<dyn std::error::Error>> {
 /// halves are asserted here so the advice cannot rot.
 #[test]
 fn docs_dispatch_on_the_series_not_the_release() {
-    use rubo4e::Bo4eObject as _;
+    use rubo4e::Bo4eTyped as _;
 
     fn series_of(wire_version: &str) -> &str {
         wire_version.split('.').next().unwrap_or(wire_version)

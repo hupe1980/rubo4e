@@ -1191,7 +1191,7 @@ mod current_alias_tests {
 mod required_field_constructor_tests {
     use garde::Validate as _;
     use rubo4e::current::{BoTyp, Lastgang, Menge, Mengeneinheit};
-    use rubo4e::Bo4eObject as _;
+    use rubo4e::Bo4eTyped as _;
 
     #[test]
     fn lastgang_new_fills_in_everything_else() {
@@ -1204,7 +1204,7 @@ mod required_field_constructor_tests {
         assert_eq!(lg.zeit_intervall_laenge, interval);
         assert_eq!(lg.typ, Some(BoTyp::Lastgang), "`_typ` is stamped");
         assert!(lg.marktlokation.is_none(), "everything else defaults");
-        assert_eq!(lg.bo_type(), BoTyp::Lastgang);
+        assert_eq!(Lastgang::TYP, BoTyp::Lastgang);
         assert!(lg.validate().is_ok());
     }
 

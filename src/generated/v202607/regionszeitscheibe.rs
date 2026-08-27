@@ -1,4 +1,4 @@
-use super::{ComTyp, Region, Zeitraum, ZusatzAttribut};
+use super::{Bo4eComponent, Bo4eTyped, ComTyp, Region, Zeitraum, ZusatzAttribut};
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(not(feature = "json"), derive(Eq, Hash))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -75,6 +75,16 @@ impl Default for Regionszeitscheibe {
         }
     }
 }
+impl Bo4eTyped for Regionszeitscheibe {
+    type Typ = ComTyp;
+    const TYP: ComTyp = ComTyp::Regionszeitscheibe;
+    const TYP_WIRE: &'static str = "REGIONSZEITSCHEIBE";
+    const SCHEMA_VERSION: &'static str = "202607.1.0";
+    const SCHEMA_SERIES: &'static str = "202607";
+}
+impl crate::bo4e_typed_sealed::Sealed for Regionszeitscheibe {}
+impl Bo4eComponent for Regionszeitscheibe {}
+impl crate::bo4e_component_sealed::Sealed for Regionszeitscheibe {}
 #[cfg(feature = "json")]
 impl crate::json::sealed::Sealed for Regionszeitscheibe {}
 #[cfg(feature = "json")]

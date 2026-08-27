@@ -16,7 +16,7 @@ rubo4e/
 ├── justfile                 — build / generate / test recipes
 ├── site/                    — this documentation site (Zola)
 ├── src/                     — rubo4e crate source
-│   ├── lib.rs               — crate root; prelude, Bo4eObject / Bo4eEnum / Bo4eStrict
+│   ├── lib.rs               — crate root; prelude, Bo4eTyped / Bo4eEnum / Bo4eStrict
 │   ├── error.rs             — IdentifierError, LengthExpectation, UnknownVariant
 │   ├── strict.rs            — StrictError and the JSON-path helpers Bo4eStrict emits
 │   ├── convenience.rs       — hand-written ergonomic methods on generated types
@@ -152,7 +152,7 @@ a type has to be looked up per type.
 |---|---|---|
 | Always | `Debug`, `Clone`, `PartialEq`, `Default`&nbsp;\* | `Debug`, `Clone`, `Copy`, `PartialEq`, `Eq`, `PartialOrd`, `Ord`, `Hash` |
 | Without `json` | **`Eq`, `Hash`** | — |
-| `versioned` | `Bo4eObject` (BOs only) with `BO_TYP` / `TYP_WIRE` / `SCHEMA_VERSION` / `SCHEMA_SERIES`, `Bo4eStrict` | `Bo4eEnum`, `VARIANTS` / `COUNT` / `as_wire` / `from_wire` / `iter_known` |
+| `versioned` | `Bo4eTyped` with `TYP` / `TYP_WIRE` / `SCHEMA_VERSION` / `SCHEMA_SERIES`, plus the `Bo4eObject` or `Bo4eComponent` marker, and `Bo4eStrict` | `Bo4eEnum`, `VARIANTS` / `COUNT` / `as_wire` / `from_wire` / `iter_known` |
 | `json` | `Bo4eJsonExt`, `Bo4eExtensionData`, `Display` | — |
 | `serde` | `Serialize`, `Deserialize` | `Serialize`, `Deserialize` |
 | `builder` | `TypedBuilder` | — |
@@ -165,16 +165,25 @@ a type has to be looked up per type.
 (`Lastgang`, `Tarif`) — a required field's type need not have one. Each gets a
 feature-free `new(…)` taking those fields and defaulting the rest.
 
-**The BO facts are associated constants**, not just methods:
-`T::BO_TYP`, `T::TYP_WIRE`, `T::SCHEMA_VERSION`, `T::SCHEMA_SERIES`. Generic code
-therefore needs no value and no `Default` bound — which is what stops `Lastgang`
-and `Tarif` being silently excluded from anything written as `fn f<T: Default>()`.
+**The `_typ` facts are associated constants** on [`Bo4eTyped`]: `T::TYP`,
+`T::TYP_WIRE`, `T::SCHEMA_VERSION`, `T::SCHEMA_SERIES`. Generic code therefore
+needs no value and no `Default` bound — which is what stops `Lastgang` and
+`Tarif` being silently excluded from anything written as `fn f<T: Default>()`.
 
-That makes `Bo4eObject` **not `dyn`-compatible**. Use `AnyBo` for a
-heterogeneous collection: the trait is sealed, so `AnyBo` is the sum over exactly
-its implementors, it carries the same four facts as methods (`schema_version()`
-and `schema_series()` return `Option`, since the `Unknown` catch-all has no
-generated type), and it is `Clone + PartialEq + Serialize + Deserialize` besides.
+`Bo4eTyped` covers **BOs and COMs alike**, so one bound reaches everything the
+schema pins a `_typ` on — what a gate at a wire boundary wants. `Bo4eObject` and
+`Bo4eComponent` are sealed markers over it, narrowing the set and binding
+`Typ` to `BoTyp` or `ComTyp`. `ZusatzAttribut`, the one schema with no `_typ`,
+implements none of the three.
+
+Associated constants make a trait **not `dyn`-compatible**. Use `AnyBo` for a
+heterogeneous collection: the traits are sealed, so `AnyBo` is the sum over
+exactly `Bo4eObject`'s implementors, it carries the same facts as methods
+(`schema_version()` and `schema_series()` return `Option`, since the `Unknown`
+catch-all has no generated type), and it is `Clone + PartialEq + Serialize +
+Deserialize` besides.
+
+[`Bo4eTyped`]: https://docs.rs/rubo4e/latest/rubo4e/trait.Bo4eTyped.html
 
 **`Eq` and `Hash` on structs move together**, and only without `json`. One type
 blocks both: `serde_json::Value`, which reaches a generated struct through

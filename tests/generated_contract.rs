@@ -242,11 +242,11 @@ fn every_struct_stamps_the_schema_declared_typ() {
     );
 }
 
-/// Every BO's `Bo4eObject` constants must agree with the schema, and with each
+/// Every BO's `Bo4eTyped` constants must agree with the schema, and with each
 /// other.
 ///
 /// `TYP_WIRE` is emitted as a literal rather than derived from
-/// `BO_TYP.as_wire()`, because `Bo4eEnum::as_wire` is a trait method and cannot
+/// `TYP.as_wire()`, because `Bo4eEnum::as_wire` is a trait method and cannot
 /// run in a const initializer. That leaves two spellings of one fact, which is
 /// exactly the shape that drifts — so this pins them together, and both against
 /// the schema.
@@ -264,8 +264,8 @@ fn bo_constants_agree_with_the_schema_and_each_other() {
              run `just generate`"
         );
         assert!(
-            src.contains(&format!("constBO_TYP:BoTyp=BoTyp::{title};")),
-            "{title}: BO_TYP is not the variant named after the struct; run `just generate`"
+            src.contains(&format!("constTYP:BoTyp=BoTyp::{title};")),
+            "{title}: TYP is not the variant named after the struct; run `just generate`"
         );
         checked += 1;
     }
@@ -282,10 +282,10 @@ fn typ_wire_is_the_discriminants_own_wire_string() {
     use rubo4e::current::{
         Bilanzierung, Lastgang, Marktlokation, Messlokation, Netzlokation, Rechnung, Tarif, Vertrag,
     };
-    use rubo4e::{Bo4eEnum as _, Bo4eObject};
+    use rubo4e::{Bo4eEnum as _, Bo4eTyped};
 
-    fn check<T: Bo4eObject>(expected: &str) {
-        assert_eq!(T::TYP_WIRE, T::BO_TYP.as_wire(), "TYP_WIRE vs BO_TYP");
+    fn check<T: Bo4eTyped>(expected: &str) {
+        assert_eq!(T::TYP_WIRE, T::TYP.as_wire(), "TYP_WIRE vs TYP");
         assert_eq!(T::TYP_WIRE, expected);
         assert_eq!(
             T::SCHEMA_SERIES,
@@ -307,6 +307,108 @@ fn typ_wire_is_the_discriminants_own_wire_string() {
     // The two with required fields, which a `T: Default` bound would exclude.
     check::<Lastgang>("LASTGANG");
     check::<Tarif>("TARIF");
+}
+
+/// Every struct whose schema pins a `_typ` implements `Bo4eTyped`, plus the
+/// marker for its kind — BOs and COMs alike.
+///
+/// A COM without the impl is invisible to a bound written over "anything with a
+/// `_typ`", which is what a gate at a wire boundary wants, and nothing else
+/// fails when one is missing.
+#[test]
+fn every_struct_with_a_typ_implements_bo4e_typed() {
+    let mut checked = 0usize;
+    let mut untyped = Vec::new();
+
+    for (category, marker) in [
+        ("bo", "Bo4eObject"),
+        ("com", "Bo4eComponent"),
+        ("", "Bo4eComponent"),
+    ] {
+        for (title, doc) in read_schemas(&schema_dir().join(category)) {
+            let src = generated_source_flat(&title);
+            let Some(declared) = metadata_literal(&doc, "_typ") else {
+                // No `_typ` — must carry none of the three impls.
+                untyped.push(title.clone());
+                for absent in [
+                    "implBo4eTypedfor",
+                    "implBo4eObjectfor",
+                    "implBo4eComponentfor",
+                ] {
+                    assert!(
+                        !src.contains(&format!("{absent}{title}")),
+                        "{title} declares no `_typ`, so it cannot implement these traits"
+                    );
+                }
+                continue;
+            };
+            assert!(
+                src.contains(&format!("implBo4eTypedfor{title}")),
+                "{title} pins `_typ` = {declared:?} but does not implement Bo4eTyped; \
+                 run `just generate`"
+            );
+            assert!(
+                src.contains(&format!("impl{marker}for{title}")),
+                "{title} is a {category:?} type and must implement {marker}"
+            );
+            checked += 1;
+        }
+    }
+
+    assert!(
+        checked >= 90,
+        "expected ~95 schemas with a _typ, saw {checked}"
+    );
+    assert_eq!(
+        untyped,
+        ["ZusatzAttribut"],
+        "ZusatzAttribut is the one BO4E schema with no `_typ` — if that changed, \
+         re-read the schemas before updating this list"
+    );
+}
+
+/// …and the same through the API: one bound reaches a BO and a COM alike.
+#[test]
+fn one_bound_covers_business_objects_and_components() {
+    use rubo4e::current::{
+        Adresse, Betrag, BoTyp, ComTyp, Energiemix, Lastgang, Marktlokation, Rechnung, Tarif,
+        Vorauszahlung, Zahlungsinformation,
+    };
+    use rubo4e::{Bo4eComponent, Bo4eEnum as _, Bo4eObject, Bo4eTyped};
+
+    /// The shape a gate at a wire boundary wants: no `Default`, no value, and no
+    /// need to know whether `T` is a BO or a COM.
+    fn wire_typ<T: Bo4eTyped>() -> &'static str {
+        assert_eq!(T::TYP_WIRE, T::TYP.as_wire(), "TYP_WIRE vs TYP");
+        assert_eq!(
+            T::SCHEMA_SERIES,
+            T::SCHEMA_VERSION.split('.').next().expect("a version"),
+        );
+        T::TYP_WIRE
+    }
+
+    // Geschäftsobjekte, including the two with required fields and so no `Default`.
+    assert_eq!(wire_typ::<Marktlokation>(), "MARKTLOKATION");
+    assert_eq!(wire_typ::<Rechnung>(), "RECHNUNG");
+    assert_eq!(wire_typ::<Lastgang>(), "LASTGANG");
+    assert_eq!(wire_typ::<Tarif>(), "TARIF");
+
+    // …and components, through the very same function.
+    assert_eq!(wire_typ::<Adresse>(), "ADRESSE");
+    assert_eq!(wire_typ::<Betrag>(), "BETRAG");
+    assert_eq!(wire_typ::<Energiemix>(), "ENERGIEMIX");
+    assert_eq!(wire_typ::<Zahlungsinformation>(), "ZAHLUNGSINFORMATION");
+    assert_eq!(wire_typ::<Vorauszahlung>(), "VORAUSZAHLUNG");
+
+    // The markers narrow it, and bind the discriminant to its own enum.
+    fn bo_typ<T: Bo4eObject<Typ = BoTyp>>() -> BoTyp {
+        T::TYP
+    }
+    fn com_typ<T: Bo4eComponent<Typ = ComTyp>>() -> ComTyp {
+        T::TYP
+    }
+    assert_eq!(bo_typ::<Lastgang>(), BoTyp::Lastgang);
+    assert_eq!(com_typ::<Adresse>(), ComTyp::Adresse);
 }
 
 /// A struct the schema marks `required` gets a `new(...)` in place of the

@@ -1,4 +1,4 @@
-use super::{ComTyp, ZusatzAttribut};
+use super::{Bo4eComponent, Bo4eTyped, ComTyp, ZusatzAttribut};
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(not(feature = "json"), derive(Eq, Hash))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -160,6 +160,16 @@ impl Default for Zeitraum {
         }
     }
 }
+impl Bo4eTyped for Zeitraum {
+    type Typ = ComTyp;
+    const TYP: ComTyp = ComTyp::Zeitraum;
+    const TYP_WIRE: &'static str = "ZEITRAUM";
+    const SCHEMA_VERSION: &'static str = "202607.1.0";
+    const SCHEMA_SERIES: &'static str = "202607";
+}
+impl crate::bo4e_typed_sealed::Sealed for Zeitraum {}
+impl Bo4eComponent for Zeitraum {}
+impl crate::bo4e_component_sealed::Sealed for Zeitraum {}
 #[cfg(feature = "json")]
 impl crate::json::sealed::Sealed for Zeitraum {}
 #[cfg(feature = "json")]

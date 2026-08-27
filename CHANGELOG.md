@@ -10,7 +10,7 @@ also carries a **Schema deltas** section (see [Versioning](https://hupe1980.gith
 so downstream guards (SQL `CHECK` lists, variant-count assertions, coverage
 tests) can be updated deliberately instead of discovering drift at runtime.
 
-## [0.11.0] — unreleased
+## [0.12.0] — unreleased
 
 This release is a wire-format correction. Every payload rubo4e produced carried
 an invalid `_version`, COMs never stamped `_typ`, and `Rechnung` could not read
@@ -335,28 +335,46 @@ contract say what BO4E actually does inside a series — see **Schema deltas** a
 
 ### Changed *(breaking)*
 
-- **The `Bo4eObject` facts are associated constants, and the trait is no longer
-  `dyn`-compatible.** `BO_TYP`, `TYP_WIRE`, `SCHEMA_VERSION`, and `SCHEMA_SERIES`
-  are readable from a type without a value; `bo_type()`, `typ_wire()`,
-  `schema_version()`, and `schema_series()` remain as provided methods.
+- **The `_typ` facts are associated constants on a new `Bo4eTyped` trait, over
+  BOs *and* COMs, and the trait is not `dyn`-compatible.** `TYP`, `TYP_WIRE`,
+  `SCHEMA_VERSION`, and `SCHEMA_SERIES` are readable from a type without a value;
+  `typ_wire()`, `schema_version()`, and `schema_series()` are provided methods.
+  `Bo4eObject` and `Bo4eComponent` are sealed markers over it, narrowing the set
+  and binding `Typ` to `BoTyp` or `ComTyp`.
 
-  The point is generic code. Reading a BO's discriminant used to mean
-  constructing one — `T::default().bo_type()` — which silently excludes the two
-  types the schema marks `required`, because a `T: Default` bound does not admit
-  `Lastgang` or `Tarif`. Nothing failed; they were simply never reached, and the
-  workaround was to name the `BoTyp` variant by hand.
+  The point is generic code. Reading a discriminant used to mean constructing a
+  value — `T::default().bo_type()` — which silently excludes the two types the
+  schema marks `required`, because a `T: Default` bound does not admit `Lastgang`
+  or `Tarif`. Nothing failed; they were never reached.
+
+  Putting the constants on a trait that spans both kinds is what lets a consumer
+  write **one bound over "anything with a `_typ`"**, which is what a gate at a
+  wire boundary actually wants — a service gating `Marktlokation` and `Rechnung`
+  alongside `Energiemix`, `Zahlungsinformation`, and `Vorauszahlung` no longer
+  needs two accessors. It also removes the `Default` dependency from the COM
+  half, where no schema declares a `required` field *today* but one release doing
+  so would drop that COM out of a `T: Default` bound exactly as `Lastgang` was.
+
+  `ZusatzAttribut` implements none of the three: it is the single BO4E schema
+  that declares no `_typ`.
+
+  There is deliberately **no `typ()` method** beside the public `typ` field. Two
+  spellings a keystroke apart, one meaning the payload's claim and the other the
+  type's own identity, is the confusion `TYP` exists to prevent.
 
   Associated constants make a trait dyn-incompatible, so `Box<dyn Bo4eObject>` is
-  gone. That is the right trade rather than a cost: the trait is **sealed**, so
-  its implementors are a closed set of 35 generated types, and this crate already
-  ships the sum type over exactly that set. `AnyBo` is `Clone`, `PartialEq`,
-  `Serialize`, `Deserialize`, and matchable — none of which a trait object is —
-  and it now carries the same four facts (`typ_wire()`, `schema_version()`, and
-  `schema_series()` are new; the latter two return `Option` because the `Unknown`
-  catch-all has no generated type to report one for).
+  gone. The traits are **sealed**, so their implementors are a closed set, and
+  this crate already ships the sum type over exactly `Bo4eObject`'s. `AnyBo` is
+  `Clone`, `PartialEq`, `Serialize`, `Deserialize`, and matchable — none of which
+  a trait object is — and it now carries the same facts (`typ_wire()`,
+  `schema_version()`, and `schema_series()` are new; the latter two return
+  `Option` because the `Unknown` catch-all has no generated type to report one
+  for).
 
-  **Action required:** replace `Vec<Box<dyn Bo4eObject<BoTyp = BoTyp>>>` with
-  `Vec<AnyBo>` — `.into()` converts each element.
+  **Action required:** `T::BO_TYP` becomes `T::TYP` and `v.bo_type()` becomes
+  `T::TYP`; import `Bo4eTyped` where you imported `Bo4eObject` for the accessors.
+  Replace `Vec<Box<dyn Bo4eObject<BoTyp = BoTyp>>>` with `Vec<AnyBo>` — `.into()`
+  converts each element.
 
 - **`schemars`'s `rust_decimal1` and `utoipa`'s `decimal` / `time` features moved
   to the features that need them.** They are enabled as
@@ -665,6 +683,11 @@ contract say what BO4E actually does inside a series — see **Schema deltas** a
 - **A `Borrow<str>` contract guard over the whole identifier family** in
   `tests/prelude_surface.rs`: every identifier must be findable in a `HashMap`
   and a `BTreeMap` by the string it renders as. `ObisCode` was not.
+
+- **`tests/generated_contract.rs` guards COM coverage too.** A COM missing its
+  `Bo4eTyped` impl is invisible to a bound written over "anything with a `_typ`",
+  and nothing else fails when one is absent — so the schemas are read and the
+  correspondence checked in both directions, `ZusatzAttribut`'s absence included.
 
 - **`tests/generated_contract.rs` guards the new constants and constructors.**
   `TYP_WIRE` is emitted as a literal because `Bo4eEnum::as_wire` is a trait

@@ -1,6 +1,6 @@
 use super::{
-    Bo4eObject, BoTyp, Konfigurationsprodukt, Lokationszuordnung, Marktrolle, Menge, Sparte,
-    VerwendungszweckProMarktrolle, ZusatzAttribut,
+    Bo4eObject, Bo4eTyped, BoTyp, Konfigurationsprodukt, Lokationszuordnung, Marktrolle, Menge,
+    Sparte, VerwendungszweckProMarktrolle, ZusatzAttribut,
 };
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(not(feature = "json"), derive(Eq, Hash))]
@@ -137,13 +137,16 @@ impl Default for Netzlokation {
         }
     }
 }
-impl Bo4eObject for Netzlokation {
-    type BoTyp = BoTyp;
-    const BO_TYP: BoTyp = BoTyp::Netzlokation;
+impl Bo4eTyped for Netzlokation {
+    type Typ = BoTyp;
+    const TYP: BoTyp = BoTyp::Netzlokation;
     const TYP_WIRE: &'static str = "NETZLOKATION";
     const SCHEMA_VERSION: &'static str = "202607.1.0";
     const SCHEMA_SERIES: &'static str = "202607";
 }
+impl crate::bo4e_typed_sealed::Sealed for Netzlokation {}
+impl Bo4eObject for Netzlokation {}
+impl crate::bo4e_object_sealed::Sealed for Netzlokation {}
 #[cfg(feature = "json")]
 impl crate::json::sealed::Sealed for Netzlokation {}
 #[cfg(feature = "json")]

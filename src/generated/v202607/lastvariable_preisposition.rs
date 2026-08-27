@@ -1,6 +1,6 @@
 use super::{
-    ComTyp, Mengeneinheit, Preisreferenz, Preisstaffel, Tarifkalkulationsmethode, Waehrungseinheit,
-    ZusatzAttribut,
+    Bo4eComponent, Bo4eTyped, ComTyp, Mengeneinheit, Preisreferenz, Preisstaffel,
+    Tarifkalkulationsmethode, Waehrungseinheit, ZusatzAttribut,
 };
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(not(feature = "json"), derive(Eq, Hash))]
@@ -108,6 +108,16 @@ impl Default for LastvariablePreisposition {
         }
     }
 }
+impl Bo4eTyped for LastvariablePreisposition {
+    type Typ = ComTyp;
+    const TYP: ComTyp = ComTyp::LastvariablePreisposition;
+    const TYP_WIRE: &'static str = "LASTVARIABLEPREISPOSITION";
+    const SCHEMA_VERSION: &'static str = "202607.1.0";
+    const SCHEMA_SERIES: &'static str = "202607";
+}
+impl crate::bo4e_typed_sealed::Sealed for LastvariablePreisposition {}
+impl Bo4eComponent for LastvariablePreisposition {}
+impl crate::bo4e_component_sealed::Sealed for LastvariablePreisposition {}
 #[cfg(feature = "json")]
 impl crate::json::sealed::Sealed for LastvariablePreisposition {}
 #[cfg(feature = "json")]

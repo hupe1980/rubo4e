@@ -1,6 +1,6 @@
 use super::{
-    BdewArtikelnummer, Bemessungsgroesse, ComTyp, Kalkulationsmethode, Leistungstyp, Mengeneinheit,
-    Preisstaffel, Tarifzeit, Waehrungseinheit, ZusatzAttribut,
+    BdewArtikelnummer, Bemessungsgroesse, Bo4eComponent, Bo4eTyped, ComTyp, Kalkulationsmethode,
+    Leistungstyp, Mengeneinheit, Preisstaffel, Tarifzeit, Waehrungseinheit, ZusatzAttribut,
 };
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(not(feature = "json"), derive(Eq, Hash))]
@@ -182,6 +182,16 @@ impl Default for Preisposition {
         }
     }
 }
+impl Bo4eTyped for Preisposition {
+    type Typ = ComTyp;
+    const TYP: ComTyp = ComTyp::Preisposition;
+    const TYP_WIRE: &'static str = "PREISPOSITION";
+    const SCHEMA_VERSION: &'static str = "202607.1.0";
+    const SCHEMA_SERIES: &'static str = "202607";
+}
+impl crate::bo4e_typed_sealed::Sealed for Preisposition {}
+impl Bo4eComponent for Preisposition {}
+impl crate::bo4e_component_sealed::Sealed for Preisposition {}
 #[cfg(feature = "json")]
 impl crate::json::sealed::Sealed for Preisposition {}
 #[cfg(feature = "json")]

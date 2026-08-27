@@ -1,4 +1,7 @@
-use super::{ComTyp, Mengeneinheit, Preisstaffel, Preistyp, Waehrungseinheit, ZusatzAttribut};
+use super::{
+    Bo4eComponent, Bo4eTyped, ComTyp, Mengeneinheit, Preisstaffel, Preistyp, Waehrungseinheit,
+    ZusatzAttribut,
+};
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(not(feature = "json"), derive(Eq, Hash))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -92,6 +95,16 @@ impl Default for Tarifpreisposition {
         }
     }
 }
+impl Bo4eTyped for Tarifpreisposition {
+    type Typ = ComTyp;
+    const TYP: ComTyp = ComTyp::Tarifpreisposition;
+    const TYP_WIRE: &'static str = "TARIFPREISPOSITION";
+    const SCHEMA_VERSION: &'static str = "202607.1.0";
+    const SCHEMA_SERIES: &'static str = "202607";
+}
+impl crate::bo4e_typed_sealed::Sealed for Tarifpreisposition {}
+impl Bo4eComponent for Tarifpreisposition {}
+impl crate::bo4e_component_sealed::Sealed for Tarifpreisposition {}
 #[cfg(feature = "json")]
 impl crate::json::sealed::Sealed for Tarifpreisposition {}
 #[cfg(feature = "json")]

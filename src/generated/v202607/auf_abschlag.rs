@@ -1,6 +1,6 @@
 use super::{
-    AufAbschlagstyp, AufAbschlagsziel, ComTyp, Preisstaffel, Waehrungseinheit, Zeitraum,
-    ZusatzAttribut,
+    AufAbschlagstyp, AufAbschlagsziel, Bo4eComponent, Bo4eTyped, ComTyp, Preisstaffel,
+    Waehrungseinheit, Zeitraum, ZusatzAttribut,
 };
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(not(feature = "json"), derive(Eq, Hash))]
@@ -116,6 +116,16 @@ impl Default for AufAbschlag {
         }
     }
 }
+impl Bo4eTyped for AufAbschlag {
+    type Typ = ComTyp;
+    const TYP: ComTyp = ComTyp::AufAbschlag;
+    const TYP_WIRE: &'static str = "AUFABSCHLAG";
+    const SCHEMA_VERSION: &'static str = "202607.1.0";
+    const SCHEMA_SERIES: &'static str = "202607";
+}
+impl crate::bo4e_typed_sealed::Sealed for AufAbschlag {}
+impl Bo4eComponent for AufAbschlag {}
+impl crate::bo4e_component_sealed::Sealed for AufAbschlag {}
 #[cfg(feature = "json")]
 impl crate::json::sealed::Sealed for AufAbschlag {}
 #[cfg(feature = "json")]

@@ -1,4 +1,4 @@
-use super::{Betrag, ComTyp, Menge, Preis, ZusatzAttribut};
+use super::{Betrag, Bo4eComponent, Bo4eTyped, ComTyp, Menge, Preis, ZusatzAttribut};
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(not(feature = "json"), derive(Eq, Hash))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -92,6 +92,16 @@ impl Default for Angebotsposition {
         }
     }
 }
+impl Bo4eTyped for Angebotsposition {
+    type Typ = ComTyp;
+    const TYP: ComTyp = ComTyp::Angebotsposition;
+    const TYP_WIRE: &'static str = "ANGEBOTSPOSITION";
+    const SCHEMA_VERSION: &'static str = "202607.1.0";
+    const SCHEMA_SERIES: &'static str = "202607";
+}
+impl crate::bo4e_typed_sealed::Sealed for Angebotsposition {}
+impl Bo4eComponent for Angebotsposition {}
+impl crate::bo4e_component_sealed::Sealed for Angebotsposition {}
 #[cfg(feature = "json")]
 impl crate::json::sealed::Sealed for Angebotsposition {}
 #[cfg(feature = "json")]

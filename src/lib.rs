@@ -232,83 +232,76 @@ pub mod current {
     pub use crate::generated::v202607::*;
 }
 
-/// Implemented by every generated BO4E business object (Geschäftsobjekt).
+/// The `_typ` discriminant, as constants — implemented by every generated BO
+/// **and** COM.
 ///
-/// The BO type discriminant and the schema release are **associated constants**,
-/// readable from a type without a value, with method forms for when you have
-/// one. COM types and enums do not implement this trait.
-///
-/// Sealed: it cannot be implemented outside this crate.
+/// BO4E pins each schema's `_typ` with a `const`, and this exposes it without a
+/// value, so a gate at a wire boundary can read the discriminant of a type it
+/// only knows generically:
 ///
 /// ```
-/// use rubo4e::{current::{BoTyp, Lastgang, Vertrag}, Bo4eObject};
+/// use rubo4e::{current::{Adresse, Marktlokation}, Bo4eTyped};
 ///
-/// assert_eq!(Vertrag::BO_TYP, BoTyp::Vertrag);
-/// assert_eq!(Vertrag::TYP_WIRE, "VERTRAG");
-/// assert_eq!(Vertrag::SCHEMA_VERSION, "202607.1.0");
-/// assert_eq!(Vertrag::SCHEMA_SERIES, "202607");
+/// fn wire_typ<T: Bo4eTyped>() -> &'static str { T::TYP_WIRE }
 ///
-/// // Generic code needs no value, so a `Default` bound is not required —
-/// // which is what admits `Lastgang` and `Tarif`, the two types the schema
-/// // marks `required` and which therefore have no `Default`.
-/// fn discriminant_of<T: Bo4eObject<BoTyp = BoTyp>>() -> BoTyp { T::BO_TYP }
-/// assert_eq!(discriminant_of::<Lastgang>(), BoTyp::Lastgang);
+/// assert_eq!(wire_typ::<Marktlokation>(), "MARKTLOKATION");   // a BO
+/// assert_eq!(wire_typ::<Adresse>(), "ADRESSE");               // a COM
 /// ```
+///
+/// [`Bo4eObject`] and [`Bo4eComponent`] narrow this to the Geschäftsobjekte and
+/// the components; bind [`Typ`](Bo4eTyped::Typ) through either when you need the
+/// discriminant as its own enum rather than as a string.
+///
+/// Every generated struct implements it except `ZusatzAttribut`, the one BO4E
+/// schema that declares no `_typ`. Sealed: not implementable outside this crate.
 ///
 /// # Not `dyn`-compatible
 ///
 /// Associated constants make a trait dyn-incompatible. For a heterogeneous
-/// collection use [`AnyBo`](crate::current::AnyBo), the sum type over exactly
-/// this trait's (sealed) implementors — it carries the same facts and is
+/// collection of BOs use [`AnyBo`](crate::current::AnyBo), the sum type over
+/// exactly [`Bo4eObject`]'s implementors — it carries the same facts and is
 /// `Clone + PartialEq + Serialize + Deserialize` besides.
-///
-/// ```
-/// use rubo4e::current::{AnyBo, BoTyp, Marktlokation, Vertrag};
-///
-/// let objects: Vec<AnyBo> = vec![Vertrag::default().into(), Marktlokation::default().into()];
-/// assert_eq!(
-///     objects.iter().map(AnyBo::bo_type).collect::<Vec<_>>(),
-///     [BoTyp::Vertrag, BoTyp::Marktlokation],
-/// );
-/// ```
 #[cfg(feature = "versioned")]
 #[cfg_attr(docsrs, doc(cfg(feature = "versioned")))]
-pub trait Bo4eObject: bo4e_object_sealed::Sealed {
-    /// The BO type discriminant enum for this schema version (e.g. `v202607::BoTyp`).
+pub trait Bo4eTyped: bo4e_typed_sealed::Sealed {
+    /// The discriminant enum this type's `_typ` draws from — `BoTyp` for a
+    /// Geschäftsobjekt, `ComTyp` for a component.
     ///
     /// An associated type, so one trait definition serves every schema version
-    /// while each version's `BoTyp` stays strongly typed.
-    type BoTyp: Bo4eEnum;
+    /// while each version's enums stay strongly typed.
+    type Typ: Bo4eEnum;
 
-    /// The [`BoTyp`](Bo4eObject::BoTyp) discriminant for **this Rust type** —
-    /// the value the BO4E schema pins with a `const`.
+    /// The [`Typ`](Bo4eTyped::Typ) discriminant for **this Rust type** — the
+    /// value the BO4E schema pins with a `const`.
     ///
-    /// Not the `_typ` a payload carried: a `Marktlokation` decoded from
-    /// `{"_typ":"VERTRAG", …}` is still a `Marktlokation`, and a `match` on this
-    /// must not take the branch the sender named. The `typ` field is public, so
-    /// comparing the two finds a payload whose discriminant disagrees with the
-    /// type it was read into.
+    /// Not the `_typ` a payload carried. A `Marktlokation` decoded from
+    /// `{"_typ":"VERTRAG", …}` is still a `Marktlokation`, and a `match` on the
+    /// discriminant must not take the branch the sender named. The `typ` field
+    /// stays public for the payload's own claim, so comparing the two finds a
+    /// payload whose discriminant disagrees with the type it was read into:
     ///
     /// ```
     /// # #[cfg(feature = "json")] {
-    /// use rubo4e::{current::{BoTyp, Marktlokation}, Bo4eObject as _};
+    /// use rubo4e::{current::{BoTyp, Marktlokation}, Bo4eTyped};
     ///
     /// let body = r#"{"_typ":"VERTRAG","marktlokationsId":"51238696781"}"#;
     /// let malo: Marktlokation = serde_json::from_str(body).unwrap();
     ///
-    /// assert_eq!(malo.bo_type(), BoTyp::Marktlokation);   // what it *is*
-    /// assert_eq!(malo.typ, Some(BoTyp::Vertrag));         // what it *claimed*
+    /// assert_eq!(Marktlokation::TYP, BoTyp::Marktlokation);   // what it *is*
+    /// assert_eq!(malo.typ, Some(BoTyp::Vertrag));             // what it *claimed*
     /// # }
     /// ```
     ///
-    /// To dispatch on what a payload says it is, decode
-    /// [`AnyBo`](crate::current::AnyBo).
-    const BO_TYP: Self::BoTyp;
+    /// There is deliberately no `typ()` method beside the `typ` field — two
+    /// spellings a keystroke apart with those two meanings is the confusion this
+    /// constant exists to prevent. To dispatch on what a payload says it is,
+    /// decode [`AnyBo`](crate::current::AnyBo).
+    const TYP: Self::Typ;
 
     /// The `_typ` wire string for this type (e.g. `"MARKTLOKATION"`).
     ///
-    /// The same value as `Self::BO_TYP.as_wire()`, without needing
-    /// [`Bo4eEnum`] in scope.
+    /// The same value as `Self::TYP.as_wire()`, without needing [`Bo4eEnum`] in
+    /// scope or the concrete discriminant enum in the bound.
     const TYP_WIRE: &'static str;
 
     /// The exact BO4E schema release this type was generated from, in the
@@ -321,7 +314,7 @@ pub trait Bo4eObject: bo4e_object_sealed::Sealed {
     /// **Do not dispatch on it.** BO4E ships patch releases inside a series, so
     /// a producer one patch ahead sends `"202607.2.0"` and an equality match
     /// rejects a payload this module handles. Match on
-    /// [`SCHEMA_SERIES`](Bo4eObject::SCHEMA_SERIES) instead.
+    /// [`SCHEMA_SERIES`](Bo4eTyped::SCHEMA_SERIES) instead.
     const SCHEMA_VERSION: &'static str;
 
     /// The schema **series** — the `YYYYMM` prefix of the release, e.g.
@@ -332,41 +325,81 @@ pub trait Bo4eObject: bo4e_object_sealed::Sealed {
     /// same types.
     ///
     /// ```
-    /// use rubo4e::{current::Rechnung, Bo4eObject as _};
+    /// use rubo4e::{current::Rechnung, Bo4eTyped};
     ///
     /// let incoming = "202607.4.0";   // a sender's own `_version`
     /// assert_eq!(incoming.split('.').next(), Some(Rechnung::SCHEMA_SERIES));
     /// ```
     const SCHEMA_SERIES: &'static str;
 
-    /// Returns [`BO_TYP`](Bo4eObject::BO_TYP).
-    fn bo_type(&self) -> Self::BoTyp {
-        Self::BO_TYP
-    }
-
-    /// Returns [`TYP_WIRE`](Bo4eObject::TYP_WIRE).
+    /// Returns [`TYP_WIRE`](Bo4eTyped::TYP_WIRE).
     fn typ_wire(&self) -> &'static str {
         Self::TYP_WIRE
     }
 
-    /// Returns [`SCHEMA_VERSION`](Bo4eObject::SCHEMA_VERSION).
+    /// Returns [`SCHEMA_VERSION`](Bo4eTyped::SCHEMA_VERSION).
     fn schema_version(&self) -> &'static str {
         Self::SCHEMA_VERSION
     }
 
-    /// Returns [`SCHEMA_SERIES`](Bo4eObject::SCHEMA_SERIES).
+    /// Returns [`SCHEMA_SERIES`](Bo4eTyped::SCHEMA_SERIES).
     fn schema_series(&self) -> &'static str {
         Self::SCHEMA_SERIES
     }
+}
+
+/// Marks a generated **Geschäftsobjekt** — the BO4E types that stand on their
+/// own as a message payload.
+///
+/// Everything it carries comes from [`Bo4eTyped`]; this narrows the set, and
+/// pins [`Typ`](Bo4eTyped::Typ) to `BoTyp`:
+///
+/// ```
+/// use rubo4e::{current::{BoTyp, Lastgang, Vertrag}, Bo4eObject};
+///
+/// // No value needed, so no `Default` bound — which is what admits `Lastgang`
+/// // and `Tarif`, the two types the schema marks `required`.
+/// fn discriminant_of<T: Bo4eObject<Typ = BoTyp>>() -> BoTyp { T::TYP }
+///
+/// assert_eq!(discriminant_of::<Vertrag>(), BoTyp::Vertrag);
+/// assert_eq!(discriminant_of::<Lastgang>(), BoTyp::Lastgang);
+/// ```
+///
+/// Sealed: not implementable outside this crate.
+#[cfg(feature = "versioned")]
+#[cfg_attr(docsrs, doc(cfg(feature = "versioned")))]
+pub trait Bo4eObject: Bo4eTyped + bo4e_object_sealed::Sealed {}
+
+/// Marks a generated **component** (COM) — the BO4E types that appear nested
+/// inside a Geschäftsobjekt rather than on their own.
+///
+/// The counterpart of [`Bo4eObject`], with [`Typ`](Bo4eTyped::Typ) pinned to
+/// `ComTyp`: `fn f<T: Bo4eComponent<Typ = ComTyp>>()` takes `Adresse` and
+/// `Betrag` the way the example there takes `Vertrag` and `Lastgang`.
+///
+/// Sealed: not implementable outside this crate.
+#[cfg(feature = "versioned")]
+#[cfg_attr(docsrs, doc(cfg(feature = "versioned")))]
+pub trait Bo4eComponent: Bo4eTyped + bo4e_component_sealed::Sealed {}
+
+#[cfg(feature = "versioned")]
+#[doc(hidden)]
+pub mod bo4e_typed_sealed {
+    /// Sealing supertrait for [`crate::Bo4eTyped`].
+    pub trait Sealed {}
 }
 
 #[cfg(feature = "versioned")]
 #[doc(hidden)]
 pub mod bo4e_object_sealed {
     /// Sealing supertrait for [`crate::Bo4eObject`].
-    ///
-    /// Only generated BO types carry this impl.  External crates cannot implement
-    /// `Bo4eObject` because `Sealed` is not accessible outside `rubo4e`.
+    pub trait Sealed {}
+}
+
+#[cfg(feature = "versioned")]
+#[doc(hidden)]
+pub mod bo4e_component_sealed {
+    /// Sealing supertrait for [`crate::Bo4eComponent`].
     pub trait Sealed {}
 }
 
@@ -492,7 +525,7 @@ pub mod bo4e_enum_sealed {
 ///
 /// # Not sealed
 ///
-/// Unlike [`Bo4eObject`] and [`Bo4eEnum`], `Bo4eStrict` is intentionally **not**
+/// Unlike [`Bo4eTyped`] and [`Bo4eEnum`], `Bo4eStrict` is intentionally **not**
 /// sealed: downstream crates that wrap BO4E types in their own domain types can
 /// implement it to make their wrappers participate in the same recursive check.
 #[cfg(feature = "versioned")]
@@ -539,7 +572,8 @@ pub trait Bo4eStrict {
 /// - **every** identifier type and its error type — always;
 /// - [`Bo4eJsonExt`](crate::json::Bo4eJsonExt) and
 ///   [`Bo4eExtensionData`](crate::json::Bo4eExtensionData), with `json`;
-/// - [`Bo4eObject`], [`Bo4eEnum`], and [`Bo4eStrict`], with `versioned`;
+/// - [`Bo4eTyped`], [`Bo4eObject`], [`Bo4eComponent`], [`Bo4eEnum`], and
+///   [`Bo4eStrict`], with `versioned`;
 /// - [`Validate`](garde::Validate), [`Validated`](crate::validation::Validated),
 ///   and the report helpers, with `validate`;
 /// - the COM extension traits [`BetragExt`](crate::convenience::BetragExt),
@@ -592,8 +626,10 @@ pub mod prelude {
     #[cfg(feature = "json")]
     pub use crate::json::Bo4eJsonExt;
 
+    /// The `_typ` discriminant as constants, and the two markers that narrow it
+    /// to the Geschäftsobjekte and the components.
     #[cfg(feature = "versioned")]
-    pub use crate::Bo4eObject;
+    pub use crate::{Bo4eComponent, Bo4eObject, Bo4eTyped};
 
     /// Flatten `Option<Betrag>` → `Option<Decimal>` in one call.
     #[cfg(all(feature = "versioned", feature = "decimal"))]

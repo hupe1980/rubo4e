@@ -1,6 +1,6 @@
 use super::{
-    Befestigungsart, Bo4eObject, BoTyp, Geraet, Geschaeftspartner, Registeranzahl, Sparte,
-    Zaehlerauspraegung, Zaehlergroesse, Zaehlertyp, ZaehlertypSpezifikation, Zaehlwerk,
+    Befestigungsart, Bo4eObject, Bo4eTyped, BoTyp, Geraet, Geschaeftspartner, Registeranzahl,
+    Sparte, Zaehlerauspraegung, Zaehlergroesse, Zaehlertyp, ZaehlertypSpezifikation, Zaehlwerk,
     ZusatzAttribut,
 };
 #[derive(Debug, Clone, PartialEq)]
@@ -219,13 +219,16 @@ impl Default for Zaehler {
         }
     }
 }
-impl Bo4eObject for Zaehler {
-    type BoTyp = BoTyp;
-    const BO_TYP: BoTyp = BoTyp::Zaehler;
+impl Bo4eTyped for Zaehler {
+    type Typ = BoTyp;
+    const TYP: BoTyp = BoTyp::Zaehler;
     const TYP_WIRE: &'static str = "ZAEHLER";
     const SCHEMA_VERSION: &'static str = "202607.1.0";
     const SCHEMA_SERIES: &'static str = "202607";
 }
+impl crate::bo4e_typed_sealed::Sealed for Zaehler {}
+impl Bo4eObject for Zaehler {}
+impl crate::bo4e_object_sealed::Sealed for Zaehler {}
 #[cfg(feature = "json")]
 impl crate::json::sealed::Sealed for Zaehler {}
 #[cfg(feature = "json")]

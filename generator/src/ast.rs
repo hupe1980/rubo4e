@@ -57,7 +57,7 @@ pub struct Field {
 /// Whether a struct schema is a Geschäftsobjekt (BO) or a component (COM).
 ///
 /// The two differ only in which discriminant enum their `_typ` field draws from,
-/// and in whether they implement [`Bo4eObject`](../../rubo4e/trait.Bo4eObject.html).
+/// and in which marker trait they carry — `Bo4eObject` or `Bo4eComponent`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum StructKind {
     /// A BO4E Geschäftsobjekt — `_typ` is a `BoTyp`.

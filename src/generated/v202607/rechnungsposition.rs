@@ -1,6 +1,6 @@
 use super::{
-    BdewArtikelnummer, Betrag, ComTyp, Menge, Mengeneinheit, Preis, Steuerbetrag, Zeitraum,
-    ZusatzAttribut,
+    BdewArtikelnummer, Betrag, Bo4eComponent, Bo4eTyped, ComTyp, Menge, Mengeneinheit, Preis,
+    Steuerbetrag, Zeitraum, ZusatzAttribut,
 };
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(not(feature = "json"), derive(Eq, Hash))]
@@ -140,6 +140,16 @@ impl Default for Rechnungsposition {
         }
     }
 }
+impl Bo4eTyped for Rechnungsposition {
+    type Typ = ComTyp;
+    const TYP: ComTyp = ComTyp::Rechnungsposition;
+    const TYP_WIRE: &'static str = "RECHNUNGSPOSITION";
+    const SCHEMA_VERSION: &'static str = "202607.1.0";
+    const SCHEMA_SERIES: &'static str = "202607";
+}
+impl crate::bo4e_typed_sealed::Sealed for Rechnungsposition {}
+impl Bo4eComponent for Rechnungsposition {}
+impl crate::bo4e_component_sealed::Sealed for Rechnungsposition {}
 #[cfg(feature = "json")]
 impl crate::json::sealed::Sealed for Rechnungsposition {}
 #[cfg(feature = "json")]

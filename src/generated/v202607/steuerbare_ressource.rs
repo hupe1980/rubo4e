@@ -1,5 +1,5 @@
 use super::{
-    Bo4eObject, BoTyp, Konfigurationsprodukt, Lokationszuordnung, Marktrolle,
+    Bo4eObject, Bo4eTyped, BoTyp, Konfigurationsprodukt, Lokationszuordnung, Marktrolle,
     SteuerkanalLeistungsbeschreibung, ZusatzAttribut,
 };
 #[derive(Debug, Clone, PartialEq)]
@@ -110,13 +110,16 @@ impl Default for SteuerbareRessource {
         }
     }
 }
-impl Bo4eObject for SteuerbareRessource {
-    type BoTyp = BoTyp;
-    const BO_TYP: BoTyp = BoTyp::SteuerbareRessource;
+impl Bo4eTyped for SteuerbareRessource {
+    type Typ = BoTyp;
+    const TYP: BoTyp = BoTyp::SteuerbareRessource;
     const TYP_WIRE: &'static str = "STEUERBARERESSOURCE";
     const SCHEMA_VERSION: &'static str = "202607.1.0";
     const SCHEMA_SERIES: &'static str = "202607";
 }
+impl crate::bo4e_typed_sealed::Sealed for SteuerbareRessource {}
+impl Bo4eObject for SteuerbareRessource {}
+impl crate::bo4e_object_sealed::Sealed for SteuerbareRessource {}
 #[cfg(feature = "json")]
 impl crate::json::sealed::Sealed for SteuerbareRessource {}
 #[cfg(feature = "json")]

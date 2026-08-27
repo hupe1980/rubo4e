@@ -1,4 +1,6 @@
-use super::{ComTyp, Regionszeitscheibe, Tarifpreiszeitscheibe, ZusatzAttribut};
+use super::{
+    Bo4eComponent, Bo4eTyped, ComTyp, Regionszeitscheibe, Tarifpreiszeitscheibe, ZusatzAttribut,
+};
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(not(feature = "json"), derive(Eq, Hash))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -79,6 +81,16 @@ impl Default for Regionspreis {
         }
     }
 }
+impl Bo4eTyped for Regionspreis {
+    type Typ = ComTyp;
+    const TYP: ComTyp = ComTyp::Regionspreis;
+    const TYP_WIRE: &'static str = "REGIONSPREIS";
+    const SCHEMA_VERSION: &'static str = "202607.1.0";
+    const SCHEMA_SERIES: &'static str = "202607";
+}
+impl crate::bo4e_typed_sealed::Sealed for Regionspreis {}
+impl Bo4eComponent for Regionspreis {}
+impl crate::bo4e_component_sealed::Sealed for Regionspreis {}
 #[cfg(feature = "json")]
 impl crate::json::sealed::Sealed for Regionspreis {}
 #[cfg(feature = "json")]

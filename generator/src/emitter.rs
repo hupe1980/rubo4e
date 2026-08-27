@@ -87,20 +87,22 @@ fn emit_any_bo(bos: &[BoDispatch]) -> String {
     s.push_str("impl AnyBo {\n");
     s.push_str("    /// Returns the [`BoTyp`] discriminant for this BO object.\n");
     s.push_str("    ///\n");
-    s.push_str("    /// Delegates to the inner type's [`Bo4eObject::bo_type`] for all known\n");
+    s.push_str("    /// Delegates to the inner type's [`Bo4eTyped::TYP`] for all known\n");
     s.push_str("    /// variants; returns [`BoTyp::Unknown`] for the `Unknown` catch-all.\n");
     s.push_str("    pub fn bo_type(&self) -> BoTyp {\n");
     s.push_str("        match self {\n");
     for name in &bo_names {
-        s.push_str(&format!("            AnyBo::{name}(v) => v.bo_type(),\n"));
+        s.push_str(&format!(
+            "            AnyBo::{name}(_) => <{name} as Bo4eTyped>::TYP,\n"
+        ));
     }
     s.push_str("            #[cfg(feature = \"json\")]\n");
     s.push_str("            AnyBo::Unknown { .. } => BoTyp::Unknown,\n");
     s.push_str("        }\n");
     s.push_str("    }\n\n");
 
-    // The remaining `Bo4eObject` facts, so `AnyBo` is a complete replacement for
-    // the `dyn Bo4eObject` the associated constants made impossible.
+    // The remaining `Bo4eTyped` facts, so `AnyBo` serves the heterogeneous case
+    // the associated constants make impossible for a trait object.
     s.push_str("    /// Returns the `_typ` wire string for this BO object.\n");
     s.push_str("    ///\n");
     s.push_str("    /// Total: for the `Unknown` catch-all it is the value the payload\n");
@@ -109,7 +111,7 @@ fn emit_any_bo(bos: &[BoDispatch]) -> String {
     s.push_str("        match self {\n");
     for name in &bo_names {
         s.push_str(&format!(
-            "            AnyBo::{name}(_) => <{name} as Bo4eObject>::TYP_WIRE,\n"
+            "            AnyBo::{name}(_) => <{name} as Bo4eTyped>::TYP_WIRE,\n"
         ));
     }
     s.push_str("            #[cfg(feature = \"json\")]\n");
@@ -141,7 +143,7 @@ fn emit_any_bo(bos: &[BoDispatch]) -> String {
         s.push_str("        match self {\n");
         for name in &bo_names {
             s.push_str(&format!(
-                "            AnyBo::{name}(_) => Some(<{name} as Bo4eObject>::{konst}),\n"
+                "            AnyBo::{name}(_) => Some(<{name} as Bo4eTyped>::{konst}),\n"
             ));
         }
         s.push_str("            #[cfg(feature = \"json\")]\n");
@@ -317,7 +319,7 @@ impl DiscriminantNames {
 /// Returns `(filename, source_code)`.
 ///
 /// `schema_version` is the full schema version tag, e.g. `"v202607.0.0"`, used to
-/// populate [`Bo4eObject::schema_version`] on generated BO types.  The `_typ` and
+/// populate [`Bo4eTyped::SCHEMA_VERSION`] on generated types.  The `_typ` and
 /// `_version` values written into the JSON come from the schema itself, not from
 /// this tag.
 pub fn emit_node(
@@ -342,7 +344,7 @@ pub fn emit_node(
 }
 
 /// Emits a `mod.rs` that re-exports every node name in `nodes` and re-exports
-/// the crate-level [`Bo4eObject`] trait so struct files can impl it via `use super::*;`.
+/// the crate-level discriminant traits so struct files can implement them.
 ///
 /// `schema_version` is passed through for completeness but is not currently
 /// used in the `mod.rs` body (the trait lives in `src/lib.rs`).
@@ -364,8 +366,10 @@ pub fn emit_mod_rs(nodes: &[SchemaNode], _schema_version: &str) -> Result<String
         let mod_name = heck::AsSnakeCase(&rust_name).to_string();
         s.push_str(&format!("pub use {mod_name}::{rust_name};\n"));
     }
-    // ── Bo4eObject re-export ──────────────────────────────────────────────────
-    s.push_str("// Re-export the crate-level Bo4eObject so struct files can call trait methods.\npub use crate::Bo4eObject;\n");
+    // ── Discriminant-trait re-exports ─────────────────────────────────────────
+    s.push_str(
+        "// Re-exported so the struct files can name the traits they implement.\n         pub use crate::{Bo4eComponent, Bo4eObject, Bo4eTyped};\n",
+    );
 
     // ── AnyBo: heterogeneous dispatch enum ───────────────────────────────────
     let bos: Vec<BoDispatch> = sorted_nodes
@@ -382,31 +386,7 @@ pub fn emit_mod_rs(nodes: &[SchemaNode], _schema_version: &str) -> Result<String
                 .unwrap_or_else(|| st.name.to_ascii_uppercase()),
         })
         .collect();
-    let bo_names: Vec<String> = bos.iter().map(|b| b.rust_name.clone()).collect();
     s.push_str(&emit_any_bo(&bos));
-
-    // ── Bo4eObject sealed-trait impls ─────────────────────────────────────────
-    // Implement the sealing supertrait for every BO type so they satisfy the
-    // `Bo4eObject: bo4e_object_sealed::Sealed` bound.  The whole `generated`
-    // module is already gated on `#[cfg(feature = "versioned")]` in lib.rs, so
-    // a single cfg gate here covers the entire block cleanly.
-    if !bo_names.is_empty() {
-        s.push_str(
-            "// ── Bo4eObject sealed-trait impls ──────────────────────────────────────────\n",
-        );
-        s.push_str("// These implement the sealing supertrait for all BO types that carry\n");
-        s.push_str(
-            "// `impl Bo4eObject for Type`.  External crates cannot implement this trait.\n",
-        );
-        s.push_str("#[cfg(feature = \"versioned\")]\n");
-        s.push_str("const _: () = {\n");
-        for bo_name in &bo_names {
-            s.push_str(&format!(
-                "    impl crate::bo4e_object_sealed::Sealed for {bo_name} {{}}\n"
-            ));
-        }
-        s.push_str("};\n");
-    }
 
     format_source(s)
 }
@@ -591,14 +571,23 @@ fn holds_nested_object(ft: &FieldType) -> bool {
 fn collect_sibling_imports(name: &str, node: &StructNode) -> Vec<String> {
     let mut set = HashSet::new();
 
-    // BO types always need `BoTyp` (used in the field definition, in `impl Bo4eObject`,
-    // and as the associated `type BoTyp = BoTyp` alias) and `Bo4eObject` (the trait).
-    if node.kind.is_bo() {
+    // A struct with a `_typ` needs its discriminant enum, `Bo4eTyped`, and the
+    // marker trait for its kind.  `ZusatzAttribut` — the one schema with no
+    // `_typ` — needs none of them.
+    if node.fields.iter().any(|f| f.name == "_typ") {
+        set.insert(node.kind.typ_enum().to_string());
+        set.insert("Bo4eTyped".to_string());
+        set.insert(
+            if node.kind.is_bo() {
+                "Bo4eObject"
+            } else {
+                "Bo4eComponent"
+            }
+            .to_string(),
+        );
+    } else if node.kind.is_bo() {
+        // A BO always names `BoTyp` in its field definition.
         set.insert("BoTyp".to_string());
-        set.insert("Bo4eObject".to_string());
-    } else if node.fields.iter().any(|f| f.name == "_typ") {
-        // COM types need `ComTyp` only when the struct has a `_typ` field.
-        set.insert("ComTyp".to_string());
     }
 
     // Walk field types to discover referenced sibling BO/COM/enum names.
@@ -1077,8 +1066,9 @@ fn strict_field_stmt(field: &Field) -> Option<String> {
     }
 }
 
-/// Emits all trait impls for a generated struct: `Bo4eObject`, `Bo4eJsonExt`, `Sealed`,
-/// `Bo4eExtensionData`, `Display`, and `Bo4eStrict`.
+/// Emits all trait impls for a generated struct: `Bo4eTyped` and its kind
+/// marker, `Bo4eJsonExt`, `Sealed`, `Bo4eExtensionData`, `Display`, and
+/// `Bo4eStrict`.
 fn emit_struct_impls(
     s: &mut String,
     name: &str,
@@ -1087,15 +1077,16 @@ fn emit_struct_impls(
     schema_version: &str,
     fields: &[Field],
 ) {
-    // Bo4eObject impl — only BO types carry the BoTyp discriminant.
-    // `type BoTyp = BoTyp;` binds the crate-level associated type to this
-    // version's local enum.
-    if is_bo {
-        // The discriminant the schema pins for this type, never the `_typ` a
-        // payload carried: `bo_type()` says what the value *is*, and a `match`
-        // on it must not take the branch a sender named. `.typ` stays public for
-        // the payload's own claim.
-        let discriminant = meta.typ_path.as_deref().unwrap_or("BoTyp::Unknown");
+    // `Bo4eTyped` — the `_typ` discriminant as constants, for every struct the
+    // schema pins one on. `ZusatzAttribut` is the single BO4E schema that
+    // declares no `_typ`, so it gets none of this.
+    //
+    // The marker beside it (`Bo4eObject` / `Bo4eComponent`) is what lets a bound
+    // say "any Geschäftsobjekt" or "any component" without naming the
+    // version-scoped discriminant enum.
+    if let (Some(discriminant), Some(typ_enum), Some(typ_wire)) =
+        (meta.typ_path.as_deref(), meta.typ_enum, meta.typ_wire)
+    {
         // The BO4E release *without* the `v` the git tag prefixes it with — the
         // same string the `_version` field carries, so the two cannot disagree.
         let wire_version = meta
@@ -1105,13 +1096,24 @@ fn emit_struct_impls(
         // exposes a module, and the only part of the version a dispatcher can
         // match on without breaking every time BO4E ships a patch inside a series.
         let series = wire_version.split('.').next().unwrap_or(wire_version);
-        // The wire spelling of the discriminant, for `TYP_WIRE`.  Emitted as a
-        // literal rather than derived from `BO_TYP.as_wire()` at compile time,
-        // because `Bo4eEnum::as_wire` is a trait method and cannot run in a
-        // const initializer; `tests/generated_contract.rs` pins the two together.
-        let typ_wire = meta.typ_wire.unwrap_or("UNKNOWN");
+        // `TYP_WIRE` is a literal rather than `TYP.as_wire()`, because
+        // `Bo4eEnum::as_wire` is a trait method and cannot run in a const
+        // initializer; `tests/generated_contract.rs` pins the two together.
         s.push_str(&format!(
-            "\nimpl Bo4eObject for {name} {{\n             \x20   type BoTyp = BoTyp;\n             \x20   const BO_TYP: BoTyp = {discriminant};\n             \x20   const TYP_WIRE: &'static str = \"{typ_wire}\";\n             \x20   const SCHEMA_VERSION: &'static str = \"{wire_version}\";\n             \x20   const SCHEMA_SERIES: &'static str = \"{series}\";\n             }}\n"
+            "\nimpl Bo4eTyped for {name} {{\n             \x20   type Typ = {typ_enum};\n             \x20   const TYP: {typ_enum} = {discriminant};\n             \x20   const TYP_WIRE: &'static str = \"{typ_wire}\";\n             \x20   const SCHEMA_VERSION: &'static str = \"{wire_version}\";\n             \x20   const SCHEMA_SERIES: &'static str = \"{series}\";\n             }}\n"
+        ));
+        s.push_str(&format!(
+            "impl crate::bo4e_typed_sealed::Sealed for {name} {{}}\n"
+        ));
+
+        let (marker, marker_sealed) = if is_bo {
+            ("Bo4eObject", "bo4e_object_sealed")
+        } else {
+            ("Bo4eComponent", "bo4e_component_sealed")
+        };
+        s.push_str(&format!("impl {marker} for {name} {{}}\n"));
+        s.push_str(&format!(
+            "impl crate::{marker_sealed}::Sealed for {name} {{}}\n"
         ));
     }
 
