@@ -22,8 +22,7 @@ pub struct Steuerbetrag {
     )]
     #[cfg(feature = "decimal")]
     pub basiswert: Option<rust_decimal::Decimal>,
-    /// Requires the `decimal` feature for the `rust_decimal::Decimal` representation.
-    /// Without `decimal`, stores the decimal's lexical form (a JSON string or number).
+    /// Nettobetrag für den die Steuer berechnet wurde. Z.B. 100
     #[cfg_attr(feature = "serde", serde(rename = "basiswert"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
@@ -56,8 +55,7 @@ pub struct Steuerbetrag {
     )]
     #[cfg(feature = "decimal")]
     pub steuersatz: Option<rust_decimal::Decimal>,
-    /// Requires the `decimal` feature for the `rust_decimal::Decimal` representation.
-    /// Without `decimal`, stores the decimal's lexical form (a JSON string or number).
+    /// Angabe des Steuersatzes in %
     #[cfg_attr(feature = "serde", serde(rename = "steuersatz"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
@@ -79,8 +77,7 @@ pub struct Steuerbetrag {
     )]
     #[cfg(feature = "decimal")]
     pub steuerwert: Option<rust_decimal::Decimal>,
-    /// Requires the `decimal` feature for the `rust_decimal::Decimal` representation.
-    /// Without `decimal`, stores the decimal's lexical form (a JSON string or number).
+    /// Aus dem Basiswert berechnete Steuer. Z.B. 19 (bei UST_19)
     #[cfg_attr(feature = "serde", serde(rename = "steuerwert"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]

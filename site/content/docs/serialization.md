@@ -299,9 +299,8 @@ Available hardened variants:
 
 #### `AnyBo` is a hardened entry point too
 
-A gateway that does not know what is arriving reaches for `AnyBo` — precisely the
-place where the budgets matter most — and all four of them survive the `_typ`
-dispatch:
+All four budgets survive the `_typ` dispatch, so a gateway that does not know
+what is arriving still gets them:
 
 ```rust
 use rubo4e::current::AnyBo;
@@ -314,13 +313,11 @@ match bo {
 }
 ```
 
-This works only because `AnyBo`'s `Deserialize` buffers through the **caller's**
-deserializer rather than re-parsing with `serde_json::from_str` — that is what
-keeps the depth limiter and the snake_case key transform in the path. The cost is
-one intermediate `serde_json::Value`; deserialize the concrete BO type on a hot
-path where you already know it. `tests/any_bo.rs` pins each limit through the
-dispatch, so a refactor that removes the intermediate tree fails the build rather
-than silently unhooking them.
+That holds because `AnyBo`'s `Deserialize` buffers through the **caller's**
+deserializer rather than re-parsing with `serde_json::from_str`, which keeps the
+depth limiter and the snake_case key transform in the path. It costs one
+intermediate `serde_json::Value`, so deserialize the concrete BO type on a hot
+path where you know it. `tests/any_bo.rs` pins each limit through the dispatch.
 
 #### What each limit means
 
@@ -413,29 +410,23 @@ matters; feature unification applies it here too.
 
 ### A decode does **not** validate field names
 
-The permissiveness above has a consequence that is easy to miss, and expensive to
-miss: **decoding a document is not a check on it.**
-
-Serde ignores keys a struct does not declare; this crate goes further and keeps
-them. So a misspelled or renamed key does not fail a decode — it lands in
-`_additional`, the decode returns `Ok`, and the field it was meant to fill reads
-back as `None`.
+Serde ignores keys a struct does not declare; this crate keeps them. So a
+misspelled or renamed key does not fail a decode — it lands in `_additional`, the
+decode returns `Ok`, and the field it was meant to fill reads back as `None`.
 
 ```rust
 let body = serde_json::json!({
     "_typ": "KOSTEN",
     "kostenbloecke": [{ "kostenblockBEZEICHNUNG": "x" }]   // misspelled
 });
-
-// Built from a literal, so a rubo4e field rename must fail here — right?
-let kosten: Kosten = serde_json::from_value(body.clone())?;   // it cannot fail
+let kosten: Kosten = serde_json::from_value(body.clone())?;   // cannot fail
 assert_eq!(kosten.kostenbloecke.unwrap()[0].kostenblockbezeichnung, None);
 ```
 
-That pattern — assemble a BO4E document as `serde_json::Value`, decode it "to
-validate", send the *literal* — is a natural thing to reach for, and it validates
-nothing. `has_extension_data()` does not rescue it either: it is shallow, and
-answers `false` at the root because the stray key sits one level down.
+Assembling a BO4E document as a `serde_json::Value`, decoding it "to validate"
+and sending the literal therefore validates nothing. `has_extension_data()` does
+not rescue it: it is shallow, and answers `false` at the root because the stray
+key sits one level down.
 
 #### `Bo4eExtensions` — the recursive check
 
@@ -446,26 +437,20 @@ assert_eq!(kosten.extension_paths(), ["kostenbloecke[0].kostenblockBEZEICHNUNG"]
 kosten.ensure_no_extension_data()?;   // Err(UnknownFieldError { paths })
 ```
 
-It descends through every nested BO, COM, `Option` and `Vec`, and reports each
-finding at its JSON-path. Only the **top-level key** of each extension entry
-counts: everything under it is opaque by design, so a vendor blob
-`{"vendorX": {"a": 1, "b": 2}}` is one finding, not three.
+It descends through every nested BO, COM, `Option` and `Vec`. Only the top-level
+key of each extension entry counts — everything under it is opaque by design, so
+a vendor blob `{"vendorX": {"a": 1, "b": 2}}` is one finding.
 
 Paths are dotted with bracketed array indices, like `Bo4eStrict`'s. Extension keys
-come off the wire, though, so they can contain the characters the path syntax
-uses — a key of `a.b` rendered `parent.a.b` would name two fields that do not
-exist. Anything that is not a plain `[A-Za-z0-9_]` identifier is bracket-quoted:
-`parent["a.b"]`.
+come off the wire and can contain the characters the path syntax uses, so anything
+that is not a plain `[A-Za-z0-9_]` identifier is bracket-quoted: `parent["a.b"]`.
 
-The order is deterministic: a struct's own undefined keys first, then its
-children's, depth-first in field order. Within one struct the keys follow
-`_additional`'s own order — arrival order when the value was decoded from text,
-sorted when it came from a `serde_json::Value`, whose objects are a `BTreeMap`.
+Order is deterministic: a struct's own undefined keys first, then its children's,
+depth-first in field order. Within one struct they follow `_additional`'s order —
+arrival order from text, sorted from a `serde_json::Value`, whose objects are a
+`BTreeMap`.
 
 #### …or make the decode itself the check
-
-For a producer, failing at the decode is usually what you wanted in the first
-place. `from_json_value_hardened` with the extension budget closed does that:
 
 ```rust
 use rubo4e::json::{Bo4eJsonExt, JsonParseLimits};
@@ -475,11 +460,9 @@ let kosten = Kosten::from_json_value_hardened(body, closed)?;   // Err on any st
 ```
 
 `from_json_value` and `from_json_value_hardened` are the `serde_json::Value`
-counterparts of the `&str` readers, with the same depth and extension budgets —
-so the strictness the text path always had is reachable where the trap actually
-lives. `max_payload_bytes` is the one cap that does not apply: there are no bytes
-left to cap, the caller already paid for the parse. It is ignored rather than
-rejected, so one `JsonParseLimits` can be shared across both paths.
+counterparts of the `&str` readers, with the same depth and extension budgets.
+`max_payload_bytes` does not apply — there are no bytes left to cap — and is
+ignored rather than rejected, so one `JsonParseLimits` serves both paths.
 
 #### Two questions, two calls
 
@@ -503,17 +486,15 @@ assert_eq!(malo.extension_paths(), ["spartee"]);
 assert!(malo.unknown_enum_paths().is_empty());
 ```
 
-They are separate on purpose. Rejecting an unknown **value** is usually right at
-an ingest boundary. Rejecting an unknown **field** usually is not — that is
-precisely how a counterparty one schema release ahead reaches you, and refusing it
-throws away the forward compatibility `_additional` exists to provide. Run the
-field check on documents you **produce**, and inbound only where a closed field
-set is contractually agreed.
+Rejecting an unknown **value** is usually right at an ingest boundary. Rejecting
+an unknown **field** usually is not — that is how a counterparty one schema
+release ahead reaches you, and refusing it throws away the forward compatibility
+`_additional` exists to provide. Run the field check on documents you **produce**,
+and inbound only where a closed field set is contractually agreed.
 
-#### Best of all: do not decode to check
+#### Or do not decode to check at all
 
-Construct the value typed, and a field rename is a compile error rather than a
-runtime one — no check needed:
+Construct the value typed, and a field rename is a compile error:
 
 ```rust
 let kosten = Kosten {
@@ -525,17 +506,16 @@ let kosten = Kosten {
 };
 ```
 
-A hand-written `"_typ"` in a `json!` literal is the reliable marker for the
+A hand-written `"_typ"` in a `json!` literal is a reliable marker for the
 decode-to-check habit; a CI grep for one is a cheap guard.
 
-#### One surprise this surfaces: `ZusatzAttribut` has no `_typ`
+#### `ZusatzAttribut` has no `_typ`
 
 It is the single BO4E schema that declares none — it has exactly `name` and
 `wert`, and `ComTyp` has no variant for it. A producer that stamps
 `"_typ": "ZUSATZATTRIBUT"` on one by analogy with every other COM is sending a
-field BO4E does not define, and the check says so. That is correct: the reference
-implementation emits no such key either, because pydantic emits what the model
-declares and the model declares none.
+field BO4E does not define, and the check says so. The reference implementation
+emits no such key either.
 
 ### Two caps you cannot turn off
 

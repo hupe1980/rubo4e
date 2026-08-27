@@ -40,8 +40,7 @@ pub struct Person {
     )]
     #[cfg(feature = "time")]
     pub geburtsdatum: Option<time::Date>,
-    /// Requires the `time` feature for the `time::Date` representation.
-    /// Without `time`, stores the ISO 8601 date string (`YYYY-MM-DD`) unchanged.
+    /// Geburtsdatum der Person
     #[cfg_attr(feature = "serde", serde(rename = "geburtsdatum"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "serde", serde(default))]

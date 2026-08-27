@@ -58,8 +58,8 @@ fn process_rechnung(json: &str, bo4e_version: &str) -> Result<(), Box<dyn std::e
             // r.schema_series() == "202607"  ← always matches this arm
             handle_v202607(r)
         }
-        // When the v202801 series ships, add one arm and a migration shim if needed:
-        // "202801" => handle_v202801(serde_json::from_str::<v202801::Rechnung>(json)?),
+        // When the v202701 series ships, add one arm and a migration shim if needed:
+        // "202701" => handle_v202701(serde_json::from_str::<v202701::Rechnung>(json)?),
         _ => Err(format!("unsupported schema series: {bo4e_version}").into()),
     }
 }
@@ -74,9 +74,9 @@ this `match` keys on, so a test can assert the two agree.
 Key points:
 - `SCHEMA_SERIES` and `SCHEMA_VERSION` are on every BO and COM via the `Bo4eTyped` trait, as constants and as methods — no new API needed
 - Each new schema *series* is exactly one `match` arm; patches inside a series need none
-- Business logic (`handle_v202607`, `handle_v202801`, …) only handles the series it was written for
-- Older series can be migrated before the branch (`FROM v202607 TO v202801`) or handled by a thin shim inside the arm
-- No trait objects, no `Any*` enums required for this straightforward branching
+- Business logic (`handle_v202607`, `handle_v202701`, …) only handles the series it was written for
+- An older series is handled by a thin shim inside its own arm — this crate ships no migration API, because a mapping between two series is a decision about *your* data, not one a library can make for you
+- `AnyBo` is the sum type over the *Geschäftsobjekte*, for a payload whose `_typ` is unknown until it is read. It is not a version abstraction, and there is deliberately no `AnyVersion`: two series have different field sets, so anything unifying them would have to erase the difference that made the dispatch necessary
 
 ## Version Module Layout
 
@@ -102,7 +102,7 @@ cargo add rubo4e --features versioned
 
 ## Known Schema Series
 
-| Series  | Snapshot in this release | Status         | Released  |
+| Series  | Committed snapshot | Status         | Released  |
 |---------|--------------------------|----------------|-----------|
 | v202607 | v202607.1.0              | Current stable | July 2026 |
 
@@ -156,7 +156,7 @@ So the honest statement is:
 > **The Rust module path pins the series. The `rubo4e` version pins the values.**
 
 If a variant set must not move under you, pin the **crate version** in
-`Cargo.toml` (`rubo4e = "=0.12.0"`) and upgrade deliberately. Importing
+`Cargo.toml` (`rubo4e = "=0.13.0"`) and upgrade deliberately. Importing
 `rubo4e::v202607::Sparte` instead of `rubo4e::current::Sparte` narrows the blast
 radius — you will not silently jump a format-version cutover — but it does not
 freeze the enum.
@@ -259,10 +259,33 @@ When BO4E's annual format-version cutover lands, with new or renamed types:
        pub use crate::generated::v202701::*;  // was: v202607
    }
    ```
-6. Update the convenience module (`src/convenience.rs`) if schema-breaking changes
-   require updating field references (e.g. renamed fields in `Rechnung`,
-   `Rechnungsposition`), and advance `rubo4e::validation::current` to the new
-   series alongside `rubo4e::current`.
+6. **Advance every hand-written module that names a series.** These are the ones
+   the generator does not touch, and nothing in the compiler notices when one is
+   left behind — the older module still exists and still type-checks, so the
+   crate ships accessors for a series nobody is using:
+
+   | File | What it pins |
+   |---|---|
+   | `src/lib.rs` | `pub mod current` and the `pub mod vYYYYMM` re-exports |
+   | `src/convenience.rs` | `Zeitraum` / `Rechnung` / `Preisstaffel` accessors |
+   | `src/units.rs` | `Mengeneinheit` dimensions and `Menge` arithmetic |
+   | `src/timeseries.rs` | the `Bo4eTimeSeries` impls for `Lastgang` / `Zeitreihe` |
+   | `src/validation/mod.rs` | `impl_validators!(vYYYYMM)` and `validation::current` |
+
+   `validation` is the one that keeps a **copy** per series, via the
+   `impl_validators!` macro — renamed fields and new rules can then diverge
+   between series instead of silently applying stale logic. The other three
+   target `current` only.
+
+   [`tests/current_series_alignment.rs`](https://github.com/hupe1980/rubo4e/blob/main/tests/current_series_alignment.rs)
+   enforces this: it reads the sources, and fails if any of them names a series
+   other than the one `current` re-exports — or if a *new* file starts naming
+   one without being added to the table above. That test is the real checklist;
+   this table is its documentation.
+
+   A schema-breaking rename will surface as a compile error in these modules,
+   which is the intended behaviour — see
+   [Semantic Field Typing](@/docs/generator.md#semantic-field-typing).
 7. Update the Known Schema Series table in this document, and keep the
    retiring series listed until you remove its module.
 8. Record a **Schema deltas** section in [`CHANGELOG.md`](https://github.com/hupe1980/rubo4e/blob/main/CHANGELOG.md) listing

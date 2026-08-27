@@ -740,8 +740,12 @@ expression: "schema_json::<Marktlokation>()"
       ]
     },
     "EicCode": {
-      "description": "Energy Identification Code (EIC): 16-character code issued by ENTSO-E.\n\nStructure:\n- Positions 1–2:  Local Issuing Office (LIO) identifier (alphanumeric)\n- Position 3:     EIC object-type character (`A`, `T`, `V`, `W`, `X`, `Y`, or `Z`)\n- Positions 4–15: LIO-specific code body (alphanumeric or `-` as padding)\n- Position 16:    Check character computed by the ENTSO-E algorithm\n\n# Object type\n\nUse [`EicCode::eic_type`] to get the [`EicType`] encoded in position 3, or\n[`EicCode::type_char`] for the raw character.\n\n# Examples\n```\nuse rubo4e::identifiers::{EicCode, EicType};\n\n// 10YDE-EON------1 = TenneT German control area (type Y = Area).\nlet area = EicCode::new(\"10YDE-EON------1\").expect(\"valid area EIC\");\nassert_eq!(area.eic_type(), EicType::Area);\nassert_eq!(area.type_char(), 'Y');\n```",
-      "type": "string"
+      "description": "16-stelliger ENTSO-E Energy Identification Code: 2 Zeichen LIO-Kennung + Objekttyp (A/T/V/W/X/Y/Z) + 12 Zeichen Körper + ENTSO-E-Prüfzeichen",
+      "type": "string",
+      "examples": [
+        "10YDE-EON------1"
+      ],
+      "pattern": "^[A-Z0-9]{2}[ATVWXYZ][A-Z0-9-]{12}[A-Z0-9]$"
     },
     "Energiemenge": {
       "description": "Abbildung von Mengen, die Lokationen zugeordnet sind\n\n> **Note:** [Energiemenge JSON Schema](https://json-schema.app/view/%23?url=https://raw.githubusercontent.com/BO4E/BO4E-Schemas/v202607.1.0/src/bo4e_schemas/bo/Energiemenge.json)",
@@ -871,7 +875,7 @@ expression: "schema_json::<Marktlokation>()"
       ]
     },
     "Gasqualitaet": {
-      "description": "Unterscheidung für hoch- und niedrig-kalorisches Gas.\n\n# Forward compatibility (H2 blends)\n\nAs of the current schema this enum models only `H_GAS` / `L_GAS`.  Hydrogen\nblend qualities expected from the 2026–2028 DVGW G 260 / BNetzA wave are not\nyet standardized in BO4E; until they are, such wire values decode to\n[`Gasqualitaet::Unknown`].  Do **not** hard-code a speculative wire string —\nwhen BO4E adds the variant it will appear here (and in the CHANGELOG) with\nits canonical spelling, and lenient decoding will start resolving it.",
+      "description": "Unterscheidung für hoch- und niedrig-kalorisches Gas.",
       "oneOf": [
         {
           "type": "string",
@@ -2023,7 +2027,7 @@ expression: "schema_json::<Marktlokation>()"
       "additionalProperties": true
     },
     "MaloId": {
-      "description": "Marktlokations-ID (MaLo-ID) — identifies a *Marktlokation* or *Tranche*.\n\nDefined by BDEW \"Identifikatoren in der Marktkommunikation\" v1.2\n(7 February 2025), §3, and by BNetzA-Festlegung BK6-16-200 / BK7-16-142.\nIn use across electricity and gas since 1 February 2018.\n\n## Format (§3.2)\n\n| Position | Content | Character set |\n|----------|---------|---------------|\n| 1 | Vergabestelle — `1`–`3` = DVGW, `4`–`9` = BDEW | `[1-9]` |\n| 2–10 | Automatically assigned body | `[0-9]` |\n| 11 | Check digit (§8.1) | `[0-9]` |\n\nThe Vergabestelle digit says **nothing** about the commodity: a MaLo-ID issued\nby either office can be assigned to an electricity Marktlokation, a gas\nMarktlokation, or a Tranche.\n\n## Check digit (§8.1 — Lok- und Waggon-Kennzeichnungsverfahren)\n\nSum the digits at odd positions, add twice the sum of the digits at even\npositions, and take the difference to the next multiple of 10. The BDEW\ndocument's own worked example:\n\n```text\nMaLo-ID base:  4 1 3 7 3 5 5 9 2 4\na) odd:        4 + 3 + 3 + 5 + 2       = 17\nb) even:      (1 + 7 + 5 + 9 + 4) * 2  = 52\nc) sum:        17 + 52                 = 69\nd) check:      70 - 69                 = 1\n→ 41373559241\n```\n\nThis is the same procedure that validates BDEW- and DVGW-Codenummern; see\n[`MarktpartnerId`](super::MarktpartnerId).\n\n## What the check digit does and does not catch\n\nIt catches every adjacent transposition of two distinct digits, and every\nsingle-digit typo **except** one class: changing a digit by exactly 5 at an\neven position, because that position carries weight 2 and `2 · 5 ≡ 0 (mod 10)`.\nFor example `41373559241` and `46373559241` share a check digit.\n\nThat blind spot is inherent to the BDEW specification, not to this\nimplementation. Treat the check digit as a typo guard, not as authentication —\nonly the issuing office can confirm that an ID was actually assigned.\n\n# Examples\n```\nuse rubo4e::identifiers::MaloId;\n\n// The worked example from the BDEW specification.\nlet id = MaloId::new(\"41373559241\").unwrap();\nassert_eq!(id.as_ref(), \"41373559241\");\n\n// The check digit is derived, so it never has to be typed by hand.\nassert_eq!(MaloId::from_base(\"4137355924\").unwrap(), id);\nassert_eq!(MaloId::check_digit(\"4137355924\").unwrap(), 1);\n\n// A wrong check digit is rejected.\nassert!(MaloId::new(\"41373559242\").is_err());\n```",
+      "description": "11-stellige BDEW Marktlokations-ID: Vergabestelle (1-3 DVGW, 4-9 BDEW) + 9 Ziffern + Prüfziffer nach dem Lok- und Waggon-Kennzeichnungsverfahren (BDEW §8.1)",
       "type": "string",
       "examples": [
         "41373559241"
@@ -2031,7 +2035,7 @@ expression: "schema_json::<Marktlokation>()"
       "pattern": "^[1-9][0-9]{10}$"
     },
     "MarktpartnerId": {
-      "description": "Marktpartner-ID (MP-ID) — identifies a market participant in one role and\none commodity.\n\nDefined by BDEW \"Identifikatoren in der Marktkommunikation\" v1.2\n(7 February 2025), §2. An MP-ID is one of three things, all 13 digits wide:\na BDEW-Codenummer (electricity), a DVGW-Codenummer (gas), or a GS1 Global\nLocation Number.\n\n## Format (§2.2)\n\n| Position | Content |\n|----------|---------|\n| 1–2 | Vergabestelle / Sparte — `99` = BDEW/Strom, `98` = DVGW/Gas |\n| 3 | `0`–`8` for BDEW, `0`–`9` for DVGW |\n| 4–12 | Assigned by the issuing office |\n| 13 | Check digit |\n\n## Why `new` does not verify the check digit\n\n§2.3 specifies two *different* check-digit procedures depending on origin:\nBDEW- and DVGW-Codenummern use the Lok- und Waggon-Kennzeichnungsverfahren\n(§8.1), while a GS1-issued GLN uses the GS1/EAN-13 procedure. The two disagree,\nand the first two digits do not reliably tell the cases apart — codes issued\nbefore the `98`/`99` convention are still in circulation and validate under\n§8.1 despite other prefixes.\n\nRejecting on a guess would drop valid production identifiers, so [`new`](Self::new)\nvalidates only what is unambiguous: 13 decimal digits. Verify the check digit\nexplicitly when you know which family you are dealing with:\n\n- [`has_valid_bdew_check_digit`](Self::has_valid_bdew_check_digit) — §8.1\n- [`has_valid_gln_check_digit`](Self::has_valid_gln_check_digit) — GS1/EAN-13\n- [`new_checked`](Self::new_checked) — accept only if **one of the two** matches\n\n# Examples\n```\nuse rubo4e::identifiers::{MarktpartnerId, MpIdAuthority};\n\nlet bdew = MarktpartnerId::new(\"9900357000003\").unwrap();\nassert_eq!(bdew.authority(), MpIdAuthority::Bdew);\nassert_eq!(bdew.authority().nad_agency_code(), \"293\");\nassert!(bdew.has_valid_bdew_check_digit());\n```",
+      "description": "13-stellige Marktpartner-ID (BDEW-Codenummer Strom mit Prefix 99, DVGW-Codenummer Gas mit Prefix 98, oder GS1 GLN)",
       "type": "string",
       "examples": [
         "9900357000003"
@@ -2173,7 +2177,7 @@ expression: "schema_json::<Marktlokation>()"
       "additionalProperties": true
     },
     "MeloId": {
-      "description": "Messlokations-ID (MeLo-ID): 33-character string.\n\nStructure (per BDEW specification):\n- **Positions 1–2**: ISO 3166-1 alpha-2 country code, uppercase (e.g. `\"DE\"`, `\"AT\"`)\n- **Positions 3–33**: alphanumeric body `[A-Za-z0-9]` (31 characters)\n\nNo checksum is applied.\n\n# Examples\n```\nuse rubo4e::identifiers::MeloId;\n\nlet id = MeloId::new(\"DE0000000000000000000000000000001\").unwrap();\nassert_eq!(id.as_ref(), \"DE0000000000000000000000000000001\");\n```",
+      "description": "33-stellige Messlokations-ID: 2-stelliger ISO-3166-1-Ländercode + 31 alphanumerische Zeichen",
       "type": "string",
       "examples": [
         "DE0000000000000000000000000000001"
@@ -2626,7 +2630,7 @@ expression: "schema_json::<Marktlokation>()"
       ]
     },
     "NeloId": {
-      "description": "Netzlokations-ID (NeLo-ID) — identifies a *Netzlokation* (grid location).\n\nIntroduced by BNetzA-Festlegung **BK6-22-128**; issued by Energie Codes und\nServices GmbH since 15 February 2023. Electricity only. Defined in BDEW\n\"Identifikatoren in der Marktkommunikation\" v1.2, §4.\n\n## Not to be confused with an EIC code\n\n`10YDE-EON------1` is an [`EicCode`](super::EicCode) for a control area, not\na NeLo-ID. EIC codes appear on `Marktlokation.marktgebiet`; NeLo-IDs identify\nthe grid location itself.\n\n# Examples\n```\nuse rubo4e::identifiers::NeloId;\n\nlet id = NeloId::new(\"E0000000019\").unwrap();\nassert_eq!(id.to_string(), \"E0000000019\");\n\n// The check digit is derived, so it never has to be typed by hand:\nlet id = NeloId::from_base(\"E000000001\").unwrap();\nassert_eq!(id.as_ref(), \"E0000000019\");\n```",
+      "description": "11-stellige BDEW Netzlokations-ID (NeLo-ID): Codetyp 'E' + 9 alphanumerische Zeichen [A-Z0-9] + ASCII-Verfahren-Prüfziffer",
       "type": "string",
       "examples": [
         "E0000000019"
@@ -2811,12 +2815,10 @@ expression: "schema_json::<Marktlokation>()"
       "additionalProperties": true
     },
     "ObisCode": {
-      "description": "OBIS identifier (IEC 62056-61 / BDEW): compact reference for metering values.\n\nGrammar: `[A-B:]C.D[.E][*F]`\n\nAll numeric components are non-negative integers.  `C` and `D` are mandatory;\n`A`, `B`, `E`, and `F` are optional.  `C = 0` is permitted and identifies the\ngeneral metering data group (IEC 62056-21 / IEC 62056-61).\n\n# Canonicalisation\n\nThe input is parsed once at construction and stored in **canonical form**, so\ntwo codes that denote the same value are always equal and hash alike:\n\n- the alternative `&` separator for the F component becomes `*`;\n- redundant leading zeros are dropped (`01.08` → `1.8`).\n\n[`AsRef<str>`], [`Display`](std::fmt::Display), and the `serde` output all\nyield this canonical string, so a round-trip through JSON is stable.\n\nUse [`ObisCode::components`] to access the parsed values — they are stored, so\nthe accessor neither re-parses nor allocates.\nUse [`ObisCode::to_pia_string`] to emit the `A-B:C.D[.E]` form (F stripped).\n\n# Examples\n```\nuse rubo4e::identifiers::ObisCode;\n\nObisCode::new(\"1-0:1.8.1\").unwrap();          // A-B:C.D.E\nObisCode::new(\"1-0:1.8.0*255\").unwrap();      // with F component\nObisCode::new(\"0-0:0.0.0\").unwrap();          // C=0 (general metering group)\nObisCode::new(\"1:1.8\").unwrap();              // A-only prefix (B absent)\nObisCode::new(\"1.8.1\").unwrap();              // C.D.E only\n\n// `&` is accepted on input and canonicalised to `*`.\nassert_eq!(ObisCode::new(\"1.8.1&255\").unwrap(), ObisCode::new(\"1.8.1*255\").unwrap());\n// Leading zeros are canonicalised away.\nassert_eq!(ObisCode::new(\"01-00:01.08.00\").unwrap(), ObisCode::new(\"1-0:1.8.0\").unwrap());\nassert_eq!(ObisCode::new(\"01-00:01.08.00\").unwrap().as_ref(), \"1-0:1.8.0\");\n```",
+      "description": "OBIS-Kennzahl nach IEC 62056-61: [A-B:]C.D[.E][*F]. Eingaben werden kanonisiert gespeichert (führende Nullen entfallen, '&' wird zu '*').",
       "type": "string",
       "examples": [
-        "1-0:1.8.0*255",
-        "1-0:1.8.1",
-        "1.8"
+        "1-0:1.8.0*255"
       ],
       "pattern": "^(?:\\d+(?:-\\d+)?:)?\\d+\\.\\d+(?:\\.\\d+)?(?:[*&]\\d+)?$"
     },
@@ -3047,7 +3049,7 @@ expression: "schema_json::<Marktlokation>()"
       ]
     },
     "SrId": {
-      "description": "Steuerbare-Ressource-ID (SR-ID) — identifies a *Steuerbare Ressource* in\nRedispatch 2.0.\n\nAssigned to a steuerbare Ressource by the Einsatzverantwortlicher and stays\nfixed for its lifetime, even when the Einsatzverantwortlicher changes.\nDefined in BDEW \"Identifikatoren in der Marktkommunikation\" v1.2, §6.3 and §6.6.\n\n# Examples\n```\nuse rubo4e::identifiers::SrId;\n\nlet id = SrId::new(\"C0000000011\").unwrap();\nassert_eq!(id.to_string(), \"C0000000011\");\n\n// The check digit is derived, so it never has to be typed by hand:\nlet id = SrId::from_base(\"C000000001\").unwrap();\nassert_eq!(id.as_ref(), \"C0000000011\");\n```",
+      "description": "11-stellige Steuerbare-Ressource-ID (SR-ID): Codetyp 'C' + 9 alphanumerische Zeichen [A-Z0-9] + ASCII-Verfahren-Prüfziffer",
       "type": "string",
       "examples": [
         "C0000000011"
@@ -3518,7 +3520,7 @@ expression: "schema_json::<Marktlokation>()"
       ]
     },
     "TrId": {
-      "description": "Technische-Ressource-ID (TR-ID) — identifies a *Technische Ressource* in\nRedispatch 2.0 (a physical generation or consumption unit).\n\nAssigned by the grid operator and stays fixed for the lifetime of the\nresource, even across a change of grid operator or of the BTR (Betreiber\neiner Technischen Ressource). Defined in BDEW \"Identifikatoren in der\nMarktkommunikation\" v1.2, §6.2 and §6.6.\n\n# Examples\n```\nuse rubo4e::identifiers::TrId;\n\nlet id = TrId::new(\"D0000000010\").unwrap();\nassert_eq!(id.to_string(), \"D0000000010\");\n\n// The check digit is derived, so it never has to be typed by hand:\nlet id = TrId::from_base(\"D000000001\").unwrap();\nassert_eq!(id.as_ref(), \"D0000000010\");\n```",
+      "description": "11-stellige Technische-Ressource-ID (TR-ID): Codetyp 'D' + 9 alphanumerische Zeichen [A-Z0-9] + ASCII-Verfahren-Prüfziffer",
       "type": "string",
       "examples": [
         "D0000000010"

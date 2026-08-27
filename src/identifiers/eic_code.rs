@@ -281,9 +281,18 @@ impl std::fmt::Display for EicType {
 #[cfg_attr(feature = "validate", derive(garde::Validate))]
 #[cfg_attr(feature = "validate", garde(allow_unvalidated))]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
-#[cfg_attr(feature = "schemars", schemars(with = "String"))]
+#[cfg_attr(
+    feature = "schemars",
+    schemars(schema_with = "crate::schema_helpers::eic_code_schema")
+)]
+#[cfg_attr(feature = "schemars", schemars(description = crate::identifiers::schema::EIC_CODE.description))]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
-#[cfg_attr(feature = "utoipa", schema(value_type = String))]
+#[cfg_attr(feature = "utoipa", schema(
+    value_type = String,
+    pattern = r"^[A-Z0-9]{2}[ATVWXYZ][A-Z0-9-]{12}[A-Z0-9]$",
+    example = "10YDE-EON------1",
+    description = crate::identifiers::schema::EIC_CODE.description
+))]
 pub struct EicCode(#[cfg_attr(feature = "validate", garde(custom(check_eic_code)))] Box<str>);
 
 #[cfg(feature = "validate")]

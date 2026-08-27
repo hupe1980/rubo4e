@@ -128,8 +128,8 @@ pub struct Zaehlwerk {
     )]
     #[cfg(feature = "decimal")]
     pub wandlerfaktor: Option<rust_decimal::Decimal>,
-    /// Requires the `decimal` feature for the `rust_decimal::Decimal` representation.
-    /// Without `decimal`, stores the decimal's lexical form (a JSON string or number).
+    /// Mit diesem Faktor wird eine Zählerstandsdifferenz multipliziert, um zum eigentlichen Verbrauch im Zeitraum
+    /// zu kommen.
     #[cfg_attr(feature = "serde", serde(rename = "wandlerfaktor"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]

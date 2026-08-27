@@ -124,12 +124,16 @@ impl std::fmt::Display for MpIdAuthority {
     feature = "schemars",
     schemars(schema_with = "crate::schema_helpers::marktpartner_id_schema")
 )]
+#[cfg_attr(
+    feature = "schemars",
+    schemars(description = crate::identifiers::schema::MARKTPARTNER_ID.description)
+)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "utoipa", schema(
     value_type = String,
     pattern = r"^[0-9]{13}$",
     example = "9900357000003",
-    description = "13-stellige Marktpartner-ID: BDEW-Codenummer Strom (Prefix 99), DVGW-Codenummer Gas (Prefix 98) oder GS1 GLN"
+    description = crate::identifiers::schema::MARKTPARTNER_ID.description
 ))]
 pub struct MarktpartnerId(
     #[cfg_attr(feature = "validate", garde(custom(check_marktpartner_id)))] Box<str>,

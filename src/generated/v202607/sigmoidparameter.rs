@@ -23,8 +23,7 @@ pub struct Sigmoidparameter {
     )]
     #[cfg(feature = "decimal")]
     pub a: Option<rust_decimal::Decimal>,
-    /// Requires the `decimal` feature for the `rust_decimal::Decimal` representation.
-    /// Without `decimal`, stores the decimal's lexical form (a JSON string or number).
+    /// Briefmarke Ortsverteilnetz (EUR/kWh)
     #[cfg_attr(feature = "serde", serde(rename = "A"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
@@ -46,8 +45,7 @@ pub struct Sigmoidparameter {
     )]
     #[cfg(feature = "decimal")]
     pub b: Option<rust_decimal::Decimal>,
-    /// Requires the `decimal` feature for the `rust_decimal::Decimal` representation.
-    /// Without `decimal`, stores the decimal's lexical form (a JSON string or number).
+    /// Wendepunkt für die bepreiste Menge (kW)
     #[cfg_attr(feature = "serde", serde(rename = "B"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
@@ -69,8 +67,7 @@ pub struct Sigmoidparameter {
     )]
     #[cfg(feature = "decimal")]
     pub c: Option<rust_decimal::Decimal>,
-    /// Requires the `decimal` feature for the `rust_decimal::Decimal` representation.
-    /// Without `decimal`, stores the decimal's lexical form (a JSON string or number).
+    /// Exponent (einheitenlos)
     #[cfg_attr(feature = "serde", serde(rename = "C"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
@@ -92,8 +89,7 @@ pub struct Sigmoidparameter {
     )]
     #[cfg(feature = "decimal")]
     pub d: Option<rust_decimal::Decimal>,
-    /// Requires the `decimal` feature for the `rust_decimal::Decimal` representation.
-    /// Without `decimal`, stores the decimal's lexical form (a JSON string or number).
+    /// Briefmarke Transportnetz (EUR/kWh)
     #[cfg_attr(feature = "serde", serde(rename = "D"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]

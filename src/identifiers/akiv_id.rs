@@ -40,8 +40,17 @@ use crate::error::IdentifierError;
     feature = "schemars",
     schemars(schema_with = "crate::schema_helpers::akiv_id_schema")
 )]
+#[cfg_attr(
+    feature = "schemars",
+    schemars(description = crate::identifiers::schema::AKIV_ID.description)
+)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
-#[cfg_attr(feature = "utoipa", schema(value_type = String))]
+#[cfg_attr(feature = "utoipa", schema(
+    value_type = String,
+    pattern = r"^[!-~]{1,36}$",
+    example = "550e8400-e29b-41d4-a716-446655440000",
+    description = crate::identifiers::schema::AKIV_ID.description
+))]
 pub struct AkivId(#[cfg_attr(feature = "validate", garde(custom(check_akiv_id)))] Box<str>);
 
 /// Maximum length for an Aktivierungs-ID.

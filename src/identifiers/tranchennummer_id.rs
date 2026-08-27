@@ -43,8 +43,17 @@ use crate::error::IdentifierError;
     feature = "schemars",
     schemars(schema_with = "crate::schema_helpers::tranchennummer_id_schema")
 )]
+#[cfg_attr(
+    feature = "schemars",
+    schemars(description = crate::identifiers::schema::TRANCHENNUMMER_ID.description)
+)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
-#[cfg_attr(feature = "utoipa", schema(value_type = String))]
+#[cfg_attr(feature = "utoipa", schema(
+    value_type = String,
+    pattern = r"^(0|[1-9][0-9]{0,5})$",
+    example = "42",
+    description = crate::identifiers::schema::TRANCHENNUMMER_ID.description
+))]
 pub struct TranchennummerId(
     #[cfg_attr(feature = "validate", garde(custom(check_tranchennummer_id)))] Box<str>,
 );

@@ -50,8 +50,7 @@ pub struct Betrag {
     )]
     #[cfg(feature = "decimal")]
     pub wert: Option<rust_decimal::Decimal>,
-    /// Requires the `decimal` feature for the `rust_decimal::Decimal` representation.
-    /// Without `decimal`, stores the decimal's lexical form (a JSON string or number).
+    /// Gibt den Betrag des Preises an.
     #[cfg_attr(feature = "serde", serde(rename = "wert"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]

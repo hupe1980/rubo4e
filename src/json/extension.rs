@@ -402,112 +402,67 @@ impl From<UnknownFieldError> for garde::Error {
 
 /// Recursive check for fields BO4E does not define — anywhere in a decoded value.
 ///
-/// # The trap this closes
-///
-/// A decode round-trip **cannot** detect a misspelled or renamed field. Serde
-/// ignores keys a struct does not declare, and this crate goes further and
-/// *keeps* them, in `_additional`, so a payload from a newer schema survives a
-/// round-trip. Both are the right defaults for inbound traffic. The consequence
-/// is that the natural way to check a document you assembled yourself proves
-/// nothing:
-///
-/// ```
-/// # #[cfg(all(feature = "json", feature = "versioned"))] {
-/// use rubo4e::current::Kosten;
-///
-/// let body = serde_json::json!({
-///     "_typ": "KOSTEN",
-///     "kostenbloecke": [{ "_typ": "KOSTENBLOCK", "kostenblockBEZEICHNUNG": "x" }]
-/// });
-///
-/// // The key is misspelled. The decode succeeds anyway.
-/// let kosten: Kosten = serde_json::from_value(body).unwrap();
-/// // …and the field it was meant to fill is empty.
-/// assert_eq!(kosten.kostenbloecke.as_ref().unwrap()[0].kostenblockbezeichnung, None);
-/// # }
-/// ```
-///
-/// A producer that assembles BO4E documents as `serde_json::Value` and decodes
-/// them "to check" is therefore shipping whatever it built, unchecked. This trait
-/// is the check that actually answers:
+/// A decode cannot detect a misspelled or renamed field: serde ignores keys a
+/// struct does not declare, and this crate keeps them in `_additional` so a
+/// payload from a newer schema survives. So a document assembled as JSON and
+/// decoded "to check" is shipped unchecked, and this is the call that answers.
 ///
 /// ```
 /// # #[cfg(all(feature = "json", feature = "versioned"))] {
 /// use rubo4e::{current::Kosten, json::Bo4eExtensions};
-/// # let body = serde_json::json!({
-/// #     "_typ": "KOSTEN",
-/// #     "kostenbloecke": [{ "_typ": "KOSTENBLOCK", "kostenblockBEZEICHNUNG": "x" }]
-/// # });
-/// let kosten: Kosten = serde_json::from_value(body).unwrap();
 ///
-/// assert_eq!(
-///     kosten.extension_paths(),
-///     ["kostenbloecke[0].kostenblockBEZEICHNUNG"],
-/// );
+/// let body = serde_json::json!({
+///     "_typ": "KOSTEN",
+///     "kostenbloecke": [{ "kostenblockBEZEICHNUNG": "x" }]   // misspelled
+/// });
+/// let kosten: Kosten = serde_json::from_value(body).unwrap();   // cannot fail
+/// assert_eq!(kosten.kostenbloecke.as_ref().unwrap()[0].kostenblockbezeichnung, None);
+///
+/// assert_eq!(kosten.extension_paths(), ["kostenbloecke[0].kostenblockBEZEICHNUNG"]);
 /// assert!(kosten.ensure_no_extension_data().is_err());
 /// # }
 /// ```
 ///
-/// Better still, do not decode-to-check at all: construct the value typed, and a
-/// field rename is a compile error rather than a runtime one.
+/// Better still, construct the value typed: a rename is then a compile error.
 ///
 /// # Recursive, unlike [`Bo4eExtensionData`]
 ///
-/// [`has_extension_data`](Bo4eExtensionData::has_extension_data) answers for
-/// **one** struct. In the example above it answers `false` at the root, because
-/// the stray key is one level down — a clean bill of health for a broken
-/// document. This trait descends through every nested BO, COM, `Option` and
-/// `Vec`, and reports each finding at its JSON-path.
+/// [`has_extension_data`](Bo4eExtensionData::has_extension_data) answers for one
+/// struct, and above it answers `false` at the root because the stray key is a
+/// level down. This descends through every nested BO, COM, `Option` and `Vec`,
+/// reporting each finding at its JSON-path.
+///
+/// Only the top-level key of each extension entry counts: everything under it is
+/// opaque by design, so `{"vendorX": {"a": 1, "b": 2}}` reports `vendorX`, once.
 ///
 /// # The sibling of [`Bo4eStrict`](crate::Bo4eStrict)
-///
-/// The two cover the two ways a payload can fall outside the schema, and a
-/// strict ingest boundary wants both:
 ///
 /// | Question | Call |
 /// |---|---|
 /// | Does it use a **value** this schema version does not define? | [`ensure_known_enums`](crate::Bo4eStrict::ensure_known_enums) |
 /// | Does it use a **field** this schema version does not define? | [`ensure_no_extension_data`](Bo4eExtensions::ensure_no_extension_data) |
 ///
-/// They are separate on purpose. Rejecting an unknown *value* is usually right
-/// at an ingest boundary; rejecting an unknown *field* usually is not — that is
-/// how a counterparty one schema release ahead reaches you, and refusing it
-/// throws away the forward-compatibility `_additional` exists to provide. Run
-/// this one on documents you **produce**, and on inbound traffic only where a
-/// closed field set is contractually agreed.
-///
-/// # What counts as one field
-///
-/// Only the top-level key of each extension entry. Everything nested under it is
-/// opaque by design — the schema stops there, and so does this walk — so a
-/// vendor blob `{"vendorX": {"a": 1, "b": 2}}` reports `vendorX`, once.
+/// Separate on purpose. Rejecting an unknown *value* is usually right at an
+/// ingest boundary; rejecting an unknown *field* usually is not — that is how a
+/// counterparty one schema release ahead reaches you. Run this on documents you
+/// **produce**, and inbound only where a closed field set is agreed.
 ///
 /// # `AnyBo::Unknown` reports its `_typ`
 ///
-/// A payload whose `_typ` matches no generated type has no field set to check it
-/// against, so nothing can be said about its keys. Rather than answer "clean" for
-/// a document it cannot read, the walk reports `_typ` — the thing that made it
-/// uncheckable. Read it as *"this was not checked"*, not as *"`_typ` is an
-/// undefined field"*; the field is defined, and it is
-/// [`Bo4eStrict`](crate::Bo4eStrict) that has the standing to call its **value**
-/// out of schema, which it also does.
+/// A payload whose `_typ` matches no generated type has no field set to check
+/// against. Rather than answer "clean" for a document it cannot read, the walk
+/// reports `_typ` — read it as *"this was not checked"*.
 ///
 /// # Order
 ///
-/// Deterministic: a struct's own undefined keys first, then its children's,
-/// depth-first in field order.
-///
-/// Within one struct, the keys follow `_additional`'s own order — which is
-/// **arrival order** when the value was decoded from text, and **sorted** when it
-/// was decoded from a [`serde_json::Value`], whose objects are a `BTreeMap`
-/// unless `preserve_order` is on. The arrival order was gone before this crate
-/// saw the payload in that case; the structural order holds either way.
+/// A struct's own undefined keys first, then its children's, depth-first in field
+/// order. Within one struct they follow `_additional`'s order: arrival order from
+/// text, sorted from a [`serde_json::Value`], whose objects are a `BTreeMap`.
 ///
 /// # Not sealed
 ///
-/// Like [`Bo4eStrict`](crate::Bo4eStrict), and for the same reason: a downstream
-/// crate that wraps BO4E types in its own domain types can implement this to make
-/// its wrappers participate in the same recursive check.
+/// Like [`Bo4eStrict`](crate::Bo4eStrict): a downstream crate wrapping BO4E types
+/// in its own can implement this so its wrappers join the same walk.
 #[cfg(all(feature = "json", feature = "versioned"))]
 #[cfg_attr(docsrs, doc(cfg(all(feature = "json", feature = "versioned"))))]
 pub trait Bo4eExtensions {

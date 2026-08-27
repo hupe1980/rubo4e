@@ -1,22 +1,27 @@
 +++
 title = "Time Series & Units"
-description = "Placing a Lastgang or Zeitreihe on a timeline, auditing what it covers, and the dimension arithmetic that turns a load profile in kW into the energy an invoice bills."
+description = "Interval series and register series, the coverage audit, Zeitraum's instant mode, and the unit dimensions behind sum, integrate and consumption."
 weight = 45
 +++
 
-`Lastgang` and `Zeitreihe` are the two BO4E Geschäftsobjekte that carry a
-`Vec<Zeitreihenwert>`, and between them they are the highest-volume payload in
-German market communication: a year of quarter-hourly readings is 35 040 entries,
-and MSCONS, MaBiS and Redispatch 2.0 move them by the million.
+BO4E carries readings over time in **two** shapes, and they are not
+interchangeable:
 
-They are also the two the schema leaves most open. Each entry states its own
-`Zeitraum`, and nothing requires the entries to be sorted, contiguous, disjoint,
-or the length the `Lastgang` declares. In practice they are routinely none of
-those, so the first question every consumer has to answer is *"is this series
-actually complete?"* — and the second is *"what does adding these numbers up
-mean?"*, because a kW is not a kWh.
+| Shape | Carried by | Each entry is | Read with |
+|---|---|---|---|
+| **Interval series** | `Lastgang`, `Zeitreihe` | a `Zeitreihenwert`: a value **over** a `Zeitraum` | `Bo4eTimeSeries` |
+| **Register series** | `Zaehlwerk` | a `Messwert`: the meter's cumulative state **at** an instant | `Zaehlwerk::readings` |
 
-Two modules answer them: [`rubo4e::timeseries`](https://docs.rs/rubo4e/latest/rubo4e/timeseries/)
+The distinction decides the arithmetic: interval values are quantities you sum or
+integrate, register values are *states* you difference. Everything up to
+[Register readings](#register-readings) is about the first half.
+
+Interval series are the highest-volume payload in German market communication — a
+year of quarter-hours is 35 040 entries — and the ones the schema leaves most
+open. Each entry states its own `Zeitraum`, and nothing requires the entries to
+be sorted, contiguous, disjoint, or the length the `Lastgang` declares.
+
+Two modules cover this: [`rubo4e::timeseries`](https://docs.rs/rubo4e/latest/rubo4e/timeseries/)
 and [`rubo4e::units`](https://docs.rs/rubo4e/latest/rubo4e/units/).
 
 ---
@@ -266,6 +271,73 @@ which is where `expected_interval()` gets the length it checks each entry agains
 
 ---
 
+## Register readings
+
+A `Zaehlwerk` holds `Messwert`s — cumulative meter states, not quantities. The
+consumption between two of them is what BO4E states on the `wandlerfaktor` field
+itself: *"Mit diesem Faktor wird eine Zählerstandsdifferenz multipliziert, um zum
+eigentlichen Verbrauch im Zeitraum zu kommen."*
+
+```text
+consumption = (to − from) × wandlerfaktor
+```
+
+```rust
+let register = Zaehlwerk {
+    vorkommastelle: Some(6),                  // a six-digit display
+    wandlerfaktor: Some(dec!(40)),            // an indirectly-measuring meter
+    ..Default::default()
+};
+
+register.consumption_between(dec!(1_000), dec!(1_050));   // Ok(2_000)  — 50 × 40
+register.readings();                                      // chronological, usable only
+register.register_capacity();                             // Some(1_000_000)
+register.total_consumption();                             // the whole series
+```
+
+### Two corrections the bare subtraction gets wrong
+
+**A wrap-around.** A six-digit register going `999998 → 000012` has not consumed
+`−999 986`; it has consumed `14`. `vorkommastelle` states where the display wraps,
+and `consumption_between` adds the capacity back — once:
+
+```rust
+register.consumption_between(dec!(999_998), dec!(12));    // Ok(560)  — 14 × 40
+dec!(12) - dec!(999_998);                                 // -999_986 — the naive answer
+```
+
+**A fall it cannot explain.** With no `vorkommastelle` stated, a wrap-around
+cannot be told from a fault, so it is refused rather than picked. And a fall
+*larger* than one whole revolution is not a wrap-around at all — adding the
+capacity back still leaves it negative — so that is refused too.
+
+### Where it stops rather than guessing
+
+`total_consumption()` returns `Result<Decimal, ConsumptionError>`, and every
+variant is a place where continuing would produce a number that means nothing:
+
+| Variant | Why |
+|---|---|
+| `TooFewReadings` | a consumption needs a pair |
+| `MeterExchange` | a reading is marked `Z78_GERAETEWECHSEL` — the register restarted from an unrelated state, so the difference across that boundary is not a consumption. Split the series there; only you know which meter the second half belongs to |
+| `DecreasedWithoutRegisterWidth` | see above |
+| `IncompatibleUnit` | a reading is in a unit that does not convert to the register's, so the total would silently span a gap it does not admit to |
+| `Overflow` | the arithmetic left `Decimal`'s range |
+
+A reading marked `FEHLT` or `NICHT_VERWENDBAR` is not a zero, so it is left out of
+the series rather than differenced against — the same call
+`Bo4eTimeSeries` makes.
+
+### Units are reconciled first
+
+`Messwert.wert` is a `Menge`, so a reading carries its own unit, which need not
+be the register's. A reading in MWh on a kWh register is brought onto the
+register's scale before it is differenced — otherwise `1.1 MWh − 1000 kWh` reads
+as `0.1`. That is [`Menge::convert_to`](#convert-through-the-base-unit-not-by-a-scalar)
+doing the work; a unit that does not convert is an error, not an omission.
+
+---
+
 ## Feature gates
 
 | Module | Requires | Without it |
@@ -275,6 +347,7 @@ which is where `expected_interval()` gets the length it checks each entry agains
 | `exact_duration`, `Menge::as_duration`, `energy_over` | `+ time` | absent |
 | `rubo4e::timeseries` — the whole timeline walk | `versioned` + `time` | absent |
 | `sum()`, `integrate()`, `Lastgang::expected_interval()` | `+ decimal` | `expected_interval()` is `None`, so `wrong_length` stays empty |
+| `Zaehlwerk::readings` / `consumption_between` / `total_consumption` | `+ decimal` | absent; register states are `String` without it |
 
 ---
 

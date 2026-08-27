@@ -20,6 +20,12 @@ and command to run.
 | 6. Doctest | Documentation is executable | all | `src/**` rustdoc comments | ~50 s |
 | 7. Feature matrix | Every feature builds warning-free | (per combination) | CI job / `just lint-features` | minutes |
 
+Compiling a feature combination is not the same as running it. `time` and
+`decimal` **replace field types**, so the generator emits a second declaration for
+each affected field, and `--all-features` compiles only the primary one.
+`just test-schema-fallback` runs the suite with those two off — the only
+configuration where the fallback declarations exist. It is part of `just ci`.
+
 Two Criterion benches sit alongside them, measured rather than asserted:
 `benches/json_perf.rs` for the three serialization modes and
 `benches/timeseries_perf.rs` for the coverage audit at a day, a month and a

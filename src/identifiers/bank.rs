@@ -75,8 +75,14 @@ pub const IBAN_MIN_LEN: usize = 15;
     feature = "schemars",
     schemars(schema_with = "crate::schema_helpers::iban_schema")
 )]
+#[cfg_attr(feature = "schemars", schemars(description = crate::identifiers::schema::IBAN.description))]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
-#[cfg_attr(feature = "utoipa", schema(value_type = String))]
+#[cfg_attr(feature = "utoipa", schema(
+    value_type = String,
+    pattern = r"^[A-Z]{2}[0-9]{2}[A-Z0-9]{11,30}$",
+    example = "DE89370400440532013000",
+    description = crate::identifiers::schema::IBAN.description
+))]
 pub struct Iban(#[cfg_attr(feature = "validate", garde(custom(check_iban)))] Box<str>);
 
 #[cfg(feature = "validate")]
@@ -376,8 +382,14 @@ impl Iban {
     feature = "schemars",
     schemars(schema_with = "crate::schema_helpers::bic_schema")
 )]
+#[cfg_attr(feature = "schemars", schemars(description = crate::identifiers::schema::BIC.description))]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
-#[cfg_attr(feature = "utoipa", schema(value_type = String))]
+#[cfg_attr(feature = "utoipa", schema(
+    value_type = String,
+    pattern = r"^[A-Z]{4}[A-Z]{2}[A-Z0-9]{2}([A-Z0-9]{3})?$",
+    example = "COBADEFFXXX",
+    description = crate::identifiers::schema::BIC.description
+))]
 pub struct Bic(#[cfg_attr(feature = "validate", garde(custom(check_bic)))] Box<str>);
 
 #[cfg(feature = "validate")]

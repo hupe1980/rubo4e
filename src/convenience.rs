@@ -45,17 +45,12 @@
 // Flatten `Option<Betrag/Menge/Preis>` to `Option<Decimal>` in one method call.
 // Gated on both `versioned` (the struct) and `decimal` (the type).
 
-/// Ergonomic access to the `wert` field of an [`Option<Betrag>`][crate::v202607::Betrag].
-///
-/// Eliminates the `.as_ref().and_then(|b| b.wert)` chain that appears wherever
-/// monetary amounts are read from `Betrag`-typed optional fields.
-///
-/// Automatically available with `use rubo4e::prelude::*`.
+/// Flattens an [`Option<Betrag>`][crate::v202607::Betrag] to its `wert`, replacing
+/// the `.as_ref().and_then(|b| b.wert)` chain. In the prelude.
 #[cfg(all(feature = "versioned", feature = "decimal"))]
 #[cfg_attr(docsrs, doc(cfg(all(feature = "versioned", feature = "decimal"))))]
 pub trait BetragExt {
-    /// Returns `wert` from the inner `Betrag`, or `None` if the outer `Option`
-    /// is empty or `wert` itself is `None`.
+    /// `None` when the outer `Option` is empty or `wert` is.
     fn wert_decimal(&self) -> Option<rust_decimal::Decimal>;
 }
 
@@ -66,17 +61,12 @@ impl BetragExt for Option<crate::generated::v202607::Betrag> {
     }
 }
 
-/// Ergonomic access to the `wert` field of an [`Option<Menge>`][crate::v202607::Menge].
-///
-/// Eliminates the `.as_ref().and_then(|m| m.wert)` chain that appears wherever
-/// quantities are read from `Menge`-typed optional fields.
-///
-/// Automatically available with `use rubo4e::prelude::*`.
+/// Flattens an [`Option<Menge>`][crate::v202607::Menge] to its `wert`, replacing
+/// the `.as_ref().and_then(|m| m.wert)` chain. In the prelude.
 #[cfg(all(feature = "versioned", feature = "decimal"))]
 #[cfg_attr(docsrs, doc(cfg(all(feature = "versioned", feature = "decimal"))))]
 pub trait MengeExt {
-    /// Returns `wert` from the inner `Menge`, or `None` if the outer `Option`
-    /// is empty or `wert` itself is `None`.
+    /// `None` when the outer `Option` is empty or `wert` is.
     fn wert_decimal(&self) -> Option<rust_decimal::Decimal>;
 }
 
@@ -87,17 +77,12 @@ impl MengeExt for Option<crate::generated::v202607::Menge> {
     }
 }
 
-/// Ergonomic access to the `wert` field of an [`Option<Preis>`][crate::v202607::Preis].
-///
-/// Eliminates the `.as_ref().and_then(|p| p.wert)` chain that appears wherever
-/// unit prices are read from `Preis`-typed optional fields.
-///
-/// Automatically available with `use rubo4e::prelude::*`.
+/// Flattens an [`Option<Preis>`][crate::v202607::Preis] to its `wert`, replacing
+/// the `.as_ref().and_then(|p| p.wert)` chain. In the prelude.
 #[cfg(all(feature = "versioned", feature = "decimal"))]
 #[cfg_attr(docsrs, doc(cfg(all(feature = "versioned", feature = "decimal"))))]
 pub trait PreisExt {
-    /// Returns `wert` from the inner `Preis`, or `None` if the outer `Option`
-    /// is empty or `wert` itself is `None`.
+    /// `None` when the outer `Option` is empty or `wert` is.
     fn wert_decimal(&self) -> Option<rust_decimal::Decimal>;
 }
 
@@ -139,27 +124,18 @@ mod zeitraum_impl {
     /// | all four together | `time::OffsetDateTime` | `[start, end)` — **half-open** | [`as_instant_range`](Zeitraum::as_instant_range) |
     /// | `dauer` | ISO 8601 duration | — | [`duration`](Zeitraum::duration) |
     ///
-    /// # The date accessors read only the date pair
+    /// The date pair being **closed** means `2026-01-01 … 2026-01-31` is all 31
+    /// days of January and `startdatum == enddatum` is a valid one-day period —
+    /// the schema gives `'2025-01-01'` as the example for both fields. Reading
+    /// `enddatum` exclusively drops a day from every period.
     ///
-    /// A `Zeitraum` that states all four fields is BO4E's third mode — *"Zeitraum:
-    /// Startzeitpunkt (Datum und Uhrzeit) bis Endzeitpunkt (Datum und Uhrzeit)"* —
-    /// and it is the one every quarter-hourly `Zeitreihenwert` uses. The date
-    /// accessors still answer for such a value, and they answer about **whole
-    /// days**: a 15-minute slot inside one day has
-    /// [`whole_days`](Zeitraum::whole_days) `Some(1)` and
-    /// [`contains`](Zeitraum::contains) that whole day. That is the right reading
-    /// of the date pair and the wrong reading of the value, so route on
-    /// [`is_instant_range`](Zeitraum::is_instant_range) and use
-    /// [`as_instant_range`](Zeitraum::as_instant_range) where it is `true`.
+    /// **The date accessors read the date pair, and only that.** A value stating
+    /// all four fields is a moment inside a day, but
+    /// [`whole_days`](Zeitraum::whole_days) still answers `Some(1)` and
+    /// [`contains`](Zeitraum::contains) still covers the whole date. Route on
+    /// [`is_instant_range`](Zeitraum::is_instant_range).
     ///
-    /// So `2026-01-01 … 2026-01-31` is the whole of January, 31 days, and
-    /// `startdatum == enddatum` is a valid one-day period — the schema gives
-    /// `'2025-01-01'` as the example for *both* date fields. Reading `enddatum`
-    /// exclusively drops a day from every period.
-    ///
-    /// [`as_inclusive_range`](Zeitraum::as_inclusive_range) returns a
-    /// [`RangeInclusive`] rather than a tuple so the convention travels with the
-    /// value. The time pair keeps its wire `String`: it carries a UTC offset
+    /// The time pair keeps its wire `String`: it carries a UTC offset
     /// (`"18:00:00+01:00"`) and no `time` type holds both.
     ///
     impl Zeitraum {
@@ -388,12 +364,10 @@ mod zeitraum_impl {
 
         /// Resolves `startdatum` **and** `startuhrzeit` into one instant.
         ///
-        /// This is BO4E's third `Zeitraum` mode — *"Zeitraum: Startzeitpunkt
-        /// (Datum und Uhrzeit) bis Endzeitpunkt (Datum und Uhrzeit)"* — the one
-        /// every quarter-hourly [`Zeitreihenwert`] uses. It needs both halves:
-        /// a date alone is a whole day, and a time of day alone is a daily
-        /// recurring window, so either on its own answers `None` rather than
-        /// guessing the other.
+        /// BO4E's third `Zeitraum` mode, and the one every quarter-hourly
+        /// [`Zeitreihenwert`] uses. It needs both halves: a date alone is a whole
+        /// day and a time of day alone is a daily recurring window, so either on
+        /// its own answers `None`.
         ///
         /// [`Zeitreihenwert`]: crate::current::Zeitreihenwert
         ///
@@ -401,9 +375,7 @@ mod zeitraum_impl {
         ///
         /// [`ZeitpunktError::Time`] when `startuhrzeit` does not parse, and
         /// [`ZeitpunktError::MissingOffset`] when it carries no UTC offset —
-        /// without one there is no instant, only a wall-clock reading, and in a
-        /// market that changes offset twice a year that is a two-hour hole to
-        /// paper over.
+        /// without one there is a wall-clock reading, not an instant.
         ///
         /// ```
         /// # #[cfg(all(feature = "versioned", feature = "time"))] {
@@ -446,18 +418,13 @@ mod zeitraum_impl {
 
         /// Returns the period as a **half-open** instant range, `[start, end)`.
         ///
-        /// `Range`, not `RangeInclusive`, and deliberately so: `startuhrzeit` is
-        /// *"im betrachteten Zeitraum **inklusiv**"* and `enduhrzeit`
-        /// *"**exklusiv**"*, which is the opposite of what the date pair does on
-        /// the same struct. Consecutive quarter-hours therefore abut without
-        /// overlapping, and `00:15` belongs to exactly one of them — the property
-        /// a load profile is summed under.
+        /// `Range`, not `RangeInclusive`: `startuhrzeit` is *"inklusiv"* and
+        /// `enduhrzeit` *"exklusiv"*, the opposite of the date pair on the same
+        /// struct. Consecutive quarter-hours therefore abut without overlapping.
         ///
-        /// `None` unless all four fields are present;
-        /// [`as_inclusive_range`](Self::as_inclusive_range) reads the date pair
-        /// on its own, and answers for a whole day even when a time of day is
-        /// also stated. [`is_instant_range`](Self::is_instant_range) tells the
-        /// two shapes apart before you pick.
+        /// `None` unless all four fields are present —
+        /// [`is_instant_range`](Self::is_instant_range) tells the two shapes
+        /// apart.
         ///
         /// # Errors
         ///
@@ -561,12 +528,11 @@ mod zeitraum_impl {
         /// [`is_instant_range`](Self::is_instant_range) where a period must
         /// actually be stated.
         ///
-        /// A **malformed** boundary is not open — it answers `false` outright. A
-        /// bound you cannot read is not one you can establish you are inside, and
-        /// this predicate is what a `.filter()` over a set of periods calls: the
-        /// safe direction there is to drop the record, not to admit it. Use
-        /// [`as_instant_range`](Self::as_instant_range) when a malformed value
-        /// has to be distinguishable from an out-of-range one.
+        /// A **malformed** boundary is not open — it answers `false`. A bound you
+        /// cannot read is not one you can establish you are inside, and dropping
+        /// the record is the safe direction for the `.filter()` this predicate
+        /// exists for. Use [`as_instant_range`](Self::as_instant_range) to tell a
+        /// malformed value from an out-of-range one.
         ///
         /// ```
         /// # #[cfg(all(feature = "versioned", feature = "time"))] {
@@ -602,10 +568,7 @@ mod zeitraum_impl {
         ///
         /// Fills all four fields, writing each time of day with the offset its
         /// `OffsetDateTime` carries, so
-        /// [`as_instant_range`](Self::as_instant_range) returns exactly what went
-        /// in. This is the constructor a producer of load profiles wants: getting
-        /// the inclusive/exclusive pair right by hand is the mistake this type
-        /// invites.
+        /// [`as_instant_range`](Self::as_instant_range) returns what went in.
         ///
         /// ```
         /// # #[cfg(all(feature = "versioned", feature = "time"))] {
@@ -891,64 +854,48 @@ mod rechnung_impl {
 mod rechnung_decimal_impl {
     use crate::generated::v202607::Rechnung;
 
+    /// The invoice totals, flattened from `Option<Betrag>` to `Option<Decimal>`.
+    ///
+    /// Each returns `None` when its `Betrag` is absent or carries no `wert`, and
+    /// reads what the sender wrote — no total is re-derived from the others.
     impl Rechnung {
-        /// Net total (`gesamtnetto.wert`) as `Decimal`.
-        ///
-        /// Returns `None` when `gesamtnetto` is absent or its `wert` is `None`.
-        ///
-        /// ```no_run
-        /// # #[cfg(all(feature = "versioned", feature = "decimal"))] {
-        /// # use rubo4e::v202607::Rechnung;
-        /// let r: Rechnung = todo!();
-        /// if let Some(net) = r.gesamtnetto_decimal() {
-        ///     println!("net total: {net}");
-        /// }
-        /// # }
-        /// ```
+        /// Net total (`gesamtnetto.wert`).
         #[must_use]
         pub fn gesamtnetto_decimal(&self) -> Option<rust_decimal::Decimal> {
             self.gesamtnetto.as_ref()?.wert
         }
 
-        /// Gross total (`gesamtbrutto.wert`) as `Decimal`.
-        ///
-        /// Returns `None` when `gesamtbrutto` is absent or its `wert` is `None`.
+        /// Gross total (`gesamtbrutto.wert`).
         #[must_use]
         pub fn gesamtbrutto_decimal(&self) -> Option<rust_decimal::Decimal> {
             self.gesamtbrutto.as_ref()?.wert
         }
 
-        /// Total tax amount (`gesamtsteuer.wert`) as `Decimal`.
-        ///
-        /// Returns `None` when `gesamtsteuer` is absent or its `wert` is `None`.
+        /// Total tax (`gesamtsteuer.wert`).
         #[must_use]
         pub fn gesamtsteuer_decimal(&self) -> Option<rust_decimal::Decimal> {
             self.gesamtsteuer.as_ref()?.wert
         }
 
-        /// Amount to pay (`zu_zahlen.wert`) as `Decimal`.
+        /// Amount to pay (`zu_zahlen.wert`).
         ///
-        /// This reads the value the sender computed; the crate does not re-derive
-        /// it. BO4E describes it as `gesamtbrutto - vorausbezahlt - rabattBrutto`,
-        /// but v202607 ships no `rabattBrutto` field, so the equation cannot be
-        /// reconstructed from the payload. Use
-        /// [`vorauszahlungen_summe`](Self::vorauszahlungen_summe) if you need the
+        /// BO4E describes it as `gesamtbrutto - vorausbezahlt - rabattBrutto`,
+        /// but v202607 ships no `rabattBrutto`, so the equation is not
+        /// reconstructible from the payload — see
+        /// [`vorauszahlungen_summe`](Self::vorauszahlungen_summe) for the
         /// advance-payment total on its own.
         #[must_use]
         pub fn zu_zahlen_decimal(&self) -> Option<rust_decimal::Decimal> {
             self.zu_zahlen.as_ref()?.wert
         }
 
-        /// Net discount (`rabatt_netto.wert`) as `Decimal`.
+        /// Net discount (`rabatt_netto.wert`).
         #[must_use]
         pub fn rabatt_netto_decimal(&self) -> Option<rust_decimal::Decimal> {
             self.rabatt_netto.as_ref()?.wert
         }
 
-        /// Estimated next instalment (`zukuenftiger_abschlag.wert`) as `Decimal`.
-        ///
-        /// Set by the sender as a forward-looking payment estimate for the next
-        /// billing period.
+        /// Estimated next instalment (`zukuenftiger_abschlag.wert`).
         #[must_use]
         pub fn zukuenftiger_abschlag_decimal(&self) -> Option<rust_decimal::Decimal> {
             self.zukuenftiger_abschlag.as_ref()?.wert

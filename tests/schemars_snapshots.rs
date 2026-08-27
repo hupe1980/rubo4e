@@ -2,15 +2,32 @@
 //!
 //! Run with:
 //! ```text
-//! cargo test --test schemars_snapshots --features schemars,versioned
+//! cargo test --test schemars_snapshots --features schemars,versioned,time,decimal
 //! ```
 //!
 //! To accept new snapshots (e.g. after schema changes):
 //! ```text
-//! INSTA_UPDATE=unseen cargo test --test schemars_snapshots --features schemars,versioned
+//! INSTA_UPDATE=unseen cargo test --test schemars_snapshots --features schemars,versioned,time,decimal
 //! ```
+//!
+//! # Why `time` and `decimal` are in the gate
+//!
+//! Those two features change field *types* — `Option<String>` becomes
+//! `Option<time::Date>` or `Option<Decimal>` — so they change the schema. A
+//! snapshot is a recording of one configuration, and these were recorded with
+//! both on. Without the gate the file compiles in a configuration it cannot pass
+//! in, which is a build failure rather than a finding.
+//!
+//! The fallback configuration is not left unchecked: `tests/schema_descriptions.rs`
+//! asserts the *properties* of the fallback declarations there, which is the part
+//! that can regress independently. See `just test-schema-fallback`.
 
-#[cfg(all(feature = "schemars", feature = "versioned"))]
+#[cfg(all(
+    feature = "schemars",
+    feature = "versioned",
+    feature = "time",
+    feature = "decimal"
+))]
 mod schema_tests {
     use schemars::{schema_for, JsonSchema};
 

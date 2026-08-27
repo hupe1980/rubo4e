@@ -73,8 +73,7 @@ pub struct Vertragsteil {
     )]
     #[cfg(feature = "time")]
     pub vertragsteilbeginn: Option<time::OffsetDateTime>,
-    /// Requires the `time` feature for the `time::OffsetDateTime` representation.
-    /// Without `time`, stores the ISO-8601 string value unchanged.
+    /// Start der Gültigkeit des Vertragsteils (inklusiv)
     #[cfg_attr(feature = "serde", serde(rename = "vertragsteilbeginn"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "serde", serde(default))]
@@ -100,8 +99,7 @@ pub struct Vertragsteil {
     )]
     #[cfg(feature = "time")]
     pub vertragsteilende: Option<time::OffsetDateTime>,
-    /// Requires the `time` feature for the `time::OffsetDateTime` representation.
-    /// Without `time`, stores the ISO-8601 string value unchanged.
+    /// Ende der Gültigkeit des Vertragsteils (exklusiv)
     #[cfg_attr(feature = "serde", serde(rename = "vertragsteilende"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "serde", serde(default))]

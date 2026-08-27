@@ -1,17 +1,25 @@
-//! Placing a BO4E time series on a timeline, and auditing what it covers.
+//! Placing a BO4E time series on a timeline, and reading what it means.
 //!
-//! [`Lastgang`] and [`Zeitreihe`] are the two BO4E Geschäftsobjekte that carry a
-//! `Vec<`[`Zeitreihenwert`]`>`, and between them they are the highest-volume
-//! payload in German market communication: a year of quarter-hourly meter
-//! readings is 35 040 entries, and MSCONS, MaBiS and Redispatch 2.0 all move
-//! them by the million.
+//! BO4E carries readings over time in **two** shapes, and they are not
+//! interchangeable:
 //!
-//! Each entry states its own [`Zeitraum`], so the series is a *bag* of intervals,
-//! not a sequence. Nothing in the schema requires them to be sorted, contiguous,
-//! disjoint, or the length the `Lastgang` declares — and in practice they are
-//! routinely none of those. The single question every consumer has to answer
-//! before using one is therefore *"is this series actually complete?"*, and this
-//! module answers it in one call.
+//! | Shape | Carried by | Each entry is | Read with |
+//! |---|---|---|---|
+//! | **Interval series** | [`Lastgang`], [`Zeitreihe`] | a [`Zeitreihenwert`]: a value **over** a `Zeitraum` | [`Bo4eTimeSeries`] |
+//! | **Register series** | [`Zaehlwerk`] | a [`Messwert`]: the meter's cumulative state **at** an instant | [`Zaehlwerk::readings`] |
+//!
+//! The distinction decides the arithmetic. Interval values are quantities you
+//! sum or integrate; register values are *states* you difference — and the bare
+//! subtraction is wrong in two ways the schema itself tells you how to fix. See
+//! [`Zaehlwerk::consumption_between`].
+//!
+//! # Interval series
+//!
+//! [`Lastgang`] and [`Zeitreihe`] carry a `Vec<`[`Zeitreihenwert`]`>`, and a year
+//! of quarter-hours is 35 040 entries. Each states its own [`Zeitraum`], so the
+//! series is a *bag* of intervals: nothing requires them to be sorted,
+//! contiguous, disjoint, or the length the `Lastgang` declares.
+//! [`audit`](Bo4eTimeSeries::audit) walks them once and says which they are.
 //!
 //! ```
 //! # #[cfg(all(feature = "versioned", feature = "time", feature = "decimal"))] {
@@ -61,20 +69,56 @@
 //!
 //! # What is checked, and what is not
 //!
-//! [`audit`](Bo4eTimeSeries::audit) is a **data-quality** report, not a
-//! conformance check. BO4E states none of these properties, so nothing here is
-//! wired into `.validate()` — the same line [`validation::current::quality`]
-//! draws. A counterparty's gappy Lastgang is still a valid Lastgang; whether you
-//! accept it is your decision, and this gives you the facts to make it.
+//! [`audit`](Bo4eTimeSeries::audit) is a data-quality report, not a conformance
+//! check. BO4E states none of these properties — a gappy Lastgang is a valid
+//! Lastgang — so nothing here is wired into `.validate()`, the same line
+//! [`validation::current::quality`] draws.
+//!
+//! # Register series
+//!
+//! A [`Zaehlwerk`]'s `messwerte` are cumulative meter states, so the consumption
+//! is the difference between two of them, times the `wandlerfaktor` BO4E defines
+//! on the field itself, corrected for a wrap-around `vorkommastelle` reveals:
+//!
+//! ```
+//! # #[cfg(all(feature = "versioned", feature = "time", feature = "decimal"))] {
+//! use rubo4e::current::Zaehlwerk;
+//! use rust_decimal::Decimal;
+//!
+//! let register = Zaehlwerk {
+//!     vorkommastelle: Some(6),                  // a six-digit display
+//!     wandlerfaktor: Some(Decimal::from(40)),   // an indirectly-measuring meter
+//!     ..Default::default()
+//! };
+//!
+//! // 999 998 → 000 012 is 14 register steps, not −999 986.
+//! assert_eq!(
+//!     register.consumption_between(Decimal::from(999_998), Decimal::from(12)),
+//!     Ok(Decimal::from(560)),                   // 14 × 40
+//! );
+//! # }
+//! ```
+//!
+//! [`total_consumption`](Zaehlwerk::total_consumption) walks a whole register in
+//! time order, and refuses rather than guessing where the arithmetic stops
+//! meaning anything — a meter exchange, a fall no register width explains, a
+//! reading in a unit that does not convert.
 //!
 //! [`validation::current::quality`]: crate::validation::current::quality
 //! [`Lastgang`]: crate::current::Lastgang
 //! [`Zeitreihe`]: crate::current::Zeitreihe
 //! [`Zeitreihenwert`]: crate::current::Zeitreihenwert
 //! [`Zeitraum`]: crate::current::Zeitraum
+//! [`Zaehlwerk`]: crate::current::Zaehlwerk
+//! [`Messwert`]: crate::current::Messwert
 
 use crate::convenience::ZeitpunktError;
 use crate::generated::v202607::{Lastgang, Zeitreihe, Zeitreihenwert};
+// The register half needs a numeric register state, so it exists only with
+// `decimal`; without it `Messwert.wert` is a `String` and a difference between
+// two of them is not arithmetic this crate can do.
+#[cfg(feature = "decimal")]
+use crate::generated::v202607::{Messwert, Zaehlwerk};
 use std::ops::Range;
 use time::{Duration, OffsetDateTime};
 
@@ -607,6 +651,337 @@ impl Bo4eTimeSeries for Zeitreihe {
     /// angegeben ist".
     fn einheit(&self) -> Option<crate::generated::v202607::Mengeneinheit> {
         self.einheit
+    }
+}
+
+// ─── Register readings: the other time-series shape ──────────────────────────
+
+/// One usable reading off a [`Zaehlwerk`], resolved to an instant and a value.
+///
+/// A register reading is a **cumulative meter state**, not a quantity consumed:
+/// `Messwert.wert` is what the display said at `zeitpunkt`. The consumption is
+/// the difference between two of them — see
+/// [`consumption_between`](Zaehlwerk::consumption_between).
+#[cfg(feature = "decimal")]
+#[cfg_attr(docsrs, doc(cfg(feature = "decimal")))]
+#[derive(Debug, Clone, PartialEq)]
+pub struct Reading<'a> {
+    /// Index of this reading in the register's `messwerte` vector.
+    pub index: usize,
+    /// When the meter was read.
+    pub at: OffsetDateTime,
+    /// The register state, in [`Zaehlwerk::einheit`] where the register states
+    /// one and the reading could be converted to it.
+    pub value: rust_decimal::Decimal,
+    /// The reading itself, for its status and any extension data.
+    pub source: &'a Messwert,
+}
+
+/// Why a consumption could not be computed from a register's readings.
+#[cfg(feature = "decimal")]
+#[cfg_attr(docsrs, doc(cfg(feature = "decimal")))]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[non_exhaustive]
+pub enum ConsumptionError {
+    /// Fewer than two usable readings — a consumption needs a pair.
+    #[error("a consumption needs two readings, and this register has {count}")]
+    TooFewReadings {
+        /// How many usable readings there are.
+        count: usize,
+    },
+
+    /// A reading is lower than the one before it, and the register states no
+    /// `vorkommastelle`, so there is no way to tell a wrap-around from an error.
+    ///
+    /// See [`Zaehlwerk::register_capacity`].
+    #[error(
+        "reading {index} fell from {from} to {to}, and the register states no \
+         vorkommastelle, so a wrap-around cannot be told from a fault"
+    )]
+    DecreasedWithoutRegisterWidth {
+        /// Index of the lower reading.
+        index: usize,
+        /// The preceding, higher state.
+        from: rust_decimal::Decimal,
+        /// The state that fell.
+        to: rust_decimal::Decimal,
+    },
+
+    /// A reading is marked `Z78_GERAETEWECHSEL`: the meter was swapped, so the
+    /// register started again from a state unrelated to the previous one.
+    ///
+    /// The difference across that boundary is not a consumption at whatever the
+    /// arithmetic says, so it is refused rather than guessed. Split the series at
+    /// the exchange and sum the halves.
+    #[error("reading {index} is marked Z78_GERAETEWECHSEL; split the series there")]
+    MeterExchange {
+        /// Index of the reading that carries the marker.
+        index: usize,
+    },
+
+    /// A reading's unit is not the register's, and the two do not convert.
+    #[error("reading {index} is in a unit that does not convert to the register's")]
+    IncompatibleUnit {
+        /// Index of the offending reading.
+        index: usize,
+    },
+
+    /// The arithmetic left `Decimal`'s range.
+    #[error("the consumption arithmetic overflowed")]
+    Overflow,
+}
+
+#[cfg(feature = "decimal")]
+impl Zaehlwerk {
+    /// The register's usable readings, in chronological order.
+    ///
+    /// Only readings that state both a `zeitpunkt` and a numeric `wert` appear,
+    /// and only ones whose status does not mark them
+    /// [unusable](crate::current::Messwertstatus::is_usable). Values are converted
+    /// into [`einheit`](crate::current::Zaehlwerk::einheit) where the register
+    /// states one; a reading whose unit does not convert is dropped here and
+    /// named by [`total_consumption`](Self::total_consumption).
+    ///
+    /// `messwerte` is a bag, not a sequence — nothing in the schema orders it —
+    /// so this sorts, which is the one allocation on the path.
+    #[must_use]
+    pub fn readings(&self) -> Vec<Reading<'_>> {
+        let target = self.einheit;
+        let mut out: Vec<Reading<'_>> = self
+            .messwerte
+            .as_deref()
+            .unwrap_or_default()
+            .iter()
+            .enumerate()
+            .filter_map(|(index, m)| {
+                if m.messwertstatus.is_some_and(|s| !s.is_usable()) {
+                    return None;
+                }
+                let value = reading_value(m, target)?;
+                Some(Reading {
+                    index,
+                    at: m.zeitpunkt?,
+                    value,
+                    source: m,
+                })
+            })
+            .collect();
+        out.sort_by_key(|r| r.at);
+        out
+    }
+
+    /// The state at which this register wraps back to zero: `10^vorkommastelle`.
+    ///
+    /// A six-digit register runs to `999999` and then reads `000000`, so its
+    /// capacity is `1_000_000` — the amount a wrapped difference is short by.
+    ///
+    /// `None` when the register states no `vorkommastelle`, or states one too
+    /// large to represent, in which case a decrease cannot be resolved.
+    ///
+    /// ```
+    /// # #[cfg(all(feature = "versioned", feature = "time", feature = "decimal"))] {
+    /// use rubo4e::current::Zaehlwerk;
+    /// use rust_decimal::Decimal;
+    ///
+    /// let zw = Zaehlwerk { vorkommastelle: Some(6), ..Default::default() };
+    /// assert_eq!(zw.register_capacity(), Some(Decimal::from(1_000_000)));
+    /// assert_eq!(Zaehlwerk::default().register_capacity(), None);
+    /// # }
+    /// ```
+    #[must_use]
+    pub fn register_capacity(&self) -> Option<rust_decimal::Decimal> {
+        let digits = u32::try_from(self.vorkommastelle?).ok()?;
+        // `Decimal` holds 28 significant digits; a wider register is not one this
+        // arithmetic can resolve, and pretending otherwise would silently round.
+        if digits > 28 {
+            return None;
+        }
+        // `10u128.pow` rather than a `Decimal` power: `Decimal::checked_powu`
+        // lives behind rust_decimal's `maths` feature, and this needs one exact
+        // power of ten, not a general exponentiation.
+        //
+        // `try_from`, not the `From` impl clippy points at: `Decimal::from(u128)`
+        // **panics** above `Decimal`'s range (`rust_decimal` unwraps an internal
+        // `Option`), and `u128` reaches 3.4e38 against `Decimal`'s 7.9e28. The
+        // `digits > 28` guard above makes it unreachable today; the fallible
+        // conversion is what keeps it unreachable if that guard is ever widened.
+        // Same reasoning as the visitors in `crate::decimal_serde`.
+        #[allow(clippy::unnecessary_fallible_conversions)]
+        rust_decimal::Decimal::try_from(10u128.checked_pow(digits)?).ok()
+    }
+
+    /// The consumption between two register states, exactly as the schema
+    /// defines it.
+    ///
+    /// BO4E states the formula on `wandlerfaktor` itself: *"Mit diesem Faktor
+    /// wird eine Zählerstandsdifferenz multipliziert, um zum eigentlichen
+    /// Verbrauch im Zeitraum zu kommen."* So:
+    ///
+    /// ```text
+    /// consumption = (to − from) × wandlerfaktor
+    /// ```
+    ///
+    /// with two corrections the bare subtraction gets wrong:
+    ///
+    /// - **A wrap-around.** A six-digit register going `999998 → 000012` has not
+    ///   consumed `−999986`; it has consumed `14`. When `to < from` and the
+    ///   register states a [`register_capacity`](Self::register_capacity), the
+    ///   capacity is added back, once.
+    /// - **No stated width.** When `to < from` and there is no
+    ///   `vorkommastelle`, a wrap-around cannot be told from a fault, so this
+    ///   refuses rather than picking one.
+    ///
+    /// An absent `wandlerfaktor` is **1**: a directly-measuring meter has no
+    /// transformer and states none. Check the field yourself where that
+    /// distinction matters.
+    ///
+    /// # Errors
+    ///
+    /// [`ConsumptionError::DecreasedWithoutRegisterWidth`] or
+    /// [`ConsumptionError::Overflow`].
+    ///
+    /// ```
+    /// # #[cfg(all(feature = "versioned", feature = "time", feature = "decimal"))] {
+    /// use rubo4e::current::Zaehlwerk;
+    /// use rust_decimal::Decimal;
+    ///
+    /// let zw = Zaehlwerk {
+    ///     vorkommastelle: Some(6),
+    ///     wandlerfaktor: Some(Decimal::from(40)),   // an indirectly-measuring meter
+    ///     ..Default::default()
+    /// };
+    ///
+    /// // An ordinary pair.
+    /// assert_eq!(
+    ///     zw.consumption_between(Decimal::from(1_000), Decimal::from(1_050)),
+    ///     Ok(Decimal::from(2_000)),                 // 50 × 40
+    /// );
+    ///
+    /// // …and one that wrapped: 14 register steps, not −999 986.
+    /// assert_eq!(
+    ///     zw.consumption_between(Decimal::from(999_998), Decimal::from(12)),
+    ///     Ok(Decimal::from(560)),                   // 14 × 40
+    /// );
+    /// # }
+    /// ```
+    pub fn consumption_between(
+        &self,
+        from: rust_decimal::Decimal,
+        to: rust_decimal::Decimal,
+    ) -> Result<rust_decimal::Decimal, ConsumptionError> {
+        self.consumption_at(0, from, to)
+    }
+
+    /// [`consumption_between`](Self::consumption_between), carrying the index the
+    /// sequence walk reports a failure at.
+    fn consumption_at(
+        &self,
+        index: usize,
+        from: rust_decimal::Decimal,
+        to: rust_decimal::Decimal,
+    ) -> Result<rust_decimal::Decimal, ConsumptionError> {
+        use rust_decimal::Decimal;
+
+        let mut delta = to.checked_sub(from).ok_or(ConsumptionError::Overflow)?;
+        if delta < Decimal::ZERO {
+            let capacity = self
+                .register_capacity()
+                .ok_or(ConsumptionError::DecreasedWithoutRegisterWidth { index, from, to })?;
+            delta = delta
+                .checked_add(capacity)
+                .ok_or(ConsumptionError::Overflow)?;
+            // Still negative: the fall is larger than one whole revolution, so it
+            // is not a wrap-around at all.
+            if delta < Decimal::ZERO {
+                return Err(ConsumptionError::DecreasedWithoutRegisterWidth { index, from, to });
+            }
+        }
+        delta
+            .checked_mul(self.wandlerfaktor.unwrap_or(Decimal::ONE))
+            .ok_or(ConsumptionError::Overflow)
+    }
+
+    /// The consumption across every consecutive pair of
+    /// [`readings`](Self::readings).
+    ///
+    /// The whole period the register covers, in
+    /// [`einheit`](crate::current::Zaehlwerk::einheit), with each step corrected
+    /// for a wrap-around and multiplied by the `wandlerfaktor`.
+    ///
+    /// # Errors
+    ///
+    /// - [`ConsumptionError::TooFewReadings`] — a consumption needs a pair.
+    /// - [`ConsumptionError::MeterExchange`] — a reading marks
+    ///   `Z78_GERAETEWECHSEL`. The register restarted from an unrelated state, so
+    ///   the difference across that boundary is not a consumption. Split the
+    ///   series there and sum the halves; nothing here can do that for you,
+    ///   because only you know which meter the second half belongs to.
+    /// - [`ConsumptionError::IncompatibleUnit`] — a reading is in a unit that
+    ///   does not convert to the register's, so it was dropped from
+    ///   [`readings`](Self::readings) and the total would silently skip it.
+    /// - [`ConsumptionError::DecreasedWithoutRegisterWidth`],
+    ///   [`ConsumptionError::Overflow`] — as
+    ///   [`consumption_between`](Self::consumption_between).
+    pub fn total_consumption(&self) -> Result<rust_decimal::Decimal, ConsumptionError> {
+        // A reading dropped for an unconvertible unit would leave a total that
+        // silently spans a gap, so it is an error rather than an omission.
+        if let Some(index) = self.unconvertible_reading() {
+            return Err(ConsumptionError::IncompatibleUnit { index });
+        }
+
+        let readings = self.readings();
+        if readings.len() < 2 {
+            return Err(ConsumptionError::TooFewReadings {
+                count: readings.len(),
+            });
+        }
+        if let Some(r) = readings.iter().find(|r| {
+            r.source.messwertstatuszusatz
+                == Some(crate::generated::v202607::Messwertstatuszusatz::Z78Geraetewechsel)
+        }) {
+            return Err(ConsumptionError::MeterExchange { index: r.index });
+        }
+
+        readings
+            .windows(2)
+            .try_fold(rust_decimal::Decimal::ZERO, |acc, pair| {
+                let step = self.consumption_at(pair[1].index, pair[0].value, pair[1].value)?;
+                acc.checked_add(step).ok_or(ConsumptionError::Overflow)
+            })
+    }
+
+    /// The index of the first reading whose unit does not convert to the
+    /// register's, if there is one.
+    fn unconvertible_reading(&self) -> Option<usize> {
+        let target = self.einheit?;
+        self.messwerte
+            .as_deref()
+            .unwrap_or_default()
+            .iter()
+            .enumerate()
+            .find(|(_, m)| {
+                m.messwertstatus.is_none_or(|s| s.is_usable())
+                    && m.zeitpunkt.is_some()
+                    && m.wert.is_some()
+                    && reading_value(m, Some(target)).is_none()
+            })
+            .map(|(index, _)| index)
+    }
+}
+
+/// A reading's numeric value, converted into `target` when both are stated.
+#[cfg(feature = "decimal")]
+fn reading_value(
+    m: &Messwert,
+    target: Option<crate::generated::v202607::Mengeneinheit>,
+) -> Option<rust_decimal::Decimal> {
+    let menge = m.wert.as_ref()?;
+    match (target, menge.einheit) {
+        // The register names a unit and the reading names a different one: the
+        // reading has to be brought onto the register's scale, or it is not
+        // comparable with the reading beside it.
+        (Some(t), Some(u)) if u != t => menge.convert_to(t)?.wert,
+        _ => menge.wert,
     }
 }
 

@@ -10,18 +10,12 @@
 //! - adds `Serialize` / `Deserialize` with the `serde` feature, routed through
 //!   the same constructor
 //!
-//! ## Validation at construction vs. `validate` feature
+//! Structural validation always runs at construction. The `validate` feature
+//! additionally derives [`garde`] rules that re-run the *same* function, so a
+//! `Validated<Marktlokation>` re-checks every nested identifier through garde's
+//! report API.
 //!
-//! All identifier types **always** validate the structural constraints (length,
-//! character set) at construction time — this happens regardless of whether the
-//! `validate` feature is enabled.
-//!
-//! The `validate` feature adds [`garde`]-based validation attributes so that
-//! `Validated<T>` (and `#[derive(garde::Validate)]` on parent structs) can
-//! re-run the same checks via the garde report API.  The actual validation logic
-//! is identical in both paths.
-//!
-//! ### Per-type validation rules
+//! ## What each type validates
 //!
 //! Section numbers refer to the BDEW Anwendungshilfe **"Identifikatoren in der
 //! Marktkommunikation"** v1.2 (7 February 2025).
@@ -47,48 +41,23 @@
 //! | [`Iban`] | 15–34 chars, registered per-country length, MOD-97-10 check digits | ISO 13616 / ISO 7064 |
 //! | [`Bic`] | 8 or 11 chars, letters in the institution and country codes | ISO 9362 — no checksum defined |
 //!
-//! ### The two BDEW check-digit procedures
+//! ## The two BDEW check-digit procedures
 //!
-//! BDEW chapter 8 defines two procedures, and they are the *same* arithmetic:
-//! sum the mapped character values at odd positions, add twice the sum at even
-//! positions, and take the difference to the next multiple of 10.
+//! Chapter 8 defines two, and they are the *same* arithmetic — §8.1 for numeric
+//! identifiers, §8.2 (the ASCII-Verfahren, where `A`–`Z` map to their ASCII
+//! codes) for alphanumeric ones. A digit maps identically under both, so §8.1 is
+//! §8.2 restricted to numeric input, and this crate implements it once.
 //!
-//! - **§8.1 Lok- und Waggon-Kennzeichnungsverfahren** — numeric identifiers
-//!   ([`MaloId`], BDEW-/DVGW-Codenummern). Each digit maps to its own value.
-//! - **§8.2 ASCII-Verfahren** — alphanumeric identifiers ([`NeloId`], [`NebeId`],
-//!   [`CrId`], [`SgId`], [`SrId`], [`TrId`], [`PaketId`]). Digits map to their
-//!   value, uppercase letters to their ASCII code (`A` = 65 … `Z` = 90).
+//! [`MarktpartnerId`] is the exception that enforces none: an MP-ID may carry
+//! either the §8.1 digit or a GS1/EAN-13 one, and the leading digits do not
+//! reliably separate them. See its own docs for the opt-in checks.
 //!
-//! Because a digit maps identically under both, §8.1 is exactly §8.2 restricted
-//! to numeric input, and this crate implements the arithmetic once.
+//! ## Where [`Iban`] and [`Bic`] are *not* used
 //!
-//! ### Why [`MarktpartnerId`] does not enforce a check digit
-//!
-//! An MP-ID may be a BDEW-/DVGW-Codenummer (which uses §8.1) *or* a GS1 Global
-//! Location Number (which uses the GS1/EAN-13 procedure). The two disagree, and
-//! the leading digits do not reliably separate them — codes predating the
-//! `98`/`99` convention are still in circulation. Enforcing either one by default
-//! would reject valid production identifiers, so construction checks only the
-//! unambiguous part and the check digit is available on demand via
-//! [`MarktpartnerId::new_checked`], [`MarktpartnerId::has_valid_bdew_check_digit`],
-//! and [`MarktpartnerId::has_valid_gln_check_digit`].
-//!
-//! ### The two bank identifiers, and where they are *not* used
-//!
-//! [`Iban`] and [`Bic`] exist for `Zahlungsinformation.iban` / `.bic`, but the
-//! generated struct keeps both fields as `String`: `Zahlungsinformation` hangs
-//! off `Rechnung` and nothing else, so a newtype refusing a **masked** IBAN —
-//! `DE89 **** **** 3000`, routine on an invoice — would take the whole invoice
-//! with it. `Zahlungsinformation::iban_checked()` runs the check on demand and
-//! costs the caller the field rather than the invoice.
-//!
-//! ### `validate` feature and `garde`
-//!
-//! When `validate` is enabled, each identifier derives `garde::Validate` with a
-//! `custom(check_*)` validator that delegates to the same `validate()` function
-//! used at construction.  This means `Validated::<Marktlokation>::new(malo)` will
-//! re-validate all nested identifier fields (e.g. `marktlokations_id`) through
-//! garde's recursive report API.
+//! `Zahlungsinformation` keeps both fields as `String`: it hangs off `Rechnung`
+//! and nothing else, so a newtype refusing a **masked** IBAN — `DE89 **** ****
+//! 3000`, routine on an invoice — would take the whole invoice with it.
+//! `Zahlungsinformation::iban_checked()` costs the caller the field instead.
 
 #[cfg(feature = "serde")]
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -108,6 +77,8 @@ mod malo_id;
 mod marktpartner_id;
 mod melo_id;
 pub(crate) mod obis_code;
+#[cfg(any(feature = "schemars", feature = "utoipa"))]
+pub mod schema;
 #[cfg(feature = "sqlx")]
 mod sqlx_impls;
 mod tranchennummer_id;

@@ -21,8 +21,6 @@ pub struct Geokoordinaten {
     )]
     #[cfg(feature = "decimal")]
     pub breitengrad: Option<rust_decimal::Decimal>,
-    /// Requires the `decimal` feature for the `rust_decimal::Decimal` representation.
-    /// Without `decimal`, stores the decimal's lexical form (a JSON string or number).
     #[cfg_attr(feature = "serde", serde(rename = "breitengrad"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
@@ -49,8 +47,6 @@ pub struct Geokoordinaten {
     )]
     #[cfg(feature = "decimal")]
     pub laengengrad: Option<rust_decimal::Decimal>,
-    /// Requires the `decimal` feature for the `rust_decimal::Decimal` representation.
-    /// Without `decimal`, stores the decimal's lexical form (a JSON string or number).
     #[cfg_attr(feature = "serde", serde(rename = "laengengrad"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]

@@ -16,6 +16,14 @@
 /// [`Gasqualitaet::Unknown`].  Do **not** hard-code a speculative wire string —
 /// when BO4E adds the variant it will appear here (and in the CHANGELOG) with
 /// its canonical spelling, and lenient decoding will start resolving it.
+#[cfg_attr(
+    feature = "schemars",
+    schemars(description = "Unterscheidung für hoch- und niedrig-kalorisches Gas.")
+)]
+#[cfg_attr(
+    feature = "utoipa",
+    schema(description = "Unterscheidung für hoch- und niedrig-kalorisches Gas.")
+)]
 #[non_exhaustive]
 pub enum Gasqualitaet {
     #[cfg_attr(feature = "serde", serde(rename = "H_GAS"))]

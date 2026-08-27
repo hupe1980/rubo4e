@@ -125,15 +125,21 @@ macro_rules! impl_identifier_traits {
 /// - `$ty` — the newtype name.
 /// - `$prefix` — the Codetyp byte string (e.g. `b"E"`, `b"P9"`).
 /// - `$schema_fn` — path to the `schemars` schema function.
+/// - `$schema_meta` — the type's entry in [`crate::identifiers::schema`], read by
+///   both derives for the description.
+/// - `$pattern` — the same regex `$schema_meta` carries, as a literal: `utoipa`
+///   compiles the regex and will not take an expression.
 /// - `$expecting` — the `serde` "expecting" message.
-/// - `$example_base` / `$example_full` — a doctest vector; `$example_full` must be
-///   `$example_base` plus its check digit.
+/// - `$example_base` / `$example_full` — a doctest vector, and the OpenAPI
+///   example; `$example_full` must be `$example_base` plus its check digit.
 macro_rules! bdew_ascii_identifier {
     (
         $(#[$meta:meta])*
         $ty:ident,
         prefix     = $prefix:expr,
         schema     = $schema_fn:literal,
+        schema_meta = $schema_meta:expr,
+        pattern    = $pattern:literal,
         expecting  = $expecting:expr,
         example    = ($example_base:literal, $example_full:literal),
         check_fn   = $check_fn:ident $(,)?
@@ -156,8 +162,21 @@ macro_rules! bdew_ascii_identifier {
         #[cfg_attr(feature = "validate", garde(allow_unvalidated))]
         #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
         #[cfg_attr(feature = "schemars", schemars(schema_with = $schema_fn))]
+        // Without this the derive substitutes the type's *rustdoc* for the
+        // description — overriding what `$schema_fn` writes, and putting Rust
+        // prose and intra-doc links into a published JSON Schema.
+        #[cfg_attr(feature = "schemars", schemars(description = $schema_meta.description))]
         #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
-        #[cfg_attr(feature = "utoipa", schema(value_type = String))]
+        // `pattern` and `example` are literals because `utoipa` validates the
+        // regex at compile time and so will not take an expression. They repeat
+        // what `$schema_meta` holds; `tests/identifier_schemas.rs` asserts the
+        // two never disagree.
+        #[cfg_attr(feature = "utoipa", schema(
+            value_type = String,
+            pattern = $pattern,
+            example = $example_full,
+            description = $schema_meta.description
+        ))]
         pub struct $ty(#[cfg_attr(feature = "validate", garde(custom($check_fn)))] Box<str>);
 
         #[cfg(feature = "validate")]
@@ -240,8 +259,13 @@ macro_rules! bdew_ascii_identifier {
 /// - `$ty` — the newtype name.
 /// - `$eic_type` — the [`EicType`] variant this identifier is restricted to.
 /// - `$schema_fn` — path to the `schemars` schema function.
+/// - `$schema_meta` — the type's entry in [`crate::identifiers::schema`], read by
+///   both derives for the description.
+/// - `$pattern` — the same regex `$schema_meta` carries, as a literal: `utoipa`
+///   compiles the regex and will not take an expression.
 /// - `$expecting` — the `serde` "expecting" message.
-/// - `$example` — a real 16-character code used in the generated doctest.
+/// - `$example` — a real 16-character code, used in the doctest and as the
+///   OpenAPI example.
 ///
 /// [`EicCode`]: crate::identifiers::EicCode
 /// [`EicType`]: crate::identifiers::EicType
@@ -251,6 +275,8 @@ macro_rules! eic_restricted_identifier {
         $ty:ident,
         eic_type   = $eic_type:expr,
         schema     = $schema_fn:literal,
+        schema_meta = $schema_meta:expr,
+        pattern    = $pattern:literal,
         expecting  = $expecting:expr,
         example    = $example:literal,
         check_fn   = $check_fn:ident $(,)?
@@ -274,8 +300,21 @@ macro_rules! eic_restricted_identifier {
         #[cfg_attr(feature = "validate", garde(allow_unvalidated))]
         #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
         #[cfg_attr(feature = "schemars", schemars(schema_with = $schema_fn))]
+        // Without this the derive substitutes the type's *rustdoc* for the
+        // description — overriding what `$schema_fn` writes, and putting Rust
+        // prose and intra-doc links into a published JSON Schema.
+        #[cfg_attr(feature = "schemars", schemars(description = $schema_meta.description))]
         #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
-        #[cfg_attr(feature = "utoipa", schema(value_type = String))]
+        // `pattern` and `example` are literals because `utoipa` validates the
+        // regex at compile time and so will not take an expression. They repeat
+        // what `$schema_meta` holds; `tests/identifier_schemas.rs` asserts the
+        // two never disagree.
+        #[cfg_attr(feature = "utoipa", schema(
+            value_type = String,
+            pattern = $pattern,
+            example = $example,
+            description = $schema_meta.description
+        ))]
         pub struct $ty(#[cfg_attr(feature = "validate", garde(custom($check_fn)))] Box<str>);
 
         #[cfg(feature = "validate")]

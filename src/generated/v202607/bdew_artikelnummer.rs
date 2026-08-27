@@ -18,6 +18,8 @@
 /// coverage signal.  New codes arrive only via a schema bump; the per-release
 /// CHANGELOG records enum additions.  Values absent from this version decode
 /// to [`BdewArtikelnummer::Unknown`]; use `from_wire` to reject them strictly.
+#[cfg_attr(feature = "schemars", schemars(description = "BDEW Artikelnummern"))]
+#[cfg_attr(feature = "utoipa", schema(description = "BDEW Artikelnummern"))]
 #[non_exhaustive]
 pub enum BdewArtikelnummer {
     #[cfg_attr(feature = "serde", serde(rename = "LEISTUNG"))]

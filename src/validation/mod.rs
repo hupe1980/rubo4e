@@ -1,81 +1,28 @@
-//! Cross-field business-rule validators for BO4E types, plus the [`Validated`](crate::validation::Validated) wrapper.
+//! Cross-field business-rule validators for BO4E types, plus the
+//! [`Validated`](crate::validation::Validated) wrapper.
 //!
 //! ## Validation is recursive
 //!
-//! Calling `.validate()` on a BO checks that BO's own cross-field rules **and
-//! descends into every nested BO, COM, and identifier below it**. A failure is
-//! reported at its path — `rechnungsperiode`,
-//! `kostenbloecke[0].kostenpositionen[0]` — so a report names where the problem
-//! is, not just that there is one.
+//! `.validate()` on a BO checks its own cross-field rules **and descends into
+//! every nested BO, COM and identifier**, reporting each failure at its path —
+//! `rechnungsperiode`, `kostenbloecke[0].kostenpositionen[0]`.
 //!
-//! What is *not* checked is presence: BO4E declares almost every field optional,
-//! so `garde` cannot enforce "required" for you. The rules below are the
-//! invariants BO4E states in prose, and they only fire on values that are there.
-//!
-//! ## `Validated<T>`
-//!
-//! [`Validated<T>`](crate::validation::Validated) is a zero-cost newtype wrapper that can only be
-//! constructed by running the garde validation rules on `T`.  It implements
-//! `Deref<Target = T>` and `AsRef<T>` for transparent field access, and
-//! [`into_inner`](crate::validation::Validated::into_inner) to unwrap.
-//!
-//! With `serde` it is also `Serialize` and `Deserialize`, and the `Deserialize`
-//! impl **validates**: decoding a `Validated<T>` and getting a value back is the
-//! proof, so a handler can take one as its request body and never have a
-//! forgotten `.validate()` call.
-//!
-//! A blanket `impl From<Validated<T>> for T` is deliberately absent: `T` is a type
-//! parameter, so such an impl is uncovered and rejected by the orphan rule.
-//! `into_inner()` is the unwrapping path.
-//!
-//! Requires only the `validate` feature (not `versioned`).
-//!
-//! ```
-//! # #[cfg(feature = "versioned")] {
-//! use rubo4e::validation::Validated;
-//! use rubo4e::current::{Adresse, Geokoordinaten, Marktlokation};
-//!
-//! // A Marktlokation may carry at most one of the three Ortsangaben.
-//! let malo = Marktlokation {
-//!     lokationsadresse: Some(Adresse { ort: Some("Bremen".into()), ..Default::default() }),
-//!     ..Default::default()
-//! };
-//!
-//! let validated = Validated::new(malo).expect("one Ortsangabe is fine");
-//! assert!(validated.lokationsadresse.is_some());  // Deref to &Marktlokation
-//! let inner: Marktlokation = validated.into_inner();
-//!
-//! // None at all is fine too — a referenced location often carries only its ID.
-//! assert!(Validated::new(Marktlokation::default()).is_ok());
-//!
-//! // Two is not: they would disagree about where the location is.
-//! let conflicting = Marktlokation {
-//!     lokationsadresse: Some(Adresse::default()),
-//!     geoadresse: Some(Geokoordinaten::default()),
-//!     ..Default::default()
-//! };
-//! assert!(Validated::new(conflicting).is_err());
-//! # }
-//! ```
+//! It does not check **presence**: BO4E declares almost every field optional, so
+//! the rules here are the invariants BO4E states in prose and they fire only on
+//! values that are there.
 //!
 //! ## Cross-field validators
 //!
-//! Each function has the signature expected by [`garde`]:
+//! Each has the signature [`garde`] expects, and is wired onto the generated
+//! struct with `#[garde(custom(...))]`:
+//!
 //! ```text
 //! fn validate_xxx(value: &T, context: &()) -> Result<(), garde::Error>
 //! ```
 //!
-//! Validators are emitted via `#[garde(custom(...))]` on the generated structs.
-//! Functions are only present when both `validate` and `versioned` features are active.
-//!
-//! ## Allocation behaviour
-//!
-//! Static error messages (e.g. "Zeitraum must have at least one of: …") are
-//! stored as `Cow::Borrowed(&'static str)` inside `garde::Error` — zero
-//! allocation on the failure path.  Messages that name the offending values
-//! (which fields conflicted, which timestamps, which amounts) use a single
-//! `format!` on the failure path — unavoidable for a diagnosis worth reading.
-//! The **happy path is always zero-allocation** for every validator here.
+//! They exist only with both `validate` and `versioned`. Every message that names
+//! offending values allocates once, on the failure path; the happy path allocates
+//! nothing.
 
 /// A zero-cost wrapper around a value that has been checked against all garde validation
 /// rules.

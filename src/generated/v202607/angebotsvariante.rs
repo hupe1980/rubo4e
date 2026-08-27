@@ -33,8 +33,7 @@ pub struct Angebotsvariante {
     )]
     #[cfg(feature = "time")]
     pub bindefrist: Option<time::OffsetDateTime>,
-    /// Requires the `time` feature for the `time::OffsetDateTime` representation.
-    /// Without `time`, stores the ISO-8601 string value unchanged.
+    /// Bis zu diesem Zeitpunkt gilt die Angebotsvariante
     #[cfg_attr(feature = "serde", serde(rename = "bindefrist"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "serde", serde(default))]
@@ -60,8 +59,7 @@ pub struct Angebotsvariante {
     )]
     #[cfg(feature = "time")]
     pub erstellungsdatum: Option<time::OffsetDateTime>,
-    /// Requires the `time` feature for the `time::OffsetDateTime` representation.
-    /// Without `time`, stores the ISO-8601 string value unchanged.
+    /// Datum der Erstellung der Angebotsvariante
     #[cfg_attr(feature = "serde", serde(rename = "erstellungsdatum"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "serde", serde(default))]

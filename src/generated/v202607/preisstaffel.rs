@@ -38,8 +38,7 @@ pub struct Preisstaffel {
     )]
     #[cfg(feature = "decimal")]
     pub preis: Option<rust_decimal::Decimal>,
-    /// Requires the `decimal` feature for the `rust_decimal::Decimal` representation.
-    /// Without `decimal`, stores the decimal's lexical form (a JSON string or number).
+    /// Preis pro abgerechneter Mengeneinheit. Die Mengeneinheit wird durch das übergeordnete Objekt angegeben.
     #[cfg_attr(feature = "serde", serde(rename = "preis"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
@@ -69,8 +68,9 @@ pub struct Preisstaffel {
     )]
     #[cfg(feature = "decimal")]
     pub staffelgrenze_bis: Option<rust_decimal::Decimal>,
-    /// Requires the `decimal` feature for the `rust_decimal::Decimal` representation.
-    /// Without `decimal`, stores the decimal's lexical form (a JSON string or number).
+    /// Exklusiver oberer Wert, bis zu dem die Staffel gilt (inklusiv).
+    /// Grenzen werden bspw. wie folgt angegeben: `0 - 1000, 1001 - 2000, etc.`
+    /// Werte zwischen den Grenzen (z.B. `1000,6`) rutschen in die obere Zone / Staffel.
     #[cfg_attr(feature = "serde", serde(rename = "staffelgrenzeBis"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
@@ -94,8 +94,9 @@ pub struct Preisstaffel {
     )]
     #[cfg(feature = "decimal")]
     pub staffelgrenze_von: Option<rust_decimal::Decimal>,
-    /// Requires the `decimal` feature for the `rust_decimal::Decimal` representation.
-    /// Without `decimal`, stores the decimal's lexical form (a JSON string or number).
+    /// Inklusiver unterer Wert, ab dem die Staffel gilt (inklusiv).
+    /// Grenzen werden bspw. wie folgt angegeben: `0 - 1000, 1001 - 2000, etc.`
+    /// Werte zwischen den Grenzen (z.B. `1000,6`) rutschen in die obere Zone / Staffel.
     #[cfg_attr(feature = "serde", serde(rename = "staffelgrenzeVon"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]

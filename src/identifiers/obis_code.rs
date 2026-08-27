@@ -210,7 +210,8 @@ impl ObisComponents {
 ///
 /// Use [`ObisCode::components`] to access the parsed values — they are stored, so
 /// the accessor neither re-parses nor allocates.
-/// Use [`ObisCode::to_pia_string`] to emit the `A-B:C.D[.E]` form (F stripped).
+/// Use [`ObisCode::to_pia_string`] to emit the same code with the F component
+/// stripped — the form an EDIFACT PIA item number carries.
 ///
 /// # Examples
 /// ```
@@ -235,6 +236,10 @@ impl ObisComponents {
 #[cfg_attr(
     feature = "schemars",
     schemars(schema_with = "crate::schema_helpers::obis_code_schema")
+)]
+#[cfg_attr(
+    feature = "schemars",
+    schemars(description = crate::identifiers::schema::OBIS_CODE.description)
 )]
 pub struct ObisCode {
     /// Canonical rendering — the only value ever exposed as a string.
@@ -331,10 +336,13 @@ impl ObisCode {
         &self.canonical
     }
 
-    /// Returns the `A-B:C.D[.E]` form of this OBIS code, without the F component.
+    /// Returns this OBIS code without its F component — the form an EDIFACT PIA
+    /// item number carries.
     ///
-    /// Useful for emitting the item-number composite in a PIA segment, where F
-    /// is not included.
+    /// Only F is dropped. The `A-B:` prefix is reproduced exactly as the code
+    /// carries it, because this cannot invent one: a code written `1.8.1` states
+    /// no A and no B, and guessing the electricity defaults would put a claim on
+    /// the wire that the value never made.
     ///
     /// # Examples
     /// ```
@@ -342,6 +350,8 @@ impl ObisCode {
     ///
     /// assert_eq!(ObisCode::new("1-0:1.8.0").unwrap().to_pia_string(),     "1-0:1.8.0");
     /// assert_eq!(ObisCode::new("1-0:1.8.0*255").unwrap().to_pia_string(), "1-0:1.8.0");
+    /// // No prefix in, no prefix out.
+    /// assert_eq!(ObisCode::new("1.8.1*255").unwrap().to_pia_string(),     "1.8.1");
     /// ```
     #[must_use]
     pub fn to_pia_string(&self) -> String {
@@ -363,14 +373,11 @@ impl utoipa::PartialSchema for ObisCode {
     fn schema() -> utoipa::openapi::RefOr<utoipa::openapi::schema::Schema> {
         utoipa::openapi::ObjectBuilder::new()
             .schema_type(utoipa::openapi::schema::Type::String)
-            .pattern(Some(OBIS_PATTERN))
-            .description(Some(
-                "OBIS-Kennzahl nach IEC 62056-61: [A-B:]C.D[.E][*F]. \
-                 Wird kanonisiert gespeichert (führende Nullen entfallen, '&' wird zu '*').",
-            ))
+            .pattern(Some(crate::identifiers::schema::OBIS_CODE.pattern))
+            .description(Some(crate::identifiers::schema::OBIS_CODE.description))
             // Not `serde_json::json!` — the `utoipa` feature does not enable
             // `serde_json` for this crate, and `&str` already converts.
-            .examples(["1-0:1.8.0*255"])
+            .examples([crate::identifiers::schema::OBIS_CODE.example])
             .into()
     }
 }

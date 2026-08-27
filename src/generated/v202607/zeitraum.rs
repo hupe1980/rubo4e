@@ -47,8 +47,10 @@ pub struct Zeitraum {
     )]
     #[cfg(feature = "time")]
     pub enddatum: Option<time::Date>,
-    /// Requires the `time` feature for the `time::Date` representation.
-    /// Without `time`, stores the ISO 8601 date string (`YYYY-MM-DD`) unchanged.
+    /// Enddatum des betrachteten Zeitraums ist **inklusiv**.
+    ///
+    /// Example:
+    /// '2025-01-01'
     #[cfg_attr(feature = "serde", serde(rename = "enddatum"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "serde", serde(default))]
@@ -91,8 +93,10 @@ pub struct Zeitraum {
     )]
     #[cfg(feature = "time")]
     pub startdatum: Option<time::Date>,
-    /// Requires the `time` feature for the `time::Date` representation.
-    /// Without `time`, stores the ISO 8601 date string (`YYYY-MM-DD`) unchanged.
+    /// Startdatum des betrachteten Zeitraums ist **inklusiv**.
+    ///
+    /// Example:
+    /// '2025-01-01'
     #[cfg_attr(feature = "serde", serde(rename = "startdatum"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "serde", serde(default))]

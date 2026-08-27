@@ -54,6 +54,17 @@ test-minimal:
 test-minimal-versioned:
     cargo test --workspace --no-default-features --features versioned
 
+# Run tests in the configuration where the feature-*fallback* field types are the
+# compiled ones.
+#
+# `time` and `decimal` replace a field's type, and the generator emits a second
+# declaration for each. Under `--all-features` only the primary declaration is
+# ever compiled, so nothing else in the suite reaches the fallback — including the
+# JSON Schema it produces, which once published "requires the `time` feature" in
+# place of the field's meaning.
+test-schema-fallback:
+    cargo test --workspace --no-default-features --features versioned,json,schemars,utoipa
+
 # Clippy with all features, deny all warnings
 lint:
     cargo clippy --workspace --all-targets --all-features -- -D warnings
@@ -142,7 +153,7 @@ fmt:
 # run alone leaves most of the crate uncompiled.  `check-msrv` is deliberately
 # omitted — it installs a second toolchain, which is CI's job, not a local
 # pre-push gate; run it explicitly before a release.
-ci: fmt-check lint lint-features check-strict check-fuzz check-docs test-all test-minimal test-minimal-versioned check-docs-examples check-codegen-size check-docs-drift site-build deny-check
+ci: fmt-check lint lint-features check-strict check-fuzz check-docs test-all test-minimal test-minimal-versioned test-schema-fallback check-docs-examples check-codegen-size check-docs-drift site-build deny-check
     @echo "All CI checks passed."
 
 # Fail only if regenerating changes the generated output (true drift), regardless

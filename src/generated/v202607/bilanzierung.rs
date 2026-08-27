@@ -41,8 +41,6 @@ pub struct Bilanzierung {
     )]
     #[cfg(feature = "time")]
     pub bilanzierungsbeginn: Option<time::OffsetDateTime>,
-    /// Requires the `time` feature for the `time::OffsetDateTime` representation.
-    /// Without `time`, stores the ISO-8601 string value unchanged.
     #[cfg_attr(feature = "serde", serde(rename = "bilanzierungsbeginn"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "serde", serde(default))]
@@ -67,8 +65,6 @@ pub struct Bilanzierung {
     )]
     #[cfg(feature = "time")]
     pub bilanzierungsende: Option<time::OffsetDateTime>,
-    /// Requires the `time` feature for the `time::OffsetDateTime` representation.
-    /// Without `time`, stores the ISO-8601 string value unchanged.
     #[cfg_attr(feature = "serde", serde(rename = "bilanzierungsende"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "serde", serde(default))]
@@ -168,8 +164,14 @@ pub struct Bilanzierung {
     )]
     #[cfg(feature = "decimal")]
     pub verbrauchsaufteilung: Option<rust_decimal::Decimal>,
-    /// Requires the `decimal` feature for the `rust_decimal::Decimal` representation.
-    /// Without `decimal`, stores the decimal's lexical form (a JSON string or number).
+    /// Verbrauchsaufteilung in % zwischen SLP und TLP-Profil.
+    ///
+    /// 1. [Gemessene Energiemenge der OBIS "nicht Schwachlast"] * [Verbrauchsaufteilung in % / 100%]
+    ///    = [zu verlagernde Energiemenge]
+    /// 2. [Gemessene Energiemenge der OBIS "Schwachlast"] - [zu verlagernde Energiemenge]
+    ///    = [Ermittelte Energiemenge für Schwachlast]
+    /// 3. [Gemessene Energiemenge der OBIS "nicht Schwachlast"] + [zu verlagernde Energiemenge]
+    ///    = [Ermittelte Energiemenge für nicht Schwachlast]
     #[cfg_attr(feature = "serde", serde(rename = "verbrauchsaufteilung"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]

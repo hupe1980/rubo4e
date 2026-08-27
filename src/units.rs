@@ -1,12 +1,9 @@
 //! Physical dimensions and unit arithmetic for BO4E's [`Mengeneinheit`].
 //!
-//! BO4E puts every quantity it knows into one flat enum: energies, powers,
-//! reactive counterparts, a volume, eleven durations, a percentage, a frequency
-//! and a dimensionless marker all sit side by side. Nothing in the schema says
-//! which of them may be added, which may be converted into which, or how long a
-//! `MONAT` is — so every consumer re-derives it, and the derivations disagree.
-//!
-//! This module states it once:
+//! `Mengeneinheit` is one flat enum over energies, powers, reactive
+//! counterparts, a volume, eleven durations, a percentage and a frequency. The
+//! schema says nothing about which may be added, which convert into which, or
+//! how long a `MONAT` is. This states it once:
 //!
 //! - [`Mengeneinheit::dimension`] groups the units into [`Dimension`]s. Two units
 //!   are convertible exactly when they share one.

@@ -34,72 +34,45 @@
 //! | Check that a document you produced uses only fields BO4E defines | [`json::Bo4eExtensions`] |
 //! | Check a market identifier | [`identifiers`] |
 //! | Check a document against BO4E's own rules | [`validation`] |
-//! | Work with a `Lastgang` or a `Zeitreihe` | [`timeseries`] |
+//! | Work with a `Lastgang`, `Zeitreihe` or `Zaehlwerk` | [`timeseries`] |
 //! | Convert between units, or turn power into energy | [`units`] |
-//!
-//! ## Identifiers without schema overhead
-//!
-//! Every identifier type **always** provides `Display`, `FromStr`,
-//! `TryFrom<&str>`, `TryFrom<String>`, `Into<String>`, `AsRef<str>`,
-//! `Borrow<str>`, and `Deref<Target = str>` without any feature flag — the
-//! minimum needed for EDIFACT wire-format encoding and decoding.
-//!
-//! To use only identifier types without pulling in the versioned BO4E schema:
-//! ```toml
-//! rubo4e = { version = "...", default-features = false, features = ["identifiers"] }
-//! ```
-//! This gives `serde` support on all identifiers with zero versioned-schema overhead.
-//!
-//! ## `serde` is enabled by default
-//!
-//! The default feature set is `default = ["identifiers"]`, and `identifiers`
-//! enables `serde`.  Targets that only need the type definitions for in-memory
-//! processing can opt out:
-//! ```toml
-//! rubo4e = { version = "...", default-features = false, features = ["versioned"] }
-//! ```
 //!
 //! ## Feature-conditional field types (`decimal` and `time`)
 //!
-//! Enabling `decimal` or `time` **changes the Rust type** of certain struct fields:
+//! Enabling `decimal` or `time` **changes the Rust type** of certain fields, so
+//! code written against one configuration may not compile under the other:
 //!
-//! | Feature   | Without feature     | With feature                                        | Affected fields                        |
-//! |-----------|---------------------|-----------------------------------------------------|----------------------------------------|
-//! | `decimal` | `Option<String>`    | `Option<rust_decimal::Decimal>`                     | `wert`, `preis`, amounts, quantities   |
-//! | `time`    | `Option<String>`    | `Option<time::OffsetDateTime>` or `Option<time::Date>` | `beginn`/`ende` fields → `OffsetDateTime`; `*datum` fields → `Date` |
+//! | Feature   | Without           | With                                                   |
+//! |-----------|-------------------|--------------------------------------------------------|
+//! | `decimal` | `Option<String>`  | `Option<rust_decimal::Decimal>`                        |
+//! | `time`    | `Option<String>`  | `Option<time::OffsetDateTime>` / `Option<time::Date>`  |
 //!
-//! This means code that compiles under one feature configuration may not compile
-//! under the other.  For code that must be feature-agnostic, either:
-//! - Always enable `decimal`/`time` and use the strong types, **or**
-//! - Access fields through JSON round-trip (`to_json_german` / `from_json_german`)
-//!   which is feature-independent.
-//!
-//! The string fallback keeps the value's lexical form, so nothing is lost when
-//! these features are absent.
+//! The string fallback keeps the value's lexical form, so nothing is lost.
 //!
 //! Decimal fields read a JSON number as well as a JSON string, because BO4E
-//! producers use both — but only the string spelling is exact. A number has
-//! already passed through `f64` before this crate sees it, losing its scale
-//! (`119.00` → `119`) and any precision past ~15 significant digits.
-//! [`decimal_serde`] documents the whole picture and counts every such read.
+//! producers use both — but only the string spelling is exact. See
+//! [`decimal_serde`], which also counts every number read.
 //!
 //! ## `Eq` and `Hash` on generated structs
 //!
-//! Generated BO and COM structs always derive `PartialEq`. They additionally
-//! derive **`Eq` and `Hash` when the `json` feature is off**, which is what lets
-//! them key a `HashMap` or a `HashSet`.
+//! Generated structs always derive `PartialEq`, and additionally `Eq + Hash`
+//! **when `json` is off** — so a BO can key a `HashMap`. `serde_json::Value`
+//! blocks both, and it appears twice with `json` on: in `LimitedExtensionMap` and
+//! as `ZusatzAttribut::wert`. Generated **enums** are always `Eq + Ord + Hash`.
 //!
-//! One type blocks both: `serde_json::Value`, which appears in a generated
-//! struct twice when `json` is on — inside `LimitedExtensionMap` (the
-//! `_additional` field) and as `ZusatzAttribut::wert`. `Value` is neither `Eq`
-//! nor `Hash`, because it wraps `f64` and `NaN != NaN`. With `json` off both
-//! degrade to a ZST stub and a `String`, and the whole tree becomes `Eq + Hash`.
+//! For content-addressed equality under any feature set, compare
+//! `to_json_canonical()` from [`json::Bo4eJsonExt`].
 //!
-//! Generated **enums** are always `Eq + Ord + Hash`, whatever the features.
+//! ## Identifiers without the schema
 //!
-//! For content-addressed equality across every feature set, compare
-//! `to_json_canonical()` (from `Bo4eJsonExt` in the `json` module), which
-//! produces a deterministic byte string.
+//! `default = ["identifiers"]` gives the identifier newtypes and `serde`, with no
+//! versioned-schema overhead. Every identifier provides `Display`, `FromStr`,
+//! `TryFrom`, `AsRef<str>`, `Borrow<str>` and `Deref<Target = str>` unfeatured —
+//! the minimum an EDIFACT encoder needs.
+//!
+//! ```toml
+//! rubo4e = { version = "...", default-features = false, features = ["identifiers"] }
+//! ```
 
 /// Error types returned by identifier construction.
 pub mod error;
@@ -235,8 +208,7 @@ pub mod v202607 {
     pub use crate::generated::v202607::*;
 }
 
-/// Current stable BO4E schema version — always resolves to the latest stable schema
-/// (`v202607` in this release).
+/// The latest stable BO4E schema series this crate ships — currently `v202607`.
 ///
 /// Prefer `use rubo4e::current::Foo` over `use rubo4e::v202607::Foo` so that
 /// imports remain valid across schema version bumps without any code changes.
@@ -426,16 +398,13 @@ pub mod bo4e_component_sealed {
 /// Uniform introspection & strict-parsing surface implemented by **every**
 /// generated BO4E enum (`Zaehlertyp`, `Marktrolle`, `BdewArtikelnummer`, …).
 ///
-/// Every BO4E enum carries an `Unknown` forward-compatibility catch-all, so the
-/// `serde` / `FromStr` path never fails on an unrecognized wire value — the
-/// right default for forward-compatibility, and the wrong one at an ingest
-/// boundary that must reject typos, legacy codes, or values from a newer schema.
-/// The members below close that gap **without the `strum` feature**.
+/// Every BO4E enum carries an `Unknown` catch-all, so the `serde` / `FromStr`
+/// path never fails on an unrecognized wire value — right for forward
+/// compatibility, wrong at an ingest boundary. These members close that gap
+/// **without the `strum` feature**.
 ///
-/// They are inherent methods on each enum too, so importing this trait is only
-/// necessary for code generic over the enum type — a
-/// `fn assert_covered<T: Bo4eEnum>()` proving a database `CHECK` list covers
-/// `T::VARIANTS`, say.
+/// They are inherent methods too, so importing the trait matters only for code
+/// generic over the enum type.
 ///
 /// # Example
 /// ```
@@ -457,17 +426,12 @@ pub mod bo4e_component_sealed {
 ///
 /// # Derived traits on every BO4E enum
 ///
-/// `Debug`, `Clone`, `Copy`, `PartialEq`, `Eq`, `PartialOrd`, `Ord`, `Hash` —
-/// so an enum can key a `HashMap` or a `BTreeMap`, be sorted, and let a caller's
-/// own struct derive `Ord`.
+/// `Debug`, `Clone`, `Copy`, `PartialEq`, `Eq`, `PartialOrd`, `Ord`, `Hash`.
 ///
-/// **`Ord` is declaration order, not a business ranking.** The variants follow
-/// the order the BO4E schema lists them in, with the `Unknown` catch-all last.
-/// It is a *total* order — which is all `BTreeMap` and `sort()` need — but a
-/// schema release may reorder the values, so never persist a sort key derived
-/// from it or compare two variants expecting a domain meaning. Compare
-/// [`as_wire`](Bo4eEnum::as_wire) when the order has to be stable across
-/// releases.
+/// **`Ord` is declaration order, not a business ranking** — schema order, with
+/// `Unknown` last. Total, so `BTreeMap` and `sort()` work, but a schema release
+/// may reorder the values: never persist a sort key derived from it. Compare
+/// [`as_wire`](Bo4eEnum::as_wire) where the order must be stable.
 ///
 /// # Sealed trait
 ///
@@ -594,36 +558,26 @@ pub trait Bo4eStrict {
     }
 }
 
-/// Re-exports the most commonly used types.
+/// Re-exports the most commonly used traits and every identifier type.
 ///
-/// `use rubo4e::prelude::*;` gives you:
+/// | Feature | Brings in |
+/// |---|---|
+/// | always | every identifier type and [`IdentifierError`](crate::error::IdentifierError) |
+/// | `versioned` | [`Bo4eTyped`], [`Bo4eObject`], [`Bo4eComponent`], [`Bo4eEnum`], [`Bo4eStrict`], [`Dimension`](crate::units::Dimension) |
+/// | `json` | [`Bo4eJsonExt`](crate::json::Bo4eJsonExt), [`Bo4eExtensionData`](crate::json::Bo4eExtensionData), [`Bo4eExtensions`](crate::json::Bo4eExtensions) |
+/// | `validate` | [`Validate`](garde::Validate), [`Validated`](crate::validation::Validated), the report helpers |
+/// | `+ decimal` | [`BetragExt`](crate::convenience::BetragExt), [`MengeExt`](crate::convenience::MengeExt), [`PreisExt`](crate::convenience::PreisExt), [`PreisstaffelSliceExt`](crate::convenience::PreisstaffelSliceExt) |
+/// | `+ time` | [`Bo4eTimeSeries`](crate::timeseries::Bo4eTimeSeries) |
 ///
-/// - **every** identifier type and its error type — always;
-/// - [`Bo4eJsonExt`](crate::json::Bo4eJsonExt) and
-///   [`Bo4eExtensionData`](crate::json::Bo4eExtensionData), with `json`;
-/// - [`Bo4eTyped`], [`Bo4eObject`], [`Bo4eComponent`], [`Bo4eEnum`], and
-///   [`Bo4eStrict`], with `versioned`;
-/// - [`Validate`](garde::Validate), [`Validated`](crate::validation::Validated),
-///   and the report helpers, with `validate`;
-/// - the COM extension traits [`BetragExt`](crate::convenience::BetragExt),
-///   [`MengeExt`](crate::convenience::MengeExt),
-///   [`PreisExt`](crate::convenience::PreisExt), and
-///   [`PreisstaffelSliceExt`](crate::convenience::PreisstaffelSliceExt), with
-///   `versioned` + `decimal`.
+/// Not the generated BO/COM types: those are version-scoped, and
+/// `use rubo4e::current::*` is the import that says which series you meant.
 ///
-/// It deliberately does **not** re-export the generated BO/COM types: they are
-/// version-scoped, and `use rubo4e::current::*` is the import that says which
-/// schema series you meant.
-///
-/// `tests/prelude_surface.rs` holds the guard that keeps the first bullet true.
+/// `tests/prelude_surface.rs` guards the identifier row.
 pub mod prelude {
     pub use crate::error::{IdentifierError, LengthExpectation, UnknownVariant};
-    /// Every identifier type, and the helper enums their accessors return.
-    ///
-    /// The BDEW Ressourcen-ID family (`CrId`, `NebeId`, `PaketId`, `SgId`, …) is
-    /// here for the same reason `MaloId` is: a crate that touches Redispatch 2.0
-    /// or a Netzbetreiberwechsel needs them, and having to remember which four of
-    /// the fourteen the prelude forgot is not a distinction worth making.
+    /// Every identifier type, and the helper enums their accessors return —
+    /// including the whole BDEW Ressourcen-ID family, so there is no set of four
+    /// to remember as missing.
     pub use crate::identifiers::{
         AkivId, Bic, BilanzierungsgebietId, BilanzkreisId, CrId, EicCode, EicType, Iban, MaloId,
         MaloVergabestelle, MarktpartnerId, MeloId, MpIdAuthority, NebeId, NeloId, ObisCode,

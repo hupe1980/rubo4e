@@ -47,8 +47,7 @@ pub struct Kostenposition {
     )]
     #[cfg(feature = "time")]
     pub bis: Option<time::OffsetDateTime>,
-    /// Requires the `time` feature for the `time::OffsetDateTime` representation.
-    /// Without `time`, stores the ISO-8601 string value unchanged.
+    /// exklusiver bis-Zeitpunkt der Kostenzeitscheibe
     #[cfg_attr(feature = "serde", serde(rename = "bis"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "serde", serde(default))]
@@ -113,8 +112,7 @@ pub struct Kostenposition {
     )]
     #[cfg(feature = "time")]
     pub von: Option<time::OffsetDateTime>,
-    /// Requires the `time` feature for the `time::OffsetDateTime` representation.
-    /// Without `time`, stores the ISO-8601 string value unchanged.
+    /// inklusiver von-Zeitpunkt der Kostenzeitscheibe
     #[cfg_attr(feature = "serde", serde(rename = "von"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "serde", serde(default))]

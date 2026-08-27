@@ -60,8 +60,9 @@ pub struct RelativePreisposition {
     )]
     #[cfg(feature = "decimal")]
     pub wert: Option<rust_decimal::Decimal>,
-    /// Requires the `decimal` feature for the `rust_decimal::Decimal` representation.
-    /// Without `decimal`, stores the decimal's lexical form (a JSON string or number).
+    /// Der Modifikator in Prozent, der auf den Preis der referenzierten Preisposition angewendet wird.
+    /// Der Wert wird multiplikativ angewendet. D.h. wenn bspw. ein Rabatt von 20% angewendet werden soll, muss der Wert
+    /// `0,8` betragen.
     #[cfg_attr(feature = "serde", serde(rename = "wert"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]

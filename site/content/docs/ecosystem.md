@@ -150,6 +150,48 @@ let openapi = ApiDoc::openapi();
 Property names in the generated OpenAPI schema use German camelCase, consistent
 with the serde rename attributes and the BO4E wire format.
 
+### Identifier schemas come from one table
+
+Every identifier emits a `pattern`, a German `description` and a valid `example`,
+and both generators emit the same three:
+
+```json
+{
+  "type": "string",
+  "pattern": "^[1-9][0-9]{10}$",
+  "example": "41373559241",
+  "description": "11-stellige BDEW Marktlokations-ID: Vergabestelle (1-3 DVGW, 4-9 BDEW) + 9 Ziffern + Prüfziffer nach dem Lok- und Waggon-Kennzeichnungsverfahren (BDEW §8.1)"
+}
+```
+
+Neither derive gives you that by default. `schemars` substitutes the type's
+**rustdoc** for the `description`, overriding whatever a `schema_with` function
+sets; `utoipa` falls back to the rustdoc when its own attribute is silent. Left
+to themselves both publish Rust prose — intra-doc links, doctest assertions,
+section headings.
+
+So both are pointed at `rubo4e::identifiers::schema`, one `const` per identifier.
+`utoipa` needs the `pattern` and `example` as literals because it compiles the
+regex at build time, so those two are written twice.
+
+`tests/identifier_schemas.rs` keeps that safe, checking for all eighteen:
+
+| Check | Why |
+|---|---|
+| All three fields present in both outputs | the claim above, made testable |
+| The two outputs agree, field for field | `utoipa`'s literals cannot drift from the table |
+| No rustdoc marker survives into either | code fences, `assert_eq!`, `# ` headings, `](crate::` links |
+| Each example matches its own pattern | a generated client must not fail on the documentation's own sample |
+| Each example survives the type's **constructor** | a pattern cannot express a check digit |
+
+The last one is why the table is safe to hand-maintain: an example that merely
+*looks* like a MaLo-ID fails the build.
+
+The same rule covers the generated types. Three enums carry a curated maintainer
+note in their rustdoc — codelist provenance, an upstream gap — and pin BO4E's own
+sentence as the schema description instead. `tests/schema_descriptions.rs` walks
+every property description of a representative BO for the same markers.
+
 ## strum — Enum `FromStr` + iteration
 
 **Feature flag:** `strum`  

@@ -42,8 +42,8 @@ pub struct Tarifpreisblatt {
     )]
     #[cfg(feature = "time")]
     pub anwendung_von: Option<time::OffsetDateTime>,
-    /// Requires the `time` feature for the `time::OffsetDateTime` representation.
-    /// Without `time`, stores the ISO-8601 string value unchanged.
+    /// Angabe des inklusiven Zeitpunkts, ab dem der Tarif bzw. der Preis angewendet und abgerechnet wird,
+    /// z.B. "2021-07-20T18:31:48Z"
     #[cfg_attr(feature = "serde", serde(rename = "anwendungVon"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "serde", serde(default))]
@@ -108,8 +108,7 @@ pub struct Tarifpreisblatt {
     )]
     #[cfg(feature = "time")]
     pub preisstand: Option<time::OffsetDateTime>,
-    /// Requires the `time` feature for the `time::OffsetDateTime` representation.
-    /// Without `time`, stores the ISO-8601 string value unchanged.
+    /// Gibt an, wann der Preis zuletzt angepasst wurde
     #[cfg_attr(feature = "serde", serde(rename = "preisstand"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "serde", serde(default))]

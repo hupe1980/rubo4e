@@ -77,12 +77,16 @@ const MIN_FIRST_DIGIT: u8 = 1;
     feature = "schemars",
     schemars(schema_with = "crate::schema_helpers::malo_id_schema")
 )]
+#[cfg_attr(
+    feature = "schemars",
+    schemars(description = crate::identifiers::schema::MALO_ID.description)
+)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "utoipa", schema(
     value_type = String,
     pattern = r"^[1-9][0-9]{10}$",
     example = "41373559241",
-    description = "11-stellige BDEW Marktlokations-ID mit Prüfziffer nach dem Lok- und Waggon-Kennzeichnungsverfahren (11. Stelle)"
+    description = crate::identifiers::schema::MALO_ID.description
 ))]
 pub struct MaloId(#[cfg_attr(feature = "validate", garde(custom(check_malo_id)))] Box<str>);
 

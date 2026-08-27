@@ -15,6 +15,18 @@
 /// `Rechnung` (e.g. `rechnungsart = "KORREKTURRECHNUNG"`) rather than a
 /// dedicated `Rechnungstyp` variant.  This is an upstream BO4E modelling gap;
 /// if a future schema introduces a correction value it will surface here.
+#[cfg_attr(
+    feature = "schemars",
+    schemars(
+        description = "Abbildung verschiedener Rechnungstypen zur Kennzeichnung von Rechnungen"
+    )
+)]
+#[cfg_attr(
+    feature = "utoipa",
+    schema(
+        description = "Abbildung verschiedener Rechnungstypen zur Kennzeichnung von Rechnungen"
+    )
+)]
 #[non_exhaustive]
 pub enum Rechnungstyp {
     #[cfg_attr(feature = "serde", serde(rename = "ENDKUNDENRECHNUNG"))]

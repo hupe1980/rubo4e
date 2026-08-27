@@ -59,8 +59,7 @@ pub struct Tarifberechnungsparameter {
     )]
     #[cfg(feature = "decimal")]
     pub kw_inklusive: Option<rust_decimal::Decimal>,
-    /// Requires the `decimal` feature for the `rust_decimal::Decimal` representation.
-    /// Without `decimal`, stores the decimal's lexical form (a JSON string or number).
+    /// Im Preis bereits eingeschlossene Leistung (für Gas)
     #[cfg_attr(feature = "serde", serde(rename = "kwInklusive"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
@@ -82,8 +81,7 @@ pub struct Tarifberechnungsparameter {
     )]
     #[cfg(feature = "decimal")]
     pub kw_weitere_mengen: Option<rust_decimal::Decimal>,
-    /// Requires the `decimal` feature for the `rust_decimal::Decimal` representation.
-    /// Without `decimal`, stores the decimal's lexical form (a JSON string or number).
+    /// Intervall, indem die über "kwInklusive" hinaus abgenommene Leistung kostenpflichtig wird (z.B. je 5 kW 20 EURO)
     #[cfg_attr(feature = "serde", serde(rename = "kwWeitereMengen"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]

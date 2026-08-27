@@ -66,8 +66,7 @@ pub struct Messwert {
     )]
     #[cfg(feature = "time")]
     pub zeitpunkt: Option<time::OffsetDateTime>,
-    /// Requires the `time` feature for the `time::OffsetDateTime` representation.
-    /// Without `time`, stores the ISO-8601 string value unchanged.
+    /// Gibt den Zeitpunkt des Messwerts an.
     #[cfg_attr(feature = "serde", serde(rename = "zeitpunkt"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "serde", serde(default))]

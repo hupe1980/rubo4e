@@ -35,8 +35,7 @@ pub struct Zaehler {
     )]
     #[cfg(feature = "time")]
     pub eichung_bis: Option<time::OffsetDateTime>,
-    /// Requires the `time` feature for the `time::OffsetDateTime` representation.
-    /// Without `time`, stores the ISO-8601 string value unchanged.
+    /// Bis zu diesem Datum (exklusiv) ist der Zähler geeicht.
     #[cfg_attr(feature = "serde", serde(rename = "eichungBis"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "serde", serde(default))]
@@ -79,8 +78,7 @@ pub struct Zaehler {
     )]
     #[cfg(feature = "time")]
     pub letzte_eichung: Option<time::OffsetDateTime>,
-    /// Requires the `time` feature for the `time::OffsetDateTime` representation.
-    /// Without `time`, stores the ISO-8601 string value unchanged.
+    /// Zu diesem Datum fand die letzte Eichprüfung des Zählers statt.
     #[cfg_attr(feature = "serde", serde(rename = "letzteEichung"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "serde", serde(default))]
@@ -144,8 +142,7 @@ pub struct Zaehler {
     )]
     #[cfg(feature = "decimal")]
     pub zaehlerkonstante: Option<rust_decimal::Decimal>,
-    /// Requires the `decimal` feature for the `rust_decimal::Decimal` representation.
-    /// Without `decimal`, stores the decimal's lexical form (a JSON string or number).
+    /// Zählerkonstante auf dem Zähler
     #[cfg_attr(feature = "serde", serde(rename = "zaehlerkonstante"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]

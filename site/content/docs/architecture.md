@@ -25,17 +25,18 @@ rubo4e/
 │   ├── offset_time.rs       — the `format: "time"` fields: time of day + UTC offset
 │   ├── iso8601_duration.rs  — Zeitraum.dauer, refusing Y/M rather than approximating
 │   ├── units.rs             — Mengeneinheit dimensions, conversion, energy ↔ power
-│   ├── timeseries.rs        — Lastgang / Zeitreihe on a timeline; the coverage audit
+│   ├── timeseries.rs        — interval series (audit) and register series (consumption)
 │   ├── schema_helpers.rs    — schemars schema_with= helpers (dates, every identifier)
 │   ├── json/                — Bo4eJsonExt and the parsing hardening
 │   │   ├── mod.rs           — the three output modes + the sorted serializer
 │   │   ├── key_transform.rs — camelCase ↔ snake_case, scoped to the schema's edge
-│   │   ├── extension.rs     — LimitedExtensionMap, Bo4eExtensionData
+│   │   ├── extension.rs     — LimitedExtensionMap, Bo4eExtensionData, Bo4eExtensions
 │   │   ├── depth.rs         — the nesting-depth guard, as a Deserializer wrapper
 │   │   └── limits.rs        — JsonParseLimits, the budgets, the hit counters
 │   ├── identifiers/         — validated domain newtypes
 │   │   ├── macros.rs        — trait boilerplate + §8.2 / EIC-restricted generators
 │   │   ├── checksum.rs      — BDEW chapter-8 check-digit arithmetic (one impl)
+│   │   ├── schema.rs        — pattern / description / example, read by both derives
 │   │   ├── ascii_ids.rs     — NeloId, NebeId, CrId, SgId, SrId, TrId, PaketId
 │   │   ├── sqlx_impls.rs    — Type / Encode / Decode / PgHasArrayType (sqlx feature)
 │   │   ├── malo_id.rs, marktpartner_id.rs, melo_id.rs, bank.rs

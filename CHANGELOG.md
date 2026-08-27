@@ -10,7 +10,7 @@ also carries a **Schema deltas** section (see [Versioning](https://hupe1980.gith
 so downstream guards (SQL `CHECK` lists, variant-count assertions, coverage
 tests) can be updated deliberately instead of discovering drift at runtime.
 
-## [0.12.0] — unreleased
+## [0.13.0] — unreleased
 
 This release is a wire-format correction. Every payload rubo4e produced carried
 an invalid `_version`, COMs never stamped `_typ`, and `Rechnung` could not read
@@ -42,6 +42,69 @@ validate field names**, and nothing in the crate's surface said so. See
   that can go negative — and the guard is gone. No published EIC was affected
   (position 3 must be an object-type character, so `"000000000000000"` is not a
   valid prefix), but the function is public and was wrong about it.
+
+- **Fourteen of eighteen identifiers published their rustdoc as an OpenAPI
+  description**, and sixteen carefully written German descriptions were dead
+  code. Neither schema derive takes its metadata from the other, and both fall
+  back to the doc comment:
+
+  - `schemars` merges the type's rustdoc in as `description`, **overriding** what
+    a `schema_with` function sets — so every description in `schema_helpers.rs`
+    was discarded, and the published JSON Schema carried Rust prose instead:
+    intra-doc links, `assert!` examples, markdown tables, and for the
+    macro-generated identifiers an empty code fence, because their doctests are
+    entirely `#`-hidden.
+  - `utoipa` reads only its own `#[schema(...)]`, and the macros that generate
+    the eight §8.2 and EIC-restricted identifiers passed it nothing but
+    `value_type = String` — no pattern, no example, no description.
+
+  Only `MaloId` and `ObisCode` were correct. The README's claim that "all
+  identifier types emit pattern, description, and example values" was false for
+  the other sixteen.
+
+  `rubo4e::identifiers::schema` is now the single table both read, one `const`
+  per identifier. `utoipa` needs the pattern and example as literals — it
+  compiles the regex at build time — so those repeat, and
+  `tests/identifier_schemas.rs` asserts they never disagree. That test also
+  checks that no rustdoc marker survives into either output, that each example
+  matches its own pattern, and that each example **survives the type's
+  constructor** — a pattern cannot express a check digit, so a pattern match
+  alone would pass an example no real system would accept.
+
+  `EicCode` had no schema metadata at all on either side; it does now.
+
+- **Rust-facing prose leaked into published schema descriptions in two more
+  places.** The generator already states the principle — *"schemars and utoipa
+  lift a type's rustdoc verbatim into the generated JSON Schema / OpenAPI
+  `description`, and a note about a Rust trait has no business in a wire-contract
+  description every consumer reads"* — which is why the `Ord` note lives on the
+  `Bo4eEnum` trait. It was then not applied to:
+
+  - **Three enums with curated maintainer notes.** `BdewArtikelnummer`,
+    `Gasqualitaet` and `Rechnungstyp` published a `# Provenance` /
+    `# Forward compatibility` section to every OpenAPI consumer. The notes stay
+    in the rustdoc, where they are useful; the schema now carries BO4E's own
+    sentence, pinned with `#[schemars(description = …)]` and
+    `#[schema(description = …)]`.
+  - **Every feature-fallback field.** `time` and `decimal` change a field's Rust
+    type, so the generator emits a second declaration — documented only with
+    *"Requires the `time` feature for the `time::Date` representation"*. With the
+    feature off, that string **replaced** the field's BO4E description in the
+    published schema, so `enddatum` stopped saying it was inclusive and started
+    talking about Cargo. Both declarations now carry the schema's description.
+
+    The feature note is gone rather than demoted to a `//` comment: the generator
+    pretty-prints through `syn`, which keeps `///` and drops `//`, so such a
+    comment can never reach a reader. Its parameter went with it — it had four
+    call sites and no remaining effect. What the features do to field types is
+    documented once, in the crate-level table.
+
+  `tests/schema_descriptions.rs` guards both, walking every property description
+  of a representative BO for code fences, doctest assertions, rustdoc headings,
+  intra-doc links and feature notes. The fallback half only exists with the
+  features **off**, so `just test-schema-fallback` runs the suite in that
+  configuration — nothing else in CI ever compiled those declarations, let alone
+  checked what they produced.
 
 - **`decimal_from_json_number_count()` did not count an integer JSON number**,
   which is the shape that matters most. The counter exists to answer *"do my
@@ -512,6 +575,38 @@ validate field names**, and nothing in the crate's surface said so. See
   Behaviour for well-formed input is unchanged; see *Added* for what this buys.
 
 ### Added
+
+- **`Zaehlwerk` register arithmetic** — the second time-series shape BO4E carries,
+  and the one the crate had no support for. A `Zeitreihenwert` is a value *over*
+  an interval; a `Messwert` on a `Zaehlwerk` is the meter's cumulative state *at*
+  an instant, and the consumption is the difference between two of them. BO4E
+  states the formula on the field itself — *"Mit diesem Faktor wird eine
+  Zählerstandsdifferenz multipliziert, um zum eigentlichen Verbrauch im Zeitraum
+  zu kommen"* — and the crate shipped both `wandlerfaktor` and `vorkommastelle`
+  with no way to perform it.
+
+  `consumption_between`, `readings`, `register_capacity` and `total_consumption`
+  do, correcting the two things a bare subtraction gets wrong: a **wrap-around**
+  (a six-digit register going `999998 → 000012` has consumed 14, not −999 986 —
+  `vorkommastelle` is exactly what BO4E gives you to know that) and a fall no
+  register width explains, which is refused rather than guessed.
+
+  `total_consumption` returns `ConsumptionError` rather than a number wherever the
+  arithmetic stops meaning anything: a reading marked `Z78_GERAETEWECHSEL` (the
+  meter was swapped, so the register restarted from an unrelated state), a fall
+  larger than one revolution, or a reading in a unit that does not convert to the
+  register's — which would otherwise vanish from the total and leave a number
+  spanning a gap it does not admit to. Readings in another unit are brought onto
+  the register's scale first, through `Menge::convert_to`.
+
+- **`tests/current_series_alignment.rs`** — a drift guard for the hand-written
+  modules that name a schema series. `src/generated/` is re-scanned by the
+  generator, but `convenience`, `units`, `timeseries` and the `validation` macro
+  each name `v202607` in their own source, and advancing `current` without
+  advancing them leaves the crate compiling perfectly while shipping accessors
+  for a series nobody is using. There is no compile error waiting to catch that.
+  The test reads the sources, and its file list is the checklist the versioning
+  guide documents.
 
 - **`Bo4eExtensions` — a recursive check for fields BO4E does not define.**
   A decode round-trip cannot detect a misspelled or renamed field, and consumers

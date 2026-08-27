@@ -1443,22 +1443,17 @@ fn emit_field(s: &mut String, field: &Field, meta: &Metadata<'_>) {
     if matches!(&field.field_type, FieldType::JsonValue)
         || matches!(&field.field_type, FieldType::Array(inner) if matches!(inner.as_ref(), FieldType::JsonValue))
     {
-        emit_feature_gated_field(
-            s,
-            field,
-            "json",
-            &type_str,
-            "    /// Requires the `json` feature for the full `serde_json::Value` representation.\n",
-            None,
-        );
+        emit_feature_gated_field(s, field, "json", &type_str, None);
     } else if has_offset_datetime {
         emit_feature_gated_field(
             s,
             field,
             "time",
             &type_str,
-            "    /// Requires the `time` feature for the `time::OffsetDateTime` representation.\n    /// Without `time`, stores the ISO-8601 string value unchanged.\n",
-            Some(("crate::schema_helpers::opt_datetime_schema", "crate::schema_helpers::datetime_schema")),
+            Some((
+                "crate::schema_helpers::opt_datetime_schema",
+                "crate::schema_helpers::datetime_schema",
+            )),
         );
     } else if has_date {
         emit_feature_gated_field(
@@ -1466,22 +1461,17 @@ fn emit_field(s: &mut String, field: &Field, meta: &Metadata<'_>) {
             field,
             "time",
             &type_str,
-            "    /// Requires the `time` feature for the `time::Date` representation.\n    /// Without `time`, stores the ISO 8601 date string (`YYYY-MM-DD`) unchanged.\n",
-            Some(("crate::schema_helpers::opt_date_schema", "crate::schema_helpers::date_schema")),
+            Some((
+                "crate::schema_helpers::opt_date_schema",
+                "crate::schema_helpers::date_schema",
+            )),
         );
     } else if matches!(
         &field.field_type,
         FieldType::Primitive(PrimitiveType::Decimal)
     ) || matches!(&field.field_type, FieldType::Array(inner) if matches!(inner.as_ref(), FieldType::Primitive(PrimitiveType::Decimal)))
     {
-        emit_feature_gated_field(
-            s,
-            field,
-            "decimal",
-            &type_str,
-            "    /// Requires the `decimal` feature for the `rust_decimal::Decimal` representation.\n    /// Without `decimal`, stores the decimal's lexical form (a JSON string or number).\n",
-            None,
-        );
+        emit_feature_gated_field(s, field, "decimal", &type_str, None);
     } else {
         s.push_str(&format!("    pub {}: {type_str},\n", field.rust_name));
     }
@@ -1492,8 +1482,13 @@ fn emit_field(s: &mut String, field: &Field, meta: &Metadata<'_>) {
 ///
 /// `feature` — the Cargo feature name (e.g. `"json"`, `"time"`, `"decimal"`).
 /// `primary_type` — the fully resolved type string for the feature-gated variant.
-/// `fallback_doc` — the doc comment lines (already `    ///`-prefixed) to emit before
-///    the fallback declaration so downstream readers know why the type differs.
+///
+/// Both declarations carry the **schema's** description. `schemars` lifts a
+/// field's doc comment into the property description, so documenting the fallback
+/// with "requires the `time` feature" instead would publish a wire contract that
+/// talks about Cargo features and no longer says what the field means. What the
+/// feature does to the type is documented once, in the crate-level table.
+///
 /// `fallback_schema_fns` — when `Some((opt_fn, req_fn))`, `emit_fallback_attrs` emits
 ///    `schemars(schema_with)` on the fallback field using the correct function path.
 ///    Pass `None` for types that need no special schemars treatment (Decimal, JsonValue).
@@ -1502,7 +1497,6 @@ fn emit_feature_gated_field(
     field: &Field,
     feature: &str,
     primary_type: &str,
-    fallback_doc: &str,
     fallback_schema_fns: Option<(&'static str, &'static str)>,
 ) {
     // An array field falls back to `Vec<String>`, not `String`: the JSON is still
@@ -1520,7 +1514,16 @@ fn emit_feature_gated_field(
     };
     s.push_str(&format!("    #[cfg(feature = \"{feature}\")]\n"));
     s.push_str(&format!("    pub {}: {primary_type},\n", field.rust_name));
-    s.push_str(fallback_doc);
+    // The fallback carries the *schema's* description, exactly as the primary
+    // does. `schemars` lifts a field's doc comment into the property description,
+    // so a fallback documented only with "requires the `time` feature" publishes
+    // a wire contract that talks about Cargo features and no longer says what the
+    // field means.
+    if let Some(doc) = &field.description {
+        for line in clean_description(doc).lines() {
+            s.push_str(&format!("    /// {}\n", line));
+        }
+    }
     emit_fallback_attrs(s, field, fallback_schema_fns);
     s.push_str(&format!("    #[cfg(not(feature = \"{feature}\"))]\n"));
     s.push_str(&format!("    pub {}: {fallback_type},\n", field.rust_name));
@@ -1671,6 +1674,23 @@ fn emit_enum(en: &EnumNode, names: &DiscriminantNames) -> Result<String> {
             } else {
                 s.push_str(&format!("/// {line}\n"));
             }
+        }
+        // …but keep it out of the wire contract. Both derives lift a type's
+        // rustdoc into the schema `description`, and these notes are addressed to
+        // whoever maintains the Rust binding — codelist provenance, an upstream
+        // gap — not to whoever reads the OpenAPI document. Pinning the schema's
+        // own sentence here is the same call the `Ord` note makes by staying on
+        // the `Bo4eEnum` trait, and the same one `identifiers::schema` makes for
+        // the identifier newtypes.
+        if let Some(doc) = &en.description {
+            let wire = clean_description(doc).replace('\n', " ");
+            let wire = wire.trim();
+            s.push_str(&format!(
+                "#[cfg_attr(feature = \"schemars\", schemars(description = {wire:?}))]\n"
+            ));
+            s.push_str(&format!(
+                "#[cfg_attr(feature = \"utoipa\", schema(description = {wire:?}))]\n"
+            ));
         }
     }
     // What the derived `Ord` means is documented once on the `Bo4eEnum` trait,

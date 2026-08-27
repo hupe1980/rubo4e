@@ -21,7 +21,6 @@ pub struct ZusatzAttribut {
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
     #[cfg(feature = "json")]
     pub wert: Option<serde_json::Value>,
-    /// Requires the `json` feature for the full `serde_json::Value` representation.
     #[cfg_attr(feature = "serde", serde(rename = "wert"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]

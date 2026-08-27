@@ -28,8 +28,7 @@ pub struct Vertragskonditionen {
     )]
     #[cfg(feature = "decimal")]
     pub anzahl_abschlaege: Option<rust_decimal::Decimal>,
-    /// Requires the `decimal` feature for the `rust_decimal::Decimal` representation.
-    /// Without `decimal`, stores the decimal's lexical form (a JSON string or number).
+    /// Anzahl der vereinbarten Abschläge pro Jahr, z.B. 12
     #[cfg_attr(feature = "serde", serde(rename = "anzahlAbschlaege"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]

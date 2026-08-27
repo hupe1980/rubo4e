@@ -268,3 +268,257 @@ fn placed_yields_only_the_resolvable_entries() {
     assert_eq!(indices, [0, 2], "the entry with no zeitraum is skipped");
     assert_eq!(lg.audit().unplaced.len(), 1, "…and reported by audit");
 }
+
+// ─── Register readings (`Zaehlwerk`) ─────────────────────────────────────────
+//
+// The other time-series shape BO4E carries: a `Zaehlwerk` holds `Messwert`s,
+// which are cumulative meter states at instants rather than quantities over
+// intervals. The consumption is the difference between two of them, and the bare
+// subtraction is wrong in two ways the schema itself tells you how to fix.
+
+#[cfg(feature = "decimal")]
+mod register {
+    use rubo4e::current::{
+        Menge, Mengeneinheit, Messwert, Messwertstatus, Messwertstatuszusatz, Zaehlwerk,
+    };
+    use rubo4e::json::Bo4eJsonExt;
+    use rubo4e::timeseries::ConsumptionError;
+    use rust_decimal::Decimal;
+    use time::macros::datetime;
+    use time::OffsetDateTime;
+
+    fn reading(at: OffsetDateTime, state: i64) -> Messwert {
+        Messwert {
+            zeitpunkt: Some(at),
+            wert: Some(Menge {
+                wert: Some(Decimal::from(state)),
+                einheit: Some(Mengeneinheit::Kwh),
+                ..Default::default()
+            }),
+            messwertstatus: Some(Messwertstatus::Abgelesen),
+            ..Default::default()
+        }
+    }
+
+    fn register(messwerte: Vec<Messwert>) -> Zaehlwerk {
+        Zaehlwerk {
+            einheit: Some(Mengeneinheit::Kwh),
+            vorkommastelle: Some(6),
+            messwerte: Some(messwerte),
+            ..Default::default()
+        }
+    }
+
+    const T0: OffsetDateTime = datetime!(2026-01-01 00:00 +01:00);
+    const DAY: time::Duration = time::Duration::DAY;
+
+    /// The plain case, and the formula the schema states on `wandlerfaktor`:
+    /// *"Mit diesem Faktor wird eine Zählerstandsdifferenz multipliziert."*
+    #[test]
+    fn consumption_is_the_difference_times_the_wandlerfaktor() {
+        let zw = Zaehlwerk {
+            wandlerfaktor: Some(Decimal::from(40)),
+            ..register(vec![])
+        };
+        assert_eq!(
+            zw.consumption_between(Decimal::from(1_000), Decimal::from(1_050)),
+            Ok(Decimal::from(2_000))
+        );
+    }
+
+    /// An absent `wandlerfaktor` is 1 — a directly-measuring meter has no
+    /// transformer and states none.
+    #[test]
+    fn an_absent_wandlerfaktor_is_one() {
+        let zw = register(vec![]);
+        assert!(zw.wandlerfaktor.is_none());
+        assert_eq!(
+            zw.consumption_between(Decimal::from(1_000), Decimal::from(1_050)),
+            Ok(Decimal::from(50))
+        );
+    }
+
+    /// The trap: a six-digit register going `999998 → 000012` has consumed 14,
+    /// not −999 986. `vorkommastelle` is what BO4E gives you to know that.
+    #[test]
+    fn a_wrapped_register_is_resolved_rather_than_going_negative() {
+        let zw = register(vec![]);
+        assert_eq!(zw.register_capacity(), Some(Decimal::from(1_000_000)));
+        assert_eq!(
+            zw.consumption_between(Decimal::from(999_998), Decimal::from(12)),
+            Ok(Decimal::from(14))
+        );
+
+        // …and the naive subtraction, for contrast.
+        assert_eq!(
+            Decimal::from(12) - Decimal::from(999_998),
+            Decimal::from(-999_986)
+        );
+    }
+
+    /// Without a stated width there is no way to tell a wrap-around from a
+    /// fault, so it is refused rather than guessed either way.
+    #[test]
+    fn a_fall_with_no_stated_width_is_refused() {
+        let zw = Zaehlwerk {
+            vorkommastelle: None,
+            ..register(vec![])
+        };
+        assert_eq!(zw.register_capacity(), None);
+        assert!(matches!(
+            zw.consumption_between(Decimal::from(999_998), Decimal::from(12)),
+            Err(ConsumptionError::DecreasedWithoutRegisterWidth { .. })
+        ));
+    }
+
+    /// A fall larger than one whole revolution is not a wrap-around at all —
+    /// adding the capacity back still leaves it negative, so it is refused.
+    #[test]
+    fn a_fall_larger_than_the_register_is_not_a_wrap_around() {
+        // Capacity 1000; a fall of 1500 cannot be one revolution.
+        let zw = Zaehlwerk {
+            vorkommastelle: Some(3),
+            ..register(vec![])
+        };
+        assert!(matches!(
+            zw.consumption_between(Decimal::from(2_000), Decimal::from(500)),
+            Err(ConsumptionError::DecreasedWithoutRegisterWidth { .. })
+        ));
+    }
+
+    /// The sequence walk sorts, differences each consecutive pair, and sums.
+    #[test]
+    fn the_total_sums_every_consecutive_pair_in_time_order() {
+        // Deliberately out of order: `messwerte` is a bag, not a sequence.
+        let zw = register(vec![
+            reading(T0 + DAY * 2, 1_250),
+            reading(T0, 1_000),
+            reading(T0 + DAY, 1_100),
+        ]);
+        assert_eq!(
+            zw.readings().iter().map(|r| r.value).collect::<Vec<_>>(),
+            [
+                Decimal::from(1_000),
+                Decimal::from(1_100),
+                Decimal::from(1_250)
+            ]
+        );
+        assert_eq!(zw.total_consumption(), Ok(Decimal::from(250)));
+    }
+
+    /// A meter exchange restarts the register from an unrelated state, so the
+    /// difference across that boundary is not a consumption. Refused, not
+    /// guessed — only the caller knows which meter the second half belongs to.
+    #[test]
+    fn a_meter_exchange_is_refused_rather_than_differenced_across() {
+        let mut werte = vec![reading(T0, 998_000), reading(T0 + DAY, 40)];
+        werte[1].messwertstatuszusatz = Some(Messwertstatuszusatz::Z78Geraetewechsel);
+
+        let zw = register(werte);
+        assert_eq!(
+            zw.total_consumption(),
+            Err(ConsumptionError::MeterExchange { index: 1 })
+        );
+        // The wrap-around arithmetic would otherwise have "explained" it.
+        assert_eq!(
+            zw.consumption_between(Decimal::from(998_000), Decimal::from(40)),
+            Ok(Decimal::from(2_040)),
+        );
+    }
+
+    /// A reading marked unusable is not a zero, so it is dropped from the walk
+    /// rather than differenced against.
+    #[test]
+    fn an_unusable_reading_is_left_out_of_the_series() {
+        let mut werte = vec![
+            reading(T0, 1_000),
+            reading(T0 + DAY, 0),
+            reading(T0 + DAY * 2, 1_250),
+        ];
+        werte[1].messwertstatus = Some(Messwertstatus::Fehlt);
+
+        let zw = register(werte);
+        assert_eq!(zw.readings().len(), 2);
+        assert_eq!(zw.total_consumption(), Ok(Decimal::from(250)));
+    }
+
+    #[test]
+    fn a_single_reading_is_not_a_consumption() {
+        assert_eq!(
+            register(vec![reading(T0, 1_000)]).total_consumption(),
+            Err(ConsumptionError::TooFewReadings { count: 1 })
+        );
+        assert_eq!(
+            register(vec![]).total_consumption(),
+            Err(ConsumptionError::TooFewReadings { count: 0 })
+        );
+    }
+
+    /// A reading in MWh on a kWh register is brought onto the register's scale
+    /// before it is differenced — otherwise `1.1 MWh − 1000 kWh` reads as `0.1`.
+    #[test]
+    fn a_reading_in_another_unit_is_converted_to_the_registers() {
+        let mut werte = vec![reading(T0, 1_000), reading(T0 + DAY, 0)];
+        werte[1].wert = Some(Menge {
+            wert: Some(Decimal::new(11, 1)), // 1.1 MWh == 1100 kWh
+            einheit: Some(Mengeneinheit::Mwh),
+            ..Default::default()
+        });
+
+        let zw = register(werte);
+        assert_eq!(
+            zw.readings().iter().map(|r| r.value).collect::<Vec<_>>(),
+            [Decimal::from(1_000), Decimal::from(1_100)]
+        );
+        assert_eq!(zw.total_consumption(), Ok(Decimal::from(100)));
+    }
+
+    /// A reading in a unit that does not convert would silently vanish from the
+    /// total, leaving a number that spans a gap it does not admit to.
+    #[test]
+    fn a_reading_in_an_incompatible_unit_is_an_error_not_an_omission() {
+        let mut werte = vec![
+            reading(T0, 1_000),
+            reading(T0 + DAY, 0),
+            reading(T0 + DAY * 2, 1_250),
+        ];
+        werte[1].wert = Some(Menge {
+            wert: Some(Decimal::from(5)),
+            einheit: Some(Mengeneinheit::Kw), // power, not energy
+            ..Default::default()
+        });
+
+        let zw = register(werte);
+        assert_eq!(
+            zw.total_consumption(),
+            Err(ConsumptionError::IncompatibleUnit { index: 1 })
+        );
+    }
+
+    /// End to end from the wire, which is the shape a `Zaehler` actually arrives
+    /// in — a register nested two levels down.
+    #[cfg(feature = "json")]
+    #[test]
+    fn a_register_read_off_the_wire_computes_its_consumption() {
+        let body = r#"{
+            "_typ": "ZAEHLWERK",
+            "zaehlwerkId": "1",
+            "einheit": "KWH",
+            "vorkommastelle": 6,
+            "nachkommastelle": 3,
+            "wandlerfaktor": "40",
+            "obisKennzahl": "1-0:1.8.0",
+            "messwerte": [
+                {"zeitpunkt":"2026-01-01T00:00:00+01:00","messwertstatus":"ABGELESEN",
+                 "wert":{"wert":"999998","einheit":"KWH"}},
+                {"zeitpunkt":"2026-02-01T00:00:00+01:00","messwertstatus":"ABGELESEN",
+                 "wert":{"wert":"12","einheit":"KWH"}}
+            ]
+        }"#;
+        let zw = Zaehlwerk::from_json_german(body).expect("valid Zaehlwerk JSON");
+
+        assert_eq!(zw.readings().len(), 2);
+        // Wrapped by 14 register steps, times a Wandlerfaktor of 40.
+        assert_eq!(zw.total_consumption(), Ok(Decimal::from(560)));
+    }
+}
