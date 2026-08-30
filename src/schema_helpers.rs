@@ -89,9 +89,26 @@ pub fn marktpartner_id_schema(_gen: &mut schemars::SchemaGenerator) -> schemars:
     identifier_schema(&crate::identifiers::schema::MARKTPARTNER_ID)
 }
 
+/// JSON Schema for [`Lokationsbuendelcode`](crate::identifiers::Lokationsbuendelcode).
+pub fn lokationsbuendel_code_schema(_gen: &mut schemars::SchemaGenerator) -> schemars::Schema {
+    identifier_schema(&crate::identifiers::schema::LOKATIONSBUENDEL_CODE)
+}
+
+/// JSON Schema for [`LokationsbuendelObjektcode`](crate::identifiers::LokationsbuendelObjektcode).
+pub fn lokationsbuendel_objektcode_schema(
+    _gen: &mut schemars::SchemaGenerator,
+) -> schemars::Schema {
+    identifier_schema(&crate::identifiers::schema::LOKATIONSBUENDEL_OBJEKTCODE)
+}
+
 /// JSON Schema for [`MeloId`](crate::identifiers::MeloId).
 pub fn melo_id_schema(_gen: &mut schemars::SchemaGenerator) -> schemars::Schema {
     identifier_schema(&crate::identifiers::schema::MELO_ID)
+}
+
+/// JSON Schema for [`Zaehlpunktbezeichnung`](crate::identifiers::Zaehlpunktbezeichnung).
+pub fn zaehlpunktbezeichnung_schema(_gen: &mut schemars::SchemaGenerator) -> schemars::Schema {
+    identifier_schema(&crate::identifiers::schema::ZAEHLPUNKTBEZEICHNUNG)
 }
 
 /// JSON Schema for [`NeloId`](crate::identifiers::NeloId).

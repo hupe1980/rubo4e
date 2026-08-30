@@ -1,6 +1,6 @@
 +++
 title = "Time Series & Units"
-description = "Interval series and register series, the coverage audit, Zeitraum's instant mode, and the unit dimensions behind sum, integrate and consumption."
+description = "Interval series and register series, one reading shape across Lastgang, Zeitreihe and Energiemenge, the coverage audit, Zeitraum's instant mode, and the unit dimensions behind sum, integrate and consumption."
 weight = 45
 +++
 
@@ -9,12 +9,16 @@ interchangeable:
 
 | Shape | Carried by | Each entry is | Read with |
 |---|---|---|---|
-| **Interval series** | `Lastgang`, `Zeitreihe` | a `Zeitreihenwert`: a value **over** a `Zeitraum` | `Bo4eTimeSeries` |
+| **Interval series** | `Lastgang`, `Zeitreihe`, `Energiemenge` | a value **over** a `Zeitraum` | `Bo4eTimeSeries`, `Bo4eIntervals` |
 | **Register series** | `Zaehlwerk` | a `Messwert`: the meter's cumulative state **at** an instant | `Zaehlwerk::readings` |
 
 The distinction decides the arithmetic: interval values are quantities you sum or
 integrate, register values are *states* you difference. Everything up to
 [Register readings](#register-readings) is about the first half.
+
+The three interval shapes look nothing alike in the schema —
+[One reading shape for all three](#one-reading-shape-for-all-three) is the layer
+that makes them one.
 
 Interval series are the highest-volume payload in German market communication — a
 year of quarter-hours is 35 040 entries — and the ones the schema leaves most
@@ -271,6 +275,105 @@ which is where `expected_interval()` gets the length it checks each entry agains
 
 ---
 
+## One reading shape for all three
+
+BO4E puts a value on a stretch of time in **three** places that look nothing
+alike:
+
+| Shape | Where the value is | Where the unit is | How many |
+|---|---|---|---|
+| `Lastgang` | `werte[].wert` | `messgroesse` on the BO | many |
+| `Zeitreihe` | `werte[].wert` | `einheit` on the BO | many |
+| `Energiemenge` | `menge.wert` | `menge.einheit` | one |
+
+A consumer that wants "a series of readings" therefore writes the mapping three
+times. `IntervalReading` is that mapping, written once — `Bo4eIntervals` produces
+it from all three, and it writes back into all three.
+
+```rust
+use rubo4e::current::{Energiemenge, Lastgang, Mengeneinheit, Zeitreihe};
+use rubo4e::timeseries::Bo4eIntervals;
+
+# fn demo(lastgang: Lastgang, zeitreihe: Zeitreihe, menge: Energiemenge) {
+for reading in lastgang.intervals() {
+    let _ = (reading.range, reading.wert, reading.einheit, reading.status);
+}
+
+// A power series and an energy series answer the same question in the same unit.
+assert_eq!(lastgang.total_energy(), Some((dec!(400), Mengeneinheit::Kwh)));   // kW × hours
+assert_eq!(zeitreihe.total_energy(), Some((dec!(400), Mengeneinheit::Kwh)));  // already kWh
+assert_eq!(menge.total_energy(),     Some((dec!(400), Mengeneinheit::Kwh)));  // one interval
+# }
+```
+
+The reading borrows only the OBIS code, so a year of quarter-hours allocates
+nothing.
+
+### `energy()` is where the two spellings meet
+
+| The reading's unit is | `energy()` returns |
+|---|---|
+| an energy — `KWH`, `MWH`, `KVARH` | the value unchanged |
+| a power — `KW`, `MW`, `KVAR` | value × interval length in hours, in the matching energy unit |
+| anything else, or absent | `None` |
+
+`None` too when the reading is not usable. A `FEHLT` slot carrying `0` is an
+absence, not a zero, and this refuses to launder it into one — `usable_intervals()`
+skips it, and `audit()` is where the gap it leaves gets reported.
+
+### Writing back
+
+```rust
+use rubo4e::current::{Mengeneinheit, Messwertstatus, Zeitreihe};
+use rubo4e::timeseries::IntervalReading;
+
+# fn demo(start: time::OffsetDateTime) {
+let readings = (0..4).map(|i| {
+    let from = start + time::Duration::minutes(15 * i);
+    IntervalReading::new(
+        from..from + time::Duration::minutes(15),
+        Some(dec!(100)),
+        Some(Mengeneinheit::Kwh),
+    )
+    .with_status(Messwertstatus::Abgelesen)
+});
+
+let zeitreihe = Zeitreihe::from_intervals(readings);
+assert_eq!(zeitreihe.einheit, Some(Mengeneinheit::Kwh));
+# }
+```
+
+`Lastgang::from_intervals` takes the `zeitIntervallLaenge` as its first argument,
+because nothing can infer it: a series of four quarter-hours and a series with
+three of them missing look identical. Pass it, and `audit()` will then measure the
+readings against it.
+
+Three things do not survive each direction, and the API says so rather than
+inventing them:
+
+- `to_zeitreihenwert()` drops the **unit** — `Zeitreihenwert` has no field for it.
+  `Zeitreihe::from_intervals` / `Lastgang::from_intervals` carry it up to the BO,
+  where BO4E puts it.
+- `to_energiemenge()` drops the **status** — `Energiemenge` has no field for it.
+  The unit and the OBIS code do survive, which makes `Energiemenge` the lossless
+  single-interval form.
+- A `Zeitraum` given as bare dates has no time of day, so it is not an interval and
+  `intervals()` yields nothing for it. That is
+  [`as_instant_range`](#the-interval-a-zeitreihenwert-states) refusing to guess a
+  midnight.
+
+Readings assembled from mixed units are converted into the first stated unit where
+the two share a dimension, so a series is never a silent sum of MWh into kWh.
+
+### Not `Zaehlwerk`
+
+`Bo4eIntervals` covers the three shapes above and stops there. A `Zaehlwerk`'s
+`messwerte` are cumulative register *states* at an instant, not quantities over an
+interval — see [Register readings](#register-readings) below, and
+`consumption_between` for the arithmetic that turns two of them into one.
+
+---
+
 ## Register readings
 
 A `Zaehlwerk` holds `Messwert`s — cumulative meter states, not quantities. The
@@ -347,6 +450,7 @@ doing the work; a unit that does not convert is an error, not an omission.
 | `exact_duration`, `Menge::as_duration`, `energy_over` | `+ time` | absent |
 | `rubo4e::timeseries` — the whole timeline walk | `versioned` + `time` | absent |
 | `sum()`, `integrate()`, `Lastgang::expected_interval()` | `+ decimal` | `expected_interval()` is `None`, so `wrong_length` stays empty |
+| `Bo4eIntervals`, `IntervalReading`, `total_energy`, `from_intervals` | `+ decimal` | absent; the value would be a `String` |
 | `Zaehlwerk::readings` / `consumption_between` / `total_consumption` | `+ decimal` | absent; register states are `String` without it |
 
 ---

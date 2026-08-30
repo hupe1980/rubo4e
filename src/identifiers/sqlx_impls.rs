@@ -102,8 +102,9 @@ macro_rules! impl_sqlx_text {
 }
 
 use crate::identifiers::{
-    AkivId, Bic, BilanzierungsgebietId, BilanzkreisId, CrId, EicCode, Iban, MaloId, MarktpartnerId,
-    MeloId, NebeId, NeloId, ObisCode, PaketId, SgId, SrId, TrId, TranchennummerId,
+    AkivId, Bic, BilanzierungsgebietId, BilanzkreisId, CrId, EicCode, Iban,
+    LokationsbuendelObjektcode, Lokationsbuendelcode, MaloId, MarktpartnerId, MeloId, NebeId,
+    NeloId, ObisCode, PaketId, SgId, SrId, TrId, TranchennummerId, Zaehlpunktbezeichnung,
 };
 
 impl_sqlx_text!(
@@ -114,6 +115,8 @@ impl_sqlx_text!(
     CrId,
     EicCode,
     Iban,
+    Lokationsbuendelcode,
+    LokationsbuendelObjektcode,
     MaloId,
     MarktpartnerId,
     MeloId,
@@ -125,4 +128,5 @@ impl_sqlx_text!(
     SrId,
     TrId,
     TranchennummerId,
+    Zaehlpunktbezeichnung,
 );

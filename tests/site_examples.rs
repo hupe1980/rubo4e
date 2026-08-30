@@ -526,3 +526,354 @@ fn readme_decode_does_not_validate_field_names() {
     };
     assert!(kosten.ensure_no_extension_data().is_ok());
 }
+
+// ─── Lokationsbündel, ZusatzAttribute, and the interval reading ──────────────
+//
+// `README.md` § Lokationsbündelstrukturen / § Namespaced `ZusatzAttribut`s /
+// § One reading shape for all three, and the site's `lokationsbuendel.md`,
+// `serialization.md` § ZusatzAttribute and namespaces, and `timeseries.md`
+// § One reading shape for all three.
+
+/// The site's Lokationsbündel page — the codelist lookups it prints verbatim.
+#[test]
+fn docs_lokationsbuendel_codelist() {
+    use rubo4e::identifiers::Lokationsbuendelcode;
+    use rubo4e::lokationsbuendel::{Lokationsbuendelstruktur, Objektfunktion};
+
+    let code = Lokationsbuendelcode::new("9992000000026").unwrap();
+    assert_eq!(code.grouped(), "9992 00000 002 6");
+    assert_eq!(code.as_str(), "9992000000026");
+    assert!(Lokationsbuendelcode::new("9992000000062").is_err());
+
+    let s = Lokationsbuendelstruktur::from_code(&code).unwrap();
+    assert_eq!(s.bezeichnung, "Verbrauch mit einer Messlokation (Standard)");
+
+    let melo = s.objekt("9992000001032").unwrap();
+    assert_eq!(melo.cardinality(), "1");
+    assert!(melo.is_mandatory());
+    assert_eq!(melo.rolle().funktion, Some(Objektfunktion::Netzuebergabe));
+
+    let tr = s.objekt("9992000001024").unwrap();
+    assert_eq!(tr.cardinality(), "0-N");
+    assert!(tr.permits(0) && tr.permits(9_999));
+
+    // The page prints all 15 structure codes; the table and the data must agree.
+    assert_eq!(rubo4e::lokationsbuendel::STRUKTUREN.len(), 15);
+    for printed in [
+        "9992000000018",
+        "9992000000026",
+        "9992000000034",
+        "9992000000042",
+        "9992000000068",
+        "9992000000076",
+        "9992000000084",
+        "9992000000109",
+        "9992000000117",
+        "9992000000125",
+        "9992000000133",
+        "9992000000159",
+        "9992000000167",
+        "9992000000175",
+        "9992000000183",
+    ] {
+        assert!(
+            Lokationsbuendelstruktur::from_wire(printed).is_some(),
+            "{printed} is printed on the site but not in the codelist"
+        );
+    }
+}
+
+/// `README.md` § Lokationsbündelstrukturen and the site's audit example.
+#[test]
+fn docs_lokationsbuendel_audit() {
+    use rubo4e::current::{Lokationszuordnung, Marktlokation, TechnischeRessource};
+    use rubo4e::lokationsbuendel::{
+        Befund, Flussrichtung, LokationsbuendelExt, LokationsbuendelObjekt, Objekttyp,
+    };
+
+    let technische_ressource = TechnischeRessource {
+        lokationsbuendel_objektcode: Some("9992000001024".into()),
+        ..Default::default()
+    };
+    let rolle = technische_ressource.objektrolle().unwrap();
+    assert_eq!(rolle.objekttyp, Objekttyp::TechnischeRessource);
+    assert_eq!(rolle.richtung, Some(Flussrichtung::Verbrauch));
+    assert_eq!(rolle.ebene, 1);
+
+    let zuordnung = Lokationszuordnung {
+        lokationsbuendelcode: Some("9992000000026".into()),
+        marktlokationen: Some(vec![Box::new(Marktlokation {
+            lokationsbuendel_objektcode: Some("9992000001016".into()),
+            ..Default::default()
+        })]),
+        ..Default::default()
+    };
+
+    let report = zuordnung.audit_buendel();
+    assert!(!report.is_conformant());
+    assert!(report.befunde.contains(&Befund::AnzahlVerletzt {
+        code: "9992000001032".into(),
+        objekttyp: Objekttyp::Messlokation,
+        gefunden: 0,
+        erwartet: "1".into(),
+    }));
+
+    // The view methods the docs list.
+    let buendel = zuordnung.buendel();
+    assert_eq!(buendel.verbrauchs_ressourcen().count(), 0);
+    assert_eq!(buendel.objekte_auf_ebene(2).len(), 0);
+    assert!(Lokationszuordnung::default().buendel().is_empty());
+}
+
+/// `README.md` § Namespaced `ZusatzAttribut`s and the site's serialization page.
+#[test]
+fn docs_namespaced_zusatz_attribute() {
+    use rubo4e::current::{SteuerbareRessource, TechnischeRessource};
+    use rubo4e::zusatz_attribut::{Namespace, ZusatzAttributeExt};
+
+    #[derive(Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+    #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+    enum Steuerungsvariante {
+        Direktansteuerung,
+        Ems,
+    }
+
+    let ski = "d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0";
+    let mut sr = SteuerbareRessource::default();
+    sr.set_zusatz_attribut_in(&Namespace::HEMS, "eebus-ski", ski);
+    sr.set_zusatz_attribut_in(&Namespace::MAKO, "vorgangsnummer", "V-2026-0001");
+
+    assert_eq!(
+        sr.zusatz_attribut_str_in(&Namespace::HEMS, "eebus-ski"),
+        Some(ski)
+    );
+    assert_eq!(sr.zusatz_attribut_namespaces(), ["hems", "mako"]);
+
+    // The wire form is the flat BO4E name.
+    let json = sr.to_json_german().unwrap();
+    assert!(json.contains(r#""name":"hems:eebus-ski""#), "{json}");
+
+    assert_eq!(sr.remove_zusatz_attribute_in(&Namespace::HEMS).len(), 1);
+
+    let mut tr = TechnischeRessource::default();
+    tr.set_zusatz_attribut_as_in(
+        &Namespace::HEMS,
+        "steuerungsvariante",
+        &Steuerungsvariante::Ems,
+    )
+    .unwrap();
+    let read: Steuerungsvariante = tr
+        .zusatz_attribut_as_in(&Namespace::HEMS, "steuerungsvariante")
+        .unwrap()
+        .unwrap();
+    assert_eq!(read, Steuerungsvariante::Ems);
+
+    // The three registered prefixes the docs table lists.
+    let registered: Vec<&str> = Namespace::REGISTERED
+        .iter()
+        .map(Namespace::as_str)
+        .collect();
+    assert_eq!(registered, ["mako", "hems", "edmd", "mabis"]);
+    assert!(!Namespace::new("sap").unwrap().is_registered());
+}
+
+/// `README.md` § One reading shape for all three, and the site's timeseries page.
+#[test]
+#[cfg(all(feature = "time", feature = "decimal"))]
+fn docs_one_reading_shape_for_all_three() {
+    use rubo4e::current::{Energiemenge, Lastgang, Menge, Mengeneinheit, Zeitraum, Zeitreihe};
+    use rubo4e::timeseries::{Bo4eIntervals, Bo4eTimeSeries};
+    use rust_decimal::Decimal;
+    use time::macros::datetime;
+
+    let start = datetime!(2026-01-01 00:00 +01:00);
+    let quarter = Menge {
+        wert: Some(Decimal::from(15)),
+        einheit: Some(Mengeneinheit::Minute),
+        ..Default::default()
+    };
+    let entries = |values: [i64; 4]| {
+        Some(
+            values
+                .into_iter()
+                .enumerate()
+                .map(|(i, v)| rubo4e::current::Zeitreihenwert {
+                    wert: Some(Decimal::from(v)),
+                    zeitraum: Some(Zeitraum::from_instants(
+                        start + time::Duration::minutes(15 * i as i64),
+                        start + time::Duration::minutes(15 * (i as i64 + 1)),
+                    )),
+                    ..Default::default()
+                })
+                .collect(),
+        )
+    };
+
+    let lastgang = Lastgang {
+        messgroesse: Some(Mengeneinheit::Kw),
+        werte: entries([400, 400, 400, 400]),
+        ..Lastgang::new(quarter)
+    };
+    let zeitreihe = Zeitreihe {
+        einheit: Some(Mengeneinheit::Kwh),
+        werte: entries([100, 100, 100, 100]),
+        ..Default::default()
+    };
+    let energiemenge = Energiemenge {
+        menge: Some(Menge {
+            wert: Some(Decimal::from(400)),
+            einheit: Some(Mengeneinheit::Kwh),
+            ..Default::default()
+        }),
+        zeitraum: Some(Zeitraum::from_instants(
+            start,
+            start + time::Duration::hours(1),
+        )),
+        ..Default::default()
+    };
+
+    let expected = Some((Decimal::from(400), Mengeneinheit::Kwh));
+    assert_eq!(lastgang.total_energy(), expected);
+    assert_eq!(zeitreihe.total_energy(), expected);
+    assert_eq!(energiemenge.total_energy(), expected);
+
+    // 400 kW over a quarter-hour is 100 kWh — the per-reading step.
+    let first = lastgang.intervals().next().unwrap();
+    assert_eq!(
+        first.energy(),
+        Some((Decimal::from(100), Mengeneinheit::Kwh))
+    );
+
+    // …and back out again, into a series that audits clean against its own
+    // interval length.
+    let rebuilt = Zeitreihe::from_intervals(zeitreihe.intervals());
+    assert_eq!(rebuilt.einheit, Some(Mengeneinheit::Kwh));
+    assert!(rebuilt.audit().is_complete());
+}
+
+// ─── MaBiS & Modell 2 ────────────────────────────────────────────────────────
+//
+// `README.md` § Beyond the schema, and the site's `beyond-the-schema.md`.
+// `tests/modell2.rs` carries the full argument; these are the snippets the
+// two documents print verbatim.
+
+/// The site's "The Bilanzierungsgebiet" section — the BO4E field, typed.
+#[test]
+fn docs_bilanzierungsgebiet_eic_is_checked() {
+    use rubo4e::current::Marktlokation;
+
+    let malo = Marktlokation {
+        bilanzierungsgebiet: Some("11YN-0000-0001-Q".into()),
+        ..Default::default()
+    };
+    assert!(malo.bilanzierungsgebiet_checked().unwrap().is_ok());
+
+    // A Bilanzkreis is a *party* code (`11X…`), not an area code.
+    let wrong = Marktlokation {
+        bilanzierungsgebiet: Some("11XSUEDWESTSTRO8".into()),
+        ..Default::default()
+    };
+    assert!(wrong.bilanzierungsgebiet_checked().unwrap().is_err());
+}
+
+/// The site's "The Zählpunkt that is not a Messlokation" section, and the
+/// `Zaehlpunktbezeichnung` entry on the Identifiers page.
+#[test]
+fn docs_zaehlpunkt_is_not_a_messlokation() {
+    use rubo4e::identifiers::{MeloId, Zaehlpunktbezeichnung};
+    use rubo4e::identifiers::{Zaehlpunkt, Zaehlpunktart};
+
+    let zpb = Zaehlpunktbezeichnung::new("DE0000000000000000000000000000042").unwrap();
+    assert_eq!(zpb.country_code(), "DE");
+
+    let zp = Zaehlpunkt::new(Zaehlpunktart::NetzgangzeitreiheEmob, zpb);
+    assert!(zp.is_emobilitaet());
+    assert_eq!(zp.as_melo_id(), None);
+
+    // Widening is a fact; narrowing is a claim, and is spelled out.
+    let melo = MeloId::new("DE0000000000000000000000000000001").unwrap();
+    let widened = Zaehlpunktbezeichnung::from(melo.clone());
+    assert_eq!(widened.clone().into_melo_id(), melo);
+
+    #[cfg(feature = "versioned")]
+    {
+        use rubo4e::current::Messlokation;
+        use rubo4e::zusatz_attribut::{well_known, ZusatzAttributeExt};
+
+        let mut melo = Messlokation::default();
+        melo.set_zusatz_attribut_key(&well_known::ZAEHLPUNKT, &zp)
+            .unwrap();
+        assert_eq!(well_known::ZAEHLPUNKT.name(), "mabis:zaehlpunkt");
+    }
+}
+
+/// The site's "E-Mobilitätsladesäule: BO4E already has it" section.
+#[test]
+fn docs_charging_point_is_native_bo4e() {
+    use rubo4e::current::{EMobilitaetsart, TechnischeRessource, TechnischeRessourceVerbrauchsart};
+
+    let ladesaeule = TechnischeRessource {
+        emobilitaetsart: Some(EMobilitaetsart::EMobilitaetsladesaeule),
+        technische_ressource_verbrauchsart: Some(TechnischeRessourceVerbrauchsart::EMobilitaet),
+        ..Default::default()
+    };
+    assert!(ladesaeule.is_emobilitaetsladesaeule());
+
+    // The three values BO4E publishes, as the page lists them.
+    assert_eq!(
+        EMobilitaetsart::VARIANTS,
+        [
+            EMobilitaetsart::Wallbox,
+            EMobilitaetsart::EMobilitaetsladesaeule,
+            EMobilitaetsart::Ladepark,
+        ]
+    );
+}
+
+/// The site's "The resting Aggregationsverantwortung" section.
+#[test]
+fn docs_resting_aggregationsverantwortung() {
+    use rubo4e::convenience::Aggregationszustaendigkeit;
+    use rubo4e::current::{Abwicklungsmodell, Bilanzierung};
+
+    let ruhend = Bilanzierung {
+        abwicklungsmodell: Some(Abwicklungsmodell::Modell2),
+        ..Default::default()
+    };
+    assert!(ruhend.aggregation_ruht());
+
+    assert_eq!(
+        Bilanzierung::default().aggregationszustaendigkeit(),
+        Aggregationszustaendigkeit::Unbekannt,
+    );
+}
+
+/// The site's "The mobile Marktlokation validates" section — and the README table
+/// row that says no field is mandatory.
+#[test]
+fn docs_mobile_marktlokation_validates() {
+    use rubo4e::current::Marktlokation;
+
+    let mobil = Marktlokation {
+        marktlokations_id: Some(MaloId::new("51238696781").unwrap()),
+        bilanzierungsgebiet: Some("11YN-0000-0001-Q".into()),
+        ..Default::default()
+    };
+    assert!(mobil.validate().is_ok());
+}
+
+/// Both documents claim `Zeitreihentyp` is exactly the DE7111 Summenzeitreihen
+/// list and that `NGZ` is not in it.
+#[test]
+fn docs_zeitreihentyp_has_no_ngz() {
+    use rubo4e::current::Zeitreihentyp;
+
+    assert_eq!(
+        Zeitreihentyp::VARIANTS
+            .iter()
+            .map(Zeitreihentyp::as_wire)
+            .collect::<Vec<_>>(),
+        ["EGS", "LGS", "NZR", "SES", "SLS", "TES", "TLS", "SLS_TLS", "SES_TES"],
+    );
+    assert!(Zeitreihentyp::from_wire("NGZ").is_err());
+}

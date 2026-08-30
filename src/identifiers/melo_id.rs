@@ -1,36 +1,6 @@
-use crate::error::{IdentifierError, LengthExpectation};
+use crate::error::IdentifierError;
 
-const LEN: usize = 33;
-
-fn validate(s: &str) -> Result<(), IdentifierError> {
-    if s.len() != LEN {
-        return Err(IdentifierError::InvalidLength {
-            expected: LengthExpectation::Exact(LEN),
-            actual: s.len(),
-        });
-    }
-    // Positions 1–2: ISO 3166-1 alpha-2 country code — must be uppercase ASCII letters.
-    // Real-world examples: "DE", "AT", "CH", "LU", "CZ".
-    for c in s.chars().take(2) {
-        if !c.is_ascii_uppercase() {
-            return Err(IdentifierError::InvalidFormat {
-                description:
-                    "first two characters must be uppercase ISO 3166-1 country code (e.g. \"DE\")"
-                        .into(),
-            });
-        }
-    }
-    // Positions 3–33: alphanumeric body [A–Z, a–z, 0–9].
-    for (i, c) in s.chars().enumerate().skip(2) {
-        if !c.is_ascii_alphanumeric() {
-            return Err(IdentifierError::InvalidCharacter {
-                position: i,
-                character: c,
-            });
-        }
-    }
-    Ok(())
-}
+use super::zaehlpunkt::validate_zaehlpunktbezeichnung as validate;
 
 /// Messlokations-ID (MeLo-ID): 33-character string.
 ///
@@ -129,6 +99,7 @@ impl_identifier_traits!(MeloId, "a 33-character Messlokations-ID");
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::error::LengthExpectation;
 
     const VALID_33: &str = "DE0000000000000000000000000000001";
 

@@ -24,7 +24,10 @@
 //! |------|-----------------|-----------|
 //! | [`MaloId`] | 11 digits, first digit `1`–`9`, §8.1 check digit | BDEW §3 |
 //! | [`MeloId`] | 33 chars, first 2 uppercase ASCII (country code), rest alphanumeric | No checksum defined |
+//! | [`Zaehlpunktbezeichnung`] | the same 33 chars — a Zählpunkt that is *not* a Messlokation | MaBiS; BDEW AWH BK6-20-160 §1.6.2 |
 //! | [`MarktpartnerId`] | 13 digits — check digit **not** enforced, see below | BDEW §2 |
+//! | [`Lokationsbuendelcode`] | 13 digits, §8.1 check digit — *which* Lokationsbündelstruktur | EDI@Energy Codeliste Lokationsbündelstrukturen v1.0 |
+//! | [`LokationsbuendelObjektcode`] | 13 digits, §8.1 check digit — *where in it* an object sits | EDI@Energy Codeliste Lokationsbündelstrukturen v1.0 |
 //! | [`NeloId`] | Codetyp `'E'` + 9 `[A-Z0-9]` + §8.2 check digit | BDEW §4 (BK6-22-128) |
 //! | [`NebeId`] | Codetyp `'F'` + 9 `[A-Z0-9]` + §8.2 check digit | BDEW §5 (BK6-22-300, BK8-22/010-A) |
 //! | [`CrId`] | Codetyp `'A'` + 9 `[A-Z0-9]` + §8.2 check digit | BDEW §6.5/§6.6 — Cluster Ressource |
@@ -40,6 +43,16 @@
 //! | [`TranchennummerId`] | 1–6 decimal digits, no leading zeros (0–999 999) | MABIS PID 13003 (BK6-06-009) |
 //! | [`Iban`] | 15–34 chars, registered per-country length, MOD-97-10 check digits | ISO 13616 / ISO 7064 |
 //! | [`Bic`] | 8 or 11 chars, letters in the institution and country codes | ISO 9362 — no checksum defined |
+//!
+//! ## Helper types beside the identifiers
+//!
+//! Not every type here is an identifier. [`EicType`], [`MaloVergabestelle`],
+//! [`MpIdAuthority`] and [`ObisComponents`] are facts *read out of* an
+//! identifier, returned by its accessors. [`Zaehlpunktart`] and [`Zaehlpunkt`]
+//! are the exception that proves the rule: a Zählpunktart cannot be read out of
+//! a [`Zaehlpunktbezeichnung`] — a Zählpunkt (eMob) and a [`MeloId`] are
+//! indistinguishable as strings — so it has to be carried alongside, and
+//! [`Zaehlpunkt::as_melo_id`] is the narrowing that refuses without it.
 //!
 //! ## The two BDEW check-digit procedures
 //!
@@ -73,6 +86,7 @@ mod bank;
 mod bilanzkreis_id;
 mod checksum;
 mod eic_code;
+mod lokationsbuendel_codes;
 mod malo_id;
 mod marktpartner_id;
 mod melo_id;
@@ -82,17 +96,20 @@ pub mod schema;
 #[cfg(feature = "sqlx")]
 mod sqlx_impls;
 mod tranchennummer_id;
+mod zaehlpunkt;
 
 pub use akiv_id::{AkivId, AKIV_ID_MAX_LEN};
 pub use ascii_ids::{CrId, NebeId, NeloId, PaketId, SgId, SrId, TrId};
 pub use bank::{Bic, Iban, IBAN_MAX_LEN, IBAN_MIN_LEN};
 pub use bilanzkreis_id::{BilanzierungsgebietId, BilanzkreisId};
 pub use eic_code::{EicCode, EicType};
+pub use lokationsbuendel_codes::{LokationsbuendelObjektcode, Lokationsbuendelcode};
 pub use malo_id::{MaloId, MaloVergabestelle};
 pub use marktpartner_id::{MarktpartnerId, MpIdAuthority};
 pub use melo_id::MeloId;
 pub use obis_code::{ObisCode, ObisComponents};
 pub use tranchennummer_id::{TranchennummerId, TRANCHENNUMMER_MAX};
+pub use zaehlpunkt::{Zaehlpunkt, Zaehlpunktart, Zaehlpunktbezeichnung};
 
 /// Serde adapter module for encoding [`MarktpartnerId`] as a JSON integer (`i64`).
 ///

@@ -59,6 +59,8 @@ fn cases() -> Vec<Case> {
         case!(SrId, SR_ID),
         case!(TrId, TR_ID),
         case!(PaketId, PAKET_ID),
+        case!(Lokationsbuendelcode, LOKATIONSBUENDEL_CODE),
+        case!(LokationsbuendelObjektcode, LOKATIONSBUENDEL_OBJEKTCODE),
         case!(EicCode, EIC_CODE),
         case!(BilanzkreisId, BILANZKREIS_ID),
         case!(BilanzierungsgebietId, BILANZIERUNGSGEBIET_ID),
@@ -66,6 +68,7 @@ fn cases() -> Vec<Case> {
         case!(TranchennummerId, TRANCHENNUMMER_ID),
         case!(Iban, IBAN),
         case!(Bic, BIC),
+        case!(Zaehlpunktbezeichnung, ZAEHLPUNKTBEZEICHNUNG),
         case!(ObisCode, OBIS_CODE),
     ]
 }
@@ -74,8 +77,9 @@ fn cases() -> Vec<Case> {
 /// cannot be added without being described.
 #[test]
 fn every_exported_identifier_is_covered() {
-    // `MaloVergabestelle`, `MpIdAuthority`, `EicType` and `ObisComponents` are
-    // helper enums the accessors return, not identifiers, so they are not here.
+    // `MaloVergabestelle`, `MpIdAuthority`, `EicType`, `ObisComponents`,
+    // `Zaehlpunktart` and `Zaehlpunkt` are helper types beside the identifiers they
+    // classify, not identifiers themselves, so they are not here.
     let expected = [
         "AkivId",
         "Bic",
@@ -84,6 +88,8 @@ fn every_exported_identifier_is_covered() {
         "CrId",
         "EicCode",
         "Iban",
+        "LokationsbuendelObjektcode",
+        "Lokationsbuendelcode",
         "MaloId",
         "MarktpartnerId",
         "MeloId",
@@ -95,6 +101,7 @@ fn every_exported_identifier_is_covered() {
         "SrId",
         "TrId",
         "TranchennummerId",
+        "Zaehlpunktbezeichnung",
     ];
     let mut actual: Vec<&str> = cases().iter().map(|c| c.name).collect();
     actual.sort_unstable();

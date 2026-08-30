@@ -1,6 +1,6 @@
 +++
 title = "Identifiers"
-description = "Every BO4E market identifier as a validated newtype: MaLo-ID, MeLo-ID, EIC, OBIS, Marktpartner-ID, the Redispatch 2.0 resource IDs and the SEPA bank identifiers, with the check-digit procedures behind them."
+description = "Every BO4E market identifier as a validated newtype: MaLo-ID, MeLo-ID, the Zählpunktbezeichnung, EIC, OBIS, Marktpartner-ID, the Lokationsbündel codes, the Redispatch 2.0 resource IDs and the SEPA bank identifiers, with the check-digit procedures behind them."
 weight = 20
 +++
 
@@ -165,6 +165,47 @@ assert!(melo.is_german());              // country_code() == "DE"
 let at = MeloId::new("AT0000123456789012345678901234561")?;
 assert!(!at.is_german());
 ```
+
+## Zaehlpunktbezeichnung — a Zählpunkt that is not a Messlokation
+
+**Source:** MaBiS (BK6-24-174, Anlage 3); BDEW Anwendungshilfe zu BK6-20-160 §1.6.2  
+**Format:** the same 33 characters as a [`MeloId`](#meloid-messlokations-id)  
+**Checksum:** none defined
+
+BO4E calls `Messlokation.messlokationsId` *"Die Messlokations-Identifikation; Das
+ist die frühere Zählpunktbezeichnung"* — one grammar, and one assumed meaning.
+MaBiS names several points with a Zählpunktbezeichnung that are not
+Messlokationen, and the Anwendungshilfe is explicit for the e-mobility case:
+
+> Für den Zählpunkt (eMob) wird eine ID (Zählpunktbezeichnung) vergeben.
+> **Hinweis: Für den Zählpunkt (eMob) wird nicht die ID der Messlokation
+> (Zählpunktbezeichnung) verwendet.**
+
+Same validation, deliberately different type — the pattern
+[`Lokationsbuendelcode` and `LokationsbuendelObjektcode`](#lokationsbuendelcode-and-lokationsbuendelobjektcode)
+follow for the same reason:
+
+```rust
+use rubo4e::identifiers::{MeloId, Zaehlpunktbezeichnung};
+
+let zpb = Zaehlpunktbezeichnung::new("DE0000000000000000000000000000042").unwrap();
+assert_eq!(zpb.country_code(), "DE");
+
+// A MeLo-ID *is* a Zählpunktbezeichnung — BO4E says so on the field itself.
+let melo = MeloId::new("DE0000000000000000000000000000001").unwrap();
+let widened = Zaehlpunktbezeichnung::from(melo);
+
+// The reverse is a claim, not a fact, so it is spelled out.
+let narrowed = zpb.into_melo_id();
+```
+
+The one grammar is implemented once and shared by both types, so the two cannot
+drift. `Zaehlpunktart` sits beside them the way `EicType` sits beside `EicCode` —
+with one difference: an `EicType` is *read out of* its code (position 3), whereas
+a Zählpunktart cannot be — a Zählpunkt (eMob) and a MeLo-ID are indistinguishable
+as strings, so it has to be carried. [`Zaehlpunkt`](@/docs/beyond-the-schema.md#the-zahlpunkt-that-is-not-a-messlokation)
+is what says *which* kind of Zählpunkt a given one names, and refuses
+`as_melo_id()` for every kind that is not a Messlokation.
 
 ## The §8.2 ASCII-Verfahren family
 
@@ -412,6 +453,54 @@ pub partner_id: MarktpartnerId,
 // Serializes as: 9900357000003  (integer, not "9900357000003")
 // Deserializes from: integer or string — both accepted, integers zero-padded to 13 digits
 ```
+
+## Lokationsbuendelcode and LokationsbuendelObjektcode
+
+**Source:** EDI@Energy / BDEW, *"Codeliste der Lokationsbündelstrukturen"* v1.0
+(31 March 2023, applicable from 1 October 2024)  
+**Format:** 13 decimal digits  
+**Checksum:** §8.1 check digit at position 13 — the same arithmetic as a MaLo-ID
+
+The two codes that carry a Lokationsbündelstruktur: *which* structure a
+Netzanschluss has, and *where in it* one object sits.
+
+```rust
+use rubo4e::identifiers::{Lokationsbuendelcode, LokationsbuendelObjektcode};
+
+let struktur = Lokationsbuendelcode::new("9992000000026").unwrap();
+let objekt = LokationsbuendelObjektcode::new("9992000001016").unwrap();
+
+// The codelist prints codes grouped 4-5-3-1 for legibility; the wire never has
+// the spaces, and neither does the stored value.
+assert_eq!(struktur.grouped(), "9992 00000 002 6");
+assert_eq!(struktur.as_str(), "9992000000026");
+
+// Derived rather than typed by hand.
+assert_eq!(LokationsbuendelObjektcode::from_base("999200000101").unwrap(), objekt);
+assert_eq!(LokationsbuendelObjektcode::check_digit("999200000101").unwrap(), 6);
+```
+
+Two things separate these from [`MarktpartnerId`](#marktpartnerid-marktpartner-id-mp-id),
+the other 13-digit BDEW code:
+
+- **The check digit is enforced.** An MP-ID may carry either the §8.1 digit or a
+  GS1/EAN-13 one and the leading digits do not reliably separate them, so
+  `MarktpartnerId` checks neither. A Lokationsbündel code has no such ambiguity:
+  all 42 published codes verify under §8.1.
+- **They are two types.** The validation is identical, but a structure code where
+  an object code belongs describes a bundle that does not exist, and no checksum
+  notices. The type does.
+
+A well-formed code outside the published list still constructs — BDEW may extend
+the list, and the document itself says complex structures are agreed bilaterally
+rather than coded. Resolving one to its *meaning* is
+[`rubo4e::lokationsbuendel`](@/docs/lokationsbuendel.md), which returns `None`
+there.
+
+Neither type is used on a generated struct field: `lokationsbuendelcode` and
+`lokationsbuendelObjektcode` stay `Option<String>`, for the same reason
+[`Zahlungsinformation.iban`](#these-two-fields-stay-string-on-the-generated-struct) does. The checked
+accessors cost the caller one `Result` instead of costing them the whole BO.
 
 ## BilanzkreisId and BilanzierungsgebietId
 

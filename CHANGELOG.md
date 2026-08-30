@@ -10,7 +10,219 @@ also carries a **Schema deltas** section (see [Versioning](https://hupe1980.gith
 so downstream guards (SQL `CHECK` lists, variant-count assertions, coverage
 tests) can be updated deliberately instead of discovering drift at runtime.
 
-## [0.13.0] — unreleased
+## [0.14.0] — unreleased
+
+Everything here sits *beside* the generated schema rather than inside it. BO4E
+`v202607.1.0` is unchanged; what changes is how much of the market's own rulebook
+the crate can read off it — the Lokationsbündelstruktur codelist, the Zählpunkt
+that is deliberately not a Messlokation, and one reading shape across all three
+BO4E interval series.
+
+The rule every addition follows: **a generated enum is never forked.** A value
+added to one emits a wire string every other BO4E implementation decodes as its
+`Unknown` catch-all, and which this crate's own `ensure_known_enums()` then
+rejects. See [Beyond the Schema](https://hupe1980.github.io/rubo4e/docs/beyond-the-schema/).
+
+### Changed *(breaking)*
+
+- **`TechnischeRessource`'s three outward references are now typed identifiers.**
+  `zugeordneteSteuerbareRessourceId` is an `SrId`, `zugeordneteMarktlokationId` a
+  `MaloId`, `vorgelagerteMesslokationId` a `MeloId` — where all three were
+  `Option<String>`.
+
+  The struct's *own* `technischeRessourceId` was already a `TrId`, so a payload
+  with a malformed TR-ID already failed to decode while one with a malformed
+  reference passed silently. That asymmetry had no justification: the schema names
+  the referenced object outright in each case, and the blast radius is the same
+  struct either way.
+
+  These three are the § 14a EnWG chain — technische Ressource → steuerbare
+  Ressource → Marktlokation — the one every consumer walks, and it no longer costs
+  a `SrId::try_from(&s)` at each hop.
+
+  **Migration:** `tr.zugeordnete_steuerbare_ressource_id` now yields
+  `Option<SrId>`. `.as_deref()` gives the `&str` the field used to be; to write
+  one, `SrId::new(s)?` or `SrId::from_base(base)?`.
+
+### Added
+
+- **MaBiS and the e-mobility Modell 2 of BK6-20-160.** BO4E models the market's
+  objects; MaBiS (BNetzA **BK6-24-174**, Anlage 3) adds how they are settled, and
+  BO4E carries only what fits an existing Geschäftsobjekt. This module carries the
+  rest, and — as importantly — says where BO4E already has what you were about to
+  add.
+
+  The rule it follows: **a generated enum is never forked.** A value added to one
+  emits a wire string every other BO4E implementation decodes as its `Unknown`
+  catch-all, and which this crate's own `ensure_known_enums()` then rejects. The
+  honest answers, in order, are: BO4E already has it somewhere else; the state is
+  readable from the fields BO4E does have; or it rides in a registered
+  `ZusatzAttribut` key as a value type.
+
+  - `Zaehlpunktbezeichnung` (in `identifiers`) and `Zaehlpunkt` / `Zaehlpunktart`
+    — BO4E calls `messlokationsId` *"die frühere Zählpunktbezeichnung"* and so
+    assumes every one names a Messlokation. The BDEW Anwendungshilfe to
+    BK6-20-160 §1.6.2 is explicit that the Zählpunkt (eMob) does not:
+    *"Für den Zählpunkt (eMob) wird **nicht** die ID der Messlokation
+    (Zählpunktbezeichnung) verwendet."* Same 33-character grammar as `MeloId`,
+    implemented once and shared, deliberately a different type — and
+    `Zaehlpunkt::as_melo_id()` returns `None` for every kind that is not a
+    Messlokation.
+  - `Bilanzierung::aggregationszustaendigkeit()` / `aggregation_ruht()` /
+    `is_modell_2()`, and `convenience::Aggregationszustaendigkeit` — on the move into
+    Modell 2 the Aggregationsverantwortung *ruht* (AWH §1.6.2). `Aggregations­-
+    verantwortung` has two members and cannot say so, and the wire encoding is an
+    **absent** field, so the state is read from the pair with
+    `abwicklungsmodell`: four values, because `None` alone is genuinely ambiguous.
+  - `Marktlokation::bilanzierungsgebiet_checked()` — the field stays a
+    `String` (BO4E names no format for it), and this pins it to ENTSO-E object type
+    `'Y'` (Area), which is what MaBiS 3.5 requires.
+
+  **And where it stops.** Every item in the module passes one test: *does it read,
+  type, or guard a value that arrives in a BO4E payload?* A Bilanzierungsgebiet's
+  Stammdaten — Regelzone, a Gültigkeitsbeginn that may fall only on the first of a
+  month, the owning Marktpartner-ID, the Deltazeitreihen-Bilanzkreis — read none,
+  so they are deliberately **not** modelled here: that would be a new aggregate
+  wrapped in a `ZusatzAttribut` no other BO4E implementation understands, which is
+  the same thing `Lokationsbuendel` is a *view* rather than a Geschäftsobjekt to
+  avoid. What BO4E does carry is the EIC, and that is typed above; the aggregate
+  belongs in the crate that owns the MaBiS processes, which can depend on `rubo4e`
+  for the identifier layer.
+  - `TechnischeRessource::is_emobilitaetsladesaeule()` / `is_emobilitaet()`.
+
+  **Where they live.** There is no `mabis` module, and no `mabis` documentation
+  page: a module or page named for a *standard* invites everything that standard
+  covers, and this crate holds only what reads a BO4E field. (A wire **namespace**
+  may name one, because there it is a provenance tag — `mabis:zaehlpunkt` tells a
+  consumer where the value's shape is published.) `Zaehlpunktart` and `Zaehlpunkt` sit in `identifiers`
+  beside the ID they classify — the way `EicType` sits beside `EicCode`, with the
+  one difference that a Zählpunktart cannot be *read out of* the string and so has
+  to be carried. The three accessors are **inherent** methods in `convenience`,
+  beside `Zahlungsinformation::iban_checked()`, whose shape
+  `bilanzierungsgebiet_checked()` copies field for field — so none of them costs a
+  trait import.
+
+  Three things that look missing from BO4E and are **not**, each now pinned by a
+  test in `tests/modell2.rs` so the claim cannot rot:
+
+  | Looks missing | Actually |
+  |---|---|
+  | `Zeitreihentyp::Ngz` | `Zeitreihentyp` is chapter 1 of the BDEW *"Codeliste der Zeitreihentypen"* — the **Summen**zeitreihentypen of DE7111, which its schema description says outright. `NGZ` is not a code there in any published version (1.1a of 2012 through 1.1d of 2021); it appears only inside the explanation of `NZR`. A Netzgangzeitreihe is an MSCONS Prüfidentifikator **13018** payload — in BO4E a `Lastgang` at a `Zaehlpunkt`. |
+  | `Verbrauchsart::EMobilitaetsladesaeule` | BO4E models the charging point on the technische Ressource — `EMobilitaetsart::EMobilitaetsladesaeule` and `TechnischeRessourceVerbrauchsart::EMobilitaet` — not on `Marktlokation.verbrauchsart`, which is the Kraft/Licht/Wärme categorisation. A `ZusatzAttribut` here would be a second spelling of a value the standard already has. |
+  | mandatory fields blocking a mobile Marktlokation | `Marktlokation` declares **no** `required` field, and this crate's only cross-field rule is *at most one* Ortsangabe — a conflict rule, not a presence rule. A Modell-2 MaLo with no address, no Zählwerk and no Verbrauchsart validates. |
+
+  See [MaBiS & Modell 2](https://hupe1980.github.io/rubo4e/docs/mabis/).
+
+- **Typed, registered `ZusatzAttribut` keys — `AttributKey<T>` and
+  `zusatz_attribut::well_known`.** A [`Namespace`] stops two systems colliding on a
+  *name*; it does not stop them disagreeing about what the value behind that name
+  **is**. `AttributKey<T>` pins the key and its type together as one `const` both
+  sides import, and `well_known` holds the ones this crate registers — currently
+  just `mabis:zaehlpunkt`. The list is short on purpose: a key there is public API,
+  and the bar is that the value must **qualify a BO4E field** that cannot express
+  the distinction on its own. A domain aggregate of another standard does not
+  qualify, and registers its own key in its own namespace. A fourth namespace,
+  `mabis`, joins `mako`, `hems` and `edmd`.
+
+  [`Namespace`]: https://docs.rs/rubo4e/latest/rubo4e/zusatz_attribut/struct.Namespace.html
+
+- **`Zaehlpunktbezeichnung`** — the 33-character Zählpunktbezeichnung as its own
+  identifier, sharing one validator with `MeloId` so the two grammars cannot
+  drift. `From<MeloId>` widens (BO4E says every MeLo-ID is one); `into_melo_id()`
+  narrows, and is spelled out because it is a claim rather than a fact.
+
+- **Lokationsbündelstrukturen — `rubo4e::lokationsbuendel`.** BO4E `v202607.1.0`
+  defines **no** `Lokationsbuendel` Geschäftsobjekt, and `BoTyp` has no
+  `LOKATIONSBUENDEL` member; the bundle is a `Lokationszuordnung` plus two
+  13-digit BDEW codes — `lokationsbuendelcode` (*which* structure) and
+  `lokationsbuendelObjektcode` on each participant (*where in it*). Looking for
+  the BO and finding only `Lokationszuordnung` is the model, not a gap.
+
+  This release ships EDI@Energy's **"Codeliste der Lokationsbündelstrukturen"**
+  (BDEW v1.0, 31 March 2023, applicable from 1 October 2024) as static data — all
+  15 structures and all 27 object codes, with each structure's cardinalities,
+  levels, directions and the object references its flexible rows require — plus:
+
+  - `Lokationsbuendelcode` and `LokationsbuendelObjektcode`, two distinct
+    newtypes over the same §8.1 check-digit arithmetic. Distinct because a
+    structure code where an object code belongs describes a bundle that does not
+    exist, and no checksum notices. Unlike `MarktpartnerId`, the check digit *is*
+    enforced: all 42 published codes verify under §8.1, and there is no GS1
+    ambiguity to make that unsafe.
+  - `Objektrolle::from_code`, which resolves one object code to the three facts it
+    pins at once — object type, energy-flow direction, level.
+  - `Lokationsbuendel`, a borrowed **view** over a `Lokationszuordnung`. Not a
+    Geschäftsobjekt and not serialisable: inventing one would produce a payload no
+    other BO4E implementation reads. `verbrauchs_ressourcen()` and
+    `objekte_auf_ebene()` are the § 14a EnWG queries.
+  - `Lokationszuordnung::audit_buendel()`, which checks a decoded bundle against
+    the structure it declares: unknown or malformed codes, an object filed under
+    the wrong type, a code the structure does not use, and every cardinality —
+    including "exactly one Marktlokation" met by zero. A data-quality report, not
+    `.validate()`, the same line `Bo4eTimeSeries::audit` draws.
+
+  The codes stay `Option<String>` on the generated structs. A newtype there would
+  make one mistyped code fail the deserialization of the whole `Marktlokation` —
+  the trade `Zahlungsinformation::iban_checked` settles the same way.
+
+  `SteuerbareRessource` carries `lokationsbuendelObjektcode` too, but chapter 2.1
+  of the codelist covers NeLo, MeLo, MaLo and TR only, so there is no object code
+  that *means* "steuerbare Ressource". The audit lists them and leaves them alone
+  rather than reporting every entry as unknown.
+
+  See [Lokationsbündel](https://hupe1980.github.io/rubo4e/docs/lokationsbuendel/).
+
+- **Namespaced `ZusatzAttribut`s — `rubo4e::zusatz_attribut`.** BO4E gives every
+  Geschäftsobjekt and component a `zusatzAttribute` list for what the standard has
+  no field for, and says nothing about how two systems writing into it stay out of
+  each other's way. `"id"` written by a market-communication layer and by a
+  household model is *one* entry, and the second write wins.
+
+  `Namespace` supplies the missing half: a `namespace:key` convention, a registry
+  of the prefixes the ecosystem has claimed (`mako`, `hems`, `edmd`), and
+  `ZusatzAttributeExt` — get, set, remove, list, and `serde`-typed values —
+  blanket-implemented over a generated accessor pair, so it is available on all 95
+  BO4E types that declare the field. `ZusatzAttribut` itself is the one that does
+  not, which is what stops an attribute list nesting inside an attribute.
+
+  The wire form is the flat BO4E name (`{"name": "hems:eebus-ski", …}`), so any
+  BO4E reader still sees an ordinary `ZusatzAttribut` and a foreign prefix
+  round-trips untouched. `remove_zusatz_attribute_in` strips one system's entries
+  before a document is handed on.
+
+  Checked against the schema this crate is generated from, `v202607.1.0` models
+  **neither** the § 14a EnWG Steuerungsvariante (Direktansteuerung vs. steering
+  through a customer EMS) **nor** an EEBUS SKI or any other identifier of a
+  Steuerungseinrichtung. `SteuerkanalLeistungsbeschreibung` is `AN_AUS` /
+  `GESTUFT` — what the channel *can do*, not who steers it — and
+  `steuerbareRessourceId` is the BDEW SR-ID, a market identifier rather than a
+  device key. Both therefore belong in a namespace. `rubo4e` deliberately ships
+  the mechanism and not the values: a `Steuerungsvariante` enum here would invent
+  a code list the market has not published.
+
+- **One reading shape for every interval series — `IntervalReading` and
+  `Bo4eIntervals`.** BO4E puts a value on a stretch of time in three places that
+  look nothing alike: `Lastgang` and `Zeitreihe` hold a `Vec<Zeitreihenwert>`
+  whose unit lives on the enclosing BO, `Energiemenge` is a single `Menge` over a
+  `Zeitraum`. A consumer that wants "a series of readings" wrote the mapping three
+  times.
+
+  `Bo4eIntervals` produces `IntervalReading` from all three, and
+  `to_zeitreihenwert` / `to_energiemenge` / `Zeitreihe::from_intervals` /
+  `Lastgang::from_intervals` write it back. `IntervalReading::energy()` collapses
+  the two spellings of "how much energy": an energy unit passes through, a power
+  unit is multiplied by the interval length, and `total_energy()` answers in kWh
+  from a kW load profile and a kWh series alike. The reading borrows only the OBIS
+  code, so a year of quarter-hours allocates nothing.
+
+  An unusable reading is skipped rather than counted as zero — a `FEHLT` slot
+  carrying `0` is an absence — and `audit()` remains where the gap it leaves gets
+  reported. Not implemented for `Zaehlwerk`: its `messwerte` are cumulative
+  register *states*, and `consumption_between` is that shape's arithmetic.
+
+  See [Time Series & Units](https://hupe1980.github.io/rubo4e/docs/timeseries/#one-reading-shape-for-all-three).
+
+## [0.13.0] — 2026-08-27
 
 This release is a wire-format correction. Every payload rubo4e produced carried
 an invalid `_version`, COMs never stamped `_typ`, and `Rechnung` could not read

@@ -367,6 +367,53 @@ fn every_struct_with_a_typ_implements_bo4e_typed() {
     );
 }
 
+/// Every schema that declares `zusatzAttribute` must get the accessor pair
+/// `ZusatzAttributeExt` is blanket-implemented over — and nothing else may.
+///
+/// The generator keys the impl on the field rather than on a list of type names,
+/// so a schema that gains or loses `zusatzAttribute` changes the set silently.
+/// This is what makes that visible.
+#[test]
+fn every_struct_with_zusatz_attribute_implements_the_accessor() {
+    let mut with_field = Vec::new();
+    let mut without_field = Vec::new();
+
+    for category in ["bo", "com", ""] {
+        for (title, doc) in read_schemas(&schema_dir().join(category)) {
+            let declares = doc
+                .get("properties")
+                .and_then(|p| p.get("zusatzAttribute"))
+                .is_some();
+            let src = generated_source_flat(&title);
+            let has_impl = src.contains(&format!(
+                "implcrate::zusatz_attribut::HasZusatzAttributefor{title}"
+            ));
+            assert_eq!(
+                declares, has_impl,
+                "{title}: declares zusatzAttribute = {declares}, but implements \
+                 HasZusatzAttribute = {has_impl}; run `just generate`"
+            );
+            if declares {
+                with_field.push(title);
+            } else {
+                without_field.push(title);
+            }
+        }
+    }
+
+    assert!(
+        with_field.len() >= 90,
+        "expected ~95 schemas with zusatzAttribute, saw {}",
+        with_field.len()
+    );
+    assert_eq!(
+        without_field,
+        ["ZusatzAttribut"],
+        "ZusatzAttribut is the one BO4E schema that carries no list of its own — \
+         an attribute list nesting inside an attribute is what that prevents"
+    );
+}
+
 /// …and the same through the API: one bound reaches a BO and a COM alike.
 #[test]
 fn one_bound_covers_business_objects_and_components() {

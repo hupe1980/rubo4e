@@ -1067,6 +1067,231 @@ mod zahlungsinformation_impl {
     }
 }
 
+// ── Marktlokation / Bilanzierung / TechnischeRessource — the market rules ────
+//
+// Three accessors in the `iban_checked()` shape above: the schema leaves a field
+// loose, a rule outside the schema tightens it, and the check runs on demand
+// rather than at deserialization, where refusing a value would take the whole
+// enclosing object down.
+
+#[cfg(feature = "versioned")]
+pub use marktregeln_impl::Aggregationszustaendigkeit;
+
+#[cfg(feature = "versioned")]
+mod marktregeln_impl {
+    use crate::error::IdentifierError;
+    use crate::generated::v202607::{
+        Abwicklungsmodell, Aggregationsverantwortung, Bilanzierung, EMobilitaetsart, Marktlokation,
+        TechnischeRessource, TechnischeRessourceVerbrauchsart,
+    };
+    use crate::identifiers::BilanzierungsgebietId;
+
+    impl Marktlokation {
+        /// Parses `bilanzierungsgebiet` as a [`BilanzierungsgebietId`] — an EIC
+        /// pinned to ENTSO-E object type `'Y'` (Area).
+        ///
+        /// The field stays a `String` on the generated struct because BO4E
+        /// documents it only as *"Bilanzierungsgebiet, dem das Netzgebiet
+        /// zugeordnet ist"* and names no format, and this crate types a field only
+        /// where the schema names one. MaBiS (BNetzA **BK6-24-174**, Anlage 3,
+        /// Kapitel 3.5) does name one — *"Jedes BG ist durch einen eindeutigen
+        /// Energy Identification Code (EIC) zu kennzeichnen"* — and every
+        /// published Bilanzierungsgebiet EIC carries object type `'Y'`, which is
+        /// what tells it from a Bilanzkreis (`11X…`).
+        ///
+        /// Returns `None` when the field is absent, so "not stated" and "stated
+        /// but invalid" stay distinguishable — the same contract as
+        /// [`Zahlungsinformation::iban_checked`](crate::current::Zahlungsinformation::iban_checked).
+        ///
+        /// # Errors
+        ///
+        /// [`IdentifierError`] when the value is not a 16-character EIC of object
+        /// type `'Y'`.
+        ///
+        /// ```
+        /// # #[cfg(feature = "versioned")] {
+        /// use rubo4e::current::Marktlokation;
+        ///
+        /// let malo = Marktlokation {
+        ///     bilanzierungsgebiet: Some("11YN-0000-0001-Q".into()),
+        ///     ..Default::default()
+        /// };
+        /// assert!(malo.bilanzierungsgebiet_checked().unwrap().is_ok());
+        ///
+        /// // A Bilanzkreis is a *party* code, not an area code.
+        /// let wrong = Marktlokation {
+        ///     bilanzierungsgebiet: Some("11XSUEDWESTSTRO8".into()),
+        ///     ..Default::default()
+        /// };
+        /// assert!(wrong.bilanzierungsgebiet_checked().unwrap().is_err());
+        /// assert!(Marktlokation::default().bilanzierungsgebiet_checked().is_none());
+        /// # }
+        /// ```
+        #[must_use]
+        pub fn bilanzierungsgebiet_checked(
+            &self,
+        ) -> Option<Result<BilanzierungsgebietId, IdentifierError>> {
+            Some(BilanzierungsgebietId::new(
+                self.bilanzierungsgebiet.as_deref()?,
+            ))
+        }
+    }
+
+    /// Who aggregates the Energiemenge of a Marktlokation — including the state
+    /// BO4E has no value for.
+    ///
+    /// [`Aggregationsverantwortung`] has exactly two members, `UENB` and `VNB`.
+    /// The e-mobility Modell 2 of BNetzA **BK6-20-160** needs a third: on the move
+    /// into Modell 2 the Aggregationsverantwortung for the Energiemenge of the
+    /// MaLo **ruht** (BDEW Anwendungshilfe v1.3, § 1.6.2 — *"Beim Wechsel in das
+    /// Modell 2 ruht die Aggregationsverantwortung für die Energiemenge der MaLo
+    /// (NB oder ÜNB)"*).
+    ///
+    /// The wire encoding for that state is an **absent**
+    /// `aggregationsverantwortung`, not a new enum value: writing `"RUHEND"` into
+    /// the field produces a string every other BO4E implementation decodes as its
+    /// `Unknown` catch-all, and which this crate's own
+    /// [`Bo4eStrict`](crate::Bo4eStrict) rejects. So the state is read from the
+    /// *pair* of fields, which is what [`Bilanzierung::aggregationszustaendigkeit`]
+    /// does — and why there are four values rather than three: an absent field
+    /// alone is genuinely ambiguous.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+    #[non_exhaustive]
+    pub enum Aggregationszustaendigkeit {
+        /// `aggregationsverantwortung = UENB`.
+        Uebertragungsnetzbetreiber,
+        /// `aggregationsverantwortung = VNB`.
+        Verteilnetzbetreiber,
+        /// Nobody holds it: Modell 2, and no `aggregationsverantwortung` stated.
+        Ruhend,
+        /// No `aggregationsverantwortung`, and nothing that says it ruht.
+        ///
+        /// BO4E declares the field optional and most payloads omit it, so this is
+        /// the common case — not an error.
+        Unbekannt,
+    }
+
+    impl Bilanzierung {
+        /// `true` if `abwicklungsmodell` is
+        /// [`Modell2`](Abwicklungsmodell::Modell2) — the ladevorgangscharfe model
+        /// of BK6-20-160.
+        #[must_use]
+        pub fn is_modell_2(&self) -> bool {
+            self.abwicklungsmodell == Some(Abwicklungsmodell::Modell2)
+        }
+
+        /// Who aggregates, in the three states the market rules need plus "not
+        /// stated".
+        ///
+        /// ```
+        /// # #[cfg(feature = "versioned")] {
+        /// use rubo4e::convenience::Aggregationszustaendigkeit;
+        /// use rubo4e::current::{Abwicklungsmodell, Aggregationsverantwortung, Bilanzierung};
+        ///
+        /// // Modell 2 and nobody named: it ruht.
+        /// let modell2 = Bilanzierung {
+        ///     abwicklungsmodell: Some(Abwicklungsmodell::Modell2),
+        ///     ..Default::default()
+        /// };
+        /// assert_eq!(
+        ///     modell2.aggregationszustaendigkeit(),
+        ///     Aggregationszustaendigkeit::Ruhend,
+        /// );
+        /// assert!(modell2.aggregation_ruht());
+        ///
+        /// // An absent field *alone* says nothing at all.
+        /// assert_eq!(
+        ///     Bilanzierung::default().aggregationszustaendigkeit(),
+        ///     Aggregationszustaendigkeit::Unbekannt,
+        /// );
+        ///
+        /// // A named holder is a named holder, whatever the model.
+        /// let vnb = Bilanzierung {
+        ///     abwicklungsmodell: Some(Abwicklungsmodell::Modell2),
+        ///     aggregationsverantwortung: Some(Aggregationsverantwortung::Vnb),
+        ///     ..Default::default()
+        /// };
+        /// assert_eq!(
+        ///     vnb.aggregationszustaendigkeit(),
+        ///     Aggregationszustaendigkeit::Verteilnetzbetreiber,
+        /// );
+        /// # }
+        /// ```
+        #[must_use]
+        pub fn aggregationszustaendigkeit(&self) -> Aggregationszustaendigkeit {
+            match self.aggregationsverantwortung {
+                Some(Aggregationsverantwortung::Uenb) => {
+                    Aggregationszustaendigkeit::Uebertragungsnetzbetreiber
+                }
+                Some(Aggregationsverantwortung::Vnb) => {
+                    Aggregationszustaendigkeit::Verteilnetzbetreiber
+                }
+                // An out-of-schema value decoded leniently says nothing reliable.
+                Some(Aggregationsverantwortung::Unknown) => Aggregationszustaendigkeit::Unbekannt,
+                None if self.is_modell_2() => Aggregationszustaendigkeit::Ruhend,
+                None => Aggregationszustaendigkeit::Unbekannt,
+            }
+        }
+
+        /// `true` where the Aggregationsverantwortung ruht.
+        #[must_use]
+        pub fn aggregation_ruht(&self) -> bool {
+            self.aggregationszustaendigkeit() == Aggregationszustaendigkeit::Ruhend
+        }
+    }
+
+    impl TechnischeRessource {
+        /// `true` if either `emobilitaetsart` is stated or
+        /// `technischeRessourceVerbrauchsart` is `E_MOBILITAET`.
+        ///
+        /// This is where BO4E puts e-mobility — **not** on
+        /// [`Marktlokation.verbrauchsart`](crate::current::Verbrauchsart), which
+        /// is the Kraft/Licht/Wärme categorisation and has no charging-point
+        /// member. A `ZusatzAttribut` for this would be a second spelling of a
+        /// value the standard already has.
+        #[must_use]
+        pub fn is_emobilitaet(&self) -> bool {
+            self.emobilitaetsart
+                .is_some_and(|a| crate::Bo4eEnum::is_known(&a))
+                || self.technische_ressource_verbrauchsart
+                    == Some(TechnischeRessourceVerbrauchsart::EMobilitaet)
+        }
+
+        /// `true` if `emobilitaetsart` is
+        /// [`EMobilitaetsladesaeule`](EMobilitaetsart::EMobilitaetsladesaeule) —
+        /// the precondition BK6-20-160 Modell 2 states for the Marktlokation.
+        ///
+        /// ```
+        /// # #[cfg(feature = "versioned")] {
+        /// use rubo4e::current::{
+        ///     EMobilitaetsart, TechnischeRessource, TechnischeRessourceVerbrauchsart,
+        /// };
+        ///
+        /// let ladesaeule = TechnischeRessource {
+        ///     emobilitaetsart: Some(EMobilitaetsart::EMobilitaetsladesaeule),
+        ///     technische_ressource_verbrauchsart:
+        ///         Some(TechnischeRessourceVerbrauchsart::EMobilitaet),
+        ///     ..Default::default()
+        /// };
+        /// assert!(ladesaeule.is_emobilitaet());
+        /// assert!(ladesaeule.is_emobilitaetsladesaeule());
+        ///
+        /// // A wallbox is e-mobility, but it is not a Ladesäule.
+        /// let wallbox = TechnischeRessource {
+        ///     emobilitaetsart: Some(EMobilitaetsart::Wallbox),
+        ///     ..Default::default()
+        /// };
+        /// assert!(wallbox.is_emobilitaet());
+        /// assert!(!wallbox.is_emobilitaetsladesaeule());
+        /// # }
+        /// ```
+        #[must_use]
+        pub fn is_emobilitaetsladesaeule(&self) -> bool {
+            self.emobilitaetsart == Some(EMobilitaetsart::EMobilitaetsladesaeule)
+        }
+    }
+}
+
 // ── Preisstaffel — tier bounds and tier selection ────────────────────────────
 
 #[cfg(all(feature = "versioned", feature = "decimal"))]

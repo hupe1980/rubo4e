@@ -40,6 +40,20 @@ pub const MARKTPARTNER_ID: IdentifierSchema = IdentifierSchema {
     example: "9900357000003",
 };
 
+/// [`Lokationsbuendelcode`](crate::identifiers::Lokationsbuendelcode).
+pub const LOKATIONSBUENDEL_CODE: IdentifierSchema = IdentifierSchema {
+    pattern: "^[0-9]{13}$",
+    description: "13-stelliger Code der Lokationsbündelstruktur nach EDI@Energy \"Codeliste der Lokationsbündelstrukturen\" (BDEW v1.0) mit Prüfziffer nach BDEW §8.1",
+    example: "9992000000026",
+};
+
+/// [`LokationsbuendelObjektcode`](crate::identifiers::LokationsbuendelObjektcode).
+pub const LOKATIONSBUENDEL_OBJEKTCODE: IdentifierSchema = IdentifierSchema {
+    pattern: "^[0-9]{13}$",
+    description: "13-stelliger Objekt-Code der Lokationsbündelstruktur: Objekttyp (MaLo/MeLo/NeLo/TR), Energieflussrichtung und Ebene, mit Prüfziffer nach BDEW §8.1",
+    example: "9992000001016",
+};
+
 // ─── §8.2 — ASCII-Verfahren identifiers ──────────────────────────────────────
 
 /// [`NeloId`](crate::identifiers::NeloId).
@@ -98,6 +112,13 @@ pub const MELO_ID: IdentifierSchema = IdentifierSchema {
     pattern: "^[A-Z]{2}[A-Za-z0-9]{31}$",
     description: "33-stellige Messlokations-ID: 2-stelliger ISO-3166-1-Ländercode + 31 alphanumerische Zeichen",
     example: "DE0000000000000000000000000000001",
+};
+
+/// [`Zaehlpunktbezeichnung`](crate::identifiers::Zaehlpunktbezeichnung).
+pub const ZAEHLPUNKTBEZEICHNUNG: IdentifierSchema = IdentifierSchema {
+    pattern: "^[A-Z]{2}[A-Za-z0-9]{31}$",
+    description: "33-stellige Zählpunktbezeichnung eines Zählpunkts, der keine Messlokation ist (z. B. Zählpunkt (eMob) nach BDEW-Anwendungshilfe zu BK6-20-160): 2-stelliger ISO-3166-1-Ländercode + 31 alphanumerische Zeichen",
+    example: "DE0000000000000000000000000000042",
 };
 
 /// [`ObisCode`](crate::identifiers::ObisCode). Its `pattern` is

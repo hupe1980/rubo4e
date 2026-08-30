@@ -3,7 +3,7 @@
 //!
 //! BO4E declares every identifier as a bare string. This table is what turns
 //! `Marktlokation.marktlokationsId` into a `MaloId` that verifies its own BDEW
-//! check digit instead of a `String` that does not. Three rules govern it:
+//! check digit instead of a `String` that does not. Four rules govern it:
 //!
 //! 1. **Keyed on `(struct, field)`** — never a bare name, never a suffix. BO4E
 //!    reuses names: `Marktlokation.marktgebiet` is *"Code vom EIC"*, while
@@ -23,10 +23,16 @@
 //!    using; `Zahlungsinformation::iban_checked()` runs the check on demand
 //!    without putting the invoice at risk.
 //!
-
+//!    The same reasoning keeps `Lokationszuordnung.lokationsbuendelcode` and the
+//!    five `lokationsbuendelObjektcode` fields as plain strings. Both are
+//!    13-digit BDEW codes with a §8.1 check digit, and `Lokationsbuendelcode` /
+//!    `LokationsbuendelObjektcode` verify them — but the object code sits on
+//!    `Marktlokation`, `Messlokation`, `Netzlokation`, `SteuerbareRessource` and
+//!    `TechnischeRessource`, so one mistyped code would take a whole location
+//!    down. `crate::lokationsbuendel`'s accessors check on demand.
 //!
 //! See `site/content/docs/generator.md` for the resulting table and the fields
-//! left untyped under rule 3.
+//! left untyped under rules 3 and 4.
 
 use std::collections::HashMap;
 use std::sync::LazyLock;
@@ -51,6 +57,26 @@ static FIELD_TYPES: LazyLock<HashMap<(&'static str, &'static str), FieldType>> =
             // ── Redispatch 2.0 resource identifiers ──────────────────────────
             (("SteuerbareRessource", "steuerbareRessourceId"), id("SrId")),
             (("TechnischeRessource", "technischeRessourceId"), id("TrId")),
+            // …and the three references `TechnischeRessource` makes out of
+            // itself.  The schema names the referenced object outright —
+            // "Referenz auf die der technischen Ressource zugeordneten Steuerbaren
+            // Ressource" — so rule 3 is met, and rule 4 adds nothing new: the
+            // struct's *own* id is already a `TrId` with exactly the same blast
+            // radius, so leaving the references as `String` made a bad TR-ID fail
+            // the decode while a bad reference passed silently.  These three are
+            // the § 14a EnWG chain (TR → SR → MaLo), the one every consumer walks.
+            (
+                ("TechnischeRessource", "zugeordneteSteuerbareRessourceId"),
+                id("SrId"),
+            ),
+            (
+                ("TechnischeRessource", "zugeordneteMarktlokationId"),
+                id("MaloId"),
+            ),
+            (
+                ("TechnischeRessource", "vorgelagerteMesslokationId"),
+                id("MeloId"),
+            ),
             // ── EIC codes ────────────────────────────────────────────────────
             //
             // Only where the schema says the field carries a *code*.  The same
@@ -189,6 +215,32 @@ mod tests {
     #[test]
     fn kontaktwert_is_not_a_decimal() {
         assert_eq!(infer_with_parent(Some("Kontaktweg"), "kontaktwert"), None);
+    }
+
+    /// A reference field is typed only where the schema names *which* object it
+    /// points at.
+    #[test]
+    fn references_are_typed_only_where_the_target_is_named() {
+        // "Referenz auf die der technischen Ressource zugeordneten Steuerbaren
+        // Ressource" — one object, one format.
+        assert_eq!(
+            infer_with_parent(
+                Some("TechnischeRessource"),
+                "zugeordneteSteuerbareRessourceId"
+            ),
+            Some(ident("SrId"))
+        );
+        assert_eq!(
+            infer_with_parent(Some("TechnischeRessource"), "zugeordneteMarktlokationId"),
+            Some(ident("MaloId"))
+        );
+        assert_eq!(
+            infer_with_parent(Some("TechnischeRessource"), "vorgelagerteMesslokationId"),
+            Some(ident("MeloId"))
+        );
+        // "Der Identifier für diejenigen Markt- **oder** Messlokation" — two
+        // formats behind one field, so neither newtype can read it.
+        assert_eq!(infer_with_parent(Some("Vertragsteil"), "lokation"), None);
     }
 
     /// No suffix, prefix, or bare-name matching: an unlisted pair keeps its

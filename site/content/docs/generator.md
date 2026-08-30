@@ -213,6 +213,13 @@ Where BO4E splits a thing into a name and a code they are separate properties, a
 only the code half is typed: `StandorteigenschaftenStrom.regelzoneEic` is an
 `EicCode`, `.regelzone` is not.
 
+A **reference** field is typed on the same rule, and only where the schema names
+which object it points at. `TechnischeRessource.zugeordneteSteuerbareRessourceId`
+is *"Referenz auf die der technischen Ressource zugeordneten Steuerbaren
+Ressource"* — one object, one format — so it is an `SrId`. `Vertragsteil.lokation`
+is *"Der Identifier für diejenigen Markt- **oder** Messlokation"* — two formats
+behind one field — so it is a `String`, and no newtype could read it.
+
 Under rule 2, `Rechnungsposition.einzelpreis` is `Preis` (`$ref`), `Betrag.wert` is
 `Decimal` (`"type": "number"`), and `Rechnung.rechnungsdatum` is `OffsetDateTime`
 (`"format": "date-time"`) — none need an entry.
@@ -235,6 +242,16 @@ Under rule 4, two fields the schema *does* name stay `String` anyway:
   (`11X…`), but the same field carries gas Bilanzkreise whose object type is not
   established here; narrowing it would turn an unverified assumption into a hard
   deserialization failure. Callers opt in via `BilanzkreisId::try_from(eic)`.
+- **`Lokationszuordnung.lokationsbuendelcode` and the five
+  `lokationsbuendelObjektcode` fields** — named outright (*"Code, der angibt wie
+  die Lokationsbündelstruktur zusammengesetzt ist"*), and
+  [`Lokationsbuendelcode`](@/docs/lokationsbuendel.md#the-two-codes) exists and
+  verifies its §8.1 check digit. But the object code sits on `Marktlokation`,
+  `Messlokation`, `Netzlokation`, `SteuerbareRessource` and `TechnischeRessource`
+  — five of the most-carried BOs in the model — so one mistyped code would fail
+  the deserialization of the whole location, id and Netzbetreiber and all.
+  `lokationsbuendel_objektcode()` and `objektrolle()` run the check on demand
+  instead, the same shape `iban_checked()` takes.
 
 ### What is typed today
 
@@ -242,11 +259,14 @@ Under rule 4, two fields the schema *does* name stay `String` anyway:
 |---|---|
 | `MaloId` | `Marktlokation`, `Bilanzierung`, `Ausschreibungsdetail` — `marktlokationsId` |
 | `MeloId` / `NeloId` | `Messlokation.messlokationsId`, `Netzlokation.netzlokationsId` |
-| `SrId` / `TrId` | `SteuerbareRessource.steuerbareRessourceId`, `TechnischeRessource.technischeRessourceId` |
+| `SrId` / `TrId` | `SteuerbareRessource.steuerbareRessourceId`, `TechnischeRessource.technischeRessourceId`, `TechnischeRessource.zugeordneteSteuerbareRessourceId` |
+| `MaloId` / `MeloId` (references) | `TechnischeRessource.zugeordneteMarktlokationId`, `TechnischeRessource.vorgelagerteMesslokationId` |
 | `EicCode` | `Marktlokation.marktgebiet`, `Marktlokation.regelzone`, `Bilanzierung.bilanzkreis`, `StandorteigenschaftenStrom.regelzoneEic`, `Fremdkostenposition.gebietcodeEic` |
 | `BilanzierungsgebietId` | `StandorteigenschaftenStrom.bilanzierungsgebietEic` |
 | `MarktpartnerId` | `Marktteilnehmer.rollencodenummer` and the six `*Codenr` / `*Codenummer` fields |
 | `ObisCode` | `Energiemenge`, `Lastgang`, `Zaehlwerk` — `obisKennzahl`; `Netzlokation.obiskennzahl` (upstream spells it with a lower-case `k`) |
+
+And, under rule 4, what is deliberately not: `Zahlungsinformation.iban` / `.bic`, `Bilanzierung.bilanzkreis` (kept broad), and the six Lokationsbündel code fields.
 
 ### Adding an entry
 

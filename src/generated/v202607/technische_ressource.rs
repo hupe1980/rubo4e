@@ -111,7 +111,8 @@ pub struct TechnischeRessource {
     #[cfg_attr(feature = "serde", serde(rename = "vorgelagerteMesslokationId"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
-    pub vorgelagerte_messlokation_id: Option<String>,
+    #[cfg_attr(feature = "validate", garde(dive))]
+    pub vorgelagerte_messlokation_id: Option<crate::identifiers::MeloId>,
     /// Wärmenutzung
     #[cfg_attr(feature = "serde", serde(rename = "waermenutzung"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
@@ -121,12 +122,14 @@ pub struct TechnischeRessource {
     #[cfg_attr(feature = "serde", serde(rename = "zugeordneteMarktlokationId"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
-    pub zugeordnete_marktlokation_id: Option<String>,
+    #[cfg_attr(feature = "validate", garde(dive))]
+    pub zugeordnete_marktlokation_id: Option<crate::identifiers::MaloId>,
     /// Referenz auf die der technischen Ressource zugeordneten Steuerbaren Ressource
     #[cfg_attr(feature = "serde", serde(rename = "zugeordneteSteuerbareRessourceId"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
-    pub zugeordnete_steuerbare_ressource_id: Option<String>,
+    #[cfg_attr(feature = "validate", garde(dive))]
+    pub zugeordnete_steuerbare_ressource_id: Option<crate::identifiers::SrId>,
     #[cfg_attr(feature = "serde", serde(rename = "zusatzAttribute"))]
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[cfg_attr(feature = "builder", builder(default, setter(into)))]
@@ -342,5 +345,13 @@ impl crate::json::Bo4eExtensions for TechnischeRessource {
                 );
             }
         }
+    }
+}
+impl crate::zusatz_attribut::HasZusatzAttribute for TechnischeRessource {
+    fn zusatz_attribute_field(&self) -> Option<&Vec<ZusatzAttribut>> {
+        self.zusatz_attribute.as_ref()
+    }
+    fn zusatz_attribute_field_mut(&mut self) -> &mut Option<Vec<ZusatzAttribut>> {
+        &mut self.zusatz_attribute
     }
 }

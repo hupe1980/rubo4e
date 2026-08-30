@@ -26,6 +26,11 @@ rubo4e/
 │   ├── iso8601_duration.rs  — Zeitraum.dauer, refusing Y/M rather than approximating
 │   ├── units.rs             — Mengeneinheit dimensions, conversion, energy ↔ power
 │   ├── timeseries.rs        — interval series (audit) and register series (consumption)
+│   ├── zusatz_attribut.rs   — namespaced ZusatzAttribute + typed AttributKey registry
+│   ├── lokationsbuendel/     — the EDI@Energy Lokationsbündel codelist
+│   │   ├── mod.rs           — Objekttyp / Flussrichtung / Objektrolle / Struktur
+│   │   ├── codelist.rs      — the published 15 structures and 27 object codes
+│   │   └── bo4e.rs          — the Lokationszuordnung view and audit_buendel
 │   ├── schema_helpers.rs    — schemars schema_with= helpers (dates, every identifier)
 │   ├── json/                — Bo4eJsonExt and the parsing hardening
 │   │   ├── mod.rs           — the three output modes + the sorted serializer
@@ -38,6 +43,8 @@ rubo4e/
 │   │   ├── checksum.rs      — BDEW chapter-8 check-digit arithmetic (one impl)
 │   │   ├── schema.rs        — pattern / description / example, read by both derives
 │   │   ├── ascii_ids.rs     — NeloId, NebeId, CrId, SgId, SrId, TrId, PaketId
+│   │   ├── lokationsbuendel_codes.rs — the two 13-digit Lokationsbündel codes
+│   │   ├── zaehlpunkt.rs    — the 33-char Zählpunktbezeichnung (shared with MeloId) + Zaehlpunktart
 │   │   ├── sqlx_impls.rs    — Type / Encode / Decode / PgHasArrayType (sqlx feature)
 │   │   ├── malo_id.rs, marktpartner_id.rs, melo_id.rs, bank.rs
 │   │   └── eic_code.rs, bilanzkreis_id.rs, obis_code.rs, akiv_id.rs, …
@@ -212,7 +219,7 @@ reorder the values, so never persist a sort key derived from it. Compare
 | `builder` | — | `typed-builder` | none | Typed builder derives on all BO/COM structs |
 | `validate` | — | `garde` | none | `.validate()` on all structs — recursive: descends into nested BOs, COMs, and identifiers |
 | `schemars` | — | `schemars` | none | `JsonSchema` derive on all types; enables `rubo4e::schema_helpers` |
-| `versioned` | — | none | none | Conditional compilation of `v202607` and `current` modules; enables `rubo4e::convenience`, `rubo4e::strict`, `rubo4e::units`, and the `Bo4eEnum` / `Bo4eStrict` traits |
+| `versioned` | — | none | none | Conditional compilation of `v202607` and `current` modules; enables `rubo4e::convenience`, `rubo4e::strict`, `rubo4e::units`, `rubo4e::zusatz_attribut`, the `LokationsbuendelExt` half of `rubo4e::lokationsbuendel`, and the `Bo4eEnum` / `Bo4eStrict` traits |
 | `time` + `versioned` | — | `time` | none | Additionally enables `rubo4e::offset_time`, `rubo4e::iso8601_duration` and `rubo4e::timeseries`, and the `Zeitraum` / `Rechnung` accessors that return their types |
 | `decimal` + `versioned` | — | `rust_decimal` | none | Additionally enables the `rubo4e::units` conversion arithmetic (`factor_to_base`, `conversion_factor`, `Menge::convert_to`) and, with `time`, the `Bo4eTimeSeries` aggregates |
 | `sqlx` | — | `sqlx` | none | `sqlx::Type`/`Encode`/`Decode`/`PgHasArrayType` for every identifier and every enum; no `json` required — both directions go through `&str` |

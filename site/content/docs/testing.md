@@ -69,6 +69,10 @@ More guards of the same kind sit alongside them, in `tests/`:
 | `site_examples.rs` | a README or site snippet that stopped compiling, or stopped meaning what the surrounding prose says |
 | `interval_conventions.rs` | a validator or accessor reading an interval bound the opposite way to the schema it came from |
 | `pinned_tag.rs` | a schema tag or MSRV written out in a workflow, recipe, or the site config instead of derived |
+| `lokationsbuendel.rs` | a bundle audit that stops seeing a departure from the structure it declares — and every published structure's own minimum being rejected by it |
+| `intervals.rs` | `Lastgang`, `Zeitreihe` and `Energiemenge` disagreeing on the energy they carry, or a round trip through `IntervalReading` losing something the schema has a field for |
+| `zusatz_attribut.rs` | a generated type losing the namespaced accessors, or a namespaced attribute not surviving the BO4E wire format |
+| `modell2.rs` | any of the six BK6-20-160 Modell-2 answers going stale — including the two negative ones: that `Zeitreihentyp` is exactly the DE7111 Summenzeitreihen list, and that a mobile Marktlokation still validates |
 
 ## Layer 1 — Golden Schema Tests
 

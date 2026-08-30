@@ -1271,6 +1271,34 @@ fn emit_struct_impls(
     // and this crate keeps it in `_additional` — so a producer that checks a
     // document by round-tripping it checks nothing. This is the call that does.
     emit_extensions_struct_impl(s, name, fields);
+
+    // HasZusatzAttribute: the field accessor pair `ZusatzAttributeExt` is
+    // blanket-implemented over. Every BO4E schema declares `zusatzAttribute`
+    // except `ZusatzAttribut` itself, so this is keyed on the field rather than
+    // on a list of type names.
+    emit_zusatz_attribute_impl(s, name, fields);
+}
+
+/// Emits `HasZusatzAttribute` for a struct that declares `zusatzAttribute`.
+///
+/// The field is `Option<Vec<ZusatzAttribut>>` in every schema that has it, and
+/// the trait hands back both the shared and the `Option` itself, so a first write
+/// can create the vector without the caller reaching for the field.
+fn emit_zusatz_attribute_impl(s: &mut String, name: &str, fields: &[Field]) {
+    let Some(field) = fields.iter().find(|f| f.name == "zusatzAttribute") else {
+        return;
+    };
+    let rust = &field.rust_name;
+    s.push_str(&format!(
+        "\nimpl crate::zusatz_attribut::HasZusatzAttribute for {name} {{\n\
+         \x20   fn zusatz_attribute_field(&self) -> Option<&Vec<ZusatzAttribut>> {{\n\
+         \x20       self.{rust}.as_ref()\n\
+         \x20   }}\n\
+         \x20   fn zusatz_attribute_field_mut(&mut self) -> &mut Option<Vec<ZusatzAttribut>> {{\n\
+         \x20       &mut self.{rust}\n\
+         \x20   }}\n\
+         }}\n"
+    ));
 }
 
 /// Whether `ft` is a bare decimal — the shape `crate::decimal_serde` handles.

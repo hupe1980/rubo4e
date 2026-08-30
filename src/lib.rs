@@ -33,6 +33,8 @@
 //! | Reject a payload that carries an out-of-schema value | [`Bo4eStrict`], [`Bo4eEnum`] |
 //! | Check that a document you produced uses only fields BO4E defines | [`json::Bo4eExtensions`] |
 //! | Check a market identifier | [`identifiers`] |
+//! | Read a Lokationsbündelstruktur, or check one | [`lokationsbuendel`] |
+//! | Carry something BO4E does not model | [`zusatz_attribut`] |
 //! | Check a document against BO4E's own rules | [`validation`] |
 //! | Work with a `Lastgang`, `Zeitreihe` or `Zaehlwerk` | [`timeseries`] |
 //! | Convert between units, or turn power into energy | [`units`] |
@@ -77,6 +79,8 @@
 /// Error types returned by identifier construction.
 pub mod error;
 pub mod identifiers;
+
+pub mod lokationsbuendel;
 
 /// JSON serialization helpers: `json::Bo4eJsonExt` with `to_json_german()`,
 /// `to_json_snake_case()`, and `to_json_canonical()`.
@@ -200,6 +204,10 @@ pub mod units;
 #[cfg(all(feature = "versioned", feature = "time"))]
 #[cfg_attr(docsrs, doc(cfg(all(feature = "versioned", feature = "time"))))]
 pub mod timeseries;
+
+#[cfg(feature = "versioned")]
+#[cfg_attr(docsrs, doc(cfg(feature = "versioned")))]
+pub mod zusatz_attribut;
 
 /// BO4E schema v202607 types.
 #[cfg(feature = "versioned")]
@@ -563,11 +571,12 @@ pub trait Bo4eStrict {
 /// | Feature | Brings in |
 /// |---|---|
 /// | always | every identifier type and [`IdentifierError`](crate::error::IdentifierError) |
-/// | `versioned` | [`Bo4eTyped`], [`Bo4eObject`], [`Bo4eComponent`], [`Bo4eEnum`], [`Bo4eStrict`], [`Dimension`](crate::units::Dimension) |
+/// | `versioned` | [`Bo4eTyped`], [`Bo4eObject`], [`Bo4eComponent`], [`Bo4eEnum`], [`Bo4eStrict`], [`Dimension`](crate::units::Dimension), [`LokationsbuendelExt`](crate::lokationsbuendel::LokationsbuendelExt), [`LokationsbuendelObjekt`](crate::lokationsbuendel::LokationsbuendelObjekt) , [`ZusatzAttributeExt`](crate::zusatz_attribut::ZusatzAttributeExt) |
 /// | `json` | [`Bo4eJsonExt`](crate::json::Bo4eJsonExt), [`Bo4eExtensionData`](crate::json::Bo4eExtensionData), [`Bo4eExtensions`](crate::json::Bo4eExtensions) |
 /// | `validate` | [`Validate`](garde::Validate), [`Validated`](crate::validation::Validated), the report helpers |
 /// | `+ decimal` | [`BetragExt`](crate::convenience::BetragExt), [`MengeExt`](crate::convenience::MengeExt), [`PreisExt`](crate::convenience::PreisExt), [`PreisstaffelSliceExt`](crate::convenience::PreisstaffelSliceExt) |
 /// | `+ time` | [`Bo4eTimeSeries`](crate::timeseries::Bo4eTimeSeries) |
+/// | `+ time + decimal` | [`Bo4eIntervals`](crate::timeseries::Bo4eIntervals), [`IntervalReading`](crate::timeseries::IntervalReading) |
 ///
 /// Not the generated BO/COM types: those are version-scoped, and
 /// `use rubo4e::current::*` is the import that says which series you meant.
@@ -575,13 +584,16 @@ pub trait Bo4eStrict {
 /// `tests/prelude_surface.rs` guards the identifier row.
 pub mod prelude {
     pub use crate::error::{IdentifierError, LengthExpectation, UnknownVariant};
-    /// Every identifier type, and the helper enums their accessors return —
-    /// including the whole BDEW Ressourcen-ID family, so there is no set of four
-    /// to remember as missing.
+    /// Every identifier type, plus the helper types that sit beside them — the
+    /// enums an accessor returns (`EicType`, `MpIdAuthority`, …) and
+    /// [`Zaehlpunktart`], which classifies an
+    /// ID that cannot classify itself. Includes the whole BDEW Ressourcen-ID
+    /// family, so there is no set of four to remember as missing.
     pub use crate::identifiers::{
-        AkivId, Bic, BilanzierungsgebietId, BilanzkreisId, CrId, EicCode, EicType, Iban, MaloId,
-        MaloVergabestelle, MarktpartnerId, MeloId, MpIdAuthority, NebeId, NeloId, ObisCode,
-        ObisComponents, PaketId, SgId, SrId, TrId, TranchennummerId,
+        AkivId, Bic, BilanzierungsgebietId, BilanzkreisId, CrId, EicCode, EicType, Iban,
+        LokationsbuendelObjektcode, Lokationsbuendelcode, MaloId, MaloVergabestelle,
+        MarktpartnerId, MeloId, MpIdAuthority, NebeId, NeloId, ObisCode, ObisComponents, PaketId,
+        SgId, SrId, TrId, TranchennummerId, Zaehlpunkt, Zaehlpunktart, Zaehlpunktbezeichnung,
     };
 
     /// Uniform enum introspection + strict parsing (`VARIANTS`, `from_wire`, …).
@@ -644,4 +656,22 @@ pub mod prelude {
     /// `sum`, `integrate`.
     #[cfg(all(feature = "versioned", feature = "time"))]
     pub use crate::timeseries::Bo4eTimeSeries;
+
+    /// One reading shape for `Lastgang`, `Zeitreihe` **and** `Energiemenge`:
+    /// `intervals`, `total_energy`.
+    #[cfg(all(feature = "versioned", feature = "time", feature = "decimal"))]
+    pub use crate::timeseries::{Bo4eIntervals, IntervalReading};
+
+    /// Read a `Lokationszuordnung` as the Lokationsbündel it describes, and check
+    /// it against the structure it declares.
+    #[cfg(feature = "versioned")]
+    pub use crate::lokationsbuendel::{LokationsbuendelExt, LokationsbuendelObjekt};
+
+    /// Namespaced `ZusatzAttribut` access on every BO and COM.
+    ///
+    /// The trait only: `Namespace` is too common a name to put in a glob import,
+    /// so it is named at the one call site that needs it —
+    /// `use rubo4e::zusatz_attribut::Namespace`.
+    #[cfg(feature = "versioned")]
+    pub use crate::zusatz_attribut::ZusatzAttributeExt;
 }

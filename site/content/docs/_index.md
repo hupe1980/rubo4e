@@ -18,3 +18,7 @@ digits, cross-field invariants, and strict decoding boundaries.
 
 If you are new to the crate, read **Architecture** first for the layout, then
 **Identifiers** for the part that carries the most domain weight.
+
+If you are extending it — because a market rule needs a fact BO4E has no field
+for — read **Beyond the Schema**. It carries the one test every addition passes,
+and the reason a generated enum is never forked.

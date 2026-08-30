@@ -531,6 +531,151 @@ returns `Err(ExtensionInsertError)` rather than growing past either, and no
 Replacing an existing key is always allowed, even at capacity, since it does not
 grow the map.
 
+## ZusatzAttribute and namespaces
+
+`ExtensionData` above is about fields BO4E does **not** define — keys that arrived
+and had nowhere to go. `zusatzAttribute` is the opposite: the list BO4E *does*
+define, on every Geschäftsobjekt and every component, for exactly the values a
+sender wants to carry and the standard has no field for.
+
+BO4E defines the list and then says nothing about how two systems writing into it
+stay out of each other's way. Two facts follow, and both are why `rubo4e` supplies
+a convention rather than leaving the field bare:
+
+1. **A collision is silent.** `"id"` written by a market-communication layer and
+   by a household model is *one* entry, and the second write wins.
+2. **A receiver may drop it.** BO4E states no obligation to round-trip
+   `zusatzAttribute`, so a namespaced value is a hint you re-derive, never the
+   system of record.
+
+`rubo4e::zusatz_attribut` is a `namespace:key` convention, a small registry of the
+prefixes the ecosystem has claimed, and accessors that read and write through it.
+`ZusatzAttributeExt` is blanket-implemented over a generated trait, so it is
+available on every BO4E type that declares the field:
+
+```rust
+use rubo4e::current::SteuerbareRessource;
+use rubo4e::zusatz_attribut::{Namespace, ZusatzAttributeExt};
+
+let mut sr = SteuerbareRessource::default();
+sr.set_zusatz_attribut_in(&Namespace::HEMS, "eebus-ski", "d1e2…d9e0");
+sr.set_zusatz_attribut_in(&Namespace::MAKO, "vorgangsnummer", "V-2026-0001");
+
+assert_eq!(sr.zusatz_attribut_str_in(&Namespace::HEMS, "eebus-ski"), Some("d1e2…d9e0"));
+assert_eq!(sr.zusatz_attribut_namespaces(), ["hems", "mako"]);
+```
+
+The wire form is the flat BO4E name — `{"name": "hems:eebus-ski", "wert": "…"}` —
+so any BO4E reader still sees an ordinary `ZusatzAttribut`, and a foreign prefix
+you do not recognise round-trips untouched.
+
+### Registered prefixes
+
+| Prefix | For |
+|---|---|
+| `mako` | market communication — Vorgang metadata, message references, sender/receiver context |
+| `hems` | home energy management — device keys, § 14a steering, anything the household model knows that BO4E does not |
+| `edmd` | Energiedaten-Management — series provenance, replacement-value procedure, back-end keys |
+| `mabis` | settlement facts fixed by a published BNetzA or BDEW document — the keys this crate itself registers, see below |
+
+`mabis` names a *standard* where the other three name systems, and that is
+deliberate: a namespace is a wire-level **provenance** tag, read by a consumer
+deciding whether an attribute means anything to them — "this came from the MaBiS
+rules" is the useful answer. (A *module* named for a standard is the opposite —
+see [Beyond the Schema](@/docs/beyond-the-schema.md#the-test).) The other three
+name systems because that data has no published provenance to name instead.
+
+It is a convention, not an enforcement: `Namespace::new` takes any well-formed
+prefix (`[A-Za-z0-9_-]+`, no `:`), and `is_registered()` says whether a given one
+is on the list. Claiming a new prefix means adding it to `Namespace::REGISTERED`
+and shipping it, so a collision is caught in review.
+
+### Typed keys, and the keys this crate registers
+
+A namespace stops two systems colliding on a *name*. It does not stop them
+disagreeing about what the value behind that name **is** — one writing a string
+where the other reads an object. `AttributKey<T>` closes that too: the key and its
+type travel together, as one `const` both sides import.
+
+```rust
+use rubo4e::zusatz_attribut::{AttributKey, Namespace, ZusatzAttributeExt};
+
+const LADEPUNKT: AttributKey<Ladepunkt> = AttributKey::new(Namespace::HEMS, "ladepunkt");
+
+malo.set_zusatz_attribut_key(&LADEPUNKT, &ladepunkt)?;
+let read: Ladepunkt = malo.zusatz_attribut_key(&LADEPUNKT).unwrap()?;
+assert_eq!(LADEPUNKT.name(), "hems:ladepunkt");
+```
+
+`rubo4e::zusatz_attribut::well_known` holds the keys **this crate** registers, so
+two crates carrying the same fact carry it under the same name:
+
+| Key | Type | Why BO4E has no field |
+|---|---|---|
+| `mabis:zaehlpunkt` | [`identifiers::Zaehlpunkt`](@/docs/beyond-the-schema.md#the-zahlpunkt-that-is-not-a-messlokation) | BO4E has one field for a Zählpunktbezeichnung and assumes it is always a Messlokation; BK6-20-160 §1.6.2 says the Zählpunkt (eMob) is not |
+
+The list is short on purpose. A key here is part of the public API, and the bar
+for adding one is high: the value must **qualify a BO4E field** that cannot
+express the distinction on its own. A domain aggregate of some other standard
+does not qualify however useful it is — it belongs in the crate that owns that
+standard, registering its own key in its own namespace with `AttributKey::new`.
+See [Beyond the Schema — the test](@/docs/beyond-the-schema.md#the-test).
+
+### Typed values
+
+With the `json` feature the value is a `serde_json::Value`, so anything
+`Serialize` round-trips — including a code list BO4E has not published and your
+crate has:
+
+```rust
+use rubo4e::current::TechnischeRessource;
+use rubo4e::zusatz_attribut::{Namespace, ZusatzAttributeExt};
+
+#[derive(Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+enum Steuerungsvariante { Direktansteuerung, Ems }
+
+let mut tr = TechnischeRessource::default();
+tr.set_zusatz_attribut_as_in(&Namespace::HEMS, "steuerungsvariante", &Steuerungsvariante::Ems)
+    .unwrap();
+
+let read: Steuerungsvariante = tr
+    .zusatz_attribut_as_in(&Namespace::HEMS, "steuerungsvariante")
+    .unwrap()
+    .unwrap();
+assert_eq!(read, Steuerungsvariante::Ems);
+```
+
+### What BO4E v202607 does not model
+
+Two things the § 14a EnWG case needs, checked against the schema this crate is
+generated from:
+
+| Wanted | In `v202607.1.0`? | Nearest field |
+|---|---|---|
+| Steuerungsvariante — Direktansteuerung vs. Steuerung über ein EMS | **no** | none; `SteuerkanalLeistungsbeschreibung` is `AN_AUS` / `GESTUFT`, which says what the channel *can do*, not who steers it |
+| EEBUS SKI / identifier of the Steuerungseinrichtung | **no** | none; `SteuerbareRessource.steuerbareRessourceId` is the BDEW SR-ID, a market identifier, not a device key |
+
+Both therefore belong in a namespace until BO4E models them. `rubo4e`
+deliberately does **not** define the values: shipping a `Steuerungsvariante` enum
+here would be inventing a code list the market has not published, and every
+consumer would then have to keep it in step with a document that does not exist.
+The mechanism is the crate's job; the code list is yours.
+
+Where BO4E *does* model something, use the field — a control channel's
+characteristic is `SteuerkanalLeistungsbeschreibung`, not a namespaced string.
+
+### Ordering and duplicates
+
+The list is a `Vec` and stays one. Entries keep insertion order, and `set_*`
+replaces the first entry with that name rather than appending a second. A payload
+that arrived with duplicates keeps them; the getters read the first, which is what
+a reader that ignores the problem would also see.
+
+`remove_zusatz_attribute_in(&namespace)` strips one system's entries and returns
+them — the call to make before handing a document to a partner who has no business
+seeing another system's internals.
+
 ## Why there is no SIMD backend
 
 A SIMD JSON parser does not help this crate, and measurement says so at every

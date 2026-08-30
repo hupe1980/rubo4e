@@ -149,3 +149,11 @@ impl crate::json::Bo4eExtensions for StandorteigenschaftenStrom {
         }
     }
 }
+impl crate::zusatz_attribut::HasZusatzAttribute for StandorteigenschaftenStrom {
+    fn zusatz_attribute_field(&self) -> Option<&Vec<ZusatzAttribut>> {
+        self.zusatz_attribute.as_ref()
+    }
+    fn zusatz_attribute_field_mut(&mut self) -> &mut Option<Vec<ZusatzAttribut>> {
+        &mut self.zusatz_attribute
+    }
+}

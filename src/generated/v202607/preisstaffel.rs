@@ -239,3 +239,11 @@ impl crate::json::Bo4eExtensions for Preisstaffel {
         }
     }
 }
+impl crate::zusatz_attribut::HasZusatzAttribute for Preisstaffel {
+    fn zusatz_attribute_field(&self) -> Option<&Vec<ZusatzAttribut>> {
+        self.zusatz_attribute.as_ref()
+    }
+    fn zusatz_attribute_field_mut(&mut self) -> &mut Option<Vec<ZusatzAttribut>> {
+        &mut self.zusatz_attribute
+    }
+}

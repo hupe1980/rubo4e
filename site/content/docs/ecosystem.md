@@ -113,9 +113,10 @@ Use `Sparte::from_wire(...)` on a `String` column, or check `is_known()`, when a
 value from outside the schema must be rejected.
 
 **Implemented for:** every identifier type — `AkivId`, `Bic`,
-`BilanzierungsgebietId`, `BilanzkreisId`, `CrId`, `EicCode`, `Iban`, `MaloId`,
-`MarktpartnerId`, `MeloId`, `NebeId`, `NeloId`, `ObisCode`, `PaketId`, `SgId`,
-`SrId`, `TrId`, `TranchennummerId` — and **every** generated enum.
+`BilanzierungsgebietId`, `BilanzkreisId`, `CrId`, `EicCode`, `Iban`,
+`Lokationsbuendelcode`, `LokationsbuendelObjektcode`, `MaloId`, `MarktpartnerId`,
+`MeloId`, `NebeId`, `NeloId`, `ObisCode`, `PaketId`, `SgId`, `SrId`, `TrId`,
+`TranchennummerId`, `Zaehlpunktbezeichnung` — and **every** generated enum.
 `PgHasArrayType` is on both, so `Vec<Sparte>` binds to a `TEXT[]` column just as
 `Vec<MaloId>` does. Neither needs the `json` feature: both directions go through
 `&str`.
@@ -174,7 +175,7 @@ So both are pointed at `rubo4e::identifiers::schema`, one `const` per identifier
 `utoipa` needs the `pattern` and `example` as literals because it compiles the
 regex at build time, so those two are written twice.
 
-`tests/identifier_schemas.rs` keeps that safe, checking for all eighteen:
+`tests/identifier_schemas.rs` keeps that safe, checking for all twenty-one:
 
 | Check | Why |
 |---|---|

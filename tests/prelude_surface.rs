@@ -142,6 +142,13 @@ const NON_IDENTIFIER_HELPERS: &[&str] = &[
     "MaloVergabestelle", // MaloId::vergabestelle
     "MpIdAuthority",     // MarktpartnerId::authority
     "ObisComponents",    // ObisCode::components
+    // The two below differ from the four above in one way: an `EicType` is read
+    // *out of* its identifier (position 3), whereas a Zählpunktart cannot be — a
+    // Zählpunkt (eMob) and a MeLo-ID are indistinguishable as strings. They are
+    // still classification helpers beside the identifier they classify, not
+    // identifiers, so they are no more a SQL column than an `EicType` is.
+    "Zaehlpunkt",    // Zaehlpunktbezeichnung + what it names
+    "Zaehlpunktart", // Zaehlpunkt::art
 ];
 
 #[test]

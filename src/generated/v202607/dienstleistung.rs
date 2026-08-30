@@ -148,3 +148,11 @@ impl crate::json::Bo4eExtensions for Dienstleistung {
         }
     }
 }
+impl crate::zusatz_attribut::HasZusatzAttribute for Dienstleistung {
+    fn zusatz_attribute_field(&self) -> Option<&Vec<ZusatzAttribut>> {
+        self.zusatz_attribute.as_ref()
+    }
+    fn zusatz_attribute_field_mut(&mut self) -> &mut Option<Vec<ZusatzAttribut>> {
+        &mut self.zusatz_attribute
+    }
+}

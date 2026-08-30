@@ -654,6 +654,542 @@ impl Bo4eTimeSeries for Zeitreihe {
     }
 }
 
+// ─── One shape for every interval series ─────────────────────────────────────
+
+/// One measurement interval, resolved: when it ran, what it measured, and
+/// whether the value can be used.
+///
+/// BO4E carries interval data in three places that look nothing alike —
+/// [`Lastgang`] and [`Zeitreihe`] hold a `Vec<Zeitreihenwert>` whose unit lives on
+/// the enclosing BO, [`Energiemenge`] is a single `Menge` over a `Zeitraum` — and
+/// a consumer that wants "a series of readings" ends up writing the third mapping
+/// by hand. This is that mapping, written once: [`Bo4eIntervals`] produces it from
+/// all three, and [`to_zeitreihenwert`] / [`to_energiemenge`] write it back.
+///
+/// It borrows only the OBIS code, so producing a year of quarter-hours allocates
+/// nothing.
+///
+/// ```
+/// # #[cfg(all(feature = "versioned", feature = "time", feature = "decimal"))] {
+/// use rubo4e::current::{Energiemenge, Menge, Mengeneinheit, Zeitraum};
+/// use rubo4e::timeseries::Bo4eIntervals;
+/// use rust_decimal::Decimal;
+/// use time::macros::datetime;
+///
+/// let menge = Energiemenge {
+///     menge: Some(Menge {
+///         wert: Some(Decimal::from(120)),
+///         einheit: Some(Mengeneinheit::Kwh),
+///         ..Default::default()
+///     }),
+///     zeitraum: Some(Zeitraum::from_instants(
+///         datetime!(2026-01-01 00:00 +01:00),
+///         datetime!(2026-01-01 01:00 +01:00),
+///     )),
+///     ..Default::default()
+/// };
+///
+/// let readings: Vec<_> = menge.intervals().collect();
+/// assert_eq!(readings.len(), 1);
+/// assert_eq!(readings[0].wert, Some(Decimal::from(120)));
+/// assert_eq!(readings[0].duration(), time::Duration::hours(1));
+/// # }
+/// ```
+///
+/// [`Lastgang`]: crate::current::Lastgang
+/// [`Zeitreihe`]: crate::current::Zeitreihe
+/// [`Energiemenge`]: crate::current::Energiemenge
+/// [`to_zeitreihenwert`]: IntervalReading::to_zeitreihenwert
+/// [`to_energiemenge`]: IntervalReading::to_energiemenge
+#[cfg(feature = "decimal")]
+#[cfg_attr(docsrs, doc(cfg(feature = "decimal")))]
+#[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
+pub struct IntervalReading<'a> {
+    /// Index of the entry this came from, in the source's own list. Always `0`
+    /// for an [`Energiemenge`](crate::current::Energiemenge), which holds one.
+    pub index: usize,
+    /// The measurement interval, `[start, end)` — the same half-open convention
+    /// [`PlacedValue`] uses.
+    pub range: Range<OffsetDateTime>,
+    /// The measured value. `None` where the source states an interval but no
+    /// number, which BO4E permits and a `FEHLT` slot routinely does.
+    pub wert: Option<rust_decimal::Decimal>,
+    /// The unit, taken from the enclosing BO for a `Lastgang` / `Zeitreihe` and
+    /// from the `Menge` itself for an `Energiemenge`.
+    pub einheit: Option<crate::generated::v202607::Mengeneinheit>,
+    /// How the value is to be read — measured, substituted, missing.
+    pub status: Option<crate::generated::v202607::Messwertstatus>,
+    /// The reason behind the status, where one is stated.
+    pub statuszusatz: Option<crate::generated::v202607::Messwertstatuszusatz>,
+    /// The OBIS code of the register the series belongs to, where the source
+    /// states one.
+    pub obis_kennzahl: Option<&'a crate::identifiers::ObisCode>,
+}
+
+#[cfg(feature = "decimal")]
+impl IntervalReading<'static> {
+    /// Builds a reading from the three things it cannot be read without.
+    ///
+    /// The entry point for the other direction — a household or metering system
+    /// that has its own intervals and wants BO4E out the far end. Chain
+    /// [`with_status`](Self::with_status) and friends for the rest, then
+    /// [`to_zeitreihenwert`](Self::to_zeitreihenwert) or
+    /// [`Zeitreihe::from_intervals`](crate::current::Zeitreihe::from_intervals).
+    ///
+    /// ```
+    /// # #[cfg(all(feature = "versioned", feature = "time", feature = "decimal"))] {
+    /// use rubo4e::current::{Mengeneinheit, Messwertstatus, Zeitreihe};
+    /// use rubo4e::timeseries::IntervalReading;
+    /// use rust_decimal::Decimal;
+    /// use time::macros::datetime;
+    ///
+    /// let start = datetime!(2026-03-01 00:00 +01:00);
+    /// let readings = (0..4).map(|i| {
+    ///     let from = start + time::Duration::minutes(15 * i);
+    ///     IntervalReading::new(
+    ///         from..from + time::Duration::minutes(15),
+    ///         Some(Decimal::from(100 + i)),
+    ///         Some(Mengeneinheit::Kwh),
+    ///     )
+    ///     .with_status(Messwertstatus::Abgelesen)
+    /// });
+    ///
+    /// let zeitreihe = Zeitreihe::from_intervals(readings);
+    /// assert_eq!(zeitreihe.einheit, Some(Mengeneinheit::Kwh));
+    /// assert_eq!(zeitreihe.werte.as_ref().map(Vec::len), Some(4));
+    /// # }
+    /// ```
+    #[must_use]
+    pub const fn new(
+        range: Range<OffsetDateTime>,
+        wert: Option<rust_decimal::Decimal>,
+        einheit: Option<crate::generated::v202607::Mengeneinheit>,
+    ) -> Self {
+        Self {
+            index: 0,
+            range,
+            wert,
+            einheit,
+            status: None,
+            statuszusatz: None,
+            obis_kennzahl: None,
+        }
+    }
+}
+
+#[cfg(feature = "decimal")]
+impl<'a> IntervalReading<'a> {
+    /// Sets the status.
+    #[must_use]
+    pub fn with_status(mut self, status: crate::generated::v202607::Messwertstatus) -> Self {
+        self.status = Some(status);
+        self
+    }
+
+    /// Sets the status qualifier.
+    #[must_use]
+    pub fn with_statuszusatz(
+        mut self,
+        statuszusatz: crate::generated::v202607::Messwertstatuszusatz,
+    ) -> Self {
+        self.statuszusatz = Some(statuszusatz);
+        self
+    }
+
+    /// Attaches the OBIS code of the register this reading belongs to.
+    #[must_use]
+    pub fn with_obis(mut self, obis: &'a crate::identifiers::ObisCode) -> Self {
+        self.obis_kennzahl = Some(obis);
+        self
+    }
+
+    /// Sets the index this reading reports.
+    #[must_use]
+    pub const fn with_index(mut self, index: usize) -> Self {
+        self.index = index;
+        self
+    }
+
+    /// How long the interval ran.
+    #[must_use]
+    pub fn duration(&self) -> Duration {
+        self.range.end - self.range.start
+    }
+
+    /// Whether the value may be used in arithmetic.
+    ///
+    /// A reading with no `status` is taken at its word, the way
+    /// [`Bo4eTimeSeries::sum`] takes it. A reading with no `wert` is not usable
+    /// whatever its status says — there is nothing to use.
+    #[must_use]
+    pub fn is_usable(&self) -> bool {
+        self.wert.is_some() && self.status.is_none_or(|s| s.is_usable())
+    }
+
+    /// The energy this interval represents, and the unit it is in.
+    ///
+    /// The one call the two BO4E spellings of "how much energy" collapse into:
+    ///
+    /// | The reading's unit is | Result |
+    /// |---|---|
+    /// | an energy (`KWH`, `MWH`, `KVARH`) | the value unchanged |
+    /// | a power (`KW`, `MW`, `KVAR`) | value × interval length in hours, in the matching energy unit |
+    /// | anything else, or absent | `None` |
+    ///
+    /// `None` too when the reading is not [usable](Self::is_usable) or when the
+    /// arithmetic overflows. A `FEHLT` slot carrying `0` is an absence, not a
+    /// zero, and this refuses to launder it into one.
+    ///
+    /// ```
+    /// # #[cfg(all(feature = "versioned", feature = "time", feature = "decimal"))] {
+    /// use rubo4e::current::Mengeneinheit;
+    /// use rubo4e::timeseries::IntervalReading;
+    /// use rust_decimal::Decimal;
+    /// use time::macros::datetime;
+    ///
+    /// let start = datetime!(2026-01-01 00:00 +01:00);
+    /// let quarter = start..start + time::Duration::minutes(15);
+    ///
+    /// // 400 kW held for a quarter of an hour is 100 kWh.
+    /// let power = IntervalReading::new(quarter.clone(), Some(Decimal::from(400)), Some(Mengeneinheit::Kw));
+    /// assert_eq!(power.energy(), Some((Decimal::from(100), Mengeneinheit::Kwh)));
+    ///
+    /// // An energy reading is already the answer.
+    /// let energy = IntervalReading::new(quarter, Some(Decimal::from(100)), Some(Mengeneinheit::Kwh));
+    /// assert_eq!(energy.energy(), Some((Decimal::from(100), Mengeneinheit::Kwh)));
+    /// # }
+    /// ```
+    #[must_use]
+    pub fn energy(
+        &self,
+    ) -> Option<(
+        rust_decimal::Decimal,
+        crate::generated::v202607::Mengeneinheit,
+    )> {
+        if !self.is_usable() {
+            return None;
+        }
+        let einheit = self.einheit?;
+        let wert = self.wert?;
+        if einheit.power_unit().is_some() {
+            // Already an energy — `power_unit` is the inverse map, so a unit that
+            // has one *is* the energy side of the pair.
+            return Some((wert, einheit));
+        }
+        let energy_unit = einheit.energy_unit()?;
+        let hours = crate::units::duration_to_hours(self.duration())?;
+        Some((wert.checked_mul(hours)?, energy_unit))
+    }
+
+    /// The same reading expressed in `target`.
+    ///
+    /// `None` when the reading states no unit or no value, when `target` is a
+    /// different [`Dimension`](crate::units::Dimension), or when the arithmetic
+    /// overflows. This converts *within* a dimension — `MWH` → `KWH`; crossing
+    /// from power to energy is [`energy`](Self::energy)'s job, because that needs
+    /// the interval length as well as the value.
+    #[must_use]
+    pub fn converted_to(&self, target: crate::generated::v202607::Mengeneinheit) -> Option<Self> {
+        let source = self.einheit?;
+        if source.dimension()? != target.dimension()? {
+            return None;
+        }
+        let wert = self
+            .wert?
+            .checked_mul(source.factor_to_base()?)?
+            .checked_div(target.factor_to_base()?)?;
+        Some(Self {
+            wert: Some(wert),
+            einheit: Some(target),
+            range: self.range.clone(),
+            ..*self
+        })
+    }
+
+    /// Writes the reading back as a [`Zeitreihenwert`].
+    ///
+    /// The unit does not travel: `Zeitreihenwert` has no unit field, because a
+    /// `Lastgang` and a `Zeitreihe` state it once for the whole series. Use
+    /// [`Zeitreihe::from_intervals`](crate::current::Zeitreihe::from_intervals) or
+    /// [`Lastgang::from_intervals`](crate::current::Lastgang::from_intervals),
+    /// which carry it up to where it belongs.
+    #[must_use]
+    pub fn to_zeitreihenwert(&self) -> Zeitreihenwert {
+        Zeitreihenwert {
+            wert: self.wert,
+            zeitraum: Some(crate::generated::v202607::Zeitraum::from_instants(
+                self.range.start,
+                self.range.end,
+            )),
+            status: self.status,
+            statuszusatz: self.statuszusatz,
+            ..Default::default()
+        }
+    }
+
+    /// Writes the reading back as an [`Energiemenge`](crate::current::Energiemenge).
+    ///
+    /// Everything survives here — the unit rides along on the `Menge`, and the
+    /// OBIS code on the BO — which is what makes `Energiemenge` the lossless
+    /// single-interval form. The status does not: `Energiemenge` has no field for
+    /// it.
+    #[must_use]
+    pub fn to_energiemenge(&self) -> crate::generated::v202607::Energiemenge {
+        crate::generated::v202607::Energiemenge {
+            menge: Some(crate::generated::v202607::Menge {
+                wert: self.wert,
+                einheit: self.einheit,
+                ..Default::default()
+            }),
+            zeitraum: Some(crate::generated::v202607::Zeitraum::from_instants(
+                self.range.start,
+                self.range.end,
+            )),
+            obis_kennzahl: self.obis_kennzahl.cloned(),
+            ..Default::default()
+        }
+    }
+}
+
+/// Reads any BO4E interval series as a stream of [`IntervalReading`]s.
+///
+/// Implemented for [`Lastgang`], [`Zeitreihe`] and [`Energiemenge`] — the three
+/// BO4E shapes that put a value on a stretch of time. Not for [`Zaehlwerk`],
+/// whose `messwerte` are cumulative register *states* at an instant rather than
+/// quantities over an interval; [`Zaehlwerk::readings`] is that shape's reader,
+/// and turning two of them into a consumption is
+/// [`consumption_between`](Zaehlwerk::consumption_between)'s job.
+///
+/// Entries that state no resolvable interval are skipped, exactly as in
+/// [`Bo4eTimeSeries::placed`]; run [`audit`](Bo4eTimeSeries::audit) when a
+/// silently dropped row would matter.
+///
+/// [`Lastgang`]: crate::current::Lastgang
+/// [`Zeitreihe`]: crate::current::Zeitreihe
+/// [`Energiemenge`]: crate::current::Energiemenge
+/// [`Zaehlwerk`]: crate::current::Zaehlwerk
+#[cfg(feature = "decimal")]
+#[cfg_attr(docsrs, doc(cfg(feature = "decimal")))]
+pub trait Bo4eIntervals {
+    /// Every interval the source resolves, in the order it lists them.
+    fn intervals(&self) -> impl Iterator<Item = IntervalReading<'_>>;
+
+    /// Every interval whose value may be used — see
+    /// [`IntervalReading::is_usable`].
+    fn usable_intervals(&self) -> impl Iterator<Item = IntervalReading<'_>> {
+        self.intervals().filter(IntervalReading::is_usable)
+    }
+
+    /// The total energy across every usable interval, and its unit.
+    ///
+    /// Sums [`IntervalReading::energy`], so a `Lastgang` in kW and a `Zeitreihe`
+    /// in kWh both answer in kWh — the number an invoice bills, from either
+    /// spelling.
+    ///
+    /// `None` when the series states no unit, when its unit is neither an energy
+    /// nor a power, when two readings answer in different units, or when the
+    /// arithmetic overflows. Unusable readings are skipped rather than counted as
+    /// zero; [`audit`](Bo4eTimeSeries::audit) is where the gap they leave is
+    /// reported.
+    ///
+    /// Also `None` — not `Some((0, unit))` — for a series with **no** usable
+    /// reading at all, empty or entirely `FEHLT`. The unit comes from the readings
+    /// that were totalled, and with none there is nothing to name the zero in.
+    fn total_energy(
+        &self,
+    ) -> Option<(
+        rust_decimal::Decimal,
+        crate::generated::v202607::Mengeneinheit,
+    )> {
+        let mut total = rust_decimal::Decimal::ZERO;
+        let mut unit = None;
+        for reading in self.usable_intervals() {
+            let (value, u) = reading.energy()?;
+            match unit {
+                None => unit = Some(u),
+                Some(seen) if seen != u => return None,
+                Some(_) => {}
+            }
+            total = total.checked_add(value)?;
+        }
+        Some((total, unit?))
+    }
+}
+
+#[cfg(feature = "decimal")]
+impl Bo4eIntervals for Lastgang {
+    fn intervals(&self) -> impl Iterator<Item = IntervalReading<'_>> {
+        let einheit = self.messgroesse;
+        let obis = self.obis_kennzahl.as_ref();
+        self.placed()
+            .map(move |p| reading_from_placed(&p, einheit, obis))
+    }
+}
+
+#[cfg(feature = "decimal")]
+impl Bo4eIntervals for Zeitreihe {
+    fn intervals(&self) -> impl Iterator<Item = IntervalReading<'_>> {
+        let einheit = self.einheit;
+        // `Zeitreihe` states no OBIS code — `messgroesse` there is a
+        // `Messgroesse`, a physical quantity, not a register.
+        self.placed()
+            .map(move |p| reading_from_placed(&p, einheit, None))
+    }
+}
+
+#[cfg(feature = "decimal")]
+impl Bo4eIntervals for crate::generated::v202607::Energiemenge {
+    /// At most one interval: an `Energiemenge` is a single `Menge` over a single
+    /// `Zeitraum`.
+    ///
+    /// Empty when either is absent, or when the `zeitraum` does not resolve to
+    /// two instants — a period given as bare dates has no time of day, and a
+    /// reading needs one.
+    fn intervals(&self) -> impl Iterator<Item = IntervalReading<'_>> {
+        let range = self
+            .zeitraum
+            .as_ref()
+            .and_then(crate::generated::v202607::Zeitraum::as_instant_range)
+            .and_then(Result::ok)
+            .filter(|r| r.end >= r.start);
+        let menge = self.menge.as_ref();
+        range
+            .zip(menge)
+            .map(|(range, menge)| IntervalReading {
+                index: 0,
+                range,
+                wert: menge.wert,
+                einheit: menge.einheit,
+                status: None,
+                statuszusatz: None,
+                obis_kennzahl: self.obis_kennzahl.as_ref(),
+            })
+            .into_iter()
+    }
+}
+
+// ─── …and back again ─────────────────────────────────────────────────────────
+
+/// What a stream of readings contributes to the BO that will carry it.
+///
+/// A `Lastgang` and a `Zeitreihe` state the unit once, for the whole series, so
+/// building either means folding the per-reading unit up to the BO — and both
+/// spell the field differently (`messgroesse`, `einheit`) while meaning the same
+/// thing. This is that fold, once.
+#[cfg(feature = "decimal")]
+struct CollectedSeries {
+    werte: Vec<Zeitreihenwert>,
+    einheit: Option<crate::generated::v202607::Mengeneinheit>,
+    obis_kennzahl: Option<crate::identifiers::ObisCode>,
+}
+
+/// Folds readings into the entries plus the two facts the enclosing BO states.
+///
+/// The unit is the first one any reading states; a reading in a different unit is
+/// converted into it where the two share a [`Dimension`](crate::units::Dimension),
+/// and carried through unconverted where they do not — dropping the row silently
+/// would be worse than a series [`audit`](Bo4eTimeSeries::audit) can flag.
+#[cfg(feature = "decimal")]
+fn collect_series<'a>(readings: impl IntoIterator<Item = IntervalReading<'a>>) -> CollectedSeries {
+    let mut einheit = None;
+    let mut obis = None;
+    let mut werte = Vec::new();
+    for reading in readings {
+        if obis.is_none() {
+            obis = reading.obis_kennzahl.cloned();
+        }
+        if einheit.is_none() {
+            einheit = reading.einheit;
+        }
+        werte.push(match (einheit, reading.einheit) {
+            (Some(target), Some(source)) if source != target => reading
+                .converted_to(target)
+                .unwrap_or(reading)
+                .to_zeitreihenwert(),
+            _ => reading.to_zeitreihenwert(),
+        });
+    }
+    CollectedSeries {
+        werte,
+        einheit,
+        obis_kennzahl: obis,
+    }
+}
+
+#[cfg(feature = "decimal")]
+impl Zeitreihe {
+    /// Builds a `Zeitreihe` from a stream of readings.
+    ///
+    /// The unit is taken from the first reading that states one and written to
+    /// `einheit`, where BO4E puts it — *"Alle Werte in der Tabelle haben die
+    /// Einheit, die hier angegeben ist"*. A reading in a **different** unit is
+    /// converted into it where the two share a
+    /// [`Dimension`](crate::units::Dimension), and carried through unconverted
+    /// where they do not, because dropping the row silently would be worse than
+    /// a series [`audit`](Bo4eTimeSeries::audit) can flag.
+    ///
+    /// Every other field is left at its default: a `Zeitreihe` says what it is
+    /// through `bezeichnung`, `medium` and `messart`, and this cannot know them.
+    #[must_use]
+    pub fn from_intervals<'a>(
+        readings: impl IntoIterator<Item = IntervalReading<'a>>,
+    ) -> Zeitreihe {
+        let series = collect_series(readings);
+        Zeitreihe {
+            einheit: series.einheit,
+            werte: Some(series.werte),
+            ..Default::default()
+        }
+    }
+}
+
+#[cfg(feature = "decimal")]
+impl Lastgang {
+    /// Builds a `Lastgang` from a stream of readings, over a stated interval
+    /// length.
+    ///
+    /// `zeit_intervall_laenge` is the one field the `Lastgang` schema marks
+    /// `required`, and nothing here can infer it: a series of four quarter-hours
+    /// and a series with three of them missing look identical. Pass it, and
+    /// [`audit`](Bo4eTimeSeries::audit) will then measure the readings against it.
+    ///
+    /// The unit goes to `messgroesse`, following the same rule as
+    /// [`Zeitreihe::from_intervals`], and the first OBIS code any reading carries
+    /// goes to `obisKennzahl`.
+    #[must_use]
+    pub fn from_intervals<'a>(
+        zeit_intervall_laenge: crate::generated::v202607::Menge,
+        readings: impl IntoIterator<Item = IntervalReading<'a>>,
+    ) -> Lastgang {
+        let series = collect_series(readings);
+        Lastgang {
+            messgroesse: series.einheit,
+            obis_kennzahl: series.obis_kennzahl,
+            werte: Some(series.werte),
+            ..Lastgang::new(zeit_intervall_laenge)
+        }
+    }
+}
+
+/// Shared body of the `Lastgang` and `Zeitreihe` impls.
+#[cfg(feature = "decimal")]
+fn reading_from_placed<'a>(
+    placed: &PlacedValue<'a>,
+    einheit: Option<crate::generated::v202607::Mengeneinheit>,
+    obis: Option<&'a crate::identifiers::ObisCode>,
+) -> IntervalReading<'a> {
+    IntervalReading {
+        index: placed.index,
+        range: placed.range.clone(),
+        wert: placed.value.wert,
+        einheit,
+        status: placed.value.status,
+        statuszusatz: placed.value.statuszusatz,
+        obis_kennzahl: obis,
+    }
+}
+
 // ─── Register readings: the other time-series shape ──────────────────────────
 
 /// One usable reading off a [`Zaehlwerk`], resolved to an instant and a value.

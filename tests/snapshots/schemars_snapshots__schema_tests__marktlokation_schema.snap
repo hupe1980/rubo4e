@@ -3346,9 +3346,13 @@ expression: "schema_json::<Marktlokation>()"
         },
         "vorgelagerteMesslokationId": {
           "description": "Vorgelagerte Messlokation ID",
-          "type": [
-            "string",
-            "null"
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MeloId"
+            },
+            {
+              "type": "null"
+            }
           ]
         },
         "waermenutzung": {
@@ -3364,16 +3368,24 @@ expression: "schema_json::<Marktlokation>()"
         },
         "zugeordneteMarktlokationId": {
           "description": "Referenz auf die der technischen Ressource zugeordneten Marktlokation",
-          "type": [
-            "string",
-            "null"
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MaloId"
+            },
+            {
+              "type": "null"
+            }
           ]
         },
         "zugeordneteSteuerbareRessourceId": {
           "description": "Referenz auf die der technischen Ressource zugeordneten Steuerbaren Ressource",
-          "type": [
-            "string",
-            "null"
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SrId"
+            },
+            {
+              "type": "null"
+            }
           ]
         },
         "zusatzAttribute": {
